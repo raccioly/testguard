@@ -1,0 +1,121 @@
+name: TestGuard CI
+
+on:
+  workflow_dispatch: # manual recovery for pushes that don't auto-trigger (e.g. release PRs opened by GITHUB_TOKEN)
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # 20 is the floor (node:util.parseArgs). 24 ships npm 11 — keep it so
+        # `npm ci` exercises the npm that treats some config as fatal where
+        # npm 10 is silent. Do not drop 24.
+        node-version: [20, 22, 24]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # probe builds a git worktree from HEAD; the self-probe below needs history
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install (devDependencies only; zero runtime deps)
+        run: npm ci
+
+      # ── Syntax-check EVERY source, not just what the entry point eagerly
+      #    imports; a lazily loaded module's parse error would otherwise slip. ──
+      - name: Syntax-check all sources
+        run: find cli src spec -name '*.mjs' -print0 | xargs -0 -n1 node --check
+
+      - name: Python wrapper imports (PyPI surface)
+        run: python3 -c "import testguard_cli.wrapper; print('testguard_cli.wrapper OK')"
+
+      # ── Test suite with a RUNTIME BUDGET. A test that walks the wrong tree
+      #    or probes far more than it should still passes — it just takes
+      #    forever. Only a duration gate catches that class. Normal: ~15s
+      #    locally, ~30–60s here. Budget is loose on purpose. ──
+      - name: Run tests (with runtime budget)
+        shell: bash
+        env:
+          TEST_BUDGET_MS: 240000
+        run: |
+          START=$(date +%s%3N)
+          npm test
+          DURATION=$(( $(date +%s%3N) - START ))
+          echo "Test suite duration: ${DURATION}ms (budget: ${TEST_BUDGET_MS}ms)"
+          if [ "$DURATION" -gt "$TEST_BUDGET_MS" ]; then
+            echo "::error::Test suite took ${DURATION}ms, over the ${TEST_BUDGET_MS}ms budget — something is probing far more than it should."
+            exit 1
+          fi
+
+      # ── Dogfood: the real binary against the known-answer fixture, as a
+      #    user would run it (the suite drives main() in-process). ──
+      - name: CLI version
+        run: node cli/testguard.mjs --version
+
+      - name: claims — fixture lists cleanly, no drift
+        run: node cli/testguard.mjs claims fixtures/known-answer
+
+      - name: probe → baseline → probe → brief on the fixture (through the bin)
+        shell: bash
+        run: |
+          set -o pipefail
+          S=$(mktemp -d)
+          cp -R fixtures/known-answer/. "$S/"
+          rm -rf "$S/node_modules" "$S/.flake-counter" "$S/.testguard"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$S/node_modules"
+          git -C "$S" init -q
+          git -C "$S" -c user.email=ci@example.invalid -c user.name=ci add -A
+          git -C "$S" -c user.email=ci@example.invalid -c user.name=ci commit -qm fixture
+          B="$GITHUB_WORKSPACE/cli/testguard.mjs"
+          status=0; node "$B" probe "$S" --budget 60000 --quiet || status=$?
+          [ "$status" -eq 1 ] || { echo "::error::expected exit 1 (unproven claims), got $status"; exit 1; }
+          node "$B" baseline "$S"
+          status=0; node "$B" probe "$S" --budget 60000 --quiet || status=$?
+          [ "$status" -eq 0 ] || { echo "::error::expected exit 0 after baseline, got $status"; exit 1; }
+          node "$B" brief "$S" --text | head -12
+          # every verdict must appear exactly once per expected.json
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const ev = JSON.parse(readFileSync('$S/.testguard/evidence.json','utf8'));
+            const exp = JSON.parse(readFileSync('fixtures/known-answer/expected.json','utf8')).expected;
+            const bad = ev.records.filter(r => exp[r.claim.id+'/'+r.subject.id].verdict !== r.verdict);
+            if (bad.length) { console.error('MISMATCH', bad.map(r => r.claim.id+'/'+r.subject.id+':'+r.verdict)); process.exit(1); }
+            console.log('fixture verdicts match expected.json:', ev.records.length);
+          "
+
+      # ── Self-verification: TestGuard is governed by the standard it defines.
+      #    testguard.claims.json states invariants of the tool itself; every
+      #    fault must be killed by the tool's own tests. Exit 0 = all defended. ──
+      - name: probe TestGuard's own claims
+        run: node cli/testguard.mjs probe . --budget 180000 --out "$RUNNER_TEMP/self-evidence.json"
+
+      - name: Upload self-probe evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: testguard-self-evidence-node-${{ matrix.node-version }}
+          path: ${{ runner.temp }}/self-evidence.json
+          if-no-files-found: warn
+
+  # ── npm publish dry-run on tags ──
+  publish-check:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - run: npm publish --dry-run

@@ -1,0 +1,34 @@
+# TestGuard hooks for the pre-commit framework (https://pre-commit.com).
+#
+# `language: node` installs this repo with npm into an isolated nodeenv;
+# package.json's `"bin": { "testguard": ... }` makes `testguard` resolvable.
+#
+# Consumers add to .pre-commit-config.yaml:
+#
+#     repos:
+#       - repo: https://github.com/raccioly/testguard
+#         rev: v0.1.0
+#         hooks:
+#           - id: testguard-claims        # fast: validates the claims file + drift
+#           - id: testguard-probe         # slow: pre-push stage, runs the faults
+#
+#     # install the push-stage hook once per clone:
+#     #   pre-commit install --hook-type pre-push
+
+- id: testguard-claims
+  name: TestGuard claims (validate + drift)
+  description: Validates testguard.claims.json against the spec and reports @claim drift. Fast.
+  entry: testguard claims
+  language: node
+  pass_filenames: false
+  always_run: true
+
+- id: testguard-probe
+  name: TestGuard probe (pre-push)
+  description: Injects every claim's faults and fails on any the tests miss. Gated by the committed baseline.
+  entry: testguard probe --quiet
+  language: node
+  pass_filenames: false
+  always_run: true
+  stages: [pre-push]
+  minimum_pre_commit_version: '3.2.0'

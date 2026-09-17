@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      all-npm:
+        patterns: ["*"]
+    # devDependencies only (ajv for the conformance suite, vitest as the test
+    # runner). The published package has zero runtime dependencies.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      all-pip:
+        patterns: ["*"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      all-actions:
+        patterns: ["*"]

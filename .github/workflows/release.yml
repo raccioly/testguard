@@ -1,0 +1,161 @@
+name: Auto Release — Tag, GitHub Release, npm, PyPI
+
+# TAG-DRIVEN and idempotent: a version needs releasing iff no tag v<version>
+# exists. Re-runs never double-publish. No long-lived secrets anywhere —
+# npm and PyPI both authenticate with OIDC Trusted Publishing.
+#
+# ONE-TIME SETUP (maintainer, cannot be automated):
+#   npm:  the first `npm publish` of testguard-cli is manual (Trusted Publishing
+#         is configured on an existing package). Then on npmjs.com →
+#         testguard-cli → Settings → Trusted Publisher: raccioly/testguard,
+#         workflow release.yml. Every later release is OIDC.
+#   PyPI: pypi.org → Your account → Publishing → add a PENDING publisher for
+#         project testguard-cli: owner raccioly, repo testguard, workflow
+#         release.yml, environment pypi. The first release creates the project.
+
+on:
+  workflow_dispatch: # manual recovery
+  schedule:
+    - cron: '17 * * * *' # hourly sweep: publishes any merged version bump the push event missed
+  push:
+    branches: [main]
+
+permissions:
+  contents: write # tags + releases
+
+concurrency:
+  group: testguard-release
+  cancel-in-progress: false
+
+jobs:
+  detect-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      changed: ${{ steps.check.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+      - name: Does this version need releasing?
+        id: check
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          TAG="v${CURRENT}"
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "refs/tags/$TAG$"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "⏭️ $TAG already released — nothing to do"
+          else
+            echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "✅ $TAG is not yet released — releasing"
+          fi
+
+  test:
+    needs: detect-version
+    if: needs.detect-version.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm test
+      - name: Self-probe must be fully defended before anything ships
+        run: node cli/testguard.mjs probe . --budget 180000 --out "$RUNNER_TEMP/self-evidence.json" --quiet
+      - name: Version surfaces are in sync
+        run: node .github/scripts/sync-release-version.mjs --check
+
+  create-release:
+    needs: [detect-version, test]
+    if: needs.detect-version.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: v${{ needs.detect-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Create and push tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ needs.detect-version.outputs.version }}"
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG$"; then
+            echo "✅ Tag $TAG already exists on remote"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          fi
+      - name: Release notes from CHANGELOG
+        run: |
+          VERSION="${{ needs.detect-version.outputs.version }}"
+          NOTES=$(awk "/^## \\[${VERSION}\\]/{found=1; next} /^## \\[/{if(found) exit} found{print}" CHANGELOG.md)
+          [ -n "$NOTES" ] || NOTES="Release v${VERSION} — see CHANGELOG.md."
+          printf '%s\n' "$NOTES" > /tmp/release-notes.md
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ needs.detect-version.outputs.version }}"
+          gh release view "$TAG" >/dev/null 2>&1 && { echo "✅ Release $TAG exists"; exit 0; }
+          gh release create "$TAG" --title "TestGuard $TAG" --notes-file /tmp/release-notes.md --latest
+
+  publish-npm:
+    needs: [detect-version, test, create-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # mints the OIDC token for npm Trusted Publishing
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # NO registry-url on purpose: with it, setup-node writes an _authToken
+      # line that expands to an EMPTY token when NODE_AUTH_TOKEN is unset, and
+      # npm then sends that instead of attempting OIDC.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - run: npm install -g npm@11
+      - name: Assert Trusted Publishing preconditions
+        run: |
+          NPM_V=$(npm --version)
+          echo "node=$(node -p 'process.versions.node') npm=$NPM_V"
+          node -e '
+            const [maj, min] = process.versions.node.split(".").map(Number);
+            if (!(maj > 22 || (maj === 22 && min >= 14))) { console.error("::error::Node below the 22.14.0 floor npm Trusted Publishing requires."); process.exit(1); }
+          '
+          node -e '
+            const v = process.argv[1].split(".").map(Number);
+            if (!(v[0] > 11 || (v[0] === 11 && (v[1] > 5 || (v[1] === 5 && v[2] >= 1))))) { console.error("::error::npm below the 11.5.1 floor npm Trusted Publishing requires."); process.exit(1); }
+          ' "$NPM_V"
+          [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] || { echo "::error::no OIDC token endpoint — job lacks id-token: write"; exit 1; }
+      - name: Publish (provenance is automatic under Trusted Publishing)
+        run: npm publish --loglevel verbose
+
+  publish-pypi:
+    needs: [detect-version, test, create-release]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Sync version into pyproject.toml
+        run: |
+          VERSION="${{ needs.detect-version.outputs.version }}"
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
+          grep '^version' pyproject.toml
+      - run: pip install build
+      - run: python -m build
+      - name: Assert OIDC token is available
+        run: '[ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] || { echo "::error::no OIDC token endpoint"; exit 1; }'
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2

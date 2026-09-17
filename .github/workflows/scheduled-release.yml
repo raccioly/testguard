@@ -1,0 +1,128 @@
+name: Scheduled Release
+
+# Weekly: if anything releasable merged since the last tag, bump the patch
+# version, write the CHANGELOG entry, sync every version surface, verify the
+# tree is green, and open a release PR with auto-merge armed. Once merged, the
+# hourly sweep in release.yml tags and publishes.
+#
+# GITHUB_TOKEN-created PRs do not trigger `pull_request` workflows, so CI on
+# the release PR must be started by the maintainer:
+#     gh workflow run ci.yml --ref release/vX.Y.Z
+# After it goes green, auto-merge completes.
+
+on:
+  schedule:
+    - cron: '0 9 * * 1' # Mondays 09:00 UTC
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump'
+        type: choice
+        options: [patch, minor]
+        default: patch
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: scheduled-release
+  cancel-in-progress: false
+
+jobs:
+  cut-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Check for unreleased changes
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          if ! git ls-remote --tags origin "refs/tags/v$CURRENT" | grep -q "refs/tags/v$CURRENT$"; then
+            echo "v$CURRENT is not published — dispatching the idempotent release."
+            gh workflow run release.yml --ref main
+            echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ -z "$LAST_TAG" ]; then echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          COMMITS=$(git log "${LAST_TAG}..HEAD" --oneline | grep -viE '^[0-9a-f]+ (release|chore\(release\)):' || true)
+          COUNT=$(echo "$COMMITS" | grep -c . || true)
+          echo "Last tag: $LAST_TAG — releasable commits since: $COUNT"
+          echo "$COMMITS"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "last_tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
+            echo "$COMMITS" > /tmp/commits.txt
+          fi
+
+      - name: Bump version and write changelog
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          BUMP="${{ inputs.bump || 'patch' }}"
+          OLD="${{ steps.check.outputs.current }}"
+          NEW=$(node -e "const [a,b,c]='$OLD'.split('.').map(Number); console.log('$BUMP'==='minor' ? \`\${a}.\${b+1}.0\` : \`\${a}.\${b}.\${c+1}\`)")
+          echo "Bumping $OLD → $NEW"
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='$NEW';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+          npm install --package-lock-only --ignore-scripts
+          {
+            echo "## [$NEW] - $(date -u +%Y-%m-%d)"; echo
+            echo "Automated weekly release — everything merged since \`${{ steps.check.outputs.last_tag }}\`."; echo
+            echo "### Changed"; echo
+            sed -E 's/^[0-9a-f]+ /- /' /tmp/commits.txt; echo
+          } > /tmp/entry.md
+          awk '/^## \[Unreleased\]/ { print; print ""; while ((getline line < "/tmp/entry.md") > 0) print line; next } { print }' CHANGELOG.md > /tmp/CHANGELOG.new && mv /tmp/CHANGELOG.new CHANGELOG.md
+          node .github/scripts/sync-release-version.mjs
+          echo "NEW_VERSION=$NEW" >> "$GITHUB_ENV"
+
+      - name: Verify the tree is still green
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          npm ci
+          npm test
+          node cli/testguard.mjs probe . --budget 180000 --quiet --out "$RUNNER_TEMP/self.json"
+
+      - name: Open release PR with auto-merge armed
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="release/v${NEW_VERSION}"
+          # Only release surfaces may change in a release PR.
+          CHANGED=$(git diff --name-only HEAD --)
+          for f in $CHANGED; do
+            case "$f" in package.json|package-lock.json|pyproject.toml|CHANGELOG.md|action.yml|packaging/homebrew/testguard.rb) ;;
+              *) echo "::error::unexpected file in release diff: $f"; exit 1;;
+            esac
+          done
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "::error::branch $BRANCH already exists; refusing to overwrite"; exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "release: v${NEW_VERSION} — automated weekly batch"
+          git push origin "$BRANCH"
+          PR=$(gh pr create --base main --head "$BRANCH" \
+            --title "release: v${NEW_VERSION} — automated weekly batch" \
+            --body "Automated weekly release. Version bump + CHANGELOG entry + synced version surfaces. Merging tags and publishes to npm and PyPI via release.yml.
+
+CI does not start automatically on PRs opened by GITHUB_TOKEN — run:
+
+    gh workflow run ci.yml --ref ${BRANCH}
+
+Auto-merge is armed; it completes once required checks pass.")
+          gh pr merge --auto --squash "$PR"
+          echo "Release PR: $PR"

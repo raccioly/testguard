@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "testguard-cli"
+version = "0.1.0"
+description = "Proves a test suite actually defends the claims a project makes: injects the faults those claims forbid and reports every one the tests miss. Python wrapper for the Node.js CLI (requires Node.js 20+)."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+authors = [
+    { name = "Ricardo Accioly", email = "raccioly@gmail.com" }
+]
+keywords = [
+    "testing", "fault-injection", "mutation-testing", "test-quality",
+    "claims", "verification", "vitest", "ai-agents", "quality-assurance"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: JavaScript",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.urls]
+Homepage = "https://github.com/raccioly/testguard"
+Documentation = "https://github.com/raccioly/testguard#readme"
+Repository = "https://github.com/raccioly/testguard"
+Issues = "https://github.com/raccioly/testguard/issues"
+
+[project.scripts]
+testguard = "testguard_cli.wrapper:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["testguard_cli"]

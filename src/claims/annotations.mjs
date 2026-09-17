@@ -1,17 +1,42 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, extname } from 'node:path';
-import { walk } from '../util/glob.mjs';
 
 const SCAN_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.jsx', '.tsx', '.py', '.go', '.rs', '.java', '.kt', '.md']);
-const RE = /@claim\s+([A-Za-z0-9][A-Za-z0-9._-]*)/g;
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'coverage']);
+const TEST_FILE = /\.(test|spec)\.[cm]?[jt]sx?$|(^|\/)(tests?|__tests__)\//;
+// An annotation id must contain a hyphen (REDACT-001, TG-KILL-NEEDS-N). Prose
+// such as "@claim annotations" is not an annotation.
+const RE = /@claim\s+([A-Za-z0-9]+(?:[._]?[A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9])\b/g;
 
-/** Every `@claim <ID>` token in source, with where it was found. */
+/**
+ * Source files worth scanning: skips hidden directories (tooling), dependency
+ * and build output, test files (a claim asserted by a test is the authorship
+ * trap this tool exists for), and nested projects that carry their own
+ * claims file.
+ */
+function sourceFiles(root) {
+  const out = [];
+  const visit = (dir, rel) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const relPath = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        if (e.name.startsWith('.') || SKIP_DIRS.has(e.name)) continue;
+        if (existsSync(join(dir, e.name, 'testguard.claims.json'))) continue;
+        visit(join(dir, e.name), relPath);
+      } else if (e.isFile() && SCAN_EXT.has(extname(e.name)) && !TEST_FILE.test(relPath)) {
+        out.push(relPath);
+      }
+    }
+  };
+  visit(root, '');
+  return out.sort();
+}
+
+/** Every `@claim <ID>` annotation in source, with where it was found. */
 export function scanAnnotations(projectDir) {
   const found = [];
-  for (const rel of walk(projectDir)) {
-    if (!SCAN_EXT.has(extname(rel))) continue;
-    const lines = readFileSync(join(projectDir, rel), 'utf8').split('\n');
-    lines.forEach((text, i) => {
+  for (const rel of sourceFiles(projectDir)) {
+    readFileSync(join(projectDir, rel), 'utf8').split('\n').forEach((text, i) => {
       for (const m of text.matchAll(RE)) found.push({ id: m[1], file: rel, line: i + 1 });
     });
   }

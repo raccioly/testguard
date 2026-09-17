@@ -1,5 +1,12 @@
 # TestGuard
 
+[![CI](https://github.com/raccioly/testguard/actions/workflows/ci.yml/badge.svg)](https://github.com/raccioly/testguard/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/testguard-cli.svg)](https://www.npmjs.com/package/testguard-cli)
+[![PyPI](https://img.shields.io/pypi/v/testguard-cli.svg)](https://pypi.org/project/testguard-cli/)
+[![node](https://img.shields.io/node/v/testguard-cli.svg)](https://nodejs.org)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./package.json)
+
 > Proves that a test suite actually defends the claims a project makes — by
 > injecting the faults those claims say cannot happen, and reporting every
 > fault the tests fail to detect.
@@ -27,6 +34,17 @@ historical bugs were invisible to the suite**, worst case 2,451 tests green
 on known-broken code. The largest gap was a compliance-critical path with
 100% coverage, where the one assertion that mattered used
 `expect.objectContaining({...})` and omitted the field carrying the data.
+
+## Install
+
+| How | Command |
+|---|---|
+| npx (no install) | `npx testguard-cli probe` |
+| npm | `npm i -D testguard-cli` then `npx testguard probe` |
+| pip | `pip install testguard-cli` then `testguard probe` (needs Node ≥ 20) |
+| Homebrew | `brew tap raccioly/tap && brew install testguard` |
+| GitHub Action | `uses: raccioly/testguard@v0.1.0` — see [`action.yml`](./action.yml) |
+| pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
 
 ## How it works
 

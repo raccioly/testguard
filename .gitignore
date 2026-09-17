@@ -8,6 +8,11 @@ coverage/
 # Local agent tooling — not part of the public project
 .wolf/
 .claude/
-CLAUDE.md
+CLAUDE.local.md
 graphify-out/
 .vitest/
+# Python build artefacts
+dist/
+build/
+*.egg-info/
+__pycache__/

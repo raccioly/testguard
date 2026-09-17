@@ -13,12 +13,22 @@
     "spec/schemas",
     "spec/lib",
     "spec/GATE-SEMANTICS.md",
+    "spec/README.md",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
+    "testguard": "node cli/testguard.mjs",
+    "claims": "node cli/testguard.mjs claims",
+    "probe": "node cli/testguard.mjs probe",
+    "baseline": "node cli/testguard.mjs baseline",
+    "brief": "node cli/testguard.mjs brief",
     "test": "vitest run",
-    "test:spec": "vitest run spec/conformance"
+    "test:spec": "vitest run spec/conformance",
+    "self:probe": "node cli/testguard.mjs probe . --budget 180000",
+    "release:sync": "node .github/scripts/sync-release-version.mjs",
+    "prepublishOnly": "node cli/testguard.mjs --version && node .github/scripts/sync-release-version.mjs --check"
   },
   "keywords": [
     "testing",
@@ -27,7 +37,12 @@
     "test-quality",
     "claims",
     "verification",
-    "vitest"
+    "vitest",
+    "ai-agents",
+    "test-generation",
+    "claim-verification",
+    "github-actions",
+    "quality-gate"
   ],
   "devDependencies": {
     "ajv": "^8.20.0",
@@ -35,5 +50,17 @@
   },
   "bin": {
     "testguard": "cli/testguard.mjs"
+  },
+  "author": "Ricardo Accioly <raccioly@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/raccioly/testguard.git"
+  },
+  "homepage": "https://github.com/raccioly/testguard#readme",
+  "bugs": {
+    "url": "https://github.com/raccioly/testguard/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -1,0 +1,72 @@
+name: 'TestGuard — Claim Verification'
+description: 'Prove your test suite defends the claims your project makes. Injects the faults those claims forbid; fails on any the tests miss.'
+author: 'Ricardo Accioly'
+
+branding:
+  icon: 'crosshair'
+  color: 'red'
+
+inputs:
+  command:
+    description: 'Command to run: probe, claims, baseline, brief'
+    required: false
+    default: 'probe'
+  working-directory:
+    description: 'Directory whose test runner is invoked (where testguard.claims.json lives)'
+    required: false
+    default: '.'
+  claims:
+    description: 'Path to the claims file (default: <working-directory>/testguard.claims.json)'
+    required: false
+    default: ''
+  severity:
+    description: 'Gate only at or above this severity: critical, high, medium, low'
+    required: false
+    default: 'low'
+  confirm:
+    description: 'Runs per verdict (N)'
+    required: false
+    default: '3'
+  budget:
+    description: 'Wall-clock budget per test run, ms'
+    required: false
+    default: '120000'
+  no-escalate:
+    description: 'Skip re-running survivors against the whole suite'
+    required: false
+    default: 'false'
+  version:
+    description: 'testguard-cli version to run'
+    required: false
+    default: '0.1.0'
+  node-version:
+    description: 'Node.js version (20+)'
+    required: false
+    default: '22'
+
+outputs:
+  evidence:
+    description: 'Path to the evidence file written by probe'
+    value: ${{ steps.run.outputs.evidence }}
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - id: run
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -o pipefail
+        ARGS=()
+        [ -n "${{ inputs.claims }}" ] && ARGS+=(--claims "${{ inputs.claims }}")
+        if [ "${{ inputs.command }}" = "probe" ]; then
+          ARGS+=(--severity "${{ inputs.severity }}" --confirm "${{ inputs.confirm }}" --budget "${{ inputs.budget }}")
+          [ "${{ inputs.no-escalate }}" = "true" ] && ARGS+=(--no-escalate)
+        fi
+        [ "${{ inputs.command }}" = "brief" ] && ARGS+=(--text)
+        echo "evidence=$(pwd)/.testguard/evidence.json" >> "$GITHUB_OUTPUT"
+        npx -y "testguard-cli@${{ inputs.version }}" "${{ inputs.command }}" . "${ARGS[@]}"

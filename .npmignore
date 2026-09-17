@@ -1,0 +1,22 @@
+# package.json `files` is the allowlist; this is belt-and-braces.
+.git/
+.github/
+.wolf/
+.claude/
+graphify-out/
+test/
+fixtures/
+bench/
+spec/conformance/
+packaging/
+testguard_cli/
+pyproject.toml
+action.yml
+.pre-commit-hooks.yaml
+vitest.config.mjs
+.testguard/
+.vitest/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+.DS_Store

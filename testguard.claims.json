@@ -1,0 +1,120 @@
+{
+  "$schema": "./spec/schemas/claims.schema.json",
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "TG-KILL-NEEDS-N",
+      "statement": "A fault is killed only when every one of the N probe runs fails with an assertion; a mixed result is never a kill.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#verdicts rule 2 and 4" },
+      "severity": "critical",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-09-17T00:00:00Z" },
+      "defendedBy": ["test/classify.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "One killing run is enough to report killed (optimistic bias).",
+          "faultClass": "condition-forced",
+          "file": "src/probe/classify.mjs",
+          "find": "if (probeRuns.length === confirmRuns && killedRuns.length === confirmRuns) return { verdict: 'killed' };",
+          "replace": "if (killedRuns.length >= 1) return { verdict: 'killed' };",
+          "producedBy": { "producer": "human", "by": "maintainer" }
+        }
+      ]
+    },
+    {
+      "id": "TG-TIMEOUT-NEVER-KILLS",
+      "statement": "A timeout is never counted as a detection.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#verdicts rule 3" },
+      "severity": "critical",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-09-17T00:00:00Z" },
+      "defendedBy": ["test/classify.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The timeout check is removed; a timed-out run falls through to the kill/survive logic.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/classify.mjs",
+          "find": "if (probeRuns.some((r) => r.outcome === 'timeout' || r.timeouts > 0)) return { verdict: 'timeout', reason: 'test-timed-out' };",
+          "replace": "/* fault: timeout check removed */",
+          "producedBy": { "producer": "human", "by": "maintainer" }
+        }
+      ]
+    },
+    {
+      "id": "TG-WRITER-REFUSES",
+      "statement": "The tool never writes a spec document that does not conform to the spec.",
+      "source": { "kind": "spec", "ref": "AGENTS.md rule 2; CONTRIBUTING.md rule 1" },
+      "severity": "high",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-09-17T00:00:00Z" },
+      "defendedBy": ["test/writer.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Validation failure no longer throws; the non-conforming document is written anyway.",
+          "faultClass": "guard-removed",
+          "file": "src/evidence/writer.mjs",
+          "find": "if (!result.ok) throw new SpecDocError('refusing to write: ' + describe(kind, path, result));",
+          "replace": "/* fault: validation ignored */",
+          "producedBy": { "producer": "human", "by": "maintainer" }
+        }
+      ]
+    },
+    {
+      "id": "TG-FINGERPRINT-VERDICT",
+      "statement": "The fingerprint includes the verdict, so a change of verdict on the same claim and subject surfaces as a new finding.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#baseline-and-delta" },
+      "severity": "high",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-09-17T00:00:00Z" },
+      "defendedBy": ["spec/conformance/schemas.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Verdict dropped from the fingerprint derivation.",
+          "faultClass": "variable-swap",
+          "file": "spec/lib/fingerprint.mjs",
+          "find": ".update([claimId, subjectId, file, verdict].join('\\n'))",
+          "replace": ".update([claimId, subjectId, file].join('\\n'))",
+          "producedBy": { "producer": "human", "by": "maintainer" }
+        }
+      ]
+    },
+    {
+      "id": "TG-RESTORE-ALWAYS",
+      "statement": "After a fault is applied in place, restore() puts the original file content back.",
+      "source": { "kind": "spec", "ref": "README.md#how-it-works; SECURITY.md#security-model" },
+      "severity": "critical",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-09-17T00:00:00Z" },
+      "defendedBy": ["test/inject.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "restore() marks itself done but never writes the original back.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/inject.mjs",
+          "find": "    live.delete(restore);\n    writeFileSync(path, original);",
+          "replace": "    live.delete(restore);",
+          "producedBy": { "producer": "human", "by": "maintainer" }
+        }
+      ]
+    },
+    {
+      "id": "TG-ESCALATION-N-RUNS",
+      "statement": "A test outside the declared defenders is credited with a kill only if it fails in all N escalation runs; a single failing run is never attribution.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#verdicts rule 5" },
+      "severity": "high",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-09-17T00:00:00Z" },
+      "defendedBy": ["test/probe.fixture.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Single-run attribution: any escalation run with a failure credits the undeclared tests (the exact defect logged as bug-001 during development).",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "if (killers.size > 0 && runs.length === confirmRuns && runs.every(isKill)) detail.reason = 'killed-by-undeclared-tests';",
+          "replace": "if (runs.some(isKill)) detail.reason = 'killed-by-undeclared-tests';",
+          "producedBy": { "producer": "human", "by": "maintainer" }
+        }
+      ]
+    }
+  ]
+}
