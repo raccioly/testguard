@@ -192,6 +192,9 @@ describe('probe reproduces the known-answer fixture', () => {
       const reasons = withDefenders.map((r) => r.detail.reason);
       expect(reasons.filter((x) => x === 'defenders-failed-to-load').length).toBeGreaterThanOrEqual(6);
       expect(new Set(reasons.filter((x) => x !== 'defenders-failed-to-load'))).toEqual(new Set(['anchor-missing', 'anchor-ambiguous']));
+      // A suite that cannot load measures NOTHING about stability: there must
+      // be no flake rate at all, or "cannot load" would read as "reliable".
+      for (const r of ev.records) expect(r.detail.flakeRate).toBeUndefined();
       expect(validate('evidence', ev).errors).toEqual([]);
     }, 120_000);
 
