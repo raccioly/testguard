@@ -12,7 +12,7 @@ The verdict set is closed. Only one value is a pass.
 | `killed` | Fault applied; every one of N probe runs failed with a genuine assertion failure, on a defender set that was green N/N unmodified. | no |
 | `survived` | Fault applied; every one of N probe runs passed. The claim is **unproven**. | **yes** |
 | `nocover` | No defending test exists: the declared globs resolve to nothing, or no test imports the subject. Worse than `survived` — nothing was even tried. | **yes** |
-| `unverifiable` | The fault could not be applied: anchor missing or ambiguous. Carries a `reason`. This is a loud, gating verdict — a claim that cannot be probed is not "skipped", it is undefended until someone re-authors the fault. | **yes** |
+| `unverifiable` | The claim could not be probed: the fault's anchor is missing or ambiguous, or its defenders failed to load (`defenders-failed-to-load`). Carries a `reason`. A loud, gating verdict — a claim that cannot be probed is not "skipped", it is undefended until someone fixes the fault or the defenders. Never confused with `flaky-defender`, which requires tests that *ran*. | **yes** |
 | `timeout` | Probe run exceeded its budget. Not counted as a kill; the pessimistic reading is the safe one because flakiness biases the metric optimistically. | **yes** |
 | `fault-invalid` | The replacement does not load or compile. A bad fault, not a detection. | **yes** |
 | `flaky-defender` | Defenders were not green N/N on unmodified source (`defenders-not-green`), or the N probe runs disagreed with each other (`inconsistent-probe`). Either way no verdict about the fault can be trusted; fix the defenders first. | **yes** |
@@ -81,7 +81,7 @@ evidence; they simply do not turn CI red.
 |---|---|
 | `0` | No new gating findings at or above the severity floor. |
 | `1` | At least one new gating finding. |
-| `2` | Precondition failed: defenders not green, working tree dirty for a target file, runner not found, claims file invalid. Nothing was probed. |
+| `2` | Precondition failed: test runner not resolvable (e.g. no `node_modules` linked into the scratch worktree), working tree dirty for a fault target file, claims file invalid, no commits. Nothing was probed. |
 | `3` | Usage or configuration error. |
 
 A tool must never exit `0` because it had nothing to check. If the claims

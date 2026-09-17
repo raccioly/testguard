@@ -18,8 +18,9 @@ export function summarize(records) {
 export function renderSummary(records) {
   const byVerdict = summarize(records);
   const parts = ORDER.filter((v) => byVerdict[v]).map((v) => `${byVerdict[v]} ${formatVerdict(v)}`);
-  const gating = records.filter((r) => r.verdict !== 'killed').length;
-  return `${records.length} faults probed: ${parts.join(', ')}. ${gating} unproven claim${gating === 1 ? '' : 's'}.`;
+  const unproven = records.filter((r) => r.verdict !== 'killed');
+  const claims = new Set(unproven.map((r) => r.claim.id)).size;
+  return `${records.length} faults probed: ${parts.join(', ')}. ${unproven.length} unproven fault${unproven.length === 1 ? '' : 's'} across ${claims} claim${claims === 1 ? '' : 's'}.`;
 }
 
 /** Survivors first, then by rank score; killed last. */

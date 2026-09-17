@@ -10,6 +10,63 @@ const TEST_GLOBS = ['**/*.test.js', '**/*.test.mjs', '**/*.test.cjs', '**/*.test
 
 export const name = 'vitest';
 
+/**
+ * Split a runner command template into argv. Supports double and single
+ * quotes; `{files}` expands to the test files (one argv entry each) and
+ * `{out}` to the JSON report path. Everything else is passed through.
+ */
+export function parseCommandTemplate(template) {
+  const words = [];
+  let cur = '';
+  let quote = null;
+  let has = false;
+  for (const ch of template) {
+    if (quote) {
+      if (ch === quote) quote = null;
+      else cur += ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      has = true;
+    } else if (/\s/.test(ch)) {
+      if (has || cur) words.push(cur);
+      cur = '';
+      has = false;
+    } else {
+      cur += ch;
+    }
+  }
+  if (has || cur) words.push(cur);
+  if (quote) throw new RangeError('unterminated quote in --runner-cmd');
+  if (!words.includes('{files}') || !words.some((w) => w.includes('{out}'))) throw new RangeError('--runner-cmd must contain {files} (as its own word) and {out}');
+  return words;
+}
+
+/** `{files}` must be a word of its own (one argv entry per file); `{out}` may be embedded, e.g. `--outputFile={out}`. */
+export const expandCommand = (words, files, outFile) => words.flatMap((w) => (w === '{files}' ? files : [w.replaceAll('{out}', outFile)]));
+
+/**
+ * Can the runner be resolved at all from this directory? Run before any
+ * verdict is attempted: an unresolvable runner is a precondition failure,
+ * never a statement about the tests.
+ */
+export function checkRunner({ projectDir, budgetMs = 60_000, env = process.env }) {
+  const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+  return new Promise((resolve) => {
+    const child = spawn(npx, ['--no-install', 'vitest', '--version'], { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], env: { ...env, CI: '1' } });
+    let out = '';
+    let err = '';
+    child.on('error', (e) => resolve({ ok: false, message: e.message }));
+    child.stdout.on('data', (d) => (out += d));
+    child.stderr.on('data', (d) => (err += d));
+    const timer = setTimeout(() => child.kill('SIGKILL'), budgetMs);
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      const version = out.trim().replace(/^vitest\//, '');
+      resolve(code === 0 && version ? { ok: true, version } : { ok: false, message: (err || out).trim().split('\n').filter(Boolean).slice(-1)[0] ?? `exit ${code}` });
+    });
+  });
+}
+
 /** Defender globs → existing files. Empty result is the `nocover` signal. */
 export const resolveDefenders = (projectDir, globs) => matchGlobs(projectDir, globs ?? []);
 
@@ -47,16 +104,18 @@ export function parseReport(report, durationMs) {
  * The budget matters because a synchronous infinite loop is immune to
  * vitest's own test timeout; only killing the process ends it.
  */
-export function runVitest({ projectDir, files, budgetMs = 120_000, command }) {
+export function runVitest({ projectDir, files, budgetMs = 120_000, command, commandTemplate }) {
   const outFile = join(tmpdir(), `testguard-vitest-${randomBytes(6).toString('hex')}.json`);
   const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  const [cmd, ...args] = command ?? [npx, 'vitest', 'run', ...files, '--reporter=json', `--outputFile=${outFile}`];
+  const [cmd, ...args] = command
+    ?? (commandTemplate ? expandCommand(commandTemplate, files, outFile) : [npx, 'vitest', 'run', ...files, '--reporter=json', `--outputFile=${outFile}`]);
   const started = Date.now();
 
   return new Promise((resolve) => {
     const child = spawn(cmd, args, { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CI: '1', FORCE_COLOR: '0' } });
     let stderr = '';
     child.stderr.on('data', (d) => (stderr += d));
+    child.on('error', (e) => (stderr += e.message));
     let killed = false;
     const timer = setTimeout(() => {
       killed = true;

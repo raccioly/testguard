@@ -16,6 +16,8 @@ export async function baselineCommand({ projectDir, values }, io) {
   writeSpecDoc('baseline', outPath, baseline);
   const n = Object.values(baseline.fingerprints).reduce((a, b) => a + b, 0);
   io.out(`baseline: ${n} unproven finding${n === 1 ? '' : 's'} frozen at ${baseline.head.slice(0, 12)} → ${outPath}`);
-  io.out('Commit this file. From now on only new findings gate.');
+  io.out('Commit this file; from now on only new findings gate. Ignore the regenerated ones — add to .gitignore:');
+  io.out('  .testguard/evidence.json');
+  io.out('  .testguard/brief.json');
   return 0;
 }

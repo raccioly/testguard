@@ -19,6 +19,9 @@ describe('classify — the order of checks is the spec', () => {
     expect(classify({ defenders: D, anchor: { status: 'anchor-ambiguous' }, baselineRuns: [], probeRuns: [], confirmRuns: N }).reason).toBe('anchor-ambiguous');
   });
 
+  it('defenders that failed to LOAD are unverifiable, never flaky', () =>
+    expect(classify({ defenders: D, anchor: { status: 'defenders-failed-to-load' }, baselineRuns: [err], probeRuns: [], confirmRuns: N })).toEqual({ verdict: 'unverifiable', reason: 'defenders-failed-to-load' }));
+
   it('flaky-defender when the baseline is not green N/N', () => {
     expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, kill], probeRuns: [], confirmRuns: N })).toEqual({ verdict: 'flaky-defender', reason: 'defenders-not-green' });
     expect(classify({ defenders: D, anchor: ok, baselineRuns: [], probeRuns: [], confirmRuns: N }).verdict).toBe('flaky-defender');

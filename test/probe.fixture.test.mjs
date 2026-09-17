@@ -100,6 +100,8 @@ describe('probe reproduces the known-answer fixture', () => {
       expect(await main(['claims', scratch], io)).toBe(0);
       expect(lines.out.join('\n')).toContain('REDACT-001');
       expect(lines.out.join('\n')).toContain('NO DEFENDER');
+      expect(lines.out[0]).toContain('1 carry a @claim annotation');
+      expect(lines.out.find((l) => l.includes('REDACT-003'))).toMatch(/^@ REDACT-003/);
       expect(lines.out.join('\n')).not.toMatch(/UNDECLARED|STALE/);
     });
 
@@ -133,6 +135,39 @@ describe('probe reproduces the known-answer fixture', () => {
       expect(existsSync(join(scratch, '.testguard', 'brief.json'))).toBe(false);
       expect(validate('brief', (await import('../src/brief/brief.mjs')).buildBrief(evidence, readSpecDoc('baseline', join(scratch, '.testguard', 'baseline.json')))).ok).toBe(true);
     });
+
+    it('--claim probes only the named claims and writes PARTIAL evidence beside, not over, the canonical file', async () => {
+      const { lines, io } = capture();
+      const before = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json')).records.length;
+      // the baseline frozen above already holds REDACT-001/F1, so nothing is new → exit 0
+      expect(await main(['probe', scratch, '--claim', 'REDACT-001', '--budget', '30000', '--quiet'], io)).toBe(0);
+      const partial = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence-partial.json'));
+      expect(partial.records.map((r) => r.claim.id)).toEqual(['REDACT-001', 'REDACT-001']);
+      expect(readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json')).records).toHaveLength(before);
+      expect(lines.out.join('\n')).toContain('partial: --claim REDACT-001');
+      expect(validate('evidence', partial).ok).toBe(true);
+    }, 60_000);
+
+    it('--claim with an unknown id is a precondition failure', async () => {
+      const { lines, io } = capture();
+      expect(await main(['probe', scratch, '--claim', 'NOPE-1', '--quiet'], io)).toBe(2);
+      expect(lines.err.join('\n')).toMatch(/unknown claim id/);
+    });
+
+    it('a runner that cannot run the defenders yields UNVERIFIABLE (defenders-failed-to-load), never flaky-defender', async () => {
+      const failing = `${process.execPath} -e process.exit(3) {files} {out}`;
+      const ev = await probe({ projectDir: scratch, claims: loadClaims(join(scratch, 'testguard.claims.json')), confirmRuns: 3, mode: 'worktree', budgetMs: 30_000, runnerCommand: failing, escalate: false, toolVersion: 'test' });
+      const verdicts = new Set(ev.records.map((r) => r.verdict));
+      expect(verdicts.has('flaky-defender')).toBe(false);
+      expect(verdicts.has('killed')).toBe(false);
+      const withDefenders = ev.records.filter((x) => x.defenders.resolved.length > 0);
+      for (const r of withDefenders) expect(r.verdict).toBe('unverifiable');
+      // anchor problems are detected before the defenders are ever run; everything else is the load failure
+      const reasons = withDefenders.map((r) => r.detail.reason);
+      expect(reasons.filter((x) => x === 'defenders-failed-to-load').length).toBeGreaterThanOrEqual(6);
+      expect(new Set(reasons.filter((x) => x !== 'defenders-failed-to-load'))).toEqual(new Set(['anchor-missing', 'anchor-ambiguous']));
+      expect(validate('evidence', ev).errors).toEqual([]);
+    }, 120_000);
 
     it('brief --text on a repo with no evidence exits 0 silently, so a session-start hook never breaks', async () => {
       const { lines, io } = capture();

@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, symlin
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { createScratch, PreconditionError } from '../src/probe/worktree.mjs';
+import { createScratch, findNodeModules, PreconditionError } from '../src/probe/worktree.mjs';
 
 function repo() {
   const dir = mkdtempSync(join(tmpdir(), 'tg-wt-'));
@@ -38,6 +38,33 @@ describe('createScratch', () => {
     const s = createScratch({ repoRoot: dir, projectDir: dir, ref: first.slice(0, 8) });
     expect(readFileSync(join(s.projectDir, 'a.txt'), 'utf8')).toBe('first\n');
     expect(s.sha).toBe(first);
+    s.cleanup();
+  });
+
+  it('treats a SYMLINKED node_modules as one (the sibling/auto-worktree layout) and links its target', () => {
+    const { dir } = repo();
+    const real = mkdtempSync(join(tmpdir(), 'tg-real-nm-'));
+    mkdirSync(join(real, 'dep'));
+    writeFileSync(join(real, 'dep', 'marker'), 'x');
+    const linked = mkdtempSync(join(tmpdir(), 'tg-linked-'));
+    spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', 'init', '-q'], { cwd: linked });
+    writeFileSync(join(linked, 'a.txt'), 'a\n');
+    spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', 'add', 'a.txt'], { cwd: linked });
+    spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', 'commit', '-qm', 'one'], { cwd: linked });
+    symlinkSync(real, join(linked, 'node_modules'), 'dir');
+    expect(findNodeModules(linked).map((n) => n.rel)).toEqual(['node_modules']);
+    const s = createScratch({ repoRoot: linked, projectDir: linked });
+    expect(existsSync(join(s.root, 'node_modules', 'dep', 'marker'))).toBe(true);
+    s.cleanup();
+    void dir;
+  });
+
+  it('links an explicit --node-modules path into the probed project', () => {
+    const { dir } = repo();
+    const nm = mkdtempSync(join(tmpdir(), 'tg-explicit-nm-'));
+    mkdirSync(join(nm, 'explicit'));
+    const s = createScratch({ repoRoot: dir, projectDir: dir, nodeModules: nm });
+    expect(existsSync(join(s.root, 'node_modules', 'explicit'))).toBe(true);
     s.cleanup();
   });
 

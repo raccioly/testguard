@@ -28,10 +28,13 @@ probe
   --baseline <path>    baseline to gate against (default: <dir>/.testguard/baseline.json if present)
   --severity <level>   gate only at or above   (default: low)
   --ref <commit>       probe this commit in the scratch worktree (default: HEAD)
+  --claim <ID,ID>      probe only these claims; writes .testguard/evidence-partial.json
+  --runner-cmd "<cmd>" custom runner; must contain {files} and {out}, e.g. "pnpm vitest run {files} --reporter=json --outputFile={out}"
+  --node-modules <dir> node_modules to link into the scratch worktree (or TESTGUARD_NODE_MODULES)
   --in-place           mutate the working tree instead of a scratch worktree
   --no-escalate        do not re-run survivors against the whole suite
   --no-reuse           re-probe claims whose inputs have not changed
-  --quiet              summary only
+  --quiet              suppress the per-fault stream and ranked block; print only the summary and evidence path
 
 claims     --json
 baseline   --evidence <path>  --out <path>
@@ -58,6 +61,9 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         severity: { type: 'string', default: 'low' },
         max: { type: 'string', default: '20' },
         ref: { type: 'string', default: 'HEAD' },
+        claim: { type: 'string' },
+        'runner-cmd': { type: 'string' },
+        'node-modules': { type: 'string' },
         'in-place': { type: 'boolean', default: false },
         'no-escalate': { type: 'boolean', default: false },
         'no-reuse': { type: 'boolean', default: false },

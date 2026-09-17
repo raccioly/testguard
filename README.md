@@ -35,6 +35,15 @@ on known-broken code. The largest gap was a compliance-critical path with
 100% coverage, where the one assertion that mattered used
 `expect.objectContaining({...})` and omitted the field carrying the data.
 
+A second, independent run on a different AI-authored codebase (63 test
+files, 458 tests, 24 hand-written security claims, 39 faults): **21 of 39
+faults survived a fully green suite — 9 of them critical.** Super-admin
+gating, membership checks, cookie flags and the whole authorization callback
+could be disabled without a single test noticing. One test file had
+re-implemented the authorization logic *inside the test* and asserted
+against the copy: fifteen green tests, zero detection. After wrapper-level
+tests were written against the survivors, 39/39 were killed.
+
 ## Install
 
 | How | Command |
@@ -43,7 +52,7 @@ on known-broken code. The largest gap was a compliance-critical path with
 | npm | `npm i -D testguard-cli` then `npx testguard probe` |
 | pip | `pip install testguard-cli` then `testguard probe` (needs Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.1.1` — see [`action.yml`](./action.yml) |
+| GitHub Action | `uses: raccioly/testguard@v0.1.2` — see [`action.yml`](./action.yml) |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
 
 ## How it works
@@ -60,7 +69,7 @@ npx testguard-cli brief       # tell the agent where the suite is blind, before 
    deterministic source change that would make the statement false. Every
    claim and every fault records who produced it. `testguard claims`
    validates the file and reports drift against `@claim <ID>` annotations in
-   source.
+   source. Test files are deliberately not scanned — a claim asserted by a test is the authorship trap the tool exists for — and annotation ids must contain a hyphen so prose is never mistaken for one.
 2. **Probe** confirms the defenders are green N times unmodified, applies
    each fault in a scratch git worktree (your tree is never touched), runs
    the defenders N times, re-runs survivors against the whole suite with
@@ -77,8 +86,18 @@ npx testguard-cli brief       # tell the agent where the suite is blind, before 
    | `FLAKY-DEFENDER` | the defenders are not reliably green, or disagreed across runs |
 
    Never a single score. Findings are ranked by severity, claim provenance
-   and blast radius, and written to `.testguard/evidence.json` — validated
-   against the spec before it is written.
+   and blast radius (relative imports, `tsconfig` path aliases and
+   `package.json#imports` are resolved; bare package names are not), and
+   written to `.testguard/evidence.json` — validated against the spec before
+   it is written.
+
+   Practical loop: first pass `--no-escalate` (escalation re-runs the whole
+   suite N times per survivor); iterate on one claim with
+   `--claim <ID> --in-place` — only the files faults are applied to must be
+   committed, test files may be dirty; final pass with defaults. A custom
+   runner (`pnpm --filter`, a specific config) goes in
+   `--runner-cmd "<cmd> {files} … {out}"`; if the scratch worktree cannot
+   see your `node_modules`, pass `--node-modules <dir>`.
 3. **Baseline** freezes every non-passing fingerprint. Later probes suppress
    what was already known and exit non-zero only on what is new. Claims whose
    source and defenders are unchanged reuse their prior verdict, so a probe

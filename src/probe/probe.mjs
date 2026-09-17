@@ -12,7 +12,7 @@ import { fingerprint } from '../../spec/lib/fingerprint.mjs';
 
 const isKill = (r) => r.outcome === 'fail' && r.assertionFailures > 0;
 
-function runnerVersion(projectDir) {
+function readRunnerVersion(projectDir) {
   try {
     return JSON.parse(readFileSync(createRequire(join(projectDir, 'noop.js')).resolve('vitest/package.json'), 'utf8')).version;
   } catch {
@@ -31,6 +31,9 @@ export async function probe({
   mode = 'worktree',
   ref = 'HEAD',
   budgetMs = 120_000,
+  runnerCommand,
+  nodeModules,
+  only,
   escalate = true,
   scratchBase,
   toolVersion = '0.0.0',
@@ -45,21 +48,39 @@ export async function probe({
 
   const targets = [...new Set(claims.claims.flatMap((c) => c.faults.map((f) => relative(root, join(projectDir, f.file)))))];
   if (mode === 'in-place' && isDirty(root, targets)) {
-    throw new PreconditionError(`uncommitted changes in target files (${targets.join(', ')}); commit or stash first, or drop --in-place`);
+    throw new PreconditionError(`uncommitted changes in fault target files (${targets.join(', ')}); commit or stash them, or drop --in-place. Only the files faults are applied to must be clean — test files may be dirty, which is what makes --in-place usable while writing tests.`);
+  }
+  const selected = only ? new Set(only) : null;
+  if (selected) {
+    const known = new Set(claims.claims.map((c) => c.id));
+    const unknown = [...selected].filter((id) => !known.has(id));
+    if (unknown.length) throw new PreconditionError(`--claim: unknown claim id(s) ${unknown.join(', ')}`);
   }
 
   const startedAt = new Date().toISOString();
-  const iso = mode === 'worktree' ? createScratch({ repoRoot: root, projectDir, ref, scratchBase }) : inPlace({ repoRoot: root, projectDir });
+  const iso = mode === 'worktree' ? createScratch({ repoRoot: root, projectDir, ref, scratchBase, nodeModules }) : inPlace({ repoRoot: root, projectDir });
   const records = [];
+  let runnerVersion;
   try {
+    const commandTemplate = runnerCommand ? vitest.parseCommandTemplate(runnerCommand) : undefined;
+    if (!commandTemplate) {
+      // An unresolvable runner is a precondition failure, not a flaky defender.
+      const check = await vitest.checkRunner({ projectDir: iso.projectDir });
+      if (!check.ok) {
+        throw new PreconditionError(`test runner is not resolvable in the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${check.message}). ` +
+          (mode === 'worktree' ? 'No usable node_modules was linked: pass --node-modules <path>, or run with --in-place.' : 'Install dependencies first.'));
+      }
+      runnerVersion = check.version;
+    }
     const allTests = vitest.listTestFiles(iso.projectDir);
     const baselineCache = new Map();
     const prior = previous && previous.run.confirmRuns === confirmRuns
       ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
       : new Map();
-    const runDefenders = (files) => vitest.runVitest({ projectDir: iso.projectDir, files, budgetMs });
+    const runDefenders = (files) => vitest.runVitest({ projectDir: iso.projectDir, files, budgetMs, commandTemplate });
 
     for (const claim of claims.claims) {
+      if (selected && !selected.has(claim.id)) continue;
       const defenders = vitest.resolveDefenders(iso.projectDir, claim.defendedBy);
       for (const fault of claim.faults) {
         const record = await probeOne({ claim, fault, defenders, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id });
@@ -79,7 +100,7 @@ export async function probe({
       startedAt,
       finishedAt: new Date().toISOString(),
       repo: { head, dirty: isDirty(root) },
-      runner: { name: vitest.name, ...(runnerVersion(projectDir) ? { version: runnerVersion(projectDir) } : {}) },
+      runner: { name: vitest.name, ...((runnerVersion ?? readRunnerVersion(projectDir)) ? { version: runnerVersion ?? readRunnerVersion(projectDir) } : {}) },
       confirmRuns,
       mode,
     },
@@ -111,14 +132,24 @@ async function probeOne({ claim, fault, defenders, allTests, iso, confirmRuns, e
       const key = defenders.join('\n');
       if (!baselineCache.has(key)) {
         const runs = [];
+        let loadMessage;
         for (let i = 0; i < confirmRuns; i++) {
-          const { run } = await runDefenders(defenders);
-          runs.push(run);
-          if (run.outcome !== 'pass') break;
+          const res = await runDefenders(defenders);
+          runs.push(res.run);
+          if (res.run.outcome !== 'pass') {
+            loadMessage = res.loadMessage;
+            break;
+          }
         }
-        baselineCache.set(key, runs);
+        baselineCache.set(key, { runs, loadMessage });
       }
-      detail.baselineRuns = baselineCache.get(key);
+      const baseline = baselineCache.get(key);
+      detail.baselineRuns = baseline.runs;
+      if (baseline.runs.some((r) => r.outcome === 'error')) {
+        // The defenders did not load. That is not flakiness and not a verdict
+        // about the fault; the claim cannot be probed until they do.
+        anchor = { status: 'defenders-failed-to-load', hits: anchor.hits, expected: anchor.expected, message: baseline.loadMessage };
+      }
 
       if (detail.baselineRuns.every((r) => r.outcome === 'pass') && detail.baselineRuns.length === confirmRuns) {
         const mutation = applyFault(iso.projectDir, fault);

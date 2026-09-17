@@ -21,7 +21,9 @@ export async function probeCommand({ projectDir, values, version }, io) {
     io.err('claims file declares no claims; nothing to verify');
     return 2;
   }
-  const outPath = values.out ? resolve(values.out) : evidencePath(projectDir);
+  const only = values.claim ? values.claim.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+  // A --claim run is partial evidence; keep it away from the canonical file unless --out says otherwise.
+  const outPath = values.out ? resolve(values.out) : only ? join(projectDir, '.testguard', 'evidence-partial.json') : evidencePath(projectDir);
   const previous = !values['no-reuse'] && existsSync(outPath) ? readSpecDoc('evidence', outPath) : undefined;
   const basePath = values.baseline ? resolve(values.baseline) : baselinePath(projectDir);
   const baseline = existsSync(basePath) ? readSpecDoc('baseline', basePath) : undefined;
@@ -34,6 +36,9 @@ export async function probeCommand({ projectDir, values, version }, io) {
     budgetMs,
     mode: values['in-place'] ? 'in-place' : 'worktree',
     ref: values.ref,
+    runnerCommand: values['runner-cmd'],
+    nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
+    only,
     escalate: !values['no-escalate'],
     toolVersion: version,
     onProgress: values.quiet ? undefined : (r) => io.out(renderRecord(r) + (r.reusedFrom ? '  (reused)' : '')),
@@ -41,13 +46,13 @@ export async function probeCommand({ projectDir, values, version }, io) {
   writeSpecDoc('evidence', outPath, evidence);
 
   const g = gate(evidence.records, baseline, { severityFloor: values.severity });
-  if (!values.quiet) {
+  if (!values.quiet && baseline) {
     io.out('');
     const tag = (r) => (g.new.includes(r) ? '[NEW]      ' : g.baselined.includes(r) ? '[baseline] ' : '[below floor] ');
     for (const r of sortForReport(evidence.records).filter((x) => x.verdict !== 'killed')) io.out('  ' + tag(r) + renderRecord(r));
   }
   io.out('');
   io.out(renderSummary(evidence.records) + (baseline ? ` ${g.new.length} new since baseline, ${g.baselined.length} baselined.` : ' No baseline.'));
-  io.out(`evidence: ${outPath}`);
+  io.out(`evidence: ${outPath}${only ? ` (partial: --claim ${only.join(',')}; not the canonical evidence file)` : ''}`);
   return g.new.length > 0 ? 1 : 0;
 }
