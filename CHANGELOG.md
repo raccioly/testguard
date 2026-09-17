@@ -7,13 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-17
+
+From a field report on a real codebase (63 test files, 458 tests, 39 faults).
+
 ### Fixed
 
+- **A runner that cannot be resolved was reported as `FLAKY-DEFENDER`.** In
+  the scratch worktree, a symlinked `node_modules` (the sibling/auto-worktree
+  layout) was invisible, vitest failed to load, and the load error was
+  classified as flaky tests — blaming the wrong party. Symlinked
+  `node_modules` are now linked to their resolved target; the runner is
+  checked before any verdict and an unresolvable one is a precondition
+  failure (exit 2) with the fix in the message; defenders that fail to
+  *load* during a baseline are `UNVERIFIABLE` (`defenders-failed-to-load`),
+  never flaky.
+- **Blast radius ignored path aliases.** `tsconfig`/`jsconfig` `paths` (with
+  `baseUrl` and relative `extends`) and `package.json#imports` are resolved,
+  so a module imported 83 times via `@/…` no longer ranks as if nothing
+  imported it. Bare package specifiers remain ignored, as documented.
+- Summary said "N unproven claims" when N counted faults; it now reports
+  unproven faults *and* the distinct claims they belong to.
+- `testguard claims` never showed which claims carry a `@claim` annotation;
+  it now reports the count and marks each annotated row.
 - Piping output to a closed reader (`testguard claims | head`) no longer
   crashes with an `EPIPE` stack trace.
 
+### Added
+
+- `--claim <ID,ID>` probes only the named claims and writes
+  `.testguard/evidence-partial.json`, keeping the canonical evidence intact —
+  turns a fix-loop iteration from minutes into seconds.
+- `--runner-cmd "<cmd>"` with `{files}` and `{out}` placeholders for
+  monorepos, custom configs and other package managers.
+- `--node-modules <dir>` (or `TESTGUARD_NODE_MODULES`) to link a specific
+  `node_modules` into the scratch worktree.
+
 ### Changed
 
+- The `--in-place` precondition message says what it means: only fault
+  target files must be clean; test files may be dirty.
+- `testguard baseline` prints the two `.gitignore` lines for the regenerated
+  files instead of leaving it to the README.
+- With no baseline, the ranked block is not printed a second time under the
+  per-fault stream.
+- `--quiet` is documented precisely.
 - Staged Homebrew formula carries the sha256 of the published 0.1.1 tarball.
 
 ## [0.1.1] - 2026-09-17

@@ -31,7 +31,7 @@
       "enum": ["critical", "high", "medium", "low"]
     },
     "verdict": {
-      "description": "Closed set. Only `killed` is a pass. Every other verdict gates by default (see GATE-SEMANTICS.md).",
+      "description": "Closed set. Only `killed` is a pass. Every other verdict gates by default (see GATE-SEMANTICS.md). `unverifiable` covers a fault that could not be applied (anchor missing/ambiguous) and a claim whose defenders failed to load (`defenders-failed-to-load`).",
       "enum": [
         "killed",
         "survived",

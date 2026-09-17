@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { buildBrief, HEADING, hintFor } from '../src/brief/brief.mjs';
 import { buildBaseline } from '../src/baseline/baseline.mjs';
 import { validate } from '../spec/lib/validate.mjs';
+import { renderSummary } from '../src/render.mjs';
 
 const evidence = JSON.parse(readFileSync(new URL('../spec/conformance/examples/evidence.json', import.meta.url), 'utf8'));
 
@@ -41,5 +42,15 @@ describe('buildBrief', () => {
     expect(hintFor(byVerdict.nocover)).toContain('No test file matches');
     expect(hintFor(byVerdict.unverifiable)).toContain('anchor-missing');
     expect(hintFor(byVerdict['flaky-defender'])).toContain('not reliably green');
+  });
+});
+
+describe('renderSummary', () => {
+  it('counts unproven faults AND the distinct claims they belong to', () => {
+    const line = renderSummary(evidence.records);
+    expect(line).toMatch(/\d+ unproven faults across \d+ claims\./);
+    const unproven = evidence.records.filter((r) => r.verdict !== 'killed');
+    expect(line).toContain(`${unproven.length} unproven fault`);
+    expect(line).toContain(`across ${new Set(unproven.map((r) => r.claim.id)).size} claim`);
   });
 });
