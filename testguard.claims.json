@@ -758,6 +758,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-GITLAB-PROBE-EXIT-PRESERVED",
+      "statement": "The GitLab probe job exits with the probe's own status; writing the brief and posting the note afterwards never turns a red probe green.",
+      "source": {
+        "kind": "spec",
+        "ref": "packaging/gitlab/testguard.gitlab-ci.yml"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/gitlab-template.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The job ends with exit 0 regardless of the probe's status; the pipeline is green with unproven claims.",
+          "faultClass": "literal-changed",
+          "file": "packaging/gitlab/testguard.gitlab-ci.yml",
+          "find": "    - exit $status\n",
+          "replace": "    - exit 0\n",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

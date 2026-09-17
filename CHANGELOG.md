@@ -23,7 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `post_note: true` and a `TESTGUARD_GITLAB_TOKEN` (api scope), posts the
   markdown brief as one merge-request note updated in place, found by the
   marker on its first line. The CLI still makes no network calls; the job
-  does, and only when told to. Self-claim `TG-BRIEF-MARKDOWN-UNCLAIMED-FIRST`.
+  does, and only when told to. Self-claims `TG-BRIEF-MARKDOWN-UNCLAIMED-FIRST`
+  and `TG-GITLAB-PROBE-EXIT-PRESERVED` (the job ends with the probe's own
+  exit status; writing the brief never turns a red probe green).
 
 ### Changed
 
