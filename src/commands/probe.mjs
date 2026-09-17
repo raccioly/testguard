@@ -30,6 +30,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
   // Provisional and partial runs never overwrite the canonical evidence: only confirmed, complete runs may feed a baseline.
   const outPath = values.out ? resolve(values.out) : only ? join(projectDir, '.testguard', 'evidence-partial.json') : provisional ? provisionalEvidencePath(projectDir) : evidencePath(projectDir);
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
+  const discoveryNoted = new Set();
   const previous = !values['no-reuse'] && existsSync(outPath) ? readSpecDoc('evidence', outPath) : undefined;
   const basePath = values.baseline ? resolve(values.baseline) : baselinePath(projectDir);
   const baseline = existsSync(basePath) ? readSpecDoc('baseline', basePath) : undefined;
@@ -44,6 +45,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
     ref: values.ref ?? 'HEAD',
     refExplicit: values.ref !== undefined,
     ignoreDirty: values['ignore-dirty'],
+    serial: values.serial,
     onWarn: (m) => io.err(`warning: ${m}`),
     runnerCommand: values['runner-cmd'],
     runnerName: values.runner,
@@ -55,7 +57,10 @@ export async function probeCommand({ projectDir, values, version }, io) {
     onStage: !values.quiet && !values.json && process.stderr.isTTY ? ({ claimId, faultId, stage, i, n }) => process.stderr.write(`\r\x1b[K  … ${claimId}/${faultId} ${stage} ${i}/${n}`) : undefined,
     onProgress: values.quiet || values.json ? undefined : (r) => {
       if (process.stderr.isTTY) process.stderr.write('\r\x1b[K');
-      if (values.verbose || r.verdict !== 'killed') io.out(renderRecord(r, { provisional }) + (r.reusedFrom ? '  (reused)' : ''));
+      // The discovery note is a property of the claim, not of each fault: say it once.
+      const firstOfClaim = !discoveryNoted.has(r.claim.id);
+      if (r.defenders.discovered) discoveryNoted.add(r.claim.id);
+      if (values.verbose || r.verdict !== 'killed') io.out(renderRecord(r, { provisional, showDiscovered: firstOfClaim }) + (r.reusedFrom ? '  (reused)' : ''));
     },
   });
   writeSpecDoc('evidence', outPath, evidence);

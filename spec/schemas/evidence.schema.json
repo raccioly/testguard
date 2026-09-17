@@ -90,6 +90,32 @@
           },
           "additionalProperties": false
         },
+        "serial": {
+          "description": "True when the defenders were run one test file at a time. Recorded because a serial run is slower and its durations are not comparable with a parallel one.",
+          "type": "boolean"
+        },
+        "contention": {
+          "description": "Other test runners that were already running when this probe started. Best effort, never a verdict: it exists so a reader of a TIMEOUT or FLAKY-DEFENDER can tell the machine was loaded.",
+          "type": "object",
+          "required": ["detected", "runners"],
+          "properties": {
+            "detected": { "const": true },
+            "runners": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["pid", "command"],
+                "properties": {
+                  "pid": { "type": "integer", "minimum": 1 },
+                  "command": { "type": "string", "minLength": 1, "maxLength": 200 }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "confirmRuns": {
           "description": "N \u2014 how many times the defenders were run both unmodified (baseline) and with each fault applied.",
           "type": "integer",
@@ -320,6 +346,10 @@
             "escalated": {
               "description": "True when the fault survived its declared defenders and a broader test set was then run.",
               "type": "boolean"
+            },
+            "escalationStoppedEarly": {
+              "description": "Why the escalation loop ran fewer than N times. `no-common-failure`: no test failed in every run so far, so no further run could name an undeclared killer. Stopping can only fail to NAME a killer, never upgrade a verdict.",
+              "enum": ["no-common-failure"]
             },
             "escalationRuns": {
               "type": "array",

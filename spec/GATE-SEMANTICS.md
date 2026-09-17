@@ -50,6 +50,11 @@ Rules that follow from the table:
    and `detail.undeclaredKillers` names the tests, so the author can fix
    `defendedBy`. The claim's stated evidence chain is broken even though the
    suite is not blind. It gates, and ranks below a true survivor.
+   Attribution runs **up to N times**, and stops as soon as no test has failed
+   in every run so far: from there no further run can name a killer. The
+   evidence records the early stop (`detail.escalationStoppedEarly`). Stopping
+   can only fail to *name* a killer, never upgrade a verdict, which is the
+   pessimistic side.
 6. **A verdict names the commit it is about.** Evidence records `repo.head`;
    when the working tree was probed instead, `repo.snapshot` holds the
    throwaway commit that captured it. A tool must refuse to probe a commit

@@ -33,12 +33,7 @@
     "serial": true,
     "contention": {
       "detected": true,
-      "runners": [
-        {
-          "pid": 4321,
-          "command": "node /repo/node_modules/vitest/vitest.mjs run"
-        }
-      ]
+      "runners": []
     }
   },
   "records": [

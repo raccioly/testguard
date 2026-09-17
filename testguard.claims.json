@@ -1702,6 +1702,102 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-CONTENTION-NEVER-FAILS-A-PROBE",
+      "statement": "Contention detection is best effort: an unreadable or empty process list yields no detection and never throws, so a probe can never fail because of the detector.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#how-it-works"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/contention.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The process-list read is no longer guarded; a failing ps or wmic throws out of the probe.",
+          "faultClass": "exception-swallowed",
+          "file": "src/probe/contention.mjs",
+          "find": "  } catch {\n    return [];\n  }",
+          "replace": "  } catch (e) {\n    throw e;\n  }",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONTENTION-EXCLUDES-OURSELVES",
+      "statement": "The detector never counts this process or TestGuard's own runner children as contention; only other test runners are reported.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#how-it-works"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/contention.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Our own process and our own runner children are counted, so every probe reports contention with itself.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/contention.mjs",
+          "find": "    .filter((p) => p.pid !== self && RUNNER_RE.test(p.command) && !SELF_RE.test(p.command))",
+          "replace": "    .filter((p) => RUNNER_RE.test(p.command))",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-ESCALATION-EARLY-STOP-RECORDED",
+      "statement": "When escalation stops before N runs because no test failed in every run so far, the evidence records why.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/probe.fixture.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The early stop is silent; a single escalation entry at --confirm 3 looks like a bug in the loop.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "            if (stoppedEarly) detail.escalationStoppedEarly = stoppedEarly;",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

@@ -5,6 +5,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 import { repoRoot as gitRoot, headSha, isDirty, snapshotWorkingTree } from '../git.mjs';
 import { discoverDefenders, discoverDefendersDetailed } from './discover.mjs';
 import { classifyDefenders } from './mocks.mjs';
+import { detectContention, contentionWarning } from './contention.mjs';
 import { createScratch, inPlace, PreconditionError } from './worktree.mjs';
 import { applyFault, locate } from './inject.mjs';
 import { resolveDefenders, parseCommandTemplate } from './runners/shared.mjs';
@@ -46,6 +47,7 @@ export async function probe({
   ref = 'HEAD',
   refExplicit = false,
   ignoreDirty = false,
+  serial = false,
   onWarn = () => {},
   budgetMs = 120_000,
   runnerCommand,
@@ -111,6 +113,11 @@ export async function probe({
       }
     }
   }
+  // Contention: name it before the first run, and record it, so a later
+  // reader of a TIMEOUT or FLAKY-DEFENDER knows the machine was loaded.
+  const contention = detectContention();
+  if (contention.detected) onWarn(contentionWarning(contention));
+
   const startedAt = new Date().toISOString();
   const iso = mode === 'worktree' ? createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules }) : inPlace({ repoRoot: root, projectDir });
   const isoReal = realpathSync(iso.projectDir);
@@ -149,12 +156,12 @@ export async function probe({
       ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
       : new Map();
     const runDefenders = async (files) => {
-      if (commandTemplate) return runner.run({ projectDir: iso.projectDir, files, budgetMs, commandTemplate });
+      if (commandTemplate) return runner.run({ projectDir: iso.projectDir, files, budgetMs, commandTemplate, serial });
       const groups = partitionByRunner(iso.projectDir, files, runner);
       const parts = [];
       for (const [r, group] of groups) {
         if (r !== runner) await ensureOwned(r, group[0]);
-        parts.push(await r.run({ projectDir: iso.projectDir, files: group, budgetMs }));
+        parts.push(await r.run({ projectDir: iso.projectDir, files: group, budgetMs, serial }));
       }
       return mergeRuns(parts);
     };
@@ -203,6 +210,8 @@ export async function probe({
       runner: { name: runner.name, ...((runnerVersion ?? readRunnerVersion(projectDir, runner.name)) ? { version: runnerVersion ?? readRunnerVersion(projectDir, runner.name) } : {}) },
       ...(runnersUsed.size > 1 ? { runners: [...runnersUsed].map(([n, v]) => ({ name: n, ...(v ? { version: v } : {}) })) } : {}),
       confirmRuns,
+      ...(serial ? { serial: true } : {}),
+      ...(contention.detected ? { contention } : {}),
       ...(confirmRuns < 3 ? { provisional: true } : {}),
       mode,
     },
@@ -291,15 +300,21 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
           if (provisional.verdict === 'survived' && escalate && broader.length > 0) {
             const runs = [];
             let killers = null;
+            let stoppedEarly;
             for (let i = 0; i < confirmRuns; i++) {
               stage('escalation', i + 1, confirmRuns);
               const { run, failedTests } = await runDefenders(allTests);
               runs.push(run);
               killers = killers === null ? new Set(failedTests) : new Set(failedTests.filter((t) => killers.has(t)));
-              if (killers.size === 0) break;
+              // Attribution needs a test that failed in ALL N runs. Once the
+              // intersection is empty no further run can name a killer, so the
+              // remaining runs are wasted; stopping can only fail to NAME a
+              // killer, never upgrade a verdict, which is the pessimistic side.
+              if (killers.size === 0) { stoppedEarly = 'no-common-failure'; break; }
             }
             detail.escalated = true;
             detail.escalationRuns = runs;
+            if (stoppedEarly) detail.escalationStoppedEarly = stoppedEarly;
             if (killers.size > 0 && runs.length === confirmRuns && runs.every(isKill)) {
               detail.reason = 'killed-by-undeclared-tests';
               detail.undeclaredKillers = [...killers].sort();

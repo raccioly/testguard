@@ -11,6 +11,9 @@ export const TEST_GLOBS = ['**/*.test.js', '**/*.test.mjs', '**/*.test.cjs', '**
   '**/*.spec.js', '**/*.spec.mjs', '**/*.spec.cjs', '**/*.spec.ts', '**/*.spec.mts', '**/*.spec.tsx', '**/*.spec.jsx'];
 export const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
+/** Node's own advisory warnings about the probed project's configuration; never about the fault. */
+export const NODE_NOISE = /MODULE_TYPELESS_PACKAGE_JSON|ExperimentalWarning|--trace-warnings|Reparsing as ES module|To eliminate this warning/;
+
 /**
  * Split a runner command template into argv. Supports double and single
  * quotes; `{files}` expands to the test files (one argv entry each) and
@@ -173,7 +176,10 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
   return new Promise((resolve) => {
     const child = spawn(cmd, args, { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CI: '1', FORCE_COLOR: '0', ...extraEnv } });
     let stderr = '';
-    child.stderr.on('data', (d) => (stderr += d));
+    // Node prints MODULE_TYPELESS_PACKAGE_JSON (and friends) for the PROBED
+    // project's config, not for anything the fault did. Keep it out of the
+    // stream and out of `loadMessage`, which names the cause of a load error.
+    child.stderr.on('data', (d) => (stderr += String(d).split('\n').filter((l) => !NODE_NOISE.test(l)).join('\n')));
     child.on('error', (e) => (stderr += e.message));
     let killed = false;
     const timer = setTimeout(() => {

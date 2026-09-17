@@ -6,4 +6,4 @@ export const testGlobs = [...TEST_GLOBS, '**/__tests__/**/*.js', '**/__tests__/*
 export const check = (opts) => checkRunner({ ...opts, pkg: 'jest', bin: 'jest' });
 export const tests = (projectDir) => listTestFiles(projectDir, testGlobs);
 // --runTestsByPath: positionals are exact paths, not regexes — a path with `+` or `(` would otherwise silently match nothing.
-export const run = (opts) => runProcess({ ...opts, argv: (files, outFile) => [...runnerArgv(opts.projectDir, 'jest', 'jest'), '--ci', '--json', `--outputFile=${outFile}`, '--runTestsByPath', ...files] });
+export const run = (opts) => runProcess({ ...opts, argv: (files, outFile) => [...runnerArgv(opts.projectDir, 'jest', 'jest'), '--ci', '--json', `--outputFile=${outFile}`, ...(opts.serial ? ['--runInBand'] : []), '--runTestsByPath', ...files] });
