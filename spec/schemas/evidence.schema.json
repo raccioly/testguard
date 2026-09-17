@@ -201,6 +201,25 @@
             "discovered": {
               "description": "True when no defenders were declared and `resolved` was found by static import of the subject's file.",
               "type": "boolean"
+            },
+            "mocking": {
+              "description": "Candidate test files that import the subject's file but mock it (`vi.mock`/`jest.mock`). Discovered candidates that mock are excluded from `resolved`; a declared defender that mocks stays in `resolved` and is listed here, because a declared defender that mocks the subject is a broken evidence chain.",
+              "type": "array",
+              "items": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" }
+            },
+            "signals": {
+              "description": "Static, annotation-grade signals about the defenders. They never change a verdict. `mocked-never-asserted`: the file mocks the subject and never asserts on anything imported from it. `unasserted-annotated`: the same, but the author annotated the mock with a reason (`// unasserted: <why>`), recorded here — silenced, never hidden.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["file", "signal"],
+                "properties": {
+                  "file": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" },
+                  "signal": { "enum": ["mocked-never-asserted", "unasserted-annotated"] },
+                  "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
+                },
+                "additionalProperties": false
+              }
             }
           },
           "additionalProperties": false

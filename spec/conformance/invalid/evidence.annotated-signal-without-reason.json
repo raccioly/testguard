@@ -15,8 +15,7 @@
     },
     "runner": {
       "name": "vitest",
-      "version": "5.0.1",
-      "source": "project"
+      "version": "5.0.1"
     },
     "confirmRuns": 3,
     "mode": "worktree"
@@ -349,7 +348,7 @@
         "signals": [
           {
             "file": "test/rules-mocked.test.mjs",
-            "signal": "mocked-never-asserted"
+            "signal": "unasserted-annotated"
           }
         ]
       },

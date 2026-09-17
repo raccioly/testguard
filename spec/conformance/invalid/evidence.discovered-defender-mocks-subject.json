@@ -15,8 +15,7 @@
     },
     "runner": {
       "name": "vitest",
-      "version": "5.0.1",
-      "source": "project"
+      "version": "5.0.1"
     },
     "confirmRuns": 3,
     "mode": "worktree"
@@ -260,7 +259,11 @@
         "resolved": [
           "test/redact.test.mjs"
         ],
-        "nocover": false
+        "nocover": false,
+        "discovered": true,
+        "mocking": [
+          "test/redact.test.mjs"
+        ]
       },
       "inputs": {
         "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

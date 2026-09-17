@@ -269,11 +269,11 @@
       "faults": [
         {
           "id": "F1",
-          "description": "Discovery returns nothing; every undeclared claim becomes nocover (the pre-0.1.3 behaviour).",
-          "faultClass": "return-altered",
+          "description": "Every test file counts as an importer of the target; discovery no longer depends on the import.",
+          "faultClass": "statement-deleted",
           "file": "src/probe/discover.mjs",
-          "find": "return listTestFiles(projectDir).filter((t) => fileImports(projectDir, join(projectDir, t), targetRel));",
-          "replace": "return [];",
+          "find": "  const importing = listTestFiles(projectDir).filter((t) => fileImports(projectDir, join(projectDir, t), targetRel));",
+          "replace": "  const importing = listTestFiles(projectDir);",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -783,6 +783,231 @@
           "file": "src/probe/probe.mjs",
           "find": "        ignoredDirty = dirty.sort();",
           "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-MOCKING-FILE-IS-NOT-A-DEFENDER",
+      "statement": "A test file that mocks the target module is never counted as a defender of a claim about that module; it is listed as mocking instead.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#how-it-works"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/mocks.test.mjs",
+        "test/discover.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Mocking files are treated like any other importer and counted as defenders.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/mocks.mjs",
+          "find": "    if (a.mocks) {",
+          "replace": "    if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-UNASSERTED-MOCK-SIGNALLED",
+      "statement": "A test file that mocks the target and never asserts on anything imported from it carries the mocked-never-asserted signal (or the annotated form when the author gave a reason).",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#ignore-and-annotations"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/mocks.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The signal is never produced; an unasserted mock looks like any other mock.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/mocks.mjs",
+          "find": "      if (!a.asserted) signals.push(",
+          "replace": "      if (false) signals.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-ALIAS-REFERENCES-FOLLOWED",
+      "statement": "Path aliases declared in a tsconfig reached through `references` (the Vite layout) and in a vite/vitest `resolve.alias` are resolved when discovering defenders.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#how-it-works"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/discover.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Referenced tsconfigs are ignored; only the root tsconfig's paths count.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/rank.mjs",
+          "find": "    for (const ref of Array.isArray(cfg.references) ? cfg.references : []) {",
+          "replace": "    for (const ref of []) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-WALK-SKIPS-TOOL-DIRS",
+      "statement": "File walking never descends into node_modules, .git, dist, coverage or .testguard; test discovery and defender globs cannot pick up a dependency's or a build's test files.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#how-it-works"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/glob.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The skip list is ignored; node_modules and build output are walked.",
+          "faultClass": "guard-removed",
+          "file": "src/util/glob.mjs",
+          "find": "        if (!SKIP_DIRS.has(entry.name)) visit(join(dir, entry.name), relPath);",
+          "replace": "        visit(join(dir, entry.name), relPath);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RESTAMP-REQUIRES-SAME-FINGERPRINTS",
+      "statement": "baseline --restamp moves head only when a clean probe reproduced exactly the baseline's fingerprints; a frozen contract is never silently rewritten.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#baseline-and-delta"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/baseline.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The fingerprint comparison is skipped; any clean probe re-stamps the baseline.",
+          "faultClass": "condition-forced",
+          "file": "src/baseline/baseline.mjs",
+          "find": "  if (!sameFingerprints(baseline.fingerprints, current)) return",
+          "replace": "  if (false) return",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-BASELINE-CARRIES-SNAPSHOT",
+      "statement": "A baseline frozen from working-tree-snapshot evidence records the snapshot commit, so a reader can tell its head is the parent of the commit that carries the tests.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#baseline-and-delta"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/baseline.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The snapshot is dropped; the baseline looks like a clean freeze of its parent commit.",
+          "faultClass": "field-dropped",
+          "file": "src/baseline/baseline.mjs",
+          "find": "...(repo.snapshot ? { snapshot: repo.snapshot } : {}), ",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-IS-ANCESTOR-ASKS-GIT",
+      "statement": "Ancestry between a baseline's head and HEAD is decided by git (merge-base --is-ancestor); a commit that is not in HEAD's history is never reported as an ancestor.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#baseline-and-delta"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/status.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every commit counts as an ancestor; a rewritten or foreign baseline head is never noticed.",
+          "faultClass": "return-altered",
+          "file": "src/git.mjs",
+          "find": "  return spawnSync('git', ['merge-base', '--is-ancestor', ancestor, ref], { cwd: dir }).status === 0;",
+          "replace": "  return true;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
