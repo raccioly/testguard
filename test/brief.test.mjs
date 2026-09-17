@@ -98,4 +98,9 @@ describe('provisional rendering', () => {
     expect(u.text).toContain('no evidence yet; 1 unclaimed changed file since origin/main');
     expect(u.items).toEqual([]);
   });
+
+  it('names how the hook resolved the binary when told, so a stale install is visible at session start', () => {
+    expect(buildBrief(evidence, undefined, { resolved: 'local' }).text).toMatch(/^testguard test \(local\) @ /m);
+    expect(buildBrief(evidence, undefined).text).not.toContain('(local)');
+  });
 });

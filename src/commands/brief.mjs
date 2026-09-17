@@ -6,7 +6,10 @@ import { computeStatus } from '../status/status.mjs';
 import { evidencePath, baselinePath } from './probe.mjs';
 import { resolveChangedRef, withChangedRef } from '../gate/changed.mjs';
 
+const RESOLVED = () => (['local', 'global'].includes(process.env.TESTGUARD_RESOLVED) ? process.env.TESTGUARD_RESOLVED : undefined);
+
 export async function briefCommand({ projectDir, values, version }, io) {
+  const resolved = RESOLVED();
   const evPath = values.evidence ? resolve(values.evidence) : evidencePath(projectDir);
   let status;
   try {
@@ -21,7 +24,7 @@ export async function briefCommand({ projectDir, values, version }, io) {
     // A missing brief must never break an agent's session start — but unclaimed
     // changes are still said, because the claim comes before the probe.
     if (values.text) {
-      if (status?.changes?.uncovered?.length) io.out(buildUnclaimedBrief({ tool: { name: 'testguard', version }, next: status.next, changes: status.changes }).text.trimEnd());
+      if (status?.changes?.uncovered?.length) io.out(buildUnclaimedBrief({ tool: { name: 'testguard', version }, next: status.next, changes: status.changes, resolved }).text.trimEnd());
       return 0;
     }
     io.err(`no evidence at ${evPath}; run \`testguard probe\` first`);
@@ -35,7 +38,7 @@ export async function briefCommand({ projectDir, values, version }, io) {
     io.err('--max must be an integer from 1 to 50');
     return 3;
   }
-  const brief = buildBrief(evidence, baseline, { max, next: status?.next, changes: status?.changes });
+  const brief = buildBrief(evidence, baseline, { max, next: status?.next, changes: status?.changes, resolved });
   if (!values.text) writeSpecDoc('brief', values.out ? resolve(values.out) : join(projectDir, '.testguard', 'brief.json'), brief);
   io.out(values.json ? JSON.stringify(brief, null, 2) : brief.text.trimEnd());
   return 0;

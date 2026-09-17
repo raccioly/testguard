@@ -140,12 +140,21 @@ npx testguard-cli scaffold src/x.ts   # propose faults for a file, as a draft to
 
    ```json
    { "hooks": { "SessionStart": [ { "hooks": [
-     { "type": "command", "command": "npx testguard-cli brief --text" }
+     { "type": "command", "command": "node -e \"<resolver written by testguard init>\"" }
    ] } ] } }
    ```
 
-   `--text` prints only, and exits 0 silently when there is no evidence yet,
-   so the hook can never break a session.
+   `testguard init` writes the hook. It is a **resolver, not a fetch**: it
+   runs `node_modules/.bin/testguard` from the project or the git root, else
+   `testguard` on `PATH`, else exits 0 with no output. It never runs
+   `npx -y` (which downloads the published package on every session start and
+   can lag the checkout the team uses), and not `npx --no-install` either,
+   because npm consults the registry to resolve a package that is not
+   installed. The brief's first line says how the binary was found
+   (`testguard 0.5.0 (local)` / `(global)`), so a stale install is visible.
+   `init --force` upgrades an earlier network-fetching hook. `--text` prints
+   only, and exits 0 silently when there is no evidence yet, so the hook can
+   never break a session and never touches the network.
 
 ### Every change needs a claim
 

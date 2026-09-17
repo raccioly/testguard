@@ -31,7 +31,7 @@ function orderItems(a, b) {
   return (b.isNew - a.isNew) || (ORDER.indexOf(a.verdict) - ORDER.indexOf(b.verdict)) || ((b.rank ?? 0) - (a.rank ?? 0));
 }
 
-export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Date().toISOString(), next, changes } = {}) {
+export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Date().toISOString(), next, changes, resolved } = {}) {
   const g = gate(evidence.records, baseline);
   const toItem = (r, isNew) => ({
     fingerprint: r.fingerprint,
@@ -56,17 +56,18 @@ export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Dat
   };
   const unclaimed = changes?.uncovered?.length ? { ref: changes.ref, files: changes.uncovered } : undefined;
   const doc = { schemaVersion: 1, tool: evidence.tool, generatedAt, head: evidence.run.repo.head, heading: HEADING, summary, ...(next ? { next: { action: next.action, command: next.command, why: next.why } } : {}), ...(unclaimed ? { unclaimed } : {}), items, text: '' };
-  doc.text = renderBriefText({ ...doc, provisional: Boolean(evidence.run.provisional) }, { hasBaseline: Boolean(baseline), total: evidence.records.length });
+  doc.text = renderBriefText({ ...doc, provisional: Boolean(evidence.run.provisional) }, { hasBaseline: Boolean(baseline), total: evidence.records.length, resolved });
   return doc;
 }
 
-export function renderBriefText(brief, { hasBaseline, total }) {
+/** `resolved` names how the hook found the binary (local | global); a stale install is then visible in the session-start context. */
+export function renderBriefText(brief, { hasBaseline, total, resolved }) {
   const unproven = total - (brief.summary.byVerdict.killed ?? 0);
   const lines = [
     brief.heading,
     '',
     ...(brief.provisional ? ['**PROVISIONAL** — this evidence came from fewer than three confirmation runs; treat every verdict below as unconfirmed and re-probe with --confirm 3 before acting on it.', ''] : []),
-    `testguard ${brief.tool.version}${brief.head ? ` @ ${brief.head.slice(0, 12)}` : ''} — ${brief.summary.claims} claims, ${total} faults probed, ${unproven} unproven` +
+    `testguard ${brief.tool.version}${resolved ? ` (${resolved})` : ''}${brief.head ? ` @ ${brief.head.slice(0, 12)}` : ''} — ${brief.summary.claims} claims, ${total} faults probed, ${unproven} unproven` +
       (unproven === 0 ? '.' : hasBaseline ? ` (${brief.summary.new} new since baseline).` : ' (no baseline; everything is new).'),
   ];
   // Unclaimed changes come before everything else: the claim is written
@@ -101,10 +102,10 @@ export function renderBriefText(brief, { hasBaseline, total }) {
  * session-start hook must still tell the agent to write the claim; an empty
  * summary is honest, silence is not.
  */
-export function buildUnclaimedBrief({ tool, next, changes, generatedAt = new Date().toISOString() }) {
+export function buildUnclaimedBrief({ tool, next, changes, generatedAt = new Date().toISOString(), resolved }) {
   const summary = { claims: 0, byVerdict: {}, new: 0, baselined: 0 };
   const doc = { schemaVersion: 1, tool, generatedAt, heading: HEADING, summary, ...(next ? { next: { action: next.action, command: next.command, why: next.why } } : {}), unclaimed: { ref: changes.ref, files: changes.uncovered }, items: [], text: '' };
-  const lines = [HEADING, '', `testguard ${tool.version} — no evidence yet; ${changes.uncovered.length} unclaimed changed file${changes.uncovered.length === 1 ? '' : 's'} since ${changes.ref}.`];
+  const lines = [HEADING, '', `testguard ${tool.version}${resolved ? ` (${resolved})` : ''} — no evidence yet; ${changes.uncovered.length} unclaimed changed file${changes.uncovered.length === 1 ? '' : 's'} since ${changes.ref}.`];
   lines.push('', `UNCLAIMED CHANGES since ${changes.ref}: state the claim first; nothing can be probed for this code until it has one.`);
   for (const u of changes.uncovered) lines.push(`  - ${u.file} (${u.kind}) → ${u.suggestion}`);
   if (next) lines.push('', `NEXT [${next.action}]: ${next.command}`, `  why: ${next.why}`);

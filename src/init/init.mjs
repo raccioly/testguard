@@ -3,7 +3,24 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const TEMPLATES = join(dirname(fileURLToPath(import.meta.url)), 'templates');
-const HOOK_CMD = 'npx -y testguard-cli brief --text';
+// The session-start hook resolves a binary; it never fetches one. A hook that
+// runs `npx -y` downloads the published package on every session start —
+// wrong in a repository that pins and audits dependencies, and it can lag the
+// checkout the team actually uses. Order: the project's own node_modules/.bin,
+// the git root's, then `testguard` on PATH (a global install); otherwise exit 0
+// with no output, because a hook must never break a session. `npx --no-install`
+// is deliberately absent: for a package that is not installed, npm consults the
+// registry to resolve it before deciding not to install.
+const HOOK_RESOLVER = [
+  "const{existsSync}=require('fs'),{join}=require('path'),{spawnSync}=require('child_process');",
+  "const root=(()=>{try{return spawnSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).stdout.trim()||process.cwd()}catch{return process.cwd()}})();",
+  "const bin=process.platform==='win32'?'testguard.cmd':'testguard';",
+  "for(const d of new Set([process.cwd(),root])){const p=join(d,'node_modules','.bin',bin);if(existsSync(p)){spawnSync(p,['brief','--text'],{stdio:'inherit',env:{...process.env,TESTGUARD_RESOLVED:'local'},shell:process.platform==='win32'});process.exit(0)}}",
+  "spawnSync(bin,['brief','--text'],{stdio:'inherit',env:{...process.env,TESTGUARD_RESOLVED:'global'},shell:process.platform==='win32'});process.exit(0)",
+].join('');
+export const HOOK_CMD = `node -e "${HOOK_RESOLVER}"`;
+/** Any earlier form of the hook this tool ever wrote, or a hand-written one: recognised so init can upgrade it. */
+const LEGACY_HOOK_RE = /npx\s+(-y\s+|--yes\s+)?testguard(-cli)?\s+brief\s+--text|testguard(-cli)?\s+brief\s+--text/;
 const AGENTS_BEGIN = '<!-- testguard:begin -->';
 const AGENTS_END = '<!-- testguard:end -->';
 const AGENTS_BLOCK = `${AGENTS_BEGIN}
@@ -46,14 +63,26 @@ export function initProject({ projectDir, force = false }) {
   }
   settings.hooks ??= {};
   settings.hooks.SessionStart ??= [];
-  const already = JSON.stringify(settings.hooks.SessionStart).includes(HOOK_CMD);
-  if (already) {
-    skipped.push('SessionStart hook already present in .claude/settings.json');
-  } else {
-    settings.hooks.SessionStart.push({ hooks: [{ type: 'command', command: HOOK_CMD }] });
+  const hookEntries = settings.hooks.SessionStart.flatMap((g) => g?.hooks ?? []).filter((h) => h && typeof h.command === 'string');
+  const current = hookEntries.find((h) => h.command === HOOK_CMD);
+  const legacy = hookEntries.filter((h) => h.command !== HOOK_CMD && LEGACY_HOOK_RE.test(h.command));
+  const writeSettings = () => {
     mkdirSync(dirname(settingsPath), { recursive: true });
     writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-    done.push('.claude/settings.json: SessionStart hook → brief --text');
+  };
+  if (current && legacy.length === 0) {
+    skipped.push('SessionStart hook already present in .claude/settings.json');
+  } else if (legacy.length && !force) {
+    skipped.push(`SessionStart hook present but it fetches from the network (${legacy[0].command}); run init --force to replace it with the offline resolver`);
+  } else if (legacy.length) {
+    for (const h of legacy) h.command = HOOK_CMD;
+    if (current) for (const g of settings.hooks.SessionStart) g.hooks = (g.hooks ?? []).filter((h) => h !== current);
+    writeSettings();
+    done.push(`.claude/settings.json: SessionStart hook replaced — it fetched from the network (${legacy[0].command}); it now resolves a local or global testguard and never installs`);
+  } else {
+    settings.hooks.SessionStart.push({ hooks: [{ type: 'command', command: HOOK_CMD }] });
+    writeSettings();
+    done.push('.claude/settings.json: SessionStart hook → brief --text (resolves node_modules/.bin or PATH; never fetches)');
   }
 
   const agentsPath = join(projectDir, 'AGENTS.md');

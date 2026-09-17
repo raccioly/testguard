@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The session-start hook never touches the network.** `init` used to write
+  `npx -y testguard-cli brief --text`, which downloads the published package
+  on every session start and can lag the checkout the team actually uses
+  (field report: a repository with `ignore-scripts=true` and pinned,
+  audited dependencies). The hook is now a resolver: the project's
+  `node_modules/.bin/testguard`, then the git root's, then `testguard` on
+  `PATH`, else exit 0 with no output. No `npx` at all — even `--no-install`
+  makes npm consult the registry for a package that is not installed. The
+  brief's first line now says how the binary was resolved (`(local)` /
+  `(global)`), so a stale install is visible in the session-start context.
+  `init` recognises an earlier network-fetching hook and says so;
+  `init --force` replaces it. Self-claim `TG-HOOK-NEVER-FETCHES`.
+
 ## [0.5.0] - 2026-09-17
 
 The change gate: unclaimed code is now a finding.

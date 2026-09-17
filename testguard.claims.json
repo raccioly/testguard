@@ -726,6 +726,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-HOOK-NEVER-FETCHES",
+      "statement": "The session-start hook written by init resolves a locally or globally installed testguard and never runs a command that can download a package.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#brief"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/init.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The hook falls back to npx, which fetches the published package when nothing is installed.",
+          "faultClass": "literal-changed",
+          "file": "src/init/init.mjs",
+          "find": "spawnSync(bin,['brief','--text'],{stdio:'inherit',env:{...process.env,TESTGUARD_RESOLVED:'global'},shell:process.platform==='win32'});process.exit(0)",
+          "replace": "spawnSync('npx',['-y','testguard-cli','brief','--text'],{stdio:'inherit',shell:process.platform==='win32'});process.exit(0)",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }
