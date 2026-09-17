@@ -54,13 +54,15 @@ export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Dat
     new: g.new.length + g.belowFloor.length,
     baselined: g.baselined.length,
   };
+  const kills = evidence.records.filter((r) => r.verdict === 'killed');
+  const coAuthored = kills.filter((r) => r.detail.independence?.class === 'co-authored').length;
   const unclaimed = changes?.uncovered?.length ? { ref: changes.ref, files: changes.uncovered } : undefined;
   const doc = { schemaVersion: 1, tool: evidence.tool, generatedAt, head: evidence.run.repo.head, heading: HEADING, summary, ...(next ? { next: { action: next.action, command: next.command, why: next.why } } : {}), ...(unclaimed ? { unclaimed } : {}), items, text: '' };
-  doc.text = renderBriefText({ ...doc, provisional: Boolean(evidence.run.provisional) }, { hasBaseline: Boolean(baseline), total: evidence.records.length });
+  doc.text = renderBriefText({ ...doc, provisional: Boolean(evidence.run.provisional) }, { hasBaseline: Boolean(baseline), total: evidence.records.length, independence: kills.length ? { coAuthored, kills: kills.length } : undefined });
   return doc;
 }
 
-export function renderBriefText(brief, { hasBaseline, total }) {
+export function renderBriefText(brief, { hasBaseline, total, independence }) {
   const unproven = total - (brief.summary.byVerdict.killed ?? 0);
   const lines = [
     brief.heading,
@@ -76,6 +78,9 @@ export function renderBriefText(brief, { hasBaseline, total }) {
     lines.push('', `UNCLAIMED CHANGES since ${brief.unclaimed.ref}: ${n} changed file${n === 1 ? '' : 's'} carr${n === 1 ? 'ies' : 'y'} no claim. State the claim first; nothing below can see this code.`);
     for (const u of brief.unclaimed.files) lines.push(`  - ${u.file} (${u.kind}) → ${u.suggestion}`);
   }
+  // L3: a kill written in the same change as the code it guards is not
+  // independent evidence. One line, no per-item noise.
+  if (independence?.coAuthored) lines.push('', `${independence.coAuthored} of ${independence.kills} kills are co-authored with the code they defend — the test and the code were written in the same change, so those kills are not independent evidence.`);
   if (brief.next) lines.push('', `NEXT [${brief.next.action}]: ${brief.next.command}`, `  why: ${brief.next.why}`);
   if (brief.items.length === 0) {
     lines.push('', 'Every probed claim is defended. Keep it that way: new claims need a fault and a test that fails on it.');

@@ -1,7 +1,7 @@
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync as fsRealpathSync } from 'node:fs';
 import { git } from '../git.mjs';
 import { createRequire } from 'node:module';
-import { join, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { repoRoot as gitRoot, headSha, isDirty, snapshotWorkingTree } from '../git.mjs';
 import { discoverDefenders } from './discover.mjs';
 import { createScratch, inPlace, PreconditionError } from './worktree.mjs';
@@ -10,10 +10,20 @@ import { resolveDefenders, parseCommandTemplate } from './runners/shared.mjs';
 import { selectRunner, RUNNERS } from './runners/index.mjs';
 import { classify, shouldStopEarly } from './classify.mjs';
 import { blastRadius, rank } from './rank.mjs';
+import { classifyIndependence } from './independence.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
 import { fingerprint } from '../../spec/lib/fingerprint.mjs';
 
 const isKill = (r) => r.outcome === 'fail' && r.assertionFailures > 0;
+
+/** realpath when the path still exists; the path itself otherwise. Never throws. */
+function realpathSync(p) {
+  try {
+    return fsRealpathSync(p);
+  } catch {
+    return p;
+  }
+}
 
 function readRunnerVersion(projectDir, name = 'vitest') {
   try {
@@ -102,6 +112,7 @@ export async function probe({
   }
   const startedAt = new Date().toISOString();
   const iso = mode === 'worktree' ? createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules }) : inPlace({ repoRoot: root, projectDir });
+  const isoReal = realpathSync(iso.projectDir);
   const records = [];
   let runnerVersion;
   let runner = RUNNERS[runnerName === 'auto' ? 'vitest' : runnerName];
@@ -130,7 +141,14 @@ export async function probe({
       for (const fault of claim.faults) {
         const defenders = declared ?? discoverDefenders(iso.projectDir, fault.file);
         const stage = (name, i, n) => onStage({ claimId: claim.id, faultId: fault.id, stage: name, i, n });
-        const record = await probeOne({ claim, fault, defenders, discovered: declared === null, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id });
+        const record = await probeOne({ claim, fault, defenders, discovered: declared === null, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root,
+          // A path from the runner is absolute inside the SCRATCH worktree, or
+          // project-relative. Either way history is read from the real
+          // repository, so both must land on a repo-root-relative path.
+          // The runner reports realpaths (/private/var on macOS) while the
+          // worktree path may not be one — realpath both sides or every
+          // comparison silently misses. (Same trap as projectDir above.)
+          toRepoPath: (p) => relative(root, join(projectDir, isAbsolute(p) ? relative(isoReal, realpathSync(p)) : p)) });
         records.push(record);
         onProgress(record);
       }
@@ -156,7 +174,7 @@ export async function probe({
   };
 }
 
-async function probeOne({ claim, fault, defenders, discovered, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior, priorRunId }) {
+async function probeOne({ claim, fault, defenders, discovered, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior, priorRunId, historyRef, historyDir, toRepoPath }) {
   const targetPath = join(iso.projectDir, fault.file);
   const targetExists = existsSync(targetPath);
   const inputs = {
@@ -206,11 +224,11 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
           const probeRuns = rawProbeRuns;
           for (let i = 0; i < confirmRuns; i++) {
             stage('probe', i + 1, confirmRuns);
-            const { run, timeouts, loadMessage } = await runDefenders(defenders);
-            probeRuns.push({ ...run, timeouts, loadMessage });
+            const { run, timeouts, loadMessage, failedTests } = await runDefenders(defenders);
+            probeRuns.push({ ...run, timeouts, loadMessage, failedTests });
             if (shouldStopEarly(probeRuns)) break;
           }
-          detail.probeRuns = probeRuns.map(({ timeouts, loadMessage, ...run }) => run);
+          detail.probeRuns = probeRuns.map(({ timeouts, loadMessage, failedTests, ...run }) => run);
           const provisional = classify({ defenders, anchor, baselineRuns: detail.baselineRuns, probeRuns, confirmRuns });
 
           // Escalation: does anything *undeclared* catch it? A single run cannot
@@ -247,6 +265,16 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
 
   const blast = targetExists ? blastRadius(iso.projectDir, fault.file) : 0;
 
+  // L3: a kill by a test written in the same change as the code it guards is
+  // weaker evidence than one written separately. Signal only — the verdict is
+  // already decided above, and ranking is the only consumer.
+  if (verdict === 'killed' && historyRef) {
+    // Only the tests that actually failed on the fault count as its killers;
+    // the rest of the defender set did not observe anything.
+    const killers = [...new Set(rawProbeRuns.flatMap((r) => r.failedTests ?? []).map((t) => t.split('::')[0]).filter(Boolean))];
+    detail.independence = classifyIndependence({ dir: historyDir, ref: historyRef, targetFile: toRepoPath(fault.file), defenders: (killers.length ? killers : defenders).map(toRepoPath) });
+  }
+
   return {
     fingerprint: fingerprint({ claimId: claim.id, subjectId: fault.id, file: fault.file, verdict }),
     claim: { id: claim.id, statement: claim.statement, severity: claim.severity, source: claim.source, producedBy: claim.producedBy },
@@ -255,7 +283,7 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
     detail,
     defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}) },
     inputs,
-    rank: rank({ severity: claim.severity, sourceKind: claim.source.kind, blast }),
+    rank: rank({ severity: claim.severity, sourceKind: claim.source.kind, blast, independence: detail.independence?.class }),
   };
 }
 

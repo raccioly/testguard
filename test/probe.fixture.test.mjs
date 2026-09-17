@@ -89,6 +89,19 @@ describe('probe reproduces the known-answer fixture', () => {
     }
   });
 
+  it('records L3 independence on every kill: the fixture commits code and tests together, so kills are co-authored', () => {
+    const kills = evidence.records.filter((r) => r.verdict === 'killed');
+    expect(kills.length).toBeGreaterThan(0);
+    for (const r of kills) {
+      expect(r.detail.independence).toBeDefined();
+      expect(r.detail.independence.class).toBe('co-authored');
+      expect(r.detail.independence.defenderCommit).toBe(r.detail.independence.targetCommit);
+      expect(r.detail.independence.sameAuthor).toBe(true);
+    }
+    // never on a non-kill: it is a property of a kill, and the validator enforces that
+    for (const r of evidence.records.filter((x) => x.verdict !== 'killed')) expect(r.detail.independence).toBeUndefined();
+  });
+
   it('records every fault\'s content hash so a later edit is visible', () => {
     for (const r of evidence.records) expect(r.subject.contentHash).toMatch(/^[a-f0-9]{64}$/);
   });

@@ -75,6 +75,11 @@ const semantic = {
       if (r.verdict === 'nocover' && !r.defenders.nocover) {
         errors.push({ path: `${p}/defenders/nocover`, message: 'nocover verdict requires defenders.nocover = true' });
       }
+      if (r.detail.independence) {
+        if (r.verdict !== 'killed') errors.push({ path: `${p}/detail/independence`, message: 'independence is a property of a kill; only killed records carry it' });
+        const { class: cls, defenderCommit, targetCommit } = r.detail.independence;
+        if (cls !== 'unknown' && !(defenderCommit && targetCommit)) errors.push({ path: `${p}/detail/independence`, message: `independence class ${cls} requires both defenderCommit and targetCommit` });
+      }
       if (r.detail.undeclaredKillers && r.detail.reason !== 'killed-by-undeclared-tests') {
         errors.push({ path: `${p}/detail/undeclaredKillers`, message: 'undeclaredKillers is only meaningful with reason killed-by-undeclared-tests' });
       }

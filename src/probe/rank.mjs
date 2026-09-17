@@ -136,9 +136,13 @@ export function blastRadius(projectDir, targetRel) {
   return count;
 }
 
+// A kill whose defender was written in the same change as the code carries
+// less independent evidence. Ranking may read the signal; verdicts never do.
+const INDEPENDENCE_WEIGHT = { 'separate-change': 1, unknown: 0.95, 'co-authored': 0.85 };
+
 /** Additive ordering only. Never touches the verdict. */
-export function rank({ severity, sourceKind, blast }) {
-  const score = SEVERITY_WEIGHT[severity] * (SOURCE_WEIGHT[sourceKind] ?? 0.9) * (1 + Math.log2(1 + blast));
+export function rank({ severity, sourceKind, blast, independence }) {
+  const score = SEVERITY_WEIGHT[severity] * (SOURCE_WEIGHT[sourceKind] ?? 0.9) * (1 + Math.log2(1 + blast)) * (INDEPENDENCE_WEIGHT[independence] ?? 1);
   return { score: Number(score.toFixed(3)), blastRadius: blast, tier: severity };
 }
 

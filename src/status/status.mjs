@@ -124,6 +124,9 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   const counts = {};
   for (const r of evidence.records) counts[r.verdict] = (counts[r.verdict] ?? 0) + 1;
   doc.counts.byVerdict = counts;
+  const kills = evidence.records.filter((r) => r.verdict === 'killed');
+  const coAuthored = kills.filter((r) => r.detail.independence?.class === 'co-authored').length;
+  if (kills.length) doc.counts.killedCoAuthored = coAuthored;
   doc.counts.new = g.new.length + g.belowFloor.length;
   doc.counts.baselined = g.baselined.length;
   const ranked = sortForReport([...g.new, ...g.belowFloor, ...g.baselined]);
