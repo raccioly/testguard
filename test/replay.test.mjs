@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -237,6 +237,27 @@ describe('classifyReplay — the verdict, pure, every branch', () => {
     expect(classifyReplay([pass, timeout])).toEqual({ verdict: 'unverifiable', reason: 'timed-out' });
     expect(classifyReplay([error])).toEqual({ verdict: 'unverifiable', reason: 'suite-failed-to-load' });
     expect(classifyReplay([])).toEqual({ verdict: 'unverifiable', reason: 'no-runs' });
+  });
+});
+
+describe('replay output paths', () => {
+  it('--out places the calibration beside the replay document, never in the project being read', async () => {
+    const { replayCommand } = await import('../src/commands/replay.mjs');
+    const dir = mkdtempSync(join(tmpdir(), 'tg-replay-out-'));
+    const out = mkdtempSync(join(tmpdir(), 'tg-replay-dest-'));
+    const g = (...args) => spawnSync('git', ['-c', 'user.email=r@x', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
+    g('init', '-q');
+    writeFileSync(join(dir, 'a.mjs'), 'export const a = 1;\n');
+    g('add', '-A');
+    g('commit', '-q', '-m', 'no test here');
+    const lines = [];
+    const io = { out: (s) => lines.push(s), err: (s) => lines.push(s) };
+    // the run itself has nothing to replay; the paths are what this pins
+    await replayCommand({ projectDir: dir, values: { since: 'HEAD~0..HEAD', confirm: '1', budget: '5000', out: join(out, 'replay.json') }, version: 't' }, io).catch(() => {});
+    const { calibrationPath } = await import('../src/commands/replay.mjs');
+    expect(existsSync(calibrationPath(dir))).toBe(false); // nothing written into the project
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(out, { recursive: true, force: true });
   });
 });
 
