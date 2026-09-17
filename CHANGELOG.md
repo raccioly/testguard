@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs
+
+- README: a **Properties** block (deterministic measurement; no network, no
+  telemetry; artifacts are validated data in the repository; never
+  optimistic; one pinned dependency), a **What TestGuard is not** list (not a
+  generator, not a mutation-score dashboard, not a self-healing runner, not a
+  coverage tool), the 2026 peer-reviewed evidence in *Why* (coverage and
+  mutation score lose predictive value on possibly-buggy code; buggy code
+  steers models to assert the bug; agents saturate visible tests), and the
+  Status line brought to v0.5 with all nine commands.
+
 ### Added
 
 - **`testguard admit <test-file> --claim <ID>`** — the two-gate rule as a
