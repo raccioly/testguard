@@ -758,6 +758,117 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-RUNNER-FROM-PROJECT-FIRST",
+      "statement": "A runner is resolved from the project's own package first (its pinned version, its own bin script); an executable on PATH is only a fallback and is recorded as such; npx is never asked.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#exit-codes"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/runner-vitest.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The project package is never consulted; whatever is on PATH (or nothing) decides, and the version recorded is not the project's.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "  if (local) return Promise.resolve({ ok: true, version: local.version, source: 'project' });",
+          "replace": "  if (false) return Promise.resolve({ ok: true, version: local.version, source: 'project' });",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RUNNER-ARGV-IS-THE-PROJECTS",
+      "statement": "Each runner's command line starts with the binary resolved for that project, so the version that runs is the one the project pins.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#how-it-works"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/runner-vitest.test.mjs",
+        "test/probe.fixture.test.mjs",
+        "test/probe.jest.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "vitest is invoked by bare name again, so PATH (or nothing) decides which binary runs.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/runners/vitest.mjs",
+          "find": "[...runnerArgv(opts.projectDir, 'vitest', 'vitest'), 'run', ...files,",
+          "replace": "['vitest', 'run', ...files,",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "jest is invoked by bare name again.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/runners/jest.mjs",
+          "find": "[...runnerArgv(opts.projectDir, 'jest', 'jest'), '--ci',",
+          "replace": "['jest', '--ci',",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-AUTO-PICKS-FIRST-RESOLVABLE",
+      "statement": "With --runner auto the first runner that resolves from the project is selected, in the documented order; an unknown name is a usage error, never a silent fallback.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#how-it-works"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/probe.jest.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An unknown runner name silently falls back to the first candidate instead of erroring.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/index.mjs",
+          "find": "  if (!candidates[0]) return { error: `unknown runner \"${name}\"; use vitest, jest or auto` };",
+          "replace": "  if (!candidates[0]) candidates = [vitest];",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

@@ -91,6 +91,7 @@ export async function probe({
   const iso = mode === 'worktree' ? createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules }) : inPlace({ repoRoot: root, projectDir });
   const records = [];
   let runnerVersion;
+  let runnerSource;
   let runner = RUNNERS[runnerName === 'auto' ? 'vitest' : runnerName];
   try {
     const commandTemplate = runnerCommand ? parseCommandTemplate(runnerCommand) : undefined;
@@ -103,6 +104,7 @@ export async function probe({
       }
       runner = sel.runner;
       runnerVersion = sel.version;
+      runnerSource = sel.source;
     }
     const allTests = runner.tests(iso.projectDir);
     const baselineCache = new Map();
@@ -134,7 +136,7 @@ export async function probe({
       startedAt,
       finishedAt: new Date().toISOString(),
       repo: { head, dirty: isDirty(root), ...(snapshot ? { snapshot } : {}) },
-      runner: { name: runner.name, ...((runnerVersion ?? readRunnerVersion(projectDir, runner.name)) ? { version: runnerVersion ?? readRunnerVersion(projectDir, runner.name) } : {}) },
+      runner: { name: runner.name, ...((runnerVersion ?? readRunnerVersion(projectDir, runner.name)) ? { version: runnerVersion ?? readRunnerVersion(projectDir, runner.name) } : {}), ...(runnerSource ? { source: runnerSource } : {}) },
       confirmRuns,
       ...(confirmRuns < 3 ? { provisional: true } : {}),
       mode,

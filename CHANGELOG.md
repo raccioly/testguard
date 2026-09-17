@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
 - **`testguard admit <test-file> --claim <ID>`** — the two-gate rule as a
   named verb. Sugar over `probe --claim <ID> --include-dirty --no-escalate`:
   the named test must be a declared or discovered defender of the claim
@@ -24,12 +25,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   claim is false", and it is now one command. `status.next` for `unproven`
   and the installed skill's fix loop point at it. Self-claim
   `TG-ADMIT-NEEDS-ALL-KILLED`.
+
 ### Changed
+
 
 - CI: TestGuard's self-probe runs on one Node leg instead of three, without
   escalation, and restores the previous run's evidence from the cache so
   unchanged claims reuse their verdicts. The verdicts do not depend on the
   Node minor; the from-scratch probe was ~14 minutes per leg.
+
+### Fixed
+
+
+- Runner resolution (#41). `npx --no-install <bin> --version` answered
+  "installed" from projects with no such runner whenever the npx cache held
+  the package or a same-named executable was on PATH. Runners now resolve
+  from the project's own package first (pinned version, own bin script run
+  with this node), fall back to an executable on PATH — recorded as
+  `run.runner.source: "path"` — and never ask npx.
 
 ## [0.5.0] - 2026-09-17
 

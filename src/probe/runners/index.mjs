@@ -13,7 +13,7 @@ export async function selectRunner({ projectDir, name = 'auto' }) {
   const messages = [];
   for (const r of candidates) {
     const c = await r.check({ projectDir });
-    if (c.ok) return { runner: r, version: c.version };
+    if (c.ok) return { runner: r, version: c.version, source: c.source };
     messages.push(`${r.name}: ${c.message}`);
   }
   return { error: messages.join('; ') };
