@@ -170,7 +170,12 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
 3. **Baseline** freezes every non-passing fingerprint. Later probes suppress
    what was already known and exit non-zero only on what is new. Claims whose
    source and defenders are unchanged reuse their prior verdict, so a probe
-   in CI costs only what changed.
+   in CI costs only what changed. A baseline frozen from `--include-dirty`
+   evidence records the snapshot and points at the *parent* of the commit
+   that will carry your tests; after you commit, a clean `probe` plus
+   `baseline --restamp` moves it to that commit — only when the fingerprints
+   are identical, never otherwise. `status` notes a baseline that predates
+   HEAD without making it a state.
 4. **Brief** turns evidence plus baseline into a ranked, capped
    `## TEST BLINDSPOT CONTEXT` block, printed and also written to
    `.testguard/brief.json` (`--text` prints only). Wire it into an agent's session start
