@@ -53,6 +53,7 @@ probe
 scaffold   --claim <ID> (put every proposal under this claim; copies it if it exists)  --out <path>  --json
            shapes: if-guard → if (false) · single-line guard/mutation removed · return <check> → return true
                    · security flag/window/cost literal weakened · verify/validate/check call removed
+                   · field dropped from a payload/allow-list/schema/merge · parameter-derived argument swapped for undefined/{}
 admit      --claim <ID> (required)  --fault <FID> (one fault only)  --confirm <n>  --json
            ADMITTED (exit 0) only when every fault of the claim is killed N/N by defenders that are green N/N; anything else is NOT ADMITTED (exit 1) and names the first blocking fault
            the test must be a declared or discovered defender of the claim (exit 3 otherwise); evidence goes to .testguard/evidence-partial.json

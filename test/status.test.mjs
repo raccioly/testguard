@@ -62,7 +62,7 @@ describe('computeStatus — every state, with a conforming document', () => {
   it('unprobed → probe', () => {
     const { dir } = project();
     const s = computeStatus({ projectDir: dir });
-    expect(s).toMatchObject({ state: 'unprobed', next: { action: 'probe', command: 'testguard probe' }, counts: { claims: 9, faults: 11 } });
+    expect(s).toMatchObject({ state: 'unprobed', next: { action: 'probe', command: 'testguard probe' }, counts: { claims: 10, faults: 13 } });
     expect(validate('status', s).errors).toEqual([]);
   });
   it('provisional-only → probe --confirm 3', () => {
