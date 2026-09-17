@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   claim is false", and it is now one command. `status.next` for `unproven`
   and the installed skill's fix loop point at it. Self-claim
   `TG-ADMIT-NEEDS-ALL-KILLED`.
+### Changed
+
+- CI: TestGuard's self-probe runs on one Node leg instead of three, without
+  escalation, and restores the previous run's evidence from the cache so
+  unchanged claims reuse their verdicts. The verdicts do not depend on the
+  Node minor; the from-scratch probe was ~14 minutes per leg.
 
 ## [0.5.0] - 2026-09-17
 
