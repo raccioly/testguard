@@ -15,6 +15,14 @@
       "description": "Whether the working tree had uncommitted changes when the evidence behind this baseline was taken.",
       "type": "boolean"
     },
+    "snapshot": {
+      "description": "When the evidence behind this baseline was a working-tree snapshot: that throwaway commit. `head` is then the parent of the commit that will carry the tests; `baseline --restamp` moves `head` once a clean probe reproduces the same fingerprints.",
+      "$ref": "urn:guard-spec:v1:common#/$defs/gitSha"
+    },
+    "restampedAt": {
+      "description": "Set when `head` was moved by `baseline --restamp` (same fingerprints, clean tree). `createdAt` keeps the original freeze time.",
+      "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime"
+    },
     "fingerprints": {
       "type": "object",
       "propertyNames": { "pattern": "^[a-f0-9]{64}$" },
