@@ -1,27 +1,57 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:guard-spec:v1:evidence",
-  "title": "Guard spec v1 — evidence file",
+  "title": "Guard spec v1 \u2014 evidence file",
   "description": "One run's findings, on disk, in a shape an auditor can read without the tool. Each record binds a claim to a subject (for TestGuard, an injected fault) and a verdict, with every run that produced the verdict.",
   "type": "object",
-  "required": ["schemaVersion", "tool", "run", "records"],
+  "required": [
+    "schemaVersion",
+    "tool",
+    "run",
+    "records"
+  ],
   "properties": {
-    "$schema": { "type": "string" },
-    "schemaVersion": { "const": 1 },
-    "tool": { "$ref": "urn:guard-spec:v1:common#/$defs/tool" },
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "tool": {
+      "$ref": "urn:guard-spec:v1:common#/$defs/tool"
+    },
     "run": {
       "type": "object",
-      "required": ["id", "startedAt", "repo", "confirmRuns", "mode"],
+      "required": [
+        "id",
+        "startedAt",
+        "repo",
+        "confirmRuns",
+        "mode"
+      ],
       "properties": {
-        "id": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
-        "startedAt": { "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime" },
-        "finishedAt": { "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime" },
+        "id": {
+          "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+        },
+        "startedAt": {
+          "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime"
+        },
+        "finishedAt": {
+          "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime"
+        },
         "repo": {
           "type": "object",
-          "required": ["head", "dirty"],
+          "required": [
+            "head",
+            "dirty"
+          ],
           "properties": {
-            "head": { "$ref": "urn:guard-spec:v1:common#/$defs/gitSha" },
-            "dirty": { "type": "boolean" },
+            "head": {
+              "$ref": "urn:guard-spec:v1:common#/$defs/gitSha"
+            },
+            "dirty": {
+              "type": "boolean"
+            },
             "snapshot": {
               "description": "When the working tree was probed instead of `head`: the dangling commit that captured it. Not a ref; may be garbage-collected.",
               "$ref": "urn:guard-spec:v1:common#/$defs/gitSha"
@@ -30,26 +60,38 @@
               "description": "Defender/target files that had uncommitted changes when `head` was probed as committed (an explicit --ref, or --ignore-dirty). The working-tree versions of these files are NOT what the verdicts describe.",
               "type": "array",
               "minItems": 1,
-              "items": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" }
+              "items": {
+                "$ref": "urn:guard-spec:v1:common#/$defs/repoPath"
+              }
             }
           },
           "additionalProperties": false
         },
         "runner": {
           "type": "object",
-          "required": ["name"],
+          "required": [
+            "name"
+          ],
           "properties": {
-            "name": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
-            "version": { "type": "string", "maxLength": 64 },
+            "name": {
+              "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+            },
+            "version": {
+              "type": "string",
+              "maxLength": 64
+            },
             "source": {
               "description": "`project`: the runner package resolved from the project and its own bin script ran. `path`: no such package in the project; an executable of that name on PATH ran instead (a legitimate monorepo setup, but not the project's pinned version).",
-              "enum": ["project", "path"]
+              "enum": [
+                "project",
+                "path"
+              ]
             }
           },
           "additionalProperties": false
         },
         "confirmRuns": {
-          "description": "N — how many times the defenders were run both unmodified (baseline) and with each fault applied.",
+          "description": "N \u2014 how many times the defenders were run both unmodified (baseline) and with each fault applied.",
           "type": "integer",
           "minimum": 1
         },
@@ -59,33 +101,80 @@
         },
         "mode": {
           "description": "`worktree` = faults were applied in a scratch git worktree (default). `in-place` = the user's working tree was mutated and restored.",
-          "enum": ["worktree", "in-place"]
+          "enum": [
+            "worktree",
+            "in-place"
+          ]
+        },
+        "runners": {
+          "description": "Every runner that produced part of this evidence when defenders were split by file (the project runner plus, e.g., Playwright for the files under its testDir). Absent when one runner ran everything.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+              },
+              "version": {
+                "type": "string",
+                "maxLength": 64
+              }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false
     },
     "records": {
       "type": "array",
-      "items": { "$ref": "#/$defs/record" }
+      "items": {
+        "$ref": "#/$defs/record"
+      }
     }
   },
   "additionalProperties": false,
   "$defs": {
     "testRun": {
       "type": "object",
-      "required": ["outcome", "durationMs"],
+      "required": [
+        "outcome",
+        "durationMs"
+      ],
       "properties": {
         "outcome": {
           "description": "`fail` means at least one test failed with the suite otherwise loading and running. `error` means the suite could not load or run (import/syntax error). `timeout` means the runner exceeded its budget.",
-          "enum": ["pass", "fail", "timeout", "error"]
+          "enum": [
+            "pass",
+            "fail",
+            "timeout",
+            "error"
+          ]
         },
         "tests": {
           "type": "object",
-          "required": ["total", "passed", "failed"],
+          "required": [
+            "total",
+            "passed",
+            "failed"
+          ],
           "properties": {
-            "total": { "type": "integer", "minimum": 0 },
-            "passed": { "type": "integer", "minimum": 0 },
-            "failed": { "type": "integer", "minimum": 0 }
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "passed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0
+            }
           },
           "additionalProperties": false
         },
@@ -94,13 +183,24 @@
           "type": "integer",
           "minimum": 0
         },
-        "durationMs": { "type": "integer", "minimum": 0 }
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
       "additionalProperties": false
     },
     "record": {
       "type": "object",
-      "required": ["fingerprint", "claim", "subject", "verdict", "detail", "defenders", "inputs"],
+      "required": [
+        "fingerprint",
+        "claim",
+        "subject",
+        "verdict",
+        "detail",
+        "defenders",
+        "inputs"
+      ],
       "properties": {
         "fingerprint": {
           "description": "sha256 of `<claim.id>\\n<subject.id>\\n<subject.file>\\n<verdict>`. Derived from identities and outcome, never from `find`/`replace`, so repairing a rotted anchor does not churn the baseline.",
@@ -108,46 +208,95 @@
         },
         "claim": {
           "type": "object",
-          "required": ["id", "statement", "severity", "source"],
+          "required": [
+            "id",
+            "statement",
+            "severity",
+            "source"
+          ],
           "properties": {
-            "id": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
-            "statement": { "type": "string", "minLength": 1, "maxLength": 2000 },
-            "severity": { "$ref": "urn:guard-spec:v1:common#/$defs/severity" },
+            "id": {
+              "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+            },
+            "statement": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "severity": {
+              "$ref": "urn:guard-spec:v1:common#/$defs/severity"
+            },
             "source": {
               "type": "object",
-              "required": ["kind"],
+              "required": [
+                "kind"
+              ],
               "properties": {
-                "kind": { "enum": ["spec", "adr", "annotation", "comment", "manual"] },
-                "ref": { "type": "string", "maxLength": 512 }
+                "kind": {
+                  "enum": [
+                    "spec",
+                    "adr",
+                    "annotation",
+                    "comment",
+                    "manual"
+                  ]
+                },
+                "ref": {
+                  "type": "string",
+                  "maxLength": 512
+                }
               },
               "additionalProperties": false
             },
-            "producedBy": { "$ref": "urn:guard-spec:v1:common#/$defs/provenance" }
+            "producedBy": {
+              "$ref": "urn:guard-spec:v1:common#/$defs/provenance"
+            }
           },
           "additionalProperties": false
         },
         "subject": {
           "description": "What was tried against the claim. For TestGuard `kind` is `fault`. Other adopters use their own kinds (e.g. `doc-statement`, `finding`); extra properties are permitted here and nowhere else.",
           "type": "object",
-          "required": ["kind", "id"],
+          "required": [
+            "kind",
+            "id"
+          ],
           "properties": {
-            "kind": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
-            "id": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
-            "description": { "type": "string", "maxLength": 2000 },
-            "file": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" },
-            "faultClass": { "$ref": "urn:guard-spec:v1:common#/$defs/faultClass" },
-            "producedBy": { "$ref": "urn:guard-spec:v1:common#/$defs/provenance" },
+            "kind": {
+              "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+            },
+            "id": {
+              "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "file": {
+              "$ref": "urn:guard-spec:v1:common#/$defs/repoPath"
+            },
+            "faultClass": {
+              "$ref": "urn:guard-spec:v1:common#/$defs/faultClass"
+            },
+            "producedBy": {
+              "$ref": "urn:guard-spec:v1:common#/$defs/provenance"
+            },
             "contentHash": {
-              "description": "sha256 of the subject's content (for a fault: find + newline + replace). Excluded from the fingerprint on purpose, so repairing an anchor does not churn a baseline — and recorded here on purpose, so weakening a fault to make a finding disappear is visible.",
+              "description": "sha256 of the subject's content (for a fault: find + newline + replace). Excluded from the fingerprint on purpose, so repairing an anchor does not churn a baseline \u2014 and recorded here on purpose, so weakening a fault to make a finding disappear is visible.",
               "$ref": "urn:guard-spec:v1:common#/$defs/sha256"
             }
           },
           "additionalProperties": true
         },
-        "verdict": { "$ref": "urn:guard-spec:v1:common#/$defs/verdict" },
+        "verdict": {
+          "$ref": "urn:guard-spec:v1:common#/$defs/verdict"
+        },
         "detail": {
           "type": "object",
-          "required": ["baselineRuns", "probeRuns"],
+          "required": [
+            "baselineRuns",
+            "probeRuns"
+          ],
           "properties": {
             "reason": {
               "description": "Machine-readable qualifier, e.g. `anchor-missing`, `anchor-ambiguous`, `defenders-not-green`, `replacement-does-not-compile`.",
@@ -157,12 +306,16 @@
             "baselineRuns": {
               "description": "Defenders run on unmodified source, N times. Anything short of N/N pass is `flaky-defender`.",
               "type": "array",
-              "items": { "$ref": "#/$defs/testRun" }
+              "items": {
+                "$ref": "#/$defs/testRun"
+              }
             },
             "probeRuns": {
               "description": "Defenders run with the fault applied, N times.",
               "type": "array",
-              "items": { "$ref": "#/$defs/testRun" }
+              "items": {
+                "$ref": "#/$defs/testRun"
+              }
             },
             "escalated": {
               "description": "True when the fault survived its declared defenders and a broader test set was then run.",
@@ -170,13 +323,19 @@
             },
             "escalationRuns": {
               "type": "array",
-              "items": { "$ref": "#/$defs/testRun" }
+              "items": {
+                "$ref": "#/$defs/testRun"
+              }
             },
             "undeclaredKillers": {
               "description": "With reason `killed-by-undeclared-tests`: the tests (as `file::name`) that failed in every escalation run. Names what to add to `defendedBy`.",
               "type": "array",
               "minItems": 1,
-              "items": { "type": "string", "minLength": 1, "maxLength": 1024 }
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              }
             },
             "flakeRate": {
           "description": "Observed instability of the defenders on UNMODIFIED source: `failures` of `runs` baseline runs failed with the source untouched. Only runs that actually ran are counted (`pass`/`fail`); a load error or a timeout measures nothing about stability and is excluded from both numbers. `failures > 0` means the verdict is `flaky-defender`; the degree is for whoever fixes the defender, and it is the first input to calibration.",
@@ -203,10 +362,19 @@
         "anchor": {
               "description": "With an anchor-related reason: how many times `find` occurred versus how many were expected.",
               "type": "object",
-              "required": ["hits", "expected"],
+              "required": [
+                "hits",
+                "expected"
+              ],
               "properties": {
-                "hits": { "type": "integer", "minimum": 0 },
-                "expected": { "type": "integer", "minimum": 1 }
+                "hits": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "expected": {
+                  "type": "integer",
+                  "minimum": 1
+                }
               },
               "additionalProperties": false
             }
@@ -215,11 +383,27 @@
         },
         "defenders": {
           "type": "object",
-          "required": ["requested", "resolved", "nocover"],
+          "required": [
+            "requested",
+            "resolved",
+            "nocover"
+          ],
           "properties": {
-            "requested": { "type": "array", "items": { "type": "string" } },
-            "resolved": { "type": "array", "items": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" } },
-            "nocover": { "type": "boolean" },
+            "requested": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "resolved": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:guard-spec:v1:common#/$defs/repoPath"
+              }
+            },
+            "nocover": {
+              "type": "boolean"
+            },
             "discovered": {
               "description": "True when no defenders were declared and `resolved` was found by static import of the subject's file.",
               "type": "boolean"
@@ -227,20 +411,50 @@
             "mocking": {
               "description": "Candidate test files that import the subject's file but mock it (`vi.mock`/`jest.mock`). Discovered candidates that mock are excluded from `resolved`; a declared defender that mocks stays in `resolved` and is listed here, because a declared defender that mocks the subject is a broken evidence chain.",
               "type": "array",
-              "items": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" }
+              "items": {
+                "$ref": "urn:guard-spec:v1:common#/$defs/repoPath"
+              }
             },
             "signals": {
-              "description": "Static, annotation-grade signals about the defenders. They never change a verdict. `mocked-never-asserted`: the file mocks the subject and never asserts on anything imported from it. `unasserted-annotated`: the same, but the author annotated the mock with a reason (`// unasserted: <why>`), recorded here — silenced, never hidden.",
+              "description": "Static, annotation-grade signals about the defenders. They never change a verdict. `mocked-never-asserted`: the file mocks the subject and never asserts on anything imported from it. `unasserted-annotated`: the same, but the author annotated the mock with a reason (`// unasserted: <why>`), recorded here \u2014 silenced, never hidden.",
               "type": "array",
               "items": {
                 "type": "object",
-                "required": ["file", "signal"],
+                "required": [
+                  "file",
+                  "signal"
+                ],
                 "properties": {
-                  "file": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" },
-                  "signal": { "enum": ["mocked-never-asserted", "unasserted-annotated"] },
-                  "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
+                  "file": {
+                    "$ref": "urn:guard-spec:v1:common#/$defs/repoPath"
+                  },
+                  "signal": {
+                    "enum": [
+                      "mocked-never-asserted",
+                      "unasserted-annotated"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
                 },
                 "additionalProperties": false
+              }
+            },
+            "byRunner": {
+              "description": "When the resolved defenders ran under more than one runner: runner name \u2192 the files it ran. Every file appears in `resolved`. Absent when the project runner ran them all.",
+              "type": "object",
+              "propertyNames": {
+                "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+              },
+              "additionalProperties": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "urn:guard-spec:v1:common#/$defs/repoPath"
+                }
               }
             }
           },
@@ -249,12 +463,19 @@
         "inputs": {
           "description": "Content hashes of everything the verdict depends on, so an unchanged claim can reuse its prior verdict.",
           "type": "object",
-          "required": ["targetHash", "defenderHashes"],
+          "required": [
+            "targetHash",
+            "defenderHashes"
+          ],
           "properties": {
-            "targetHash": { "$ref": "urn:guard-spec:v1:common#/$defs/sha256" },
+            "targetHash": {
+              "$ref": "urn:guard-spec:v1:common#/$defs/sha256"
+            },
             "defenderHashes": {
               "type": "object",
-              "additionalProperties": { "$ref": "urn:guard-spec:v1:common#/$defs/sha256" }
+              "additionalProperties": {
+                "$ref": "urn:guard-spec:v1:common#/$defs/sha256"
+              }
             }
           },
           "additionalProperties": false
@@ -266,21 +487,30 @@
         "rank": {
           "description": "Additive ordering signal. Never alters `verdict`.",
           "type": "object",
-          "required": ["score"],
+          "required": [
+            "score"
+          ],
           "properties": {
-            "score": { "type": "number" },
+            "score": {
+              "type": "number"
+            },
             "blastRadius": {
               "description": "Number of source files that import the subject's file, transitively or directly as the tool documents.",
               "type": "integer",
               "minimum": 0
             },
-            "tier": { "type": "string", "maxLength": 64 }
+            "tier": {
+              "type": "string",
+              "maxLength": 64
+            }
           },
           "additionalProperties": false
         },
         "annotations": {
           "type": "array",
-          "items": { "$ref": "urn:guard-spec:v1:common#/$defs/annotation" }
+          "items": {
+            "$ref": "urn:guard-spec:v1:common#/$defs/annotation"
+          }
         }
       },
       "additionalProperties": false

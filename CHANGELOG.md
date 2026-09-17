@@ -206,6 +206,21 @@ The change gate: unclaimed code is now a finding.
 
 ### Added
 
+- **Playwright runner, selected per file** (#15). A defender under
+  `playwright.config.*`'s `testDir` runs under Playwright whatever the
+  project runner is; one claim may list a unit test and a browser spec, and
+  the evidence records `defenders.byRunner` and `run.runners`. Playwright's
+  statuses map onto the verdict rules: `timedOut` is a timeout, never a
+  kill; `flaky` (failed, passed on retry) is a non-green run, so a defender
+  that only passes on retry is `FLAKY-DEFENDER` even though Playwright exits
+  0. Runs from several runners merge pessimistically. `--runner playwright`
+  selects it for a whole project. A browserless mixed fixture
+  (`fixtures/known-answer-playwright`, with its own dependencies) is the
+  oracle, verified by hand; a dedicated CI job runs it.
+- **Two UI `scaffold` shapes**: `element-removed` (a one-line JSX element,
+  self-closing or paired) and `handler-dropped` (an `on<Event>={…}` prop, on
+  its own line or inline). Never inside tests, fixtures or migrations.
+
 - **Two `scaffold` shapes and two fault classes.** `field-dropped` (#14):
   a field removed from an object that is returned, built by an arrow,
   assigned to a payload-ish name, passed to a persistence/transport call,

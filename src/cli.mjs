@@ -47,7 +47,8 @@ probe
                        (without it, a dirty defender/target with the implicit HEAD is refused: the silent-mismatch trap)
   --verbose            also print each killed fault (default: only unproven ones, plus a count)
                        --confirm below 3 is PROVISIONAL: verdicts print with "?", evidence goes to .testguard/evidence-provisional.json
-  --runner <name>      vitest | jest | auto (default: auto — first of vitest, jest that resolves)
+  --runner <name>      vitest | jest | playwright | auto (default: auto — first of vitest, jest that resolves; a defender under
+                       playwright's testDir always runs under playwright, whatever the project runner)
   --runner-cmd "<cmd>" custom runner; must contain {files} and {out}, e.g. "pnpm vitest run {files} --reporter=json --outputFile={out}"
   --node-modules <dir> node_modules to link into the scratch worktree (or TESTGUARD_NODE_MODULES)
   --in-place           mutate the working tree instead of a scratch worktree
@@ -64,6 +65,7 @@ replay     --since <range>   commit range to search for fix commits (HEAD~50..HE
            --confirm <n>     runs per verdict (default 3); a flaky failure reads as "the suite caught it", so mixed runs are never caught
            --out <path>       replay document (default: <dir>/.testguard/replay.json); the calibration goes beside it
            reports, never gates: a bug that escaped is history, not a regression in this change
+                   · one-line JSX element removed · on<Event> handler prop dropped
 admit      --claim <ID> (required)  --fault <FID> (one fault only)  --confirm <n>  --json
            ADMITTED (exit 0) only when every fault of the claim is killed N/N by defenders that are green N/N; anything else is NOT ADMITTED (exit 1) and names the first blocking fault
            the test must be a declared or discovered defender of the claim (exit 3 otherwise); evidence goes to .testguard/evidence-partial.json
@@ -160,8 +162,8 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
     io.err(USAGE);
     return 3;
   }
-  if (!['vitest', 'jest', 'auto'].includes(values.runner)) {
-    io.err('--runner must be vitest, jest or auto');
+  if (!['vitest', 'jest', 'playwright', 'auto'].includes(values.runner)) {
+    io.err('--runner must be vitest, jest, playwright or auto');
     return 3;
   }
   if (!['critical', 'high', 'medium', 'low'].includes(values.severity)) {
