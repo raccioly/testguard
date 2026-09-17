@@ -1,6 +1,6 @@
 {
   "name": "testguard-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Proves a test suite defends the claims a project makes: injects the faults those claims forbid and reports every one the tests fail to detect.",
   "type": "module",
   "license": "MIT",
@@ -28,7 +28,8 @@
     "test:spec": "vitest run spec/conformance",
     "self:probe": "node cli/testguard.mjs probe . --budget 180000",
     "release:sync": "node .github/scripts/sync-release-version.mjs",
-    "prepublishOnly": "node cli/testguard.mjs --version && node .github/scripts/sync-release-version.mjs --check"
+    "prepublishOnly": "node cli/testguard.mjs --version && node .github/scripts/sync-release-version.mjs --check",
+    "test:install": "node .github/scripts/install-smoke.mjs"
   },
   "keywords": [
     "testing",
@@ -45,7 +46,6 @@
     "quality-gate"
   ],
   "devDependencies": {
-    "ajv": "^8.20.0",
     "vitest": "^5.0.1"
   },
   "bin": {
@@ -62,5 +62,8 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "ajv": "8.20.0"
   }
 }

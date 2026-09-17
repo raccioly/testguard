@@ -102,7 +102,7 @@ jobs:
           # Only release surfaces may change in a release PR.
           CHANGED=$(git diff --name-only HEAD --)
           for f in $CHANGED; do
-            case "$f" in package.json|package-lock.json|pyproject.toml|CHANGELOG.md|action.yml|packaging/homebrew/testguard.rb) ;;
+            case "$f" in package.json|package-lock.json|pyproject.toml|CHANGELOG.md|action.yml|packaging/homebrew/testguard.rb|README.md) ;;
               *) echo "::error::unexpected file in release diff: $f"; exit 1;;
             esac
           done

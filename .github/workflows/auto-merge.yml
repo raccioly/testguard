@@ -46,7 +46,7 @@ jobs:
 
             const { data: files } = await github.rest.pulls.listFiles({ owner, repo, pull_number: num, per_page: 300 });
             const paths = files.map((f) => f.filename);
-            const RELEASE_SURFACES = new Set(['package.json', 'package-lock.json', 'pyproject.toml', 'CHANGELOG.md', 'action.yml', 'packaging/homebrew/testguard.rb']);
+            const RELEASE_SURFACES = new Set(['package.json', 'package-lock.json', 'pyproject.toml', 'CHANGELOG.md', 'action.yml', 'packaging/homebrew/testguard.rb', 'README.md']);
 
             if (author === 'dependabot[bot]') {
               const m = /from (\d+)\.(\d+)\.\S+ to (\d+)\.(\d+)\./.exec(pr.title || '');

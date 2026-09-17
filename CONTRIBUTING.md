@@ -8,9 +8,10 @@ follow from that.
 
 ```bash
 git clone https://github.com/raccioly/testguard && cd testguard
-npm install            # devDependencies only; the package itself has none
+npm install
 npm test               # ~15s: unit tests + probing the fixture end to end
 npm run self:probe     # TestGuard's own claims, probed by TestGuard
+npm run test:install   # pack → install with prod deps only → run; what 0.1.0 lacked
 ```
 
 Node ≥ 20. Python ≥ 3.8 only if you touch `testguard_cli/`.
@@ -41,8 +42,9 @@ Node ≥ 20. Python ≥ 3.8 only if you touch `testguard_cli/`.
    load failure, or an exit code count as detection.
 5. **N-run confirmation everywhere** — baseline, probe, and escalation
    attribution. A single run is never evidence.
-6. **Zero runtime dependencies.** Adding one needs a very good reason and a
-   discussion first.
+6. **One runtime dependency** (`ajv`, exact-pinned). Adding another needs a
+   very good reason and a discussion first. `npm run test:install` proves
+   the package runs as installed with production dependencies only.
 7. **No client-identifying material.** Fixtures and examples use neutral
    domains. Benchmarks against real codebases live outside this repository
    (`bench/README.md`).
