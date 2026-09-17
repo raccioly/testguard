@@ -5,7 +5,7 @@ export const formatVerdict = (v, provisional = false) => (v === 'killed' ? 'kill
 
 export const PROVISIONAL_WARNING = (n) => `PROVISIONAL — confirmRuns ${n} (< 3): nothing below is confirmed. Verdicts carry a "?"; this evidence cannot be frozen into a baseline. Re-run with --confirm 3 before trusting it.`;
 
-export function renderRecord(r, { provisional = false } = {}) {
+export function renderRecord(r, { provisional = false, showDiscovered = true } = {}) {
   const head = `${formatVerdict(r.verdict, provisional).padEnd(15)} ${r.claim.id}/${r.subject.id}`.padEnd(38);
   let why = '';
   if (r.detail.reason === 'killed-by-undeclared-tests' && r.detail.undeclaredKillers?.length) {
@@ -16,7 +16,7 @@ export function renderRecord(r, { provisional = false } = {}) {
   } else if (r.detail.reason) {
     why = `  [${r.detail.reason}]`;
   }
-  if (r.defenders.discovered) why += '  (defenders discovered by import)';
+  if (r.defenders.discovered && showDiscovered) why += '  (defenders discovered by import)';
   return `${head} ${r.claim.severity.padEnd(8)} ${r.subject.file}  ${r.subject.description}${why}`;
 }
 

@@ -97,7 +97,12 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
 2. **Probe** confirms the defenders are green N times unmodified, applies
    each fault in a scratch git worktree (your tree is never touched), runs
    the defenders N times, re-runs survivors against the whole suite with
-   N-run attribution, restores, and classifies. Verdicts are a closed set:
+   N-run attribution (up to N: it stops as soon as no test has failed in
+   every run, because from there none can be named a killer), restores, and
+   classifies. It warns when another test runner is already running — a
+   contended machine turns a slow suite into a `TIMEOUT` verdict about the
+   load, not the claim — records that on the evidence, and offers `--serial`
+   to run one test file at a time. Verdicts are a closed set:
 
    | Verdict | Meaning |
    |---|---|

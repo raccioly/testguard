@@ -71,6 +71,19 @@ describe('probe reproduces the known-answer fixture', () => {
     expect(existsSync(join(scratch, '.testguard'))).toBe(false);
   });
 
+  it('an escalation that stops before N runs records why, and never names a killer it could not confirm', () => {
+    const escalated = evidence.records.filter((r) => r.detail.escalated);
+    expect(escalated.length).toBeGreaterThan(0);
+    for (const r of escalated) {
+      if (r.detail.escalationRuns.length < expected.confirmRuns) {
+        expect(r.detail.escalationStoppedEarly).toBe('no-common-failure');
+        expect(r.detail.undeclaredKillers).toBeUndefined(); // an early stop can never name a killer
+      } else {
+        expect(r.detail.escalationStoppedEarly).toBeUndefined();
+      }
+    }
+  });
+
   it('records N/N baseline and probe runs for killed and survived', () => {
     for (const r of evidence.records.filter((x) => x.verdict === 'killed' || x.verdict === 'survived')) {
       expect(r.detail.baselineRuns).toHaveLength(expected.confirmRuns);

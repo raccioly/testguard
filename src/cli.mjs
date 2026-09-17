@@ -49,10 +49,13 @@ probe
                        playwright's testDir always runs under playwright, whatever the project runner)
   --runner-cmd "<cmd>" custom runner; must contain {files} and {out}, e.g. "pnpm vitest run {files} --reporter=json --outputFile={out}"
   --node-modules <dir> node_modules to link into the scratch worktree (or TESTGUARD_NODE_MODULES)
+  --serial             run one test file at a time (vitest --no-file-parallelism, jest --runInBand, playwright --workers=1);
+                       use it when another test runner is already running — probe warns and records the contention either way
   --in-place           mutate the working tree instead of a scratch worktree
   --no-escalate        do not re-run survivors against the whole suite
   --no-reuse           re-probe claims whose inputs have not changed
   --quiet              suppress the per-fault stream and ranked block; print only the summary and evidence path
+  --json               the status document plus this run's result (records, newSinceBaseline, exitCode)
 
 scaffold   --claim <ID> (put every proposal under this claim; copies it if it exists)  --out <path>  --json
            shapes: if-guard → if (false) · single-line guard/mutation removed · return <check> → return true
@@ -102,6 +105,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         max: { type: 'string', default: '20' },
         ref: { type: 'string' },
         'ignore-dirty': { type: 'boolean', default: false },
+        serial: { type: 'boolean', default: false },
         claim: { type: 'string' },
         fault: { type: 'string' },
         'include-dirty': { type: 'boolean', default: false },

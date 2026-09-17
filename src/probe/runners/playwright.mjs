@@ -129,5 +129,5 @@ export function parseReport(report, durationMs) {
 
 export const run = (opts) => {
   const env = { PLAYWRIGHT_JSON_OUTPUT_FILE: '{out}', PLAYWRIGHT_JSON_OUTPUT_NAME: '{out}' };
-  return runProcess({ ...opts, env, parse: parseReport, argv: (files) => [npx, 'playwright', 'test', '--reporter=json', ...files] });
+  return runProcess({ ...opts, env, parse: parseReport, argv: (files) => [npx, 'playwright', 'test', '--reporter=json', ...(opts.serial ? ['--workers=1'] : []), ...files] });
 };

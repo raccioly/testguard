@@ -44,14 +44,19 @@ describe('probe preconditions', () => {
     const { dir, claims } = dirtyRepo();
     const warnings = [];
     const ev = await probe({ projectDir: dir, claims, mode: 'worktree', ref: 'HEAD', refExplicit: true, confirmRuns: 1, budgetMs: 30_000, escalate: false, toolVersion: 't', onWarn: (m) => warnings.push(m) });
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toMatch(/test\/a\.test\.mjs.*probing HEAD \([a-f0-9]{7}\) as committed.*NOT what is being probed/s);
+    // The suite itself runs under vitest, so the contention detector legitimately
+    // warns too; assert on the dirty-tree warning rather than on the count.
+    const dirtyWarnings = warnings.filter((w) => /uncommitted changes/.test(w));
+    expect(dirtyWarnings).toHaveLength(1);
+    expect(dirtyWarnings[0]).toMatch(/test\/a\.test\.mjs.*probing HEAD \([a-f0-9]{7}\) as committed.*NOT what is being probed/s);
     expect(ev.run.repo.ignoredDirty).toEqual(['test/a.test.mjs']);
     expect(ev.run.repo.snapshot).toBeUndefined();
     const again = [];
     const ev2 = await probe({ projectDir: dir, claims, mode: 'worktree', ignoreDirty: true, confirmRuns: 1, budgetMs: 30_000, escalate: false, toolVersion: 't', onWarn: (m) => again.push(m) });
-    expect(again).toHaveLength(1);
+    expect(again.filter((w) => /uncommitted changes/.test(w))).toHaveLength(1);
     expect(ev2.run.repo.ignoredDirty).toEqual(['test/a.test.mjs']);
+    // and the contention it saw is on the evidence, so a later reader of a slow run knows
+    if (ev2.run.contention) expect(ev2.run.contention.runners.length).toBeGreaterThan(0);
     // the implicit HEAD without --ignore-dirty is still refused (the message now offers --ignore-dirty)
     await expect(probe({ projectDir: dir, claims, mode: 'worktree', toolVersion: 't' })).rejects.toThrow(/--ignore-dirty/);
   }, 120_000);
