@@ -107,7 +107,7 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    | `UNVERIFIABLE` | the fault's anchor is missing or ambiguous — loud, never a skip |
    | `TIMEOUT` | the defenders hung; a hang is not a detection |
    | `FAULT-INVALID` | the replacement does not load — a bad fault, not a finding |
-   | `FLAKY-DEFENDER` | the defenders are not reliably green, or disagreed across runs |
+   | `FLAKY-DEFENDER` | the defenders are not reliably green, or disagreed across runs — `detail.flakeRate` says how often (`failures` of `runs` on unmodified source) |
 
    Never a single score. Findings are ranked by severity, claim provenance
    and blast radius (relative imports, `tsconfig` path aliases and

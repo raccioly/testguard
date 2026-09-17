@@ -89,6 +89,22 @@ describe('probe reproduces the known-answer fixture', () => {
     }
   });
 
+  it('measures the defenders\' flake rate on unmodified source, and finishes the runs so the degree is known', async () => {
+    const flaky = evidence.records.find((r) => r.verdict === 'flaky-defender');
+    expect(flaky).toBeDefined();
+    // the fixture's flaky test fails on alternate runs: the baseline decision
+    // stops at the first failure, but the rate must still be measured over N
+    expect(flaky.detail.flakeRate).toMatchObject({ runs: expected.confirmRuns });
+    expect(flaky.detail.flakeRate.failures).toBeGreaterThan(0);
+    expect(flaky.detail.flakeRate.failures).toBeLessThan(flaky.detail.flakeRate.runs);
+    // a stable defender is measured too: that is the useful "we checked" datum
+    const stable = evidence.records.find((r) => r.verdict === 'killed');
+    expect(stable.detail.flakeRate).toEqual({ runs: expected.confirmRuns, failures: 0 });
+    // the brief names the degree, not just the adjective
+    const { hintFor } = await import('../src/brief/brief.mjs');
+    expect(hintFor(flaky)).toMatch(/failed \d+ of \d+ runs on unmodified source/);
+  });
+
   it('records every fault\'s content hash so a later edit is visible', () => {
     for (const r of evidence.records) expect(r.subject.contentHash).toMatch(/^[a-f0-9]{64}$/);
   });

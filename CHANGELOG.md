@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`detail.flakeRate`** — the observed instability of a claim's defenders on
+  unmodified source, as `{runs, failures}`. `flaky-defender` was binary; "failed
+  once in three" and "fails every time" are different problems for whoever has
+  to fix the defender. The baseline decision still stops at the first non-green
+  run, but the remaining runs are then completed **for that defender set only,
+  cached, and only when it is already broken**, so the degree is known at
+  bounded cost. Only runs that actually ran are counted: a load error or a
+  timeout measures nothing about stability and is excluded from both numbers,
+  so a suite that cannot load is never reported as flaky. A stable defender
+  records `{runs: N, failures: 0}` — the useful "we measured it" datum, and the
+  first real input to `calibration.schema.json`, which has had none.
+  `status.counts` gains `flakyDefenderSets` and `worstFlakeRate`; the brief's
+  hint names the degree. Spec: `evidence.schema.json` gains `detail.flakeRate`
+  with a semantic rule that `failures > 0` requires the `flaky-defender`
+  verdict. Self-claim `TG-FLAKE-RATE-EXCLUDES-NON-RUNS`.
+
+### Added
+
 
 
 

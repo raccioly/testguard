@@ -33,8 +33,11 @@ function hintBase(r, defenders) {
       return `Replacement does not load (${r.detail.reason}); fix the fault definition, not the code.`;
     case 'timeout':
       return 'Defenders time out with this fault applied; a hang is not a detection.';
-    case 'flaky-defender':
-      return `${defenders} not reliably green (${r.detail.reason}); fix the flake before trusting any verdict here.`;
+    case 'flaky-defender': {
+      const fr = r.detail.flakeRate;
+      const rate = fr && fr.failures > 0 ? ` — failed ${fr.failures} of ${fr.runs} runs on unmodified source` : '';
+      return `${defenders} not reliably green (${r.detail.reason})${rate}; fix the flake before trusting any verdict here.`;
+    }
     default:
       return '';
   }

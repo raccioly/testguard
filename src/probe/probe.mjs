@@ -196,10 +196,28 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
             break;
           }
         }
+        // The decision stops at the first non-green run — nothing about this
+        // fault can be trusted after it. But "failed once in three" and
+        // "fails every time" are different problems for whoever has to fix
+        // the defender, and the only way to tell them apart is to finish the
+        // runs. Paid once per defender set, and only when it is already
+        // broken, which is a stop-the-world finding anyway.
+        if (runs.length < confirmRuns && runs[runs.length - 1].outcome === 'fail') {
+          for (let i = runs.length; i < confirmRuns; i++) {
+            stage('baseline-flake', i + 1, confirmRuns);
+            runs.push((await runDefenders(defenders)).run);
+          }
+        }
         baselineCache.set(key, { runs, loadMessage });
       }
       const baseline = baselineCache.get(key);
       detail.baselineRuns = baseline.runs;
+      // Observed instability of the defenders on UNMODIFIED source: `fail` is
+      // the tests running and disagreeing with themselves. A load error or a
+      // timeout is not flakiness — nothing was measured about stability — so
+      // neither is counted, on either side of the ratio.
+      const measured = baseline.runs.filter((r) => r.outcome === 'pass' || r.outcome === 'fail');
+      if (measured.length) detail.flakeRate = { runs: measured.length, failures: measured.filter((r) => r.outcome === 'fail').length };
       if (baseline.runs.some((r) => r.outcome === 'error')) {
         // The defenders did not load. That is not flakiness and not a verdict
         // about the fault; the claim cannot be probed until they do.

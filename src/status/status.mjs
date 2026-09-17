@@ -124,6 +124,13 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   const counts = {};
   for (const r of evidence.records) counts[r.verdict] = (counts[r.verdict] ?? 0) + 1;
   doc.counts.byVerdict = counts;
+  // The worst observed flake rate, so "the defenders are unstable" is a
+  // number rather than an adjective.
+  const flaky = evidence.records.filter((r) => r.detail.flakeRate?.failures > 0);
+  if (flaky.length) {
+    doc.counts.flakyDefenderSets = new Set(flaky.map((r) => r.defenders.resolved.join('\n'))).size;
+    doc.counts.worstFlakeRate = Math.max(...flaky.map((r) => r.detail.flakeRate.failures / r.detail.flakeRate.runs));
+  }
   doc.counts.new = g.new.length + g.belowFloor.length;
   doc.counts.baselined = g.baselined.length;
   const ranked = sortForReport([...g.new, ...g.belowFloor, ...g.baselined]);

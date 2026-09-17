@@ -75,6 +75,11 @@ const semantic = {
       if (r.verdict === 'nocover' && !r.defenders.nocover) {
         errors.push({ path: `${p}/defenders/nocover`, message: 'nocover verdict requires defenders.nocover = true' });
       }
+      if (r.detail.flakeRate) {
+        const { runs, failures } = r.detail.flakeRate;
+        if (failures > runs) errors.push({ path: `${p}/detail/flakeRate`, message: `flakeRate failures (${failures}) exceed runs (${runs})` });
+        if (failures > 0 && r.verdict !== 'flaky-defender') errors.push({ path: `${p}/detail/flakeRate`, message: 'a defender that failed on unmodified source makes the verdict flaky-defender' });
+      }
       if (r.detail.undeclaredKillers && r.detail.reason !== 'killed-by-undeclared-tests') {
         errors.push({ path: `${p}/detail/undeclaredKillers`, message: 'undeclaredKillers is only meaningful with reason killed-by-undeclared-tests' });
       }

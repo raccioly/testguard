@@ -54,6 +54,8 @@
           "additionalProperties": { "type": "integer", "minimum": 0 }
         },
         "new": { "type": "integer", "minimum": 0 },
+        "flakyDefenderSets": { "description": "Distinct defender sets that failed at least once on unmodified source.", "type": "integer", "minimum": 0 },
+        "worstFlakeRate": { "description": "Highest observed failures/runs on unmodified source across all records, 0–1. A number, so \"unstable\" stops being an adjective.", "type": "number", "minimum": 0, "maximum": 1 },
         "baselined": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false

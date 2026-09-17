@@ -919,6 +919,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-FLAKE-RATE-EXCLUDES-NON-RUNS",
+      "statement": "The flake rate counts only baseline runs that actually ran; a load error or a timeout measures nothing about stability and is excluded from both numbers, so a suite that cannot load is never reported as flaky.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/evidence.schema.json"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/probe.fixture.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Load errors and timeouts are counted as flake failures; an unverifiable claim then also reports a flake rate, which the validator rejects as a contradiction.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "      const measured = baseline.runs.filter((r) => r.outcome === 'pass' || r.outcome === 'fail');",
+          "replace": "      const measured = baseline.runs;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

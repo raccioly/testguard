@@ -174,7 +174,17 @@
               "minItems": 1,
               "items": { "type": "string", "minLength": 1, "maxLength": 1024 }
             },
-            "anchor": {
+            "flakeRate": {
+          "description": "Observed instability of the defenders on UNMODIFIED source: `failures` of `runs` baseline runs failed with the source untouched. Only runs that actually ran are counted (`pass`/`fail`); a load error or a timeout measures nothing about stability and is excluded from both numbers. `failures > 0` means the verdict is `flaky-defender`; the degree is for whoever fixes the defender, and it is the first input to calibration.",
+          "type": "object",
+          "required": ["runs", "failures"],
+          "properties": {
+            "runs": { "type": "integer", "minimum": 1 },
+            "failures": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "anchor": {
               "description": "With an anchor-related reason: how many times `find` occurred versus how many were expected.",
               "type": "object",
               "required": ["hits", "expected"],
