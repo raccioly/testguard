@@ -102,6 +102,26 @@ jobs:
             console.log('fixture verdicts match expected.json:', ev.records.length);
           "
 
+      - name: probe the jest fixture (through the bin, --runner jest)
+        shell: bash
+        run: |
+          S=$(mktemp -d)
+          cp -R fixtures/known-answer-jest/. "$S/"
+          rm -rf "$S/node_modules" "$S/.flake-counter" "$S/.testguard"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$S/node_modules"
+          git -C "$S" init -q && git -C "$S" -c user.email=ci@example.invalid -c user.name=ci add -A && git -C "$S" -c user.email=ci@example.invalid -c user.name=ci commit -qm fixture
+          status=0; node cli/testguard.mjs probe "$S" --runner jest --budget 60000 --quiet --no-escalate || status=$?
+          [ "$status" -eq 1 ] || { echo "::error::expected exit 1, got $status"; exit 1; }
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const ev = JSON.parse(readFileSync('$S/.testguard/evidence.json','utf8'));
+            const exp = JSON.parse(readFileSync('fixtures/known-answer-jest/expected.json','utf8')).expected;
+            if (ev.run.runner.name !== 'jest') { console.error('runner was', ev.run.runner.name); process.exit(1); }
+            const bad = ev.records.filter(r => exp[r.claim.id+'/'+r.subject.id].verdict !== r.verdict);
+            if (bad.length) { console.error('MISMATCH', bad.map(r => r.claim.id+'/'+r.subject.id+':'+r.verdict)); process.exit(1); }
+            console.log('jest fixture verdicts match expected.json:', ev.records.length);
+          "
+
       # ── Self-verification: TestGuard is governed by the standard it defines.
       #    testguard.claims.json states invariants of the tool itself; every
       #    fault must be killed by the tool's own tests. Exit 0 = all defended. ──

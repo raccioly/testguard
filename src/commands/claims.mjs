@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
 import { scanAnnotations, reconcile } from '../claims/annotations.mjs';
-import { resolveDefenders } from '../probe/runner-vitest.mjs';
+import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 
 export async function claimsCommand({ projectDir, values }, io) {

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-17
+
+### Added
+
+- **jest runner.** `--runner vitest|jest|auto` (default `auto`: the first
+  that resolves in the project). jest runs with `--ci --json --runTestsByPath`
+  so file arguments are exact paths, not regexes; its `Exceeded timeout`
+  wording is recognised as a timeout, never a kill; `__tests__/` files are
+  collected for escalation. `run.runner.name` records which runner produced
+  the evidence.
+- A CommonJS edition of the known-answer fixture (`fixtures/known-answer-jest`)
+  with the same claims and the same expected verdicts; the acceptance suite
+  and CI prove jest against it exactly as vitest is proven against the ESM
+  one.
+
+### Changed
+
+- Runners are now modules behind one interface (`src/probe/runners/`); the
+  vitest path is unchanged and still reproduces its oracle.
+
 ## [0.3.1] - 2026-09-17
 
 Dogfooding `init` and `status` on this repository.
