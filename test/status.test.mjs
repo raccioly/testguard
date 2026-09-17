@@ -82,7 +82,7 @@ describe('computeStatus — every state, with a conforming document', () => {
     const s = computeStatus({ projectDir: dir });
     expect(s.state).toBe('unproven');
     expect(s.next).toMatchObject({ action: 'write-test', target: { claimId: 'REDACT-001', subjectId: 'F1', verdict: 'survived' } });
-    expect(s.next.command).toMatch(/^write a test in test\/redact\.test\.mjs that fails on REDACT-001\/F1 .* testguard probe --claim REDACT-001 --include-dirty$/);
+    expect(s.next.command).toMatch(/^write a test in test\/redact\.test\.mjs that fails on REDACT-001\/F1 .* testguard admit test\/redact\.test\.mjs --claim REDACT-001$/);
     expect(s.findings[0]).toMatchObject({ claimId: 'REDACT-001', isNew: true });
     expect(validate('status', s).errors).toEqual([]);
   });

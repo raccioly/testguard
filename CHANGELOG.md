@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
 - **`baseline --restamp`** (#25). A baseline frozen from `--include-dirty`
   evidence now records the snapshot commit and, once you commit, a clean
   `probe` plus `--restamp` moves its `head` to that commit — only when the
@@ -17,7 +18,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   state): a baseline frozen from a snapshot or a dirty tree that predates
   HEAD, or one whose head is not an ancestor of HEAD.
 
+- **`testguard admit <test-file> --claim <ID>`** — the two-gate rule as a
+  named verb. Sugar over `probe --claim <ID> --include-dirty --no-escalate`:
+  the named test must be a declared or discovered defender of the claim
+  (exit `3` otherwise, with the `defendedBy` line to add); `ADMITTED`
+  (exit `0`) only when every fault of the claim is `killed` N/N on defenders
+  that were green N/N unmodified; anything else is `NOT ADMITTED` (exit `1`)
+  and names the first blocking fault with the hint the brief would give.
+  `--fault <FID>` judges one fault, `--confirm 1` gives a provisional
+  `ADMITTED?`, `--json` returns `{admitted, provisional, faults[], evidence,
+  command}`. Evidence goes to `.testguard/evidence-partial.json`; nothing new
+  in the evidence schema. The market's acceptance signal for a generated
+  test is "compiles, passes, raises coverage"; this one is "fails when the
+  claim is false", and it is now one command. `status.next` for `unproven`
+  and the installed skill's fix loop point at it. Self-claim
+  `TG-ADMIT-NEEDS-ALL-KILLED`.
+
 ### Changed
+
 
 - CI: TestGuard's self-probe runs on one Node leg instead of three, without
   escalation, and restores the previous run's evidence from the cache so
