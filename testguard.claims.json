@@ -241,7 +241,7 @@
           "description": "The dirty check is disabled; uncommitted defender edits are silently ignored (field report 2, finding 1).",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "      if (dirty.length) {\n        throw new PreconditionError(",
+          "find": "      if (dirty.length && !refExplicit && !ignoreDirty) {\n        throw new PreconditionError(",
           "replace": "      if (false) {\n        throw new PreconditionError(",
           "producedBy": {
             "producer": "human",
@@ -751,6 +751,38 @@
           "file": "src/admit/admit.mjs",
           "find": "const admitted = records.every((r) => r.verdict === 'killed');",
           "replace": "const admitted = records.some((r) => r.verdict === 'killed');",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-IGNORED-DIRTY-RECORDED",
+      "statement": "When a commit is probed as committed although defender/target files are dirty (explicit --ref or --ignore-dirty), the evidence records those files under repo.ignoredDirty.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/probe-preconditions.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The ignored files are warned about but never recorded; the evidence looks like a clean probe.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "        ignoredDirty = dirty.sort();",
+          "replace": "",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",

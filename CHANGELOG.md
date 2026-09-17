@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs
+
+- README: a **Properties** block (deterministic measurement; no network, no
+  telemetry; artifacts are validated data in the repository; never
+  optimistic; one pinned dependency), a **What TestGuard is not** list (not a
+  generator, not a mutation-score dashboard, not a self-healing runner, not a
+  coverage tool), the 2026 peer-reviewed evidence in *Why* (coverage and
+  mutation score lose predictive value on possibly-buggy code; buggy code
+  steers models to assert the bug; agents saturate visible tests), and the
+  Status line brought to v0.5 with all nine commands.
+
 ### Added
 
 - **`brief --markdown`** — the brief as a merge-request note for the human
@@ -43,6 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the installed skill's fix loop point at it. Self-claim
   `TG-ADMIT-NEEDS-ALL-KILLED`.
 ### Changed
+
+
+- `probe` honours an explicit `--ref` (even `--ref HEAD`) when defender or
+  target files are dirty, and gains `--ignore-dirty` for the implicit HEAD
+  (#19). Both warn with the file names and record them in the evidence as
+  `repo.ignoredDirty` (spec: new optional field; a snapshot run can never
+  carry it). The refusal stays for the implicit HEAD without the flag — that
+  is the silent-mismatch trap the check exists for.
 
 - CI: TestGuard's self-probe runs on one Node leg instead of three, without
   escalation, and restores the previous run's evidence from the cache so
