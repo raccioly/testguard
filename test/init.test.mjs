@@ -39,6 +39,14 @@ describe('init', () => {
     expect(third.done).toEqual(['.claude/skills/testguard/SKILL.md (replaced)']);
     expect(readFileSync(join(dir, '.claude', 'skills', 'testguard', 'SKILL.md'), 'utf8')).toContain('testguard status --json');
   });
+  it('adds no per-file lines when the whole .testguard/ directory is already ignored, and says why that matters', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-init-dir-'));
+    writeFileSync(join(dir, '.gitignore'), 'node_modules/\n.testguard/\n');
+    const r = initProject({ projectDir: dir });
+    expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toBe('node_modules/\n.testguard/\n');
+    expect(r.skipped.some((s) => /baseline\.json should be committed/.test(s))).toBe(true);
+  });
+
   it('refuses to touch a settings.json it cannot parse', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-init-bad-'));
     mkdirSync(join(dir, '.claude'));

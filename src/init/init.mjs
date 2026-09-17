@@ -67,8 +67,12 @@ export function initProject({ projectDir, force = false }) {
 
   const giPath = join(projectDir, '.gitignore');
   const gi = existsSync(giPath) ? readFileSync(giPath, 'utf8') : '';
-  const missing = GITIGNORE_LINES.filter((l) => !gi.split('\n').some((x) => x.trim() === l));
-  if (missing.length) {
+  const entries = gi.split('\n').map((x) => x.trim());
+  const dirIgnored = entries.some((x) => /^\/?\.testguard\/?$/.test(x));
+  const missing = dirIgnored ? [] : GITIGNORE_LINES.filter((l) => !entries.includes(l));
+  if (dirIgnored) {
+    skipped.push('.gitignore ignores .testguard/ entirely — note that baseline.json should be committed; ignore only the regenerated files if you adopt a baseline');
+  } else if (missing.length) {
     writeFileSync(giPath, (gi ? gi.replace(/\s*$/, '\n') : '') + '# TestGuard: regenerated per run (baseline.json IS committed)\n' + missing.join('\n') + '\n');
     done.push(`.gitignore: ${missing.length} line${missing.length === 1 ? '' : 's'} added`);
   } else {

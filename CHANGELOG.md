@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-17
+
+Dogfooding `init` and `status` on this repository.
+
+### Fixed
+
+- `init` no longer adds per-file `.gitignore` lines to a project that already
+  ignores `.testguard/` wholesale; it notes instead that `baseline.json` is
+  meant to be committed.
+- The brief no longer says "everything is new" when nothing is unproven.
+
+### Changed
+
+- This repository now carries its own `AGENTS.md` TestGuard section, written
+  by `testguard init`.
+
 ## [0.3.0] - 2026-09-17
 
 The agent operating layer. TestGuard is meant to be run by AI agents; this

@@ -52,7 +52,7 @@ tests were written against the survivors, 39/39 were killed.
 | npm | `npm i -D testguard-cli` then `npx testguard probe` |
 | pip | `pip install testguard-cli` then `testguard probe` (needs Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.3.0` — see [`action.yml`](./action.yml) |
+| GitHub Action | `uses: raccioly/testguard@v0.3.1` — see [`action.yml`](./action.yml) |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
 
 Projects that set `min-release-age` in `.npmrc` cannot see a version published
