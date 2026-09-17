@@ -84,6 +84,13 @@ the suppress-up-to-count semantics are identical.
   for reasonless `path` entries.
 - An annotation is **strictly additive**. It never changes, suppresses, or
   drops a finding. Ranking may read annotations; verdicts never do.
+- A **signal** is a static, annotation-grade fact about a defender, recorded
+  on the evidence and never a verdict. `mocked-never-asserted`: a test file
+  mocks the subject's module and never asserts on anything imported from it.
+  An author may silence it with `unasserted: <reason>` above the mock; the
+  tool then records `unasserted-annotated` with the reason — silenced, never
+  hidden. A file that mocks the subject is never a discovered defender: a
+  mock cannot detect a fault in what it replaced.
 
 ## Claim coverage of a change
 
