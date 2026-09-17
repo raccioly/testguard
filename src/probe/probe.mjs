@@ -33,6 +33,9 @@ export async function probe({
   confirmRuns = 3,
   mode = 'worktree',
   ref = 'HEAD',
+  refExplicit = false,
+  ignoreDirty = false,
+  onWarn = () => {},
   budgetMs = 120_000,
   runnerCommand,
   runnerName = 'auto',
@@ -69,11 +72,17 @@ export async function probe({
 
   // Worktree mode probes a commit, not the working tree. Uncommitted defender
   // or target edits would be silently absent — the same survivors, no hint why.
+  // Refused for the IMPLICIT HEAD, which is the silent-mismatch trap. With an
+  // explicit --ref the user has named the commit they mean (a pre-fix probe
+  // in a post-mortem is the most valuable run there is); with --ignore-dirty
+  // they have said they know. Both proceed with a warning that names the
+  // files, and the evidence records what was ignored.
   let snapshot;
+  let ignoredDirty = [];
   if (mode === 'worktree') {
     if (includeDirty) {
       if (isDirty(root)) snapshot = snapshotWorkingTree(root);
-    } else if (ref === 'HEAD') {
+    } else {
       const watched = new Set(targets);
       for (const claim of claims.claims) {
         if (selected && !selected.has(claim.id)) continue;
@@ -82,8 +91,12 @@ export async function probe({
         for (const g of claim.defendedBy ?? []) if (!g.includes('*')) watched.add(relative(root, join(projectDir, g)));
       }
       const dirty = git(['status', '--porcelain', '--', ...watched], root).split('\n').filter(Boolean).map((l) => l.replace(/^[ MADRCU?!]{1,2}\s+/, '').replace(/^.* -> /, ''));
+      if (dirty.length && !refExplicit && !ignoreDirty) {
+        throw new PreconditionError(`${dirty.length} defender/target file${dirty.length === 1 ? ' has' : 's have'} uncommitted changes (${dirty.join(', ')}); worktree mode probes HEAD (${head.slice(0, 7)}), so those changes would be silently ignored. Commit them, run with --include-dirty to probe the working tree, use --in-place, or --ignore-dirty if you mean HEAD as committed.`);
+      }
       if (dirty.length) {
-        throw new PreconditionError(`${dirty.length} defender/target file${dirty.length === 1 ? ' has' : 's have'} uncommitted changes (${dirty.join(', ')}); worktree mode probes HEAD (${head.slice(0, 7)}), so those changes would be silently ignored. Commit them, run with --include-dirty to probe the working tree, or use --in-place.`);
+        ignoredDirty = dirty.sort();
+        onWarn(`${dirty.length} defender/target file${dirty.length === 1 ? ' has' : 's have'} uncommitted changes (${dirty.join(', ')}); probing ${ref === 'HEAD' ? `HEAD (${head.slice(0, 7)})` : `${ref} (${head.slice(0, 7)})`} as committed — the working-tree versions are NOT what is being probed. Recorded in the evidence as repo.ignoredDirty.`);
       }
     }
   }
@@ -160,7 +173,7 @@ export async function probe({
       id: `run-${startedAt.replace(/[-:.]/g, '').slice(0, 15)}`,
       startedAt,
       finishedAt: new Date().toISOString(),
-      repo: { head, dirty: isDirty(root), ...(snapshot ? { snapshot } : {}) },
+      repo: { head, dirty: isDirty(root), ...(snapshot ? { snapshot } : {}), ...(ignoredDirty.length ? { ignoredDirty } : {}) },
       runner: { name: runner.name, ...((runnerVersion ?? readRunnerVersion(projectDir, runner.name)) ? { version: runnerVersion ?? readRunnerVersion(projectDir, runner.name) } : {}) },
       ...(runnersUsed.size > 1 ? { runners: [...runnersUsed].map(([n, v]) => ({ name: n, ...(v ? { version: v } : {}) })) } : {}),
       confirmRuns,
