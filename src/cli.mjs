@@ -33,6 +33,7 @@ probe
   --claim <ID,ID>      probe only these claims; writes .testguard/evidence-partial.json
   --include-dirty      probe the working tree (a snapshot commit) instead of HEAD; uncommitted tests count
   --verbose            also print each killed fault (default: only unproven ones, plus a count)
+                       --confirm below 3 is PROVISIONAL: verdicts print with "?", evidence goes to .testguard/evidence-provisional.json
   --runner-cmd "<cmd>" custom runner; must contain {files} and {out}, e.g. "pnpm vitest run {files} --reporter=json --outputFile={out}"
   --node-modules <dir> node_modules to link into the scratch worktree (or TESTGUARD_NODE_MODULES)
   --in-place           mutate the working tree instead of a scratch worktree
@@ -44,7 +45,7 @@ scaffold   --claim <ID> (put every proposal under this claim; copies it if it ex
            shapes: if-guard → if (false) · single-line guard/mutation removed · return <check> → return true
                    · security flag/window/cost literal weakened · verify/validate/check call removed
 claims     --json
-baseline   --evidence <path>  --out <path>
+baseline   --evidence <path>  --out <path>  --allow-provisional (freeze unconfirmed evidence; normally refused)
 brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; safe for hooks)
 
 exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift) · 2 precondition failed · 3 usage
@@ -70,6 +71,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         ref: { type: 'string', default: 'HEAD' },
         claim: { type: 'string' },
         'include-dirty': { type: 'boolean', default: false },
+        'allow-provisional': { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'runner-cmd': { type: 'string' },
         'node-modules': { type: 'string' },

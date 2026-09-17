@@ -4,7 +4,8 @@ import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
 import { probe } from '../probe/probe.mjs';
 import { writeSpecDoc, readSpecDoc } from '../evidence/writer.mjs';
 import { gate } from '../baseline/baseline.mjs';
-import { renderRecord, renderSummary, sortForReport } from '../render.mjs';
+import { renderRecord, renderSummary, sortForReport, PROVISIONAL_WARNING } from '../render.mjs';
+export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
 export const baselinePath = (projectDir) => join(projectDir, '.testguard', 'baseline.json');
@@ -23,7 +24,10 @@ export async function probeCommand({ projectDir, values, version }, io) {
   }
   const only = values.claim ? values.claim.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
   // A --claim run is partial evidence; keep it away from the canonical file unless --out says otherwise.
-  const outPath = values.out ? resolve(values.out) : only ? join(projectDir, '.testguard', 'evidence-partial.json') : evidencePath(projectDir);
+  const provisional = confirmRuns < 3;
+  // Provisional and partial runs never overwrite the canonical evidence: only confirmed, complete runs may feed a baseline.
+  const outPath = values.out ? resolve(values.out) : only ? join(projectDir, '.testguard', 'evidence-partial.json') : provisional ? provisionalEvidencePath(projectDir) : evidencePath(projectDir);
+  if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
   const previous = !values['no-reuse'] && existsSync(outPath) ? readSpecDoc('evidence', outPath) : undefined;
   const basePath = values.baseline ? resolve(values.baseline) : baselinePath(projectDir);
   const baseline = existsSync(basePath) ? readSpecDoc('baseline', basePath) : undefined;
@@ -45,7 +49,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
     onStage: !values.quiet && process.stderr.isTTY ? ({ claimId, faultId, stage, i, n }) => process.stderr.write(`\r\x1b[K  … ${claimId}/${faultId} ${stage} ${i}/${n}`) : undefined,
     onProgress: values.quiet ? undefined : (r) => {
       if (process.stderr.isTTY) process.stderr.write('\r\x1b[K');
-      if (values.verbose || r.verdict !== 'killed') io.out(renderRecord(r) + (r.reusedFrom ? '  (reused)' : ''));
+      if (values.verbose || r.verdict !== 'killed') io.out(renderRecord(r, { provisional }) + (r.reusedFrom ? '  (reused)' : ''));
     },
   });
   writeSpecDoc('evidence', outPath, evidence);
@@ -54,7 +58,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
   if (!values.quiet && baseline) {
     io.out('');
     const tag = (r) => (g.new.includes(r) ? '[NEW]      ' : g.baselined.includes(r) ? '[baseline] ' : '[below floor] ');
-    for (const r of sortForReport(evidence.records).filter((x) => x.verdict !== 'killed')) io.out('  ' + tag(r) + renderRecord(r));
+    for (const r of sortForReport(evidence.records).filter((x) => x.verdict !== 'killed')) io.out('  ' + tag(r) + renderRecord(r, { provisional }));
   }
   io.out('');
   if (!values.quiet && !values.verbose) {
@@ -62,6 +66,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
     if (killed) io.out(`  ${killed} killed (not listed; --verbose to see them)`);
   }
   io.out(renderSummary(evidence.records, evidence.run) + (baseline ? ` ${g.new.length} new since baseline, ${g.baselined.length} baselined.` : ' No baseline.'));
-  io.out(`evidence: ${outPath}${only ? ` (partial: --claim ${only.join(',')}; not the canonical evidence file)` : ''}`);
+  io.out(`evidence: ${outPath}${only ? ` (partial: --claim ${only.join(',')}; not the canonical evidence file)` : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);
+  if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
   return g.new.length > 0 ? 1 : 0;
 }
