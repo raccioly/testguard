@@ -153,6 +153,11 @@
         "maxLength": 512
       }
     },
+    "notes": {
+      "description": "Informational lines that never change `state`: e.g. a baseline frozen from a snapshot whose head predates the commit that carries its tests, with the way to re-stamp it.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+    },
     "changedFaults": {
       "description": "Faults whose find/replace content differs from what the evidence probed. A changed fault that previously survived is the cheapest way to make a finding disappear without a test; it is surfaced, never hidden.",
       "type": "array",

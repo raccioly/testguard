@@ -23,6 +23,11 @@ export function headSha(dir, ref = 'HEAD') {
   }
 }
 
+/** Is `ancestor` reachable from `ref`? False when either does not resolve. */
+export function isAncestor(dir, ancestor, ref = 'HEAD') {
+  return spawnSync('git', ['merge-base', '--is-ancestor', ancestor, ref], { cwd: dir }).status === 0;
+}
+
 /** True when any of `paths` (repo-relative; empty = whole tree) has uncommitted changes. */
 export const isDirty = (dir, paths = []) => git(['status', '--porcelain', '--', ...paths], dir).length > 0;
 
