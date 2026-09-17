@@ -44,6 +44,19 @@ re-implemented the authorization logic *inside the test* and asserted
 against the copy: fifteen green tests, zero detection. After wrapper-level
 tests were written against the survivors, 39/39 were killed.
 
+The peer-reviewed picture in 2026 says the same thing from the other side.
+Coverage and mutation score of LLM-generated suites track effectiveness only
+when the code under test is assumed correct; once it may be buggy they "no
+longer serve as reliable indicators" ([Zhao, Zhou and Cohen, ISSTA 2026](https://arxiv.org/abs/2607.22880)).
+Buggy code steers a model toward tests that assert the bug, and prompting
+with the specification is the mitigation that works ([arXiv 2607.22883](https://arxiv.org/abs/2607.22883)) —
+which is why a claim here comes from intent, a fault is bound to the claim,
+and the brief hands the agent the claim before it writes. And agents
+saturate whatever tests they can see, with the gap to held-out tests
+growing about 28 points per tenfold increase in code size ([SpecBench](https://arxiv.org/abs/2605.21384)).
+Every generator on the market admits a test because it compiles, passes and
+raises coverage. TestGuard admits it because it fails when the claim is false.
+
 ## Install
 
 | How | Command |
@@ -103,11 +116,15 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    it is written.
 
    Worktree mode probes a **commit**. If a defender or target file has
-   uncommitted changes, `probe` refuses and says so — otherwise your new
-   tests would be silently absent and the same survivors would come back
-   with no hint why. `--include-dirty` snapshots the working tree (tracked
-   edits and new files) into a throwaway commit and probes that; your tree,
-   HEAD and index are never touched. Every summary names the commit probed.
+   uncommitted changes and you asked for the implicit HEAD, `probe` refuses
+   and says so — otherwise your new tests would be silently absent and the
+   same survivors would come back with no hint why. `--include-dirty`
+   snapshots the working tree (tracked edits and new files) into a throwaway
+   commit and probes that; your tree, HEAD and index are never touched. An
+   **explicit `--ref`** (a pre-fix commit in a post-mortem, say) is honoured
+   over a dirty tree, as is `--ignore-dirty`: a warning names the files and
+   the evidence records them as `repo.ignoredDirty`, so the run says what it
+   did not look at. Every summary names the commit probed.
 
    A claim with no `defendedBy` has its defenders **discovered**: the test
    files that import the fault's target, by relative path or resolved alias.
@@ -210,6 +227,38 @@ testguard:gate:
   script: [npx -y testguard-cli gate .]
 ```
 
+### Properties
+
+- **Deterministic measurement.** No model decides a verdict. Faults are
+  string substitutions from a reviewed file; verdicts come from the test
+  runner's structured report, confirmed N times. The same inputs give the
+  same evidence, which is what makes it replayable for an auditor.
+- **No network, no telemetry.** The CLI never opens a socket. The
+  session-start hook resolves an installed binary and never fetches one.
+  Nothing leaves the machine unless a CI job you configured posts it.
+- **Artifacts are data in the repository.** Claims, evidence, baseline and
+  brief are JSON validated against a published schema before they are
+  written. Nothing is healed, regenerated or re-targeted at run time; a
+  claims file is code, and is reviewed like code.
+- **Never optimistic.** A timeout, a load failure, a mixed N-run result, a
+  flaky defender or a missing anchor is reported as unproven, never rounded
+  toward green. The one pass is `killed`; everything else gates.
+- **One exact-pinned runtime dependency** (`ajv`), Node ≥ 20, MIT.
+
+### What TestGuard is not
+
+- **Not a test generator.** It judges a test the agent wrote (`admit`); the
+  generating half stays with the agent, where the market is putting it.
+- **Not a mutation-score dashboard.** No blanket mutants, no single score, no
+  threshold. Faults are few and bound to stated claims; findings are ranked,
+  never summed.
+- **Not a self-healing runner.** A defender that adapts itself to a change is
+  a defender that did not observe it; TestGuard reports that, it does not do
+  it.
+- **Not a coverage tool.** A line executed says nothing about whether an
+  assertion would notice. `NOCOVER` here means no test even imports the
+  file; everything above that is measured by injecting the fault.
+
 ### Built for agents to run
 
 TestGuard is meant to be driven by an AI agent, not typed by a person. Three
@@ -286,7 +335,7 @@ through every verdict.
 
 ## Status
 
-**v0.4.** Eight commands, vitest and jest runners, hand-authored faults plus
+**v0.5.** Nine commands (`status`, `init`, `claims`, `probe`, `admit`, `baseline`, `brief`, `gate`, `scaffold`), vitest and jest runners, hand-authored faults plus
 a mechanical scaffold, an agent operating layer (`status`, `init`) and a
 change gate (`gate`). The contract
 spine — eight JSON Schemas shared with the other Guard tools — is under
