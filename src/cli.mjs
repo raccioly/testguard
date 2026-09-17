@@ -67,8 +67,10 @@ gate       --changed <ref>   measure the change since merge-base(ref, HEAD); aut
            --ignore <path>   ignore file (default: <dir>/testguard.ignore.json; kind=path entries excuse files, with a reason)
            exit 0 every changed source file is claimed or excused · 1 unclaimed file · 2 cannot evaluate · 3 no reference
 status     --json (exit 0 clean · 1 unproven/stale/unclaimed · 2 nothing to probe yet)
+           --evidence <path>  read this evidence instead of .testguard/evidence.json (e.g. CI's, fetched as an artifact); staleness is still computed from the recorded input hashes, and both commits are named
            --changed <ref>   also compute claim coverage of the change; unclaimed-changes then precedes every evidence state
 init       --force (replace an existing skill file)  --here (keep the agent layer in [dir] instead of the git root)  --json
+           --ci-evidence github|gitlab   write .testguard/fetch-ci-evidence.sh, an ON-DEMAND helper that downloads CI's evidence artifact and briefs from it; the session-start hook stays offline
            agent layer (skill, SessionStart hook, AGENTS.md section) → git root; project layer (.gitignore lines) → [dir]
            the hook prefers a local install, falls back to npx --no-install, never fetches; exit 1 if a written file is gitignored
 every command accepts --json; probe/baseline emit the status document plus their own result
@@ -76,7 +78,7 @@ claims     --json
 baseline   --evidence <path>  --out <path>  --allow-provisional (freeze unconfirmed evidence; normally refused)
            --restamp          move head to the commit of a later CLEAN probe that reproduced the same fingerprints
                               (a baseline frozen from a snapshot points at the parent of the commit that carries its tests)
-brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; safe for hooks)
+brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; safe for hooks)  --markdown (print only, as a merge-request note)
 
 exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift, or unclaimed changes) · 2 precondition failed · 3 usage
 `;
@@ -111,6 +113,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         'allow-provisional': { type: 'boolean', default: false },
         restamp: { type: 'boolean', default: false },
         force: { type: 'boolean', default: false },
+        'ci-evidence': { type: 'string' },
         here: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'runner-cmd': { type: 'string' },
@@ -122,6 +125,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         quiet: { type: 'boolean', default: false },
         json: { type: 'boolean', default: false },
         text: { type: 'boolean', default: false },
+        markdown: { type: 'boolean', default: false },
         help: { type: 'boolean', short: 'h', default: false },
         version: { type: 'boolean', short: 'v', default: false },
       },

@@ -43,7 +43,7 @@ describe('sync-release-version: package.json is the single source of truth for t
     expect(readFileSync(join(dir, 'packaging/homebrew/testguard.rb'), 'utf8')).toContain('testguard-cli-9.8.7.tgz');
     const gitlab = readFileSync(join(dir, 'packaging/gitlab/testguard.gitlab-ci.yml'), 'utf8');
     expect(gitlab).toContain('testguard/v9.8.7/packaging');
-    expect(gitlab).toContain('TESTGUARD_VERSION: "9.8.7"');
+    expect(gitlab).toMatch(/\n    version:\n      description: [^\n]*\n      default: "9\.8\.7"/);
     expect(run('--check').status).toBe(0);
   });
 
