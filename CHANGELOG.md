@@ -29,8 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   briefs them even when there is no evidence yet.
 - `testguard.ignore.json` at the repository root: TestGuard's own excused
   paths (dispatch, thin command wrappers, rendering), with reasons.
-- Seven new self-claims for the gate, status and brief invariants, and one
-  for `init` idempotency; the gate runs on this repository's own pull
+- Nine new self-claims: the gate, status and brief invariants, explicit
+  `--changed` being required, `init` idempotency, and — because the gate
+  flagged it on its own pull request — the release version-sync check,
+  which had no test before. The gate runs on this repository's own pull
   requests.
 - GitHub Action `command: gate` with a `changed-ref` input; pre-commit hook
   `testguard-gate`; a GitLab CI template under `packaging/gitlab/` with

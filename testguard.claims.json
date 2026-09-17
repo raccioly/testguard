@@ -630,6 +630,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT",
+      "statement": "The release version check exits non-zero when any version surface is out of step with package.json; a release can never ship with drifting version strings.",
+      "source": {
+        "kind": "spec",
+        "ref": "CONTRIBUTING.md#releases"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/release-sync.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Drift is reported but the check exits 0; release.yml would proceed.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/sync-release-version.mjs",
+          "find": "if (check && drift) process.exit(1);",
+          "replace": "if (false) process.exit(1);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }
