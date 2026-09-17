@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
 - **`testguard admit <test-file> --claim <ID>`** — the two-gate rule as a
   named verb. Sugar over `probe --claim <ID> --include-dirty --no-escalate`:
   the named test must be a declared or discovered defender of the claim
@@ -24,7 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   claim is false", and it is now one command. `status.next` for `unproven`
   and the installed skill's fix loop point at it. Self-claim
   `TG-ADMIT-NEEDS-ALL-KILLED`.
+
 ### Changed
+
 
 - **`init` installs the agent layer at the git root** (#23): the skill,
   the session-start hook and the `AGENTS.md` section go where agent
@@ -37,6 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `node_modules/.bin/testguard … || npx --no-install testguard … || true`
   instead of `npx -y testguard-cli …`; a pre-0.6 hook is replaced on the
   next `init`. The brief's first line names the install that answered.
+
+
+- `probe` honours an explicit `--ref` (even `--ref HEAD`) when defender or
+  target files are dirty, and gains `--ignore-dirty` for the implicit HEAD
+  (#19). Both warn with the file names and record them in the evidence as
+  `repo.ignoredDirty` (spec: new optional field; a snapshot run can never
+  carry it). The refusal stays for the implicit HEAD without the flag — that
+  is the silent-mismatch trap the check exists for.
+
 - CI: TestGuard's self-probe runs on one Node leg instead of three, without
   escalation, and restores the previous run's evidence from the cache so
   unchanged claims reuse their verdicts. The verdicts do not depend on the

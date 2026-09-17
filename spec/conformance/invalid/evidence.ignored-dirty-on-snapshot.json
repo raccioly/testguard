@@ -1,0 +1,543 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.1.0"
+  },
+  "run": {
+    "id": "run-20260917-020000",
+    "startedAt": "2026-09-17T02:00:00Z",
+    "finishedAt": "2026-09-17T02:00:41Z",
+    "repo": {
+      "head": "deadbeefcafe",
+      "dirty": false,
+      "snapshot": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "ignoredDirty": [
+        "test/redact.test.mjs"
+      ]
+    },
+    "runner": {
+      "name": "vitest",
+      "version": "5.0.1"
+    },
+    "confirmRuns": 3,
+    "mode": "worktree"
+  },
+  "records": [
+    {
+      "fingerprint": "01876384493be6809da455cb1a1c4bc92e7564e9898506d790b9589200502163",
+      "claim": {
+        "id": "REDACT-001",
+        "statement": "The audit record written for a redacted message never contains the original secret.",
+        "severity": "critical",
+        "source": {
+          "kind": "spec",
+          "ref": "docs/spec.md#audit-records"
+        },
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-09-17T02:00:00Z"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "Audit row is written with the raw input.",
+        "file": "src/redact.mjs",
+        "faultClass": "variable-swap",
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-09-17T02:00:00Z"
+        },
+        "contentHash": "f232f31d9e6eecc8e952f0da1fb0878c5060e1a4dc19724874b041a4ab265aaf"
+      },
+      "verdict": "survived",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          }
+        ],
+        "escalated": true,
+        "escalationRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          }
+        ]
+      },
+      "defenders": {
+        "requested": [
+          "test/redact.test.mjs"
+        ],
+        "resolved": [
+          "test/redact.test.mjs"
+        ],
+        "nocover": false,
+        "discovered": false
+      },
+      "inputs": {
+        "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "defenderHashes": {
+          "test/redact.test.mjs": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "rank": {
+        "score": 9.5,
+        "blastRadius": 7,
+        "tier": "critical"
+      },
+      "annotations": [
+        {
+          "kind": "tracked",
+          "text": "Assertion uses objectContaining without the content key.",
+          "by": "maintainer",
+          "at": "2026-09-17T02:00:00Z",
+          "ref": "issue#12"
+        }
+      ]
+    },
+    {
+      "fingerprint": "10d526ffb9535c8d99c39dcea29a8d6fa86c3370a2a5061de5320e028ba79b1f",
+      "claim": {
+        "id": "REDACT-001",
+        "statement": "The audit record written for a redacted message never contains the original secret.",
+        "severity": "critical",
+        "source": {
+          "kind": "spec",
+          "ref": "docs/spec.md#audit-records"
+        },
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-09-17T02:00:00Z"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F2",
+        "description": "Redaction skipped.",
+        "file": "src/redact.mjs",
+        "faultClass": "statement-deleted",
+        "contentHash": "f232f31d9e6eecc8e952f0da1fb0878c5060e1a4dc19724874b041a4ab265aaf"
+      },
+      "verdict": "killed",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 4,
+              "passed": 3,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 322
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 4,
+              "passed": 3,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 322
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 4,
+              "passed": 3,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 322
+          }
+        ]
+      },
+      "defenders": {
+        "requested": [
+          "test/redact.test.mjs"
+        ],
+        "resolved": [
+          "test/redact.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "defenderHashes": {
+          "test/redact.test.mjs": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      }
+    },
+    {
+      "fingerprint": "0a0767ff8b124883e0bc042094c8494027b3d6d45bb8f4e40eda0930214a8970",
+      "claim": {
+        "id": "REDACT-002",
+        "statement": "A rule with an invalid pattern is skipped; it never aborts the scan.",
+        "severity": "high",
+        "source": {
+          "kind": "comment",
+          "ref": "src/redact.mjs:41"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "Invalid pattern rethrows.",
+        "file": "src/redact.mjs",
+        "faultClass": "exception-swallowed",
+        "contentHash": "f232f31d9e6eecc8e952f0da1fb0878c5060e1a4dc19724874b041a4ab265aaf"
+      },
+      "verdict": "unverifiable",
+      "detail": {
+        "reason": "anchor-missing",
+        "baselineRuns": [],
+        "probeRuns": [],
+        "anchor": {
+          "hits": 0,
+          "expected": 1
+        }
+      },
+      "defenders": {
+        "requested": [
+          "test/redact.test.mjs"
+        ],
+        "resolved": [
+          "test/redact.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "defenderHashes": {
+          "test/redact.test.mjs": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      }
+    },
+    {
+      "fingerprint": "81cb777d4cba8dd856ad3f0626fe58186906e5c18a01425d82957adaa963cb28",
+      "claim": {
+        "id": "REDACT-002",
+        "statement": "A rule with an invalid pattern is skipped; it never aborts the scan.",
+        "severity": "high",
+        "source": {
+          "kind": "comment",
+          "ref": "src/redact.mjs:41"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "Invalid pattern rethrows.",
+        "file": "src/redact.mjs",
+        "faultClass": "exception-swallowed",
+        "contentHash": "f232f31d9e6eecc8e952f0da1fb0878c5060e1a4dc19724874b041a4ab265aaf"
+      },
+      "verdict": "nocover",
+      "detail": {
+        "baselineRuns": [],
+        "probeRuns": []
+      },
+      "defenders": {
+        "requested": [
+          "test/rules.test.mjs"
+        ],
+        "resolved": [],
+        "nocover": true
+      },
+      "inputs": {
+        "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "defenderHashes": {
+          "test/redact.test.mjs": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      }
+    },
+    {
+      "fingerprint": "4478f443c695bdb6b4ad27b83002b13b733fdc4b905c457d872f66fe4d78a16d",
+      "claim": {
+        "id": "REDACT-001",
+        "statement": "The audit record written for a redacted message never contains the original secret.",
+        "severity": "critical",
+        "source": {
+          "kind": "spec",
+          "ref": "docs/spec.md#audit-records"
+        },
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-09-17T02:00:00Z"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F2",
+        "description": "Redaction skipped.",
+        "file": "src/redact.mjs",
+        "faultClass": "statement-deleted",
+        "contentHash": "f232f31d9e6eecc8e952f0da1fb0878c5060e1a4dc19724874b041a4ab265aaf"
+      },
+      "verdict": "flaky-defender",
+      "detail": {
+        "reason": "defenders-not-green",
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 4,
+              "passed": 3,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 322
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          }
+        ],
+        "probeRuns": []
+      },
+      "defenders": {
+        "requested": [
+          "test/redact.test.mjs"
+        ],
+        "resolved": [
+          "test/redact.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "defenderHashes": {
+          "test/redact.test.mjs": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      }
+    },
+    {
+      "fingerprint": "483eb99696800b1afceb215943cd085419396b2f3fc0ccea44f9c73b48c1b05c",
+      "claim": {
+        "id": "REDACT-001",
+        "statement": "The audit record written for a redacted message never contains the original secret.",
+        "severity": "critical",
+        "source": {
+          "kind": "spec",
+          "ref": "docs/spec.md#audit-records"
+        },
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-09-17T02:00:00Z"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F3",
+        "description": "Rule order reversed.",
+        "file": "src/redact.mjs",
+        "faultClass": "other",
+        "contentHash": "f232f31d9e6eecc8e952f0da1fb0878c5060e1a4dc19724874b041a4ab265aaf"
+      },
+      "verdict": "flaky-defender",
+      "detail": {
+        "reason": "inconsistent-probe",
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 4,
+              "passed": 3,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 322
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 4,
+              "passed": 3,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 322
+          }
+        ]
+      },
+      "defenders": {
+        "requested": [
+          "test/redact.test.mjs"
+        ],
+        "resolved": [
+          "test/redact.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "defenderHashes": {
+          "test/redact.test.mjs": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      }
+    }
+  ]
+}
