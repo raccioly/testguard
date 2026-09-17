@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
 - **Contention detection and `--serial`** (#26). `probe` looks for other test
   runners before the first run, warns naming their pids, and records them on
   the evidence (`run.contention`) — a contended machine turns a slow suite
@@ -17,19 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file at a time (`--no-file-parallelism`, `--runInBand`, `--workers=1`) and
   is recorded as `run.serial`. Best effort by design: an unreadable process
   list is no detection and never fails a probe.
-
-### Fixed
-
-- Field-report polish (#27): the discovery note prints once per claim instead
-  of on every fault; Node's own `MODULE_TYPELESS_PACKAGE_JSON` and
-  experimental-warning lines from the probed project are filtered out of the
-  stream and out of `loadMessage`; `probe --json` is documented in `--help`;
-  escalation records why it stopped before N runs
-  (`detail.escalationStoppedEarly: "no-common-failure"`) and both the README
-  and GATE-SEMANTICS explain that stopping can only fail to *name* a killer,
-  never upgrade a verdict.
-
-### Added
 
 
 
@@ -83,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TG-ADMIT-NEEDS-ALL-KILLED`.
 
 ### Changed
+
 
 
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { buildBrief, buildUnclaimedBrief, HEADING, hintFor } from '../src/brief/brief.mjs';
+import { renderBriefMarkdown, renderUnclaimedMarkdown, MARKDOWN_MARKER, buildBrief, buildUnclaimedBrief, HEADING, hintFor } from '../src/brief/brief.mjs';
 import { buildBaseline } from '../src/baseline/baseline.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { renderSummary, renderRecord } from '../src/render.mjs';
@@ -100,5 +100,45 @@ describe('provisional rendering', () => {
     expect(u.text.startsWith(HEADING)).toBe(true);
     expect(u.text).toContain('no evidence yet; 1 unclaimed changed file since origin/main');
     expect(u.items).toEqual([]);
+  });
+
+  describe('markdown rendering (merge-request note)', () => {
+    const md = (b, opts = {}) => renderBriefMarkdown(b, { hasBaseline: false, total: evidence.records.length, ...opts });
+    it('starts with the marker so a poster can update its own note, then the heading, then a table of at most --max rows', () => {
+      const b = buildBrief(evidence, undefined, { max: 2 });
+      const text = md(b);
+      const lines = text.split('\n');
+      expect(lines[0]).toBe(MARKDOWN_MARKER);
+      expect(lines[1]).toBe('## TEST BLINDSPOT CONTEXT');
+      expect(text).toContain('| # | verdict | claim / fault | severity | file | what to do |');
+      expect(lines.filter((l) => /^\| \d+ \|/.test(l))).toHaveLength(2);
+      expect(text).toMatch(/… and \d+ more in the evidence file\./);
+      expect(text).toContain('**NEW** SURVIVED');
+    });
+    it('puts unclaimed changes and next BEFORE the findings table, like the text', () => {
+      const next = { action: 'claim', command: 'testguard scaffold src/new.ts', why: 'one changed file carries no claim' };
+      const changes = { ref: 'origin/main', uncovered: [{ file: 'src/new.ts', kind: 'source', suggestion: 'testguard scaffold src/new.ts' }] };
+      const text = md(buildBrief(evidence, undefined, { next, changes }));
+      const i = (needle) => text.indexOf(needle);
+      expect(i('### Unclaimed changes since `origin/main`')).toBeGreaterThan(0);
+      expect(i('- `src/new.ts` (source) → `testguard scaffold src/new.ts`')).toBeLessThan(i('**Next** `[claim]`'));
+      expect(i('**Next** `[claim]`')).toBeLessThan(i('| # | verdict |'));
+    });
+    it('says every claim is defended when nothing is unproven; flags provisional evidence; escapes pipes in cells', () => {
+      const killed = structuredClone(evidence);
+      for (const r of killed.records) { r.verdict = 'killed'; r.detail = { baselineRuns: r.detail.baselineRuns, probeRuns: r.detail.probeRuns }; }
+      expect(md(buildBrief(killed, undefined), { total: killed.records.length })).toContain('Every probed claim is defended.');
+      const prov = structuredClone(evidence); prov.run.provisional = true;
+      expect(md({ ...buildBrief(prov, undefined), provisional: true })).toContain('**PROVISIONAL**');
+      const piped = structuredClone(evidence); piped.records[0].claim.statement = 'a | b';
+      const text = md(buildBrief(piped, undefined));
+      expect(text).toContain('a \\| b');
+    });
+    it('renders the no-evidence, unclaimed-only brief with the same marker and section', () => {
+      const text = renderUnclaimedMarkdown({ tool: { name: 'testguard', version: '0.0.0' }, next: { action: 'claim', command: 'x', why: 'y' }, changes: { ref: 'HEAD', uncovered: [{ file: 'a.ts', kind: 'source', suggestion: 's' }] } });
+      expect(text.startsWith(`${MARKDOWN_MARKER}\n## TEST BLINDSPOT CONTEXT`)).toBe(true);
+      expect(text).toContain('### Unclaimed changes since `HEAD`');
+      expect(text).toContain('- `a.ts` (source) → `s`');
+    });
   });
 });

@@ -1,47 +1,120 @@
-# TestGuard for GitLab CI. Include it from a project's .gitlab-ci.yml:
+# TestGuard for GitLab CI — a CI/CD component-shaped template.
+#
+# Include it from a project's .gitlab-ci.yml, pinned to a release:
 #
 #   include:
 #     - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.5.0/packaging/gitlab/testguard.gitlab-ci.yml'
+#       inputs:
+#         dir: backend            # where testguard.claims.json lives (default ".")
+#         post_note: true         # post the brief as a merge-request note (needs TESTGUARD_GITLAB_TOKEN, api scope)
 #
-# Two jobs. `testguard:gate` runs on every merge request pipeline and fails
+# Mirrored into a GitLab project it is a catalog component (`include: component:`),
+# with the same inputs; a compliance framework can then require it on every
+# project in a group.
+#
+# Three jobs. `testguard:gate` runs on every merge request pipeline and fails
 # when a changed source file carries no claim (and no excusing ignore entry).
-# `testguard:probe` runs the faults against the tests and is gated by the
-# committed baseline. Override TESTGUARD_VERSION / TESTGUARD_DIR as needed.
+# `testguard:probe` runs the faults against the tests, gated by the committed
+# baseline, and always writes the brief — as JSON, and as markdown for humans.
+# With `post_note: true` and a project/group access token in
+# TESTGUARD_GITLAB_TOKEN (api scope; CI_JOB_TOKEN cannot write notes) the
+# markdown brief is posted as ONE note on the merge request, updated in place
+# on later runs. The CLI itself never talks to the network; only this job does.
 #
 # The gate measures the change against CI_MERGE_REQUEST_DIFF_BASE_SHA, which
 # GitLab provides on merge request pipelines and which needs no extra fetch.
 # On other pipelines set TESTGUARD_CHANGED_REF (and fetch that ref).
 
+spec:
+  inputs:
+    version:
+      description: testguard-cli version to run
+      default: "0.5.0"
+    dir:
+      description: directory whose test runner is invoked (where testguard.claims.json lives)
+      default: "."
+    image:
+      description: Node image (Node 20+)
+      default: "node:22"
+    severity:
+      description: "probe: gate only at or above this severity (critical, high, medium, low)"
+      default: "low"
+    confirm:
+      description: "probe: runs per verdict (N); below 3 is provisional"
+      default: "3"
+    budget:
+      description: "probe: wall-clock budget per test run, ms"
+      default: "120000"
+    no_escalate:
+      description: "probe: skip re-running survivors against the whole suite"
+      default: "false"
+    strict:
+      description: "gate: fail a change whose files were all excluded instead of passing with a note"
+      default: "false"
+    post_note:
+      description: post the markdown brief as a merge-request note (requires TESTGUARD_GITLAB_TOKEN with api scope)
+      default: "false"
+    stage:
+      description: pipeline stage for both jobs
+      default: "test"
+---
 variables:
-  TESTGUARD_VERSION: "0.5.0"
-  TESTGUARD_DIR: "."
+  TESTGUARD_VERSION: "$[[ inputs.version ]]"
+  TESTGUARD_DIR: "$[[ inputs.dir ]]"
   GIT_DEPTH: "0" # the probe builds a scratch worktree from HEAD; full history is the safe default
 
 .testguard:
-  image: node:22
+  image: $[[ inputs.image ]]
+  stage: $[[ inputs.stage ]]
   before_script:
     - cd "$TESTGUARD_DIR"
     - npm ci --ignore-scripts
 
 testguard:gate:
   extends: .testguard
-  stage: test
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   script:
-    - npx -y "testguard-cli@${TESTGUARD_VERSION}" gate .
+    - ARGS=""; [ "$[[ inputs.strict ]]" = "true" ] && ARGS="--strict"
+    - npx -y "testguard-cli@${TESTGUARD_VERSION}" gate . $ARGS
   artifacts:
     when: always
     paths: [".testguard/gate.json"]
 
 testguard:probe:
   extends: .testguard
-  stage: test
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
-    - npx -y "testguard-cli@${TESTGUARD_VERSION}" probe . --quiet
+    - ARGS="--severity $[[ inputs.severity ]] --confirm $[[ inputs.confirm ]] --budget $[[ inputs.budget ]]"; [ "$[[ inputs.no_escalate ]]" = "true" ] && ARGS="$ARGS --no-escalate"
+    - status=0; npx -y "testguard-cli@${TESTGUARD_VERSION}" probe . --quiet $ARGS || status=$?
+    # The brief is written whatever the probe's exit code: reviewers read it either way.
+    - npx -y "testguard-cli@${TESTGUARD_VERSION}" brief . >/dev/null || true
+    - npx -y "testguard-cli@${TESTGUARD_VERSION}" brief . --markdown > .testguard/brief.md || true
+    - |
+      if [ "$[[ inputs.post_note ]]" = "true" ] && [ -n "${CI_MERGE_REQUEST_IID:-}" ]; then
+        if [ -z "${TESTGUARD_GITLAB_TOKEN:-}" ]; then
+          echo "post_note is on but TESTGUARD_GITLAB_TOKEN is not set (a project/group access token with api scope); the brief is in the artifacts only."
+        else
+          cat > .testguard/post-note.mjs <<'JS'
+      // Post the markdown brief as ONE merge-request note, updated in place on
+      // later runs. The note is recognised by the marker on its first line.
+      import { readFileSync } from 'node:fs';
+      const body = readFileSync('.testguard/brief.md', 'utf8');
+      const marker = body.split('\n')[0];
+      const base = `${process.env.CI_API_V4_URL}/projects/${process.env.CI_PROJECT_ID}/merge_requests/${process.env.CI_MERGE_REQUEST_IID}/notes`;
+      const headers = { 'PRIVATE-TOKEN': process.env.TESTGUARD_GITLAB_TOKEN, 'Content-Type': 'application/json' };
+      const list = await fetch(`${base}?per_page=100&sort=desc`, { headers });
+      if (!list.ok) { console.error(`could not list notes: ${list.status}`); process.exit(0); }
+      const mine = (await list.json()).find((n) => typeof n.body === 'string' && n.body.startsWith(marker));
+      const res = await fetch(mine ? `${base}/${mine.id}` : base, { method: mine ? 'PUT' : 'POST', headers, body: JSON.stringify({ body }) });
+      console.log(res.ok ? `${mine ? 'updated' : 'posted'} the TestGuard note on !${process.env.CI_MERGE_REQUEST_IID}` : `could not ${mine ? 'update' : 'post'} the note: ${res.status}`);
+      JS
+          node .testguard/post-note.mjs || true
+        fi
+      fi
+    - exit $status
   artifacts:
     when: always
-    paths: [".testguard/evidence.json"]
+    paths: [".testguard/evidence.json", ".testguard/brief.json", ".testguard/brief.md"]

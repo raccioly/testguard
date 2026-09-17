@@ -2,6 +2,8 @@ import { gate } from '../baseline/baseline.mjs';
 import { summarize, formatVerdict } from '../render.mjs';
 
 export const HEADING = '## TEST BLINDSPOT CONTEXT';
+/** First line of every markdown brief, so a poster can find and update its own note instead of adding another. */
+export const MARKDOWN_MARKER = '<!-- testguard:brief -->';
 const ORDER = ['survived', 'nocover', 'unverifiable', 'fault-invalid', 'timeout', 'flaky-defender'];
 
 /** One line the agent can act on. Names the mechanism, never just the verdict. */
@@ -33,8 +35,11 @@ function hintBase(r, defenders) {
       return `Replacement does not load (${r.detail.reason}); fix the fault definition, not the code.`;
     case 'timeout':
       return 'Defenders time out with this fault applied; a hang is not a detection.';
-    case 'flaky-defender':
-      return `${defenders} not reliably green (${r.detail.reason}); fix the flake before trusting any verdict here.`;
+    case 'flaky-defender': {
+      const fr = r.detail.flakeRate;
+      const rate = fr && fr.failures > 0 ? ` — failed ${fr.failures} of ${fr.runs} runs on unmodified source` : '';
+      return `${defenders} not reliably green (${r.detail.reason})${rate}; fix the flake before trusting any verdict here.`;
+    }
     default:
       return '';
   }
@@ -67,13 +72,15 @@ export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Dat
     new: g.new.length + g.belowFloor.length,
     baselined: g.baselined.length,
   };
+  const kills = evidence.records.filter((r) => r.verdict === 'killed');
+  const coAuthored = kills.filter((r) => r.detail.independence?.class === 'co-authored').length;
   const unclaimed = changes?.uncovered?.length ? { ref: changes.ref, files: changes.uncovered } : undefined;
   const doc = { schemaVersion: 1, tool: evidence.tool, generatedAt, head: evidence.run.repo.head, heading: HEADING, summary, ...(next ? { next: { action: next.action, command: next.command, why: next.why } } : {}), ...(unclaimed ? { unclaimed } : {}), items, text: '' };
-  doc.text = renderBriefText({ ...doc, provisional: Boolean(evidence.run.provisional), install }, { hasBaseline: Boolean(baseline), total: evidence.records.length });
+  doc.text = renderBriefText({ ...doc, provisional: Boolean(evidence.run.provisional), install }, { hasBaseline: Boolean(baseline), total: evidence.records.length, independence: kills.length ? { coAuthored, kills: kills.length } : undefined });
   return doc;
 }
 
-export function renderBriefText(brief, { hasBaseline, total }) {
+export function renderBriefText(brief, { hasBaseline, total, independence }) {
   const unproven = total - (brief.summary.byVerdict.killed ?? 0);
   const lines = [
     brief.heading,
@@ -89,6 +96,9 @@ export function renderBriefText(brief, { hasBaseline, total }) {
     lines.push('', `UNCLAIMED CHANGES since ${brief.unclaimed.ref}: ${n} changed file${n === 1 ? '' : 's'} carr${n === 1 ? 'ies' : 'y'} no claim. State the claim first; nothing below can see this code.`);
     for (const u of brief.unclaimed.files) lines.push(`  - ${u.file} (${u.kind}) → ${u.suggestion}`);
   }
+  // L3: a kill written in the same change as the code it guards is not
+  // independent evidence. One line, no per-item noise.
+  if (independence?.coAuthored) lines.push('', `${independence.coAuthored} of ${independence.kills} kills are co-authored with the code they defend — the test and the code were written in the same change, so those kills are not independent evidence.`);
   if (brief.next) lines.push('', `NEXT [${brief.next.action}]: ${brief.next.command}`, `  why: ${brief.next.why}`);
   if (brief.items.length === 0) {
     lines.push('', 'Every probed claim is defended. Keep it that way: new claims need a fault and a test that fails on it.');
@@ -123,4 +133,45 @@ export function buildUnclaimedBrief({ tool, next, changes, generatedAt = new Dat
   if (next) lines.push('', `NEXT [${next.action}]: ${next.command}`, `  why: ${next.why}`);
   doc.text = lines.join('\n') + '\n';
   return doc;
+}
+
+const cell = (v) => String(v ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+
+/**
+ * The brief as a merge-request note: same content, same order as the text —
+ * unclaimed changes first, then `next`, then the ranked findings, capped at
+ * `--max` — in GitLab/GitHub-flavoured markdown. Rendering only; the document
+ * it renders is the validated one.
+ */
+export function renderBriefMarkdown(brief, { hasBaseline, total, install } = {}) {
+  const unproven = total - (brief.summary.byVerdict.killed ?? 0);
+  const lines = [MARKDOWN_MARKER, brief.heading, ''];
+  if (brief.provisional) lines.push('**PROVISIONAL** — fewer than three confirmation runs; nothing below is confirmed. Re-probe with `--confirm 3`.', '');
+  lines.push(`\`testguard ${brief.tool.version}${install ? ` (${install})` : ''}\`${brief.head ? ` @ \`${brief.head.slice(0, 12)}\`` : ''} — **${brief.summary.claims}** claims, **${total}** faults probed, **${unproven}** unproven` +
+    (unproven === 0 ? '.' : hasBaseline ? ` (**${brief.summary.new}** new since baseline).` : ' (no baseline; everything is new).'));
+  if (brief.unclaimed) {
+    const n = brief.unclaimed.files.length;
+    lines.push('', `### Unclaimed changes since \`${brief.unclaimed.ref}\``, '', `${n} changed file${n === 1 ? '' : 's'} carr${n === 1 ? 'ies' : 'y'} no claim. State the claim first; nothing below can see this code.`, '');
+    for (const u of brief.unclaimed.files) lines.push(`- \`${u.file}\` (${u.kind}) → \`${u.suggestion}\``);
+  }
+  if (brief.next) lines.push('', `**Next** \`[${brief.next.action}]\`: \`${brief.next.command}\``, '', `> ${brief.next.why}`);
+  if (brief.items.length === 0) {
+    lines.push('', 'Every probed claim is defended. Keep it that way: new claims need a fault and a test that fails on it.');
+    return lines.join('\n') + '\n';
+  }
+  lines.push('', 'Where the test suite is blind, ranked. A **SURVIVED** fault means its defenders stayed green while the claim was false. Do not close these by asserting current behaviour; write a test that fails on the described fault and passes on HEAD.', '');
+  lines.push('| # | verdict | claim / fault | severity | file | what to do |', '|---|---|---|---|---|---|');
+  brief.items.forEach((it, i) => {
+    lines.push(`| ${i + 1} | ${it.isNew ? '**NEW** ' : ''}${formatVerdict(it.verdict)} | \`${cell(it.claimId)}/${cell(it.subjectId ?? '?')}\`<br>${cell(it.statement)} | ${it.severity} | ${it.file ? `\`${cell(it.file)}\`` : ''} | ${cell(it.hint)} |`);
+  });
+  if (unproven > brief.items.length) lines.push('', `… and ${unproven - brief.items.length} more in the evidence file.`);
+  return lines.join('\n') + '\n';
+}
+
+/** Markdown for the no-evidence-yet, unclaimed-changes-only brief. */
+export function renderUnclaimedMarkdown({ tool, next, changes, install }) {
+  const lines = [MARKDOWN_MARKER, HEADING, '', `\`testguard ${tool.version}${install ? ` (${install})` : ''}\` — no evidence yet; **${changes.uncovered.length}** unclaimed changed file${changes.uncovered.length === 1 ? '' : 's'} since \`${changes.ref}\`.`, '', `### Unclaimed changes since \`${changes.ref}\``, '', 'State the claim first; nothing can be probed for this code until it has one.', ''];
+  for (const u of changes.uncovered) lines.push(`- \`${u.file}\` (${u.kind}) → \`${u.suggestion}\``);
+  if (next) lines.push('', `**Next** \`[${next.action}]\`: \`${next.command}\``, '', `> ${next.why}`);
+  return lines.join('\n') + '\n';
 }

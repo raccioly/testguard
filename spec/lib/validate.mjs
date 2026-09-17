@@ -76,6 +76,16 @@ const semantic = {
       if (r.verdict === 'nocover' && !r.defenders.nocover) {
         errors.push({ path: `${p}/defenders/nocover`, message: 'nocover verdict requires defenders.nocover = true' });
       }
+      if (r.detail.flakeRate) {
+        const { runs, failures } = r.detail.flakeRate;
+        if (failures > runs) errors.push({ path: `${p}/detail/flakeRate`, message: `flakeRate failures (${failures}) exceed runs (${runs})` });
+        if (failures > 0 && r.verdict !== 'flaky-defender') errors.push({ path: `${p}/detail/flakeRate`, message: 'a defender that failed on unmodified source makes the verdict flaky-defender' });
+      }
+      if (r.detail.independence) {
+        if (r.verdict !== 'killed') errors.push({ path: `${p}/detail/independence`, message: 'independence is a property of a kill; only killed records carry it' });
+        const { class: cls, defenderCommit, targetCommit } = r.detail.independence;
+        if (cls !== 'unknown' && !(defenderCommit && targetCommit)) errors.push({ path: `${p}/detail/independence`, message: `independence class ${cls} requires both defenderCommit and targetCommit` });
+      }
       if (r.detail.undeclaredKillers && r.detail.reason !== 'killed-by-undeclared-tests') {
         errors.push({ path: `${p}/detail/undeclaredKillers`, message: 'undeclaredKillers is only meaningful with reason killed-by-undeclared-tests' });
       }
@@ -118,6 +128,7 @@ const semantic = {
     if (doc.state === 'clean' && (doc.counts.new ?? 0) > 0) errors.push({ path: '/state', message: 'clean with new findings' });
     if (doc.state === 'unclaimed-changes' && !(doc.changes && doc.changes.uncovered.length > 0)) errors.push({ path: '/changes/uncovered', message: 'unclaimed-changes requires at least one uncovered changed file' });
     if (doc.state === 'unclaimed-changes' && doc.next.action !== 'claim') errors.push({ path: '/next/action', message: 'unclaimed-changes requires next.action = claim' });
+    if (doc.evidenceSource && !doc.evidenceHead) errors.push({ path: '/evidenceHead', message: 'evidence was read, so the commit it describes must be recorded' });
     if (doc.changes && doc.changes.uncovered.length > 0 && !['no-claims', 'unclaimed-changes'].includes(doc.state)) errors.push({ path: '/state', message: 'uncovered changed files are hidden behind a later state; unclaimed-changes precedes every evidence state' });
     return errors;
   },
