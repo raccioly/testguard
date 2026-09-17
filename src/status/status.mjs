@@ -8,6 +8,7 @@ import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { sortForReport } from '../render.mjs';
 import { computeChangedGate, defaultIgnorePath } from '../gate/changed.mjs';
+import { headSha } from '../git.mjs';
 
 export const faultContentHash = (fault) => sha256(`${fault.find}\n${fault.replace}`);
 
@@ -23,7 +24,13 @@ const P = (projectDir) => ({
  * Reads the claims file, evidence, baseline and the working tree; never
  * trusts a cached verdict whose inputs have changed.
  */
-export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20, changedRef, includeDirty = false }) {
+/**
+ * `evidence` overrides the project's own evidence file: a document taken on
+ * ANOTHER commit (CI's, fetched as an artifact) is legitimate input. Staleness
+ * is computed from the recorded input hashes exactly as for a local run, so a
+ * foreign document is trusted only for the faults whose inputs still match.
+ */
+export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20, changedRef, includeDirty = false, evidence: evidenceOverride }) {
   const rel = (p) => relative(projectDir, p) || '.';
   const doc = {
     schemaVersion: 1,
@@ -79,7 +86,8 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
     return doc;
   }
 
-  const hasEvidence = existsSync(paths.evidence);
+  const evidenceFile = evidenceOverride ?? paths.evidence;
+  const hasEvidence = existsSync(evidenceFile);
   const hasProvisional = existsSync(paths.provisional);
   if (hasProvisional) doc.paths.provisionalEvidence = rel(paths.provisional);
   if (!hasEvidence) {
@@ -93,8 +101,14 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
     }
     return doc;
   }
-  doc.paths.evidence = rel(paths.evidence);
-  const evidence = readSpecDoc('evidence', paths.evidence);
+  doc.paths.evidence = rel(evidenceFile);
+  doc.evidenceSource = evidenceOverride ? 'provided' : 'local';
+  const evidence = readSpecDoc('evidence', evidenceFile);
+  // A verdict is about a commit. When the evidence describes a different one,
+  // say both: "looks right and is not" is the failure mode this prevents.
+  doc.evidenceHead = evidence.run.repo.snapshot ?? evidence.run.repo.head;
+  const localHead = (() => { try { return headSha(projectDir); } catch { return null; } })();
+  if (localHead) doc.head = localHead;
   const baseline = existsSync(paths.baseline) ? readSpecDoc('baseline', paths.baseline) : undefined;
   if (baseline) doc.paths.baseline = rel(paths.baseline);
 
@@ -187,7 +201,12 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
 }
 
 export function renderStatus(doc) {
-  const lines = [`state: ${doc.state}${doc.provisional ? ' (provisional)' : ''} — ${doc.counts.claims} claims / ${doc.counts.faults} faults` + (doc.counts.byVerdict ? `; ${Object.entries(doc.counts.byVerdict).map(([k, v]) => `${v} ${k}`).join(', ')}; ${doc.counts.new ?? 0} new, ${doc.counts.baselined ?? 0} baselined` : '')];
+  const lines = [];
+  if (doc.evidenceSource === 'provided') {
+    lines.push(`evidence: ${doc.paths.evidence} (provided)` + (doc.evidenceHead ? ` describes ${doc.evidenceHead.slice(0, 7)}` : '') + (doc.head && doc.evidenceHead && doc.head !== doc.evidenceHead ? `; this tree is ${doc.head.slice(0, 7)}` : ''));
+  }
+  lines.push(`state: ${doc.state}${doc.provisional ? ' (provisional)' : ''} — ${doc.counts.claims} claims / ${doc.counts.faults} faults` + (doc.counts.byVerdict ? `; ${Object.entries(doc.counts.byVerdict).map(([k, v]) => `${v} ${k}`).join(', ')}; ${doc.counts.new ?? 0} new, ${doc.counts.baselined ?? 0} baselined` : '')
+  );
   if (doc.changes) {
     const c = doc.changes;
     lines.push(`changes:  ${c.changed} file${c.changed === 1 ? '' : 's'} since ${c.ref}; ${c.evaluated} evaluated, ${c.excluded} excluded, ${c.uncovered.length} unclaimed`);

@@ -13,7 +13,7 @@ export async function briefCommand({ projectDir, values, version }, io) {
     // A detected base that does not resolve is silent here: the brief is a
     // session-start hook's output and must never add noise; `status` and
     // `gate` are where that warning is printed.
-    status = withChangedRef(resolveChangedRef({ explicit: values.changed }), (changedRef) => computeStatus({ projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'] }));
+    status = withChangedRef(resolveChangedRef({ explicit: values.changed }), (changedRef) => computeStatus({ projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'], evidence: values.evidence ? evPath : undefined }));
   } catch {
     status = undefined; // a brief must never fail because status could not be computed
   }

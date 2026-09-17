@@ -158,6 +158,31 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    `--text` prints only, and exits 0 silently when there is no evidence yet,
    so the hook can never break a session.
 
+### Read CI's evidence locally
+
+Verdict reuse makes a probe cheap, but the evidence lives where `probe` ran
+and is gitignored. On a fresh clone, or on a laptop where CI does the
+probing, the session-start brief is empty and `status` says `unprobed` while
+the default branch has full evidence. Point either command at CI's document:
+
+```bash
+testguard status . --evidence .testguard/ci/ci-self-evidence.json
+testguard brief . --text --evidence .testguard/ci/ci-self-evidence.json
+```
+
+A foreign document is not trusted blindly. `status` marks it
+`evidenceSource: provided`, prints the commit it describes next to the
+commit in your tree, and still computes staleness from the recorded input
+hashes — so a file you have edited since CI probed it goes `evidence-stale`
+for exactly those claims.
+
+`testguard init --ci-evidence github` (or `gitlab`) writes
+`.testguard/fetch-ci-evidence.sh`, which downloads the branch-named artifact
+with the platform CLI you already have and then briefs from it. **It is an
+on-demand helper, not a hook**: the session-start hook never touches the
+network, and the helper exits 0 with a message when the CLI or the artifact
+is missing. TestGuard itself still makes no network calls.
+
 ### Every change needs a claim
 
 `probe` can only verify claims that exist. Every escaped defect in the field

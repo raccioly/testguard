@@ -64,8 +64,9 @@ gate       --changed <ref>   measure the change since merge-base(ref, HEAD); aut
            --ignore <path>   ignore file (default: <dir>/testguard.ignore.json; kind=path entries excuse files, with a reason)
            exit 0 every changed source file is claimed or excused · 1 unclaimed file · 2 cannot evaluate · 3 no reference
 status     --json (exit 0 clean · 1 unproven/stale/unclaimed · 2 nothing to probe yet)
+           --evidence <path>  read this evidence instead of .testguard/evidence.json (e.g. CI's, fetched as an artifact); staleness is still computed from the recorded input hashes, and both commits are named
            --changed <ref>   also compute claim coverage of the change; unclaimed-changes then precedes every evidence state
-init       --force (replace an existing skill file)  --json
+init       --force (replace an existing skill file)  --json  --ci-evidence github|gitlab (write the on-demand helper that fetches CI's evidence; the session-start hook stays offline)
 every command accepts --json; probe/baseline emit the status document plus their own result
 claims     --json
 baseline   --evidence <path>  --out <path>  --allow-provisional (freeze unconfirmed evidence; normally refused)
@@ -102,6 +103,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         ignore: { type: 'string' },
         'allow-provisional': { type: 'boolean', default: false },
         force: { type: 'boolean', default: false },
+        'ci-evidence': { type: 'string' },
         verbose: { type: 'boolean', default: false },
         'runner-cmd': { type: 'string' },
         runner: { type: 'string', default: 'auto' },

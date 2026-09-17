@@ -21,7 +21,34 @@ const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provis
  * session-start hook, an AGENTS.md section and the .gitignore lines.
  * Idempotent: re-running changes nothing unless --force replaces the skill.
  */
-export function initProject({ projectDir, force = false }) {
+const CI_EVIDENCE_HELPERS = {
+  github: `#!/bin/sh
+# Fetch the evidence CI wrote on a branch, then brief from it. Run it when you
+# want it: the session-start hook never touches the network, and this script
+# exits 0 with a message whenever anything is missing.
+BRANCH="\${1:-main}"
+OUT=.testguard/ci
+command -v gh >/dev/null 2>&1 || { echo "gh is not installed; see README > Read CI's evidence locally" >&2; exit 0; }
+command -v testguard >/dev/null 2>&1 || { echo "testguard is not on PATH; install it or run npx testguard-cli brief --evidence <file>" >&2; exit 0; }
+mkdir -p "$OUT" || exit 0
+gh run download --name "testguard-evidence-$BRANCH" --dir "$OUT" >/dev/null 2>&1 || { echo "no testguard-evidence-$BRANCH artifact to download" >&2; exit 0; }
+exec testguard brief . --text --evidence "$OUT/ci-self-evidence.json"
+`,
+  gitlab: `#!/bin/sh
+# Fetch the evidence CI wrote on a branch, then brief from it. Run it when you
+# want it: the session-start hook never touches the network, and this script
+# exits 0 with a message whenever anything is missing.
+BRANCH="\${1:-main}"
+OUT=.testguard/ci
+command -v glab >/dev/null 2>&1 || { echo "glab is not installed; see README > Read CI's evidence locally" >&2; exit 0; }
+command -v testguard >/dev/null 2>&1 || { echo "testguard is not on PATH; install it or run npx testguard-cli brief --evidence <file>" >&2; exit 0; }
+mkdir -p "$OUT" || exit 0
+glab ci artifact "$BRANCH" testguard:probe --path "$OUT/" >/dev/null 2>&1 || { echo "no testguard:probe artifact to download for $BRANCH" >&2; exit 0; }
+exec testguard brief . --text --evidence "$OUT/.testguard/evidence.json"
+`,
+};
+
+export function initProject({ projectDir, force = false, ciEvidence }) {
   const done = [];
   const skipped = [];
 
@@ -77,6 +104,18 @@ export function initProject({ projectDir, force = false }) {
     done.push(`.gitignore: ${missing.length} line${missing.length === 1 ? '' : 's'} added`);
   } else {
     skipped.push('.gitignore already ignores the regenerated files');
+  }
+  if (ciEvidence) {
+    const helperPath = join(projectDir, '.testguard', 'fetch-ci-evidence.sh');
+    const body = CI_EVIDENCE_HELPERS[ciEvidence];
+    if (!body) throw new Error(`--ci-evidence must be github or gitlab, not ${ciEvidence}`);
+    if (!existsSync(helperPath) || force) {
+      mkdirSync(dirname(helperPath), { recursive: true });
+      writeFileSync(helperPath, body, { mode: 0o755 });
+      done.push(`.testguard/fetch-ci-evidence.sh (${ciEvidence}) — run it on demand; the session-start hook stays offline`);
+    } else {
+      skipped.push('.testguard/fetch-ci-evidence.sh exists (use --force to replace)');
+    }
   }
   return { done, skipped };
 }

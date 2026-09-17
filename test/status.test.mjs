@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { computeStatus, faultContentHash } from '../src/status/status.mjs';
+import { computeStatus, renderStatus, faultContentHash } from '../src/status/status.mjs';
 import { writeSpecDoc } from '../src/evidence/writer.mjs';
 import { buildBaseline } from '../src/baseline/baseline.mjs';
 import { validate } from '../spec/lib/validate.mjs';
@@ -143,5 +143,40 @@ describe('computeStatus — every state, with a conforming document', () => {
     const none = computeStatus({ projectDir: dir, changedRef: 'HEAD', includeDirty: true });
     expect(none).toMatchObject({ state: 'no-claims', next: { action: 'scaffold', command: 'testguard scaffold src/newfeature.mjs', file: 'src/newfeature.mjs' } });
     expect(validate('status', none).errors).toEqual([]);
+  });
+});
+
+describe("evidence from elsewhere (CI's, fetched as an artifact)", () => {
+  it('is read with --evidence, marked provided, names the commit it describes and this tree, and is still checked for staleness', () => {
+    const { dir, evidence } = project();
+    gitInit(dir);
+    const ev = evidence(() => 'killed');
+    ev.run.repo.head = 'c'.repeat(40); // CI probed another commit
+    const foreign = join(dir, 'ci-evidence.json');
+    writeSpecDoc('evidence', foreign, ev);
+    const s = computeStatus({ projectDir: dir, evidence: foreign });
+    expect(s.evidenceSource).toBe('provided');
+    expect(s.evidenceHead).toBe('c'.repeat(40));
+    expect(s.head).toMatch(/^[a-f0-9]{40}$/);
+    expect(s.head).not.toBe(s.evidenceHead);
+    expect(s.stale).toEqual([]); // inputs still match, so the verdicts hold
+    expect(validate('status', s).errors).toEqual([]);
+    expect(renderStatus(s)).toMatch(/^evidence: ci-evidence\.json \(provided\) describes ccccccc; this tree is [a-f0-9]{7}$/m);
+
+    // a target that changed since CI probed it goes stale, exactly as for a local run
+    writeFileSync(join(dir, 'src', 'redact.mjs'), readFileSync(join(dir, 'src', 'redact.mjs'), 'utf8') + '\n// local edit\n');
+    const s2 = computeStatus({ projectDir: dir, evidence: foreign });
+    expect(s2.state).toBe('evidence-stale');
+    expect(s2.stale.some((x) => /src\/redact\.mjs changed since/.test(x))).toBe(true);
+    expect(validate('status', s2).errors).toEqual([]);
+  });
+  it('local evidence is marked local and still records the commit it describes', () => {
+    const { dir, evidence } = project();
+    writeSpecDoc('evidence', join(dir, '.testguard', 'evidence.json'), evidence(() => 'killed'));
+    const s = computeStatus({ projectDir: dir });
+    expect(s.evidenceSource).toBe('local');
+    expect(s.evidenceHead).toBe('a'.repeat(40));
+    expect(renderStatus(s)).not.toContain('(provided)');
+    expect(validate('status', s).errors).toEqual([]);
   });
 });

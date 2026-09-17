@@ -104,6 +104,7 @@ const semantic = {
     if (doc.state === 'clean' && (doc.counts.new ?? 0) > 0) errors.push({ path: '/state', message: 'clean with new findings' });
     if (doc.state === 'unclaimed-changes' && !(doc.changes && doc.changes.uncovered.length > 0)) errors.push({ path: '/changes/uncovered', message: 'unclaimed-changes requires at least one uncovered changed file' });
     if (doc.state === 'unclaimed-changes' && doc.next.action !== 'claim') errors.push({ path: '/next/action', message: 'unclaimed-changes requires next.action = claim' });
+    if (doc.evidenceSource && !doc.evidenceHead) errors.push({ path: '/evidenceHead', message: 'evidence was read, so the commit it describes must be recorded' });
     if (doc.changes && doc.changes.uncovered.length > 0 && !['no-claims', 'unclaimed-changes'].includes(doc.state)) errors.push({ path: '/state', message: 'uncovered changed files are hidden behind a later state; unclaimed-changes precedes every evidence state' });
     return errors;
   },

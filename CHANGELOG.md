@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Read CI's evidence locally.** `status --evidence <path>` accepts an
+  evidence document taken elsewhere (CI's, fetched as an artifact): it is
+  marked `evidenceSource: provided`, the commit it describes is recorded as
+  `evidenceHead` next to the working tree's `head` and printed when they
+  differ, and staleness is still computed from the recorded input hashes, so
+  a foreign document is trusted only for the faults whose inputs still match.
+  `brief --evidence` passes the same file to `status`, so `next` and the
+  rendering can no longer disagree. `init --ci-evidence github|gitlab`
+  writes `.testguard/fetch-ci-evidence.sh`, an **on-demand** helper that
+  downloads the branch-named artifact with the platform CLI and briefs from
+  it; the session-start hook stays offline and the CLI still makes no network
+  calls. CI uploads `testguard-evidence-<branch>` on pushes so the artifact
+  can be fetched without a run id. Spec: `status.schema.json` gains
+  `evidenceSource`, `evidenceHead` and `head`, with a semantic rule that
+  evidence which was read must name its commit. Self-claim
+  `TG-PROVIDED-EVIDENCE-STILL-STALE-CHECKED`.
+
+### Added
+
 - **`testguard admit <test-file> --claim <ID>`** — the two-gate rule as a
   named verb. Sugar over `probe --claim <ID> --include-dirty --no-escalate`:
   the named test must be a declared or discovered defender of the claim

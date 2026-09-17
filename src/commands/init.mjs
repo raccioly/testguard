@@ -1,7 +1,7 @@
 import { initProject } from '../init/init.mjs';
 
 export async function initCommand({ projectDir, values }, io) {
-  const { done, skipped } = initProject({ projectDir, force: values.force });
+  const { done, skipped } = initProject({ projectDir, force: values.force, ciEvidence: values['ci-evidence'] });
   if (values.json) {
     io.out(JSON.stringify({ done, skipped }, null, 2));
     return 0;

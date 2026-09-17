@@ -758,6 +758,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-PROVIDED-EVIDENCE-STILL-STALE-CHECKED",
+      "statement": "Evidence supplied with --evidence is checked for staleness from its recorded input hashes exactly as local evidence is; a foreign document never makes a changed file look proven.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/status.schema.json"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/status.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Provided evidence skips the target-hash staleness check; a locally edited file keeps CI's verdict.",
+          "faultClass": "condition-forced",
+          "file": "src/status/status.mjs",
+          "find": "    if (existsSync(target) && hashFile(target) !== r.inputs.targetHash) doc.stale.push(`${cur.fault.file} changed since ${key} was probed`);",
+          "replace": "    if (false && existsSync(target) && hashFile(target) !== r.inputs.targetHash) doc.stale.push(`${cur.fault.file} changed since ${key} was probed`);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }
