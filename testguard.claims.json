@@ -921,6 +921,102 @@
       ]
     },
     {
+      "id": "TG-RESTAMP-REQUIRES-SAME-FINGERPRINTS",
+      "statement": "baseline --restamp moves head only when a clean probe reproduced exactly the baseline's fingerprints; a frozen contract is never silently rewritten.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#baseline-and-delta"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/baseline.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The fingerprint comparison is skipped; any clean probe re-stamps the baseline.",
+          "faultClass": "condition-forced",
+          "file": "src/baseline/baseline.mjs",
+          "find": "  if (!sameFingerprints(baseline.fingerprints, current)) return",
+          "replace": "  if (false) return",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-BASELINE-CARRIES-SNAPSHOT",
+      "statement": "A baseline frozen from working-tree-snapshot evidence records the snapshot commit, so a reader can tell its head is the parent of the commit that carries the tests.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#baseline-and-delta"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/baseline.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The snapshot is dropped; the baseline looks like a clean freeze of its parent commit.",
+          "faultClass": "field-dropped",
+          "file": "src/baseline/baseline.mjs",
+          "find": "...(repo.snapshot ? { snapshot: repo.snapshot } : {}), ",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-IS-ANCESTOR-ASKS-GIT",
+      "statement": "Ancestry between a baseline's head and HEAD is decided by git (merge-base --is-ancestor); a commit that is not in HEAD's history is never reported as an ancestor.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#baseline-and-delta"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/status.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every commit counts as an ancestor; a rewritten or foreign baseline head is never noticed.",
+          "faultClass": "return-altered",
+          "file": "src/git.mjs",
+          "find": "  return spawnSync('git', ['merge-base', '--is-ancestor', ancestor, ref], { cwd: dir }).status === 0;",
+          "replace": "  return true;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-FLAKE-RATE-EXCLUDES-NON-RUNS",
       "statement": "The flake rate counts only baseline runs that actually ran; a load error or a timeout measures nothing about stability and is excluded from both numbers, so a suite that cannot load is never reported as flaky.",
       "source": {

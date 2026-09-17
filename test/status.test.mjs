@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 import { computeStatus, faultContentHash } from '../src/status/status.mjs';
 import { writeSpecDoc } from '../src/evidence/writer.mjs';
 import { buildBaseline } from '../src/baseline/baseline.mjs';
@@ -143,5 +145,27 @@ describe('computeStatus — every state, with a conforming document', () => {
     const none = computeStatus({ projectDir: dir, changedRef: 'HEAD', includeDirty: true });
     expect(none).toMatchObject({ state: 'no-claims', next: { action: 'scaffold', command: 'testguard scaffold src/newfeature.mjs', file: 'src/newfeature.mjs' } });
     expect(validate('status', none).errors).toEqual([]);
+  });
+  it('a baseline frozen from a snapshot or a dirty tree, once HEAD moved on, is a note — never a state', () => {
+    const { dir, evidence } = project();
+    gitInit(dir);
+    const ev = evidence((c) => (c.id === 'REDACT-003' ? 'survived' : 'killed'));
+    writeSpecDoc('evidence', join(dir, '.testguard', 'evidence.json'), ev);
+    const b = buildBaseline(ev);
+    // freeze as if from a snapshot of a parent commit, then let HEAD move on
+    writeSpecDoc('baseline', join(dir, '.testguard', 'baseline.json'), { ...b, head: 'a'.repeat(40), dirty: true, snapshot: 'b'.repeat(40) });
+    const s = computeStatus({ projectDir: dir });
+    expect(s.state).toBe('clean');
+    expect(s.notes).toHaveLength(1);
+    expect(s.notes[0]).toMatch(/frozen from a working-tree snapshot at aaaaaaa; HEAD is [0-9a-f]{7}.*baseline --restamp/);
+    expect(validate('status', s).errors).toEqual([]);
+    // a clean baseline at HEAD itself: no note
+    const { spawnSync } = require('node:child_process');
+    const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
+    writeSpecDoc('baseline', join(dir, '.testguard', 'baseline.json'), { ...b, head, dirty: false });
+    expect(computeStatus({ projectDir: dir }).notes).toEqual([]);
+    // a clean baseline at a commit that is NOT in HEAD's history (rewritten or foreign): a different note
+    writeSpecDoc('baseline', join(dir, '.testguard', 'baseline.json'), { ...b, head: 'd'.repeat(40), dirty: false });
+    expect(computeStatus({ projectDir: dir }).notes).toEqual([expect.stringMatching(/baseline head ddddddd is not an ancestor of HEAD/)]);
   });
 });
