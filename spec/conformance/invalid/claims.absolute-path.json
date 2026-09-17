@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "REDACT-001",
+      "statement": "The audit record written for a redacted message never contains the original secret.",
+      "source": {
+        "kind": "spec",
+        "ref": "docs/spec.md#audit-records"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T02:00:00Z"
+      },
+      "defendedBy": [
+        "test/redact.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Audit row is written with the raw input instead of the redacted text.",
+          "faultClass": "variable-swap",
+          "file": "/etc/passwd",
+          "find": "content: redacted,",
+          "replace": "content: input,",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T02:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Redaction is skipped entirely; input passes through.",
+          "faultClass": "statement-deleted",
+          "file": "src/redact.mjs",
+          "find": "const redacted = mask(input, rules);",
+          "replace": "const redacted = input;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T02:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "privacy"
+      ]
+    },
+    {
+      "id": "REDACT-002",
+      "statement": "A rule with an invalid pattern is skipped; it never aborts the scan.",
+      "source": {
+        "kind": "comment",
+        "ref": "src/redact.mjs:41"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claims-extractor",
+        "reviewedBy": "maintainer",
+        "at": "2026-09-17T02:00:00Z"
+      },
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Invalid pattern rethrows instead of being skipped.",
+          "faultClass": "exception-swallowed",
+          "file": "src/redact.mjs",
+          "find": "} catch { return null; }",
+          "replace": "} catch (e) { throw e; }",
+          "expectHits": 1,
+          "occurrence": 1,
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T02:00:00Z"
+          }
+        }
+      ]
+    }
+  ]
+}

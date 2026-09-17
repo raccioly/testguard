@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:guard-spec:v1:evidence",
+  "title": "Guard spec v1 — evidence file",
+  "description": "One run's findings, on disk, in a shape an auditor can read without the tool. Each record binds a claim to a subject (for TestGuard, an injected fault) and a verdict, with every run that produced the verdict.",
+  "type": "object",
+  "required": ["schemaVersion", "tool", "run", "records"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "tool": { "$ref": "urn:guard-spec:v1:common#/$defs/tool" },
+    "run": {
+      "type": "object",
+      "required": ["id", "startedAt", "repo", "confirmRuns", "mode"],
+      "properties": {
+        "id": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+        "startedAt": { "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime" },
+        "finishedAt": { "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime" },
+        "repo": {
+          "type": "object",
+          "required": ["head", "dirty"],
+          "properties": {
+            "head": { "$ref": "urn:guard-spec:v1:common#/$defs/gitSha" },
+            "dirty": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "runner": {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+            "version": { "type": "string", "maxLength": 64 }
+          },
+          "additionalProperties": false
+        },
+        "confirmRuns": {
+          "description": "N — how many times the defenders were run both unmodified (baseline) and with each fault applied.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "mode": {
+          "description": "`worktree` = faults were applied in a scratch git worktree (default). `in-place` = the user's working tree was mutated and restored.",
+          "enum": ["worktree", "in-place"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "records": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/record" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "testRun": {
+      "type": "object",
+      "required": ["outcome", "durationMs"],
+      "properties": {
+        "outcome": {
+          "description": "`fail` means at least one test failed with the suite otherwise loading and running. `error` means the suite could not load or run (import/syntax error). `timeout` means the runner exceeded its budget.",
+          "enum": ["pass", "fail", "timeout", "error"]
+        },
+        "tests": {
+          "type": "object",
+          "required": ["total", "passed", "failed"],
+          "properties": {
+            "total": { "type": "integer", "minimum": 0 },
+            "passed": { "type": "integer", "minimum": 0 },
+            "failed": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "assertionFailures": {
+          "description": "Test-level failures that are neither timeouts nor load failures: the test body ran and rejected the behaviour, whether by an assertion or by an exception the fault caused. Only these count toward `killed`. A timeout or a suite that fails to load is not evidence that the suite defends the claim.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "durationMs": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "record": {
+      "type": "object",
+      "required": ["fingerprint", "claim", "subject", "verdict", "detail", "defenders", "inputs"],
+      "properties": {
+        "fingerprint": {
+          "description": "sha256 of `<claim.id>\\n<subject.id>\\n<subject.file>\\n<verdict>`. Derived from identities and outcome, never from `find`/`replace`, so repairing a rotted anchor does not churn the baseline.",
+          "$ref": "urn:guard-spec:v1:common#/$defs/sha256"
+        },
+        "claim": {
+          "type": "object",
+          "required": ["id", "statement", "severity", "source"],
+          "properties": {
+            "id": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+            "statement": { "type": "string", "minLength": 1, "maxLength": 2000 },
+            "severity": { "$ref": "urn:guard-spec:v1:common#/$defs/severity" },
+            "source": {
+              "type": "object",
+              "required": ["kind"],
+              "properties": {
+                "kind": { "enum": ["spec", "adr", "annotation", "comment", "manual"] },
+                "ref": { "type": "string", "maxLength": 512 }
+              },
+              "additionalProperties": false
+            },
+            "producedBy": { "$ref": "urn:guard-spec:v1:common#/$defs/provenance" }
+          },
+          "additionalProperties": false
+        },
+        "subject": {
+          "description": "What was tried against the claim. For TestGuard `kind` is `fault`. Other adopters use their own kinds (e.g. `doc-statement`, `finding`); extra properties are permitted here and nowhere else.",
+          "type": "object",
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+            "id": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+            "description": { "type": "string", "maxLength": 2000 },
+            "file": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" },
+            "faultClass": { "$ref": "urn:guard-spec:v1:common#/$defs/faultClass" },
+            "producedBy": { "$ref": "urn:guard-spec:v1:common#/$defs/provenance" }
+          },
+          "additionalProperties": true
+        },
+        "verdict": { "$ref": "urn:guard-spec:v1:common#/$defs/verdict" },
+        "detail": {
+          "type": "object",
+          "required": ["baselineRuns", "probeRuns"],
+          "properties": {
+            "reason": {
+              "description": "Machine-readable qualifier, e.g. `anchor-missing`, `anchor-ambiguous`, `defenders-not-green`, `replacement-does-not-compile`.",
+              "type": "string",
+              "maxLength": 256
+            },
+            "baselineRuns": {
+              "description": "Defenders run on unmodified source, N times. Anything short of N/N pass is `flaky-defender`.",
+              "type": "array",
+              "items": { "$ref": "#/$defs/testRun" }
+            },
+            "probeRuns": {
+              "description": "Defenders run with the fault applied, N times.",
+              "type": "array",
+              "items": { "$ref": "#/$defs/testRun" }
+            },
+            "escalated": {
+              "description": "True when the fault survived its declared defenders and a broader test set was then run.",
+              "type": "boolean"
+            },
+            "escalationRuns": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/testRun" }
+            }
+          },
+          "additionalProperties": false
+        },
+        "defenders": {
+          "type": "object",
+          "required": ["requested", "resolved", "nocover"],
+          "properties": {
+            "requested": { "type": "array", "items": { "type": "string" } },
+            "resolved": { "type": "array", "items": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" } },
+            "nocover": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "inputs": {
+          "description": "Content hashes of everything the verdict depends on, so an unchanged claim can reuse its prior verdict.",
+          "type": "object",
+          "required": ["targetHash", "defenderHashes"],
+          "properties": {
+            "targetHash": { "$ref": "urn:guard-spec:v1:common#/$defs/sha256" },
+            "defenderHashes": {
+              "type": "object",
+              "additionalProperties": { "$ref": "urn:guard-spec:v1:common#/$defs/sha256" }
+            }
+          },
+          "additionalProperties": false
+        },
+        "reusedFrom": {
+          "description": "Run id whose verdict was reused because `inputs` were unchanged.",
+          "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+        },
+        "rank": {
+          "description": "Additive ordering signal. Never alters `verdict`.",
+          "type": "object",
+          "required": ["score"],
+          "properties": {
+            "score": { "type": "number" },
+            "blastRadius": {
+              "description": "Number of source files that import the subject's file, transitively or directly as the tool documents.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "tier": { "type": "string", "maxLength": 64 }
+          },
+          "additionalProperties": false
+        },
+        "annotations": {
+          "type": "array",
+          "items": { "$ref": "urn:guard-spec:v1:common#/$defs/annotation" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

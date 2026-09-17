@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:guard-spec:v1:common",
+  "title": "Guard spec v1 — shared definitions",
+  "description": "Definitions shared by every Guard-spec format. Referenced as urn:guard-spec:v1:common#/$defs/<name>.",
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{7,40}$"
+    },
+    "isoDateTime": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "maxLength": 128
+    },
+    "repoPath": {
+      "description": "Path relative to the repository root. Absolute paths and parent traversal are rejected.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![/\\\\])(?!\\.\\.(?:[/\\\\]|$))(?!.*[/\\\\]\\.\\.(?:[/\\\\]|$)).*$"
+    },
+    "severity": {
+      "enum": ["critical", "high", "medium", "low"]
+    },
+    "verdict": {
+      "description": "Closed set. Only `killed` is a pass. Every other verdict gates by default (see GATE-SEMANTICS.md).",
+      "enum": [
+        "killed",
+        "survived",
+        "nocover",
+        "unverifiable",
+        "timeout",
+        "fault-invalid",
+        "flaky-defender"
+      ]
+    },
+    "faultClass": {
+      "description": "Taxonomy of the injected change. Required on every fault so calibration (fault class → real-bug predictiveness) can be computed later.",
+      "enum": [
+        "guard-removed",
+        "condition-forced",
+        "statement-deleted",
+        "variable-swap",
+        "literal-changed",
+        "call-removed",
+        "return-altered",
+        "exception-swallowed",
+        "other"
+      ]
+    },
+    "provenance": {
+      "description": "Who or what produced an artifact. `human` = authored by a person; `agent` = proposed by an LLM agent; `operator` = emitted by a mechanical mutation operator; `derived` = computed from another artifact (e.g. a bug log).",
+      "type": "object",
+      "required": ["producer"],
+      "properties": {
+        "producer": { "enum": ["human", "agent", "operator", "derived"] },
+        "by": { "type": "string", "maxLength": 256 },
+        "reviewedBy": { "type": "string", "maxLength": 256 },
+        "at": { "$ref": "#/$defs/isoDateTime" }
+      },
+      "additionalProperties": false
+    },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "$ref": "#/$defs/identifier" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 64 }
+      },
+      "additionalProperties": false
+    },
+    "annotation": {
+      "description": "Strictly additive. An annotation never changes, suppresses, or drops a finding; it only attaches context to it.",
+      "type": "object",
+      "required": ["kind", "text"],
+      "properties": {
+        "kind": { "enum": ["note", "accepted-risk", "false-positive", "tracked", "wontfix"] },
+        "text": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "by": { "type": "string", "maxLength": 256 },
+        "at": { "$ref": "#/$defs/isoDateTime" },
+        "ref": { "type": "string", "maxLength": 512 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "name": "testguard-cli",
+  "version": "0.1.0",
+  "description": "Proves a test suite defends the claims a project makes: injects the faults those claims forbid and reports every one the tests fail to detect.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "files": [
+    "cli",
+    "src",
+    "spec/schemas",
+    "spec/lib",
+    "spec/GATE-SEMANTICS.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:spec": "vitest run spec/conformance"
+  },
+  "keywords": [
+    "testing",
+    "fault-injection",
+    "mutation-testing",
+    "test-quality",
+    "claims",
+    "verification",
+    "vitest"
+  ],
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "vitest": "^5.0.1"
+  },
+  "bin": {
+    "testguard": "cli/testguard.mjs"
+  }
+}

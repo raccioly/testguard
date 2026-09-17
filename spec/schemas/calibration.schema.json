@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:guard-spec:v1:calibration",
+  "title": "Guard spec v1 — calibration",
+  "description": "P(finding is real) per bucket, with a confidence interval and the sample size behind it. A label without n is a vibe; this is the format that stops it being one.",
+  "type": "object",
+  "required": ["schemaVersion", "tool", "computedAt", "method", "confidence", "bucketBy", "source", "buckets"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "tool": { "$ref": "urn:guard-spec:v1:common#/$defs/tool" },
+    "computedAt": { "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime" },
+    "method": {
+      "description": "Interval method. `wilson` is the only method defined in v1.",
+      "enum": ["wilson"]
+    },
+    "confidence": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
+    "bucketBy": {
+      "description": "The field findings are bucketed on, e.g. `faultClass` or `severity`.",
+      "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+    },
+    "source": {
+      "description": "Where the ground-truth labels came from.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["bug-replay", "human-label", "mixed"] },
+        "ref": { "type": "string", "maxLength": 512 }
+      },
+      "additionalProperties": false
+    },
+    "buckets": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["n", "positives", "p", "ci"],
+        "properties": {
+          "n": { "type": "integer", "minimum": 0 },
+          "positives": { "type": "integer", "minimum": 0 },
+          "p": { "type": "number", "minimum": 0, "maximum": 1 },
+          "ci": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

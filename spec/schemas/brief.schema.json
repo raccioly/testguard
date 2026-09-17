@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:guard-spec:v1:brief",
+  "title": "Guard spec v1 — agent brief",
+  "description": "What to tell an agent before it writes code. `text` is the rendered block for an additionalContext payload; `items` is the same content structured so other tools can compose briefs. Ranked, capped, and never a single score.",
+  "type": "object",
+  "required": ["schemaVersion", "tool", "generatedAt", "heading", "summary", "items", "text"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "tool": { "$ref": "urn:guard-spec:v1:common#/$defs/tool" },
+    "generatedAt": { "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime" },
+    "head": { "$ref": "urn:guard-spec:v1:common#/$defs/gitSha" },
+    "heading": {
+      "description": "The markdown heading that opens `text`, e.g. `## TEST BLINDSPOT CONTEXT`.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "summary": {
+      "type": "object",
+      "required": ["claims", "byVerdict", "new", "baselined"],
+      "properties": {
+        "claims": { "type": "integer", "minimum": 0 },
+        "byVerdict": {
+          "type": "object",
+          "propertyNames": {
+            "enum": ["killed", "survived", "nocover", "unverifiable", "timeout", "fault-invalid", "flaky-defender"]
+          },
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "new": { "type": "integer", "minimum": 0 },
+        "baselined": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "required": ["fingerprint", "claimId", "statement", "verdict", "severity", "isNew"],
+        "properties": {
+          "fingerprint": { "$ref": "urn:guard-spec:v1:common#/$defs/sha256" },
+          "claimId": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+          "subjectId": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+          "statement": { "type": "string", "minLength": 1, "maxLength": 2000 },
+          "verdict": { "$ref": "urn:guard-spec:v1:common#/$defs/verdict" },
+          "severity": { "$ref": "urn:guard-spec:v1:common#/$defs/severity" },
+          "file": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" },
+          "rank": { "type": "number" },
+          "hint": {
+            "description": "One line the agent can act on, e.g. which assertion shape left the gap.",
+            "type": "string",
+            "maxLength": 512
+          },
+          "isNew": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "text": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

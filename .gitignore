@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+*.log
+# TestGuard's own output when run against this repo
+.testguard/
+# Local agent tooling — not part of the public project
+.wolf/
+.claude/
+CLAUDE.md
+graphify-out/
+.vitest/

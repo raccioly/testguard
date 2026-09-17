@@ -1,0 +1,58 @@
+import { describe, it, expect } from 'vitest';
+import { classify, shouldStopEarly } from '../src/probe/classify.mjs';
+
+const pass = { outcome: 'pass', assertionFailures: 0, timeouts: 0 };
+const kill = { outcome: 'fail', assertionFailures: 1, timeouts: 0 };
+const tout = { outcome: 'fail', assertionFailures: 0, timeouts: 1 };
+const budget = { outcome: 'timeout', assertionFailures: 0, timeouts: 1 };
+const err = { outcome: 'error', assertionFailures: 0, timeouts: 0 };
+const ok = { status: 'ok' };
+const D = ['t.test.mjs'];
+const N = 3;
+
+describe('classify — the order of checks is the spec', () => {
+  it('nocover before anything else', () =>
+    expect(classify({ defenders: [], anchor: { status: 'anchor-missing' }, baselineRuns: [], probeRuns: [], confirmRuns: N })).toEqual({ verdict: 'nocover' }));
+
+  it('unverifiable carries the anchor status as reason', () => {
+    expect(classify({ defenders: D, anchor: { status: 'anchor-missing' }, baselineRuns: [], probeRuns: [], confirmRuns: N })).toEqual({ verdict: 'unverifiable', reason: 'anchor-missing' });
+    expect(classify({ defenders: D, anchor: { status: 'anchor-ambiguous' }, baselineRuns: [], probeRuns: [], confirmRuns: N }).reason).toBe('anchor-ambiguous');
+  });
+
+  it('flaky-defender when the baseline is not green N/N', () => {
+    expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, kill], probeRuns: [], confirmRuns: N })).toEqual({ verdict: 'flaky-defender', reason: 'defenders-not-green' });
+    expect(classify({ defenders: D, anchor: ok, baselineRuns: [], probeRuns: [], confirmRuns: N }).verdict).toBe('flaky-defender');
+  });
+
+  it('fault-invalid when the suite cannot load, naming a parse error when the runner does', () => {
+    expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [err], confirmRuns: N })).toEqual({ verdict: 'fault-invalid', reason: 'suite-failed-to-load' });
+    expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [{ ...err, loadMessage: 'Failed to parse source: invalid JS syntax' }], confirmRuns: N }).reason).toBe('replacement-does-not-compile');
+  });
+
+  it('timeout is never a kill, whether test-level or budget-level', () => {
+    expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [tout], confirmRuns: N }).verdict).toBe('timeout');
+    expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [budget], confirmRuns: N }).verdict).toBe('timeout');
+  });
+
+  it('killed only with N/N assertion failures', () =>
+    expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [kill, kill, kill], confirmRuns: N })).toEqual({ verdict: 'killed' }));
+
+  it('survived only with N/N passes', () =>
+    expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [pass, pass, pass], confirmRuns: N })).toEqual({ verdict: 'survived' }));
+
+  it('mixed kill/pass is a flaky defender, not an optimistic kill', () =>
+    expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [kill, pass, kill], confirmRuns: N })).toEqual({ verdict: 'flaky-defender', reason: 'inconsistent-probe' }));
+
+  it('a fail with zero assertion failures and zero timeouts never kills', () =>
+    expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [{ outcome: 'fail', assertionFailures: 0, timeouts: 0 }, pass, pass], confirmRuns: N }).verdict).toBe('flaky-defender'));
+});
+
+describe('shouldStopEarly', () => {
+  it('stops on error or timeout, continues otherwise', () => {
+    expect(shouldStopEarly([err])).toBe(true);
+    expect(shouldStopEarly([budget])).toBe(true);
+    expect(shouldStopEarly([tout])).toBe(true);
+    expect(shouldStopEarly([kill])).toBe(false);
+    expect(shouldStopEarly([pass])).toBe(false);
+  });
+});

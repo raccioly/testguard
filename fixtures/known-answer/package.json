@@ -1,0 +1,10 @@
+{
+  "name": "testguard-known-answer-fixture",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A tiny project with a stated claim list and a known probe result for every verdict. Its test suite is FLAKY BY DESIGN (test/flaky.test.mjs) — that is one of the verdicts being exercised.",
+  "scripts": {
+    "test": "vitest run"
+  }
+}
