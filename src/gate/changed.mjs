@@ -46,9 +46,44 @@ export const defaultIgnorePath = (projectDir) => join(projectDir, 'testguard.ign
  */
 export function detectChangedRef(env = process.env) {
   if (env.TESTGUARD_CHANGED_REF) return { ref: env.TESTGUARD_CHANGED_REF, from: 'TESTGUARD_CHANGED_REF' };
+  // GitHub Actions, pull_request events.
   if (env.GITHUB_BASE_REF) return { ref: `origin/${env.GITHUB_BASE_REF}`, from: 'GITHUB_BASE_REF' };
+  // GitLab merge request pipelines. The diff base sha is exact and needs no
+  // remote-tracking ref; the target branch name is the fallback (it needs
+  // `git fetch origin <branch>` or GIT_DEPTH: 0 on the job).
+  const sha = env.CI_MERGE_REQUEST_DIFF_BASE_SHA;
+  if (sha && /^[0-9a-f]{7,40}$/i.test(sha) && !/^0+$/.test(sha)) return { ref: sha, from: 'CI_MERGE_REQUEST_DIFF_BASE_SHA' };
   if (env.CI_MERGE_REQUEST_TARGET_BRANCH_NAME) return { ref: `origin/${env.CI_MERGE_REQUEST_TARGET_BRANCH_NAME}`, from: 'CI_MERGE_REQUEST_TARGET_BRANCH_NAME' };
   return null;
+}
+
+/**
+ * Resolve the reference a command should measure against, and whether it may
+ * be dropped on failure. An explicit `--changed` is the user's word: if it
+ * does not resolve, that is an error. A reference detected from CI variables
+ * is a convenience: if it does not resolve (shallow clone, temp directory,
+ * no remote) the command says so on stderr and continues without a change
+ * measurement, because `status` and `brief` must keep working everywhere.
+ */
+export function resolveChangedRef({ explicit, env = process.env } = {}) {
+  if (explicit) return { ref: explicit, from: '--changed', required: true };
+  const d = detectChangedRef(env);
+  return d ? { ...d, required: false } : null;
+}
+
+/**
+ * Run `compute(ref)` for a resolved reference. A required reference propagates
+ * its error; a detected one that fails yields `undefined` after `warn(message)`.
+ */
+export function withChangedRef(resolved, compute, warn = () => {}) {
+  if (!resolved) return compute(undefined);
+  try {
+    return compute(resolved.ref);
+  } catch (e) {
+    if (resolved.required || !(e instanceof GitError)) throw e;
+    warn(`change coverage skipped: ${resolved.ref} (from ${resolved.from}) does not resolve here — ${e.message.split('. ')[0]}. Pass --changed <ref> to make this an error.`);
+    return compute(undefined);
+  }
 }
 
 /**
@@ -61,7 +96,7 @@ export function changedFiles({ root, ref, includeDirty = false }) {
   try {
     base = git(['merge-base', ref, 'HEAD'], root);
   } catch (e) {
-    throw new GitError(`cannot resolve --changed ${ref}: ${e.message.split('\n').pop()}. In CI, check out with full history (fetch-depth: 0) or fetch the base branch first.`);
+    throw new GitError(`cannot resolve --changed ${ref}: ${e.message.split('\n').pop()}. In CI the base must be present locally: GitHub Actions — actions/checkout with fetch-depth: 0; GitLab — GIT_DEPTH: 0 or \`git fetch origin <target branch>\` before the job (merge request pipelines also provide CI_MERGE_REQUEST_DIFF_BASE_SHA, which needs no fetch).`);
   }
   const head = headSha(root);
   const out = new Set(git(['diff', '--name-only', '--diff-filter=d', '-z', base, ...(includeDirty ? [] : ['HEAD'])], root).split('\0').filter(Boolean));

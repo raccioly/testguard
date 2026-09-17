@@ -163,10 +163,32 @@ excuses nothing. Non-source files and documented never-claimed patterns
 (`*.d.ts`, `*.config.*`, fixtures, mocks; `--explain` lists them) are
 excluded and said so; `--strict` fails a change that evaluated nothing.
 
-In GitHub Actions and GitLab CI the base branch is detected. With a reference
-known, `status --changed <ref>` reports `unclaimed-changes` **before** any
-evidence state and makes the claim the next action; the brief lists the
-unclaimed files first. The claim is written before more code.
+With a reference known, `status --changed <ref>` reports `unclaimed-changes`
+**before** any evidence state and makes the claim the next action; the brief
+lists the unclaimed files first. The claim is written before more code.
+
+**In CI the base is detected** — GitHub Actions (`GITHUB_BASE_REF`) and GitLab
+merge request pipelines (`CI_MERGE_REQUEST_DIFF_BASE_SHA`, then
+`CI_MERGE_REQUEST_TARGET_BRANCH_NAME`); `TESTGUARD_CHANGED_REF` overrides both.
+The base must exist locally: GitHub — `actions/checkout` with `fetch-depth: 0`;
+GitLab — the diff base sha needs nothing extra on a merge request pipeline,
+the branch name needs `GIT_DEPTH: 0` or a `git fetch origin <target>`. A
+detected base that does not resolve is a warning for `status` and `brief`
+(they keep working) and an error for `gate` (its whole job is the measurement).
+
+```yaml
+# GitHub Actions
+- uses: actions/checkout@v4
+  with: { fetch-depth: 0 }
+- uses: raccioly/testguard@v0.3.1
+  with: { command: gate }
+
+# GitLab CI — or include: remote: the template in packaging/gitlab/
+testguard:gate:
+  image: node:22
+  rules: [{ if: $CI_PIPELINE_SOURCE == "merge_request_event" }]
+  script: [npx -y testguard-cli gate .]
+```
 
 ### Built for agents to run
 

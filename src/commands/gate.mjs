@@ -1,5 +1,5 @@
 import { join, resolve } from 'node:path';
-import { computeChangedGate, detectChangedRef, renderGate, DEFAULT_EXCLUDES } from '../gate/changed.mjs';
+import { computeChangedGate, resolveChangedRef, renderGate, DEFAULT_EXCLUDES } from '../gate/changed.mjs';
 import { writeSpecDoc } from '../evidence/writer.mjs';
 
 export const gatePath = (projectDir) => join(projectDir, '.testguard', 'gate.json');
@@ -16,16 +16,14 @@ export async function gateCommand({ projectDir, values, version }, io) {
     io.out('Non-source files (anything but .js .mjs .cjs .ts .mts .cts .jsx .tsx) are excluded before these patterns apply.');
     return 0;
   }
-  let ref = values.changed;
-  if (!ref) {
-    const detected = detectChangedRef();
-    if (!detected) {
-      io.err('gate needs a reference to measure the change against: --changed <ref> (e.g. origin/main), or set TESTGUARD_CHANGED_REF. In GitHub Actions and GitLab CI the base branch is detected automatically.');
-      return 3;
-    }
-    ref = detected.ref;
-    if (!values.json && !values.quiet) io.err(`--changed not given; using ${ref} from ${detected.from}`);
+  const resolved = resolveChangedRef({ explicit: values.changed });
+  if (!resolved) {
+    io.err('gate needs a reference to measure the change against: --changed <ref> (e.g. origin/main), or set TESTGUARD_CHANGED_REF. In GitHub Actions and GitLab CI the base branch is detected automatically.');
+    return 3;
   }
+  const ref = resolved.ref;
+  // The gate itself never degrades: a detected reference that does not resolve is exit 2 here, because the gate's whole job is the measurement.
+  if (!resolved.required && !values.json && !values.quiet) io.err(`--changed not given; using ${ref} from ${resolved.from}`);
   const doc = computeChangedGate({
     projectDir,
     ref,

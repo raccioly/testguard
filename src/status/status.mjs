@@ -7,7 +7,7 @@ import { hashFile, sha256 } from '../util/hash.mjs';
 import { resolveDefenders } from '../probe/runner-vitest.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { sortForReport } from '../render.mjs';
-import { computeChangedGate, detectChangedRef, defaultIgnorePath } from '../gate/changed.mjs';
+import { computeChangedGate, defaultIgnorePath } from '../gate/changed.mjs';
 
 export const faultContentHash = (fault) => sha256(`${fault.find}\n${fault.replace}`);
 
@@ -42,7 +42,9 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   // Computed before anything about evidence: a change that touches unclaimed
   // code is the finding every field report shared, and TestGuard is silent
   // about unclaimed code by construction. The claim is written first.
-  const ref = changedRef ?? detectChangedRef()?.ref;
+  // The reference is the caller's: this function never reads the environment,
+  // so a library caller or a test in a temp directory is never surprised by CI.
+  const ref = changedRef;
   let changes;
   if (ref) {
     const g = computeChangedGate({ projectDir, ref, includeDirty, toolVersion });

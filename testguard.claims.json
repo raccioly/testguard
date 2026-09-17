@@ -598,6 +598,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-CHANGED-REF-EXPLICIT-IS-REQUIRED",
+      "statement": "An explicit --changed reference that does not resolve is an error; only a reference detected from CI variables may be dropped, with a warning.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#claim-coverage-of-a-change"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/gate.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An unresolvable explicit reference is silently dropped like a detected one.",
+          "faultClass": "condition-forced",
+          "file": "src/gate/changed.mjs",
+          "find": "if (resolved.required || !(e instanceof GitError)) throw e;",
+          "replace": "if (!(e instanceof GitError)) throw e;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

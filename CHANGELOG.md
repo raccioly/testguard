@@ -33,7 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for `init` idempotency; the gate runs on this repository's own pull
   requests.
 - GitHub Action `command: gate` with a `changed-ref` input; pre-commit hook
-  `testguard-gate`.
+  `testguard-gate`; a GitLab CI template under `packaging/gitlab/` with
+  `testguard:gate` (merge request pipelines, measured against
+  `CI_MERGE_REQUEST_DIFF_BASE_SHA`) and `testguard:probe`.
 
 ## [0.3.1] - 2026-09-17
 

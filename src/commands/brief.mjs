@@ -4,12 +4,16 @@ import { readSpecDoc, writeSpecDoc } from '../evidence/writer.mjs';
 import { buildBrief, buildUnclaimedBrief } from '../brief/brief.mjs';
 import { computeStatus } from '../status/status.mjs';
 import { evidencePath, baselinePath } from './probe.mjs';
+import { resolveChangedRef, withChangedRef } from '../gate/changed.mjs';
 
 export async function briefCommand({ projectDir, values, version }, io) {
   const evPath = values.evidence ? resolve(values.evidence) : evidencePath(projectDir);
   let status;
   try {
-    status = computeStatus({ projectDir, toolVersion: version, changedRef: values.changed, includeDirty: values['include-dirty'] });
+    // A detected base that does not resolve is silent here: the brief is a
+    // session-start hook's output and must never add noise; `status` and
+    // `gate` are where that warning is printed.
+    status = withChangedRef(resolveChangedRef({ explicit: values.changed }), (changedRef) => computeStatus({ projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'] }));
   } catch {
     status = undefined; // a brief must never fail because status could not be computed
   }

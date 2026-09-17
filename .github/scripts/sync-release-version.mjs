@@ -5,6 +5,7 @@
  *   - pyproject.toml         `version = "x.y.z"`
  *   - action.yml             default of the `version` input
  *   - packaging/homebrew/*.rb the tarball URL (sha256 is set after publish)
+ *   - packaging/gitlab/*.yml  the include URL tag and TESTGUARD_VERSION
  *
  * `--check` verifies instead of writing (used by release.yml).
  */
@@ -21,6 +22,8 @@ const surfaces = [
   ['action.yml', /(\n  version:\n    description: [^\n]*\n    required: false\n    default: ')[^']*(')/, `$1${version}$2`],
   ['packaging/homebrew/testguard.rb', /testguard-cli-\d+\.\d+\.\d+\.tgz/g, `testguard-cli-${version}.tgz`],
   ['README.md', /raccioly\/testguard@v\d+\.\d+\.\d+/g, `raccioly/testguard@v${version}`],
+  ['packaging/gitlab/testguard.gitlab-ci.yml', /testguard\/v\d+\.\d+\.\d+\/packaging/g, `testguard/v${version}/packaging`],
+  ['packaging/gitlab/testguard.gitlab-ci.yml', /TESTGUARD_VERSION: "\d+\.\d+\.\d+"/, `TESTGUARD_VERSION: "${version}"`],
 ];
 
 let drift = 0;

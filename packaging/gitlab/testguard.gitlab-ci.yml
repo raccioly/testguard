@@ -1,0 +1,47 @@
+# TestGuard for GitLab CI. Include it from a project's .gitlab-ci.yml:
+#
+#   include:
+#     - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.3.1/packaging/gitlab/testguard.gitlab-ci.yml'
+#
+# Two jobs. `testguard:gate` runs on every merge request pipeline and fails
+# when a changed source file carries no claim (and no excusing ignore entry).
+# `testguard:probe` runs the faults against the tests and is gated by the
+# committed baseline. Override TESTGUARD_VERSION / TESTGUARD_DIR as needed.
+#
+# The gate measures the change against CI_MERGE_REQUEST_DIFF_BASE_SHA, which
+# GitLab provides on merge request pipelines and which needs no extra fetch.
+# On other pipelines set TESTGUARD_CHANGED_REF (and fetch that ref).
+
+variables:
+  TESTGUARD_VERSION: "0.3.1"
+  TESTGUARD_DIR: "."
+  GIT_DEPTH: "0" # the probe builds a scratch worktree from HEAD; full history is the safe default
+
+.testguard:
+  image: node:22
+  before_script:
+    - cd "$TESTGUARD_DIR"
+    - npm ci --ignore-scripts
+
+testguard:gate:
+  extends: .testguard
+  stage: test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - npx -y "testguard-cli@${TESTGUARD_VERSION}" gate .
+  artifacts:
+    when: always
+    paths: [".testguard/gate.json"]
+
+testguard:probe:
+  extends: .testguard
+  stage: test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - npx -y "testguard-cli@${TESTGUARD_VERSION}" probe . --quiet
+  artifacts:
+    when: always
+    paths: [".testguard/evidence.json"]
