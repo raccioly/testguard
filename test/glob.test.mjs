@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { globToRegExp, matchGlobs } from '../src/util/glob.mjs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { globToRegExp, matchGlobs, walk } from '../src/util/glob.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -21,7 +23,18 @@ describe('glob', () => {
 
   it('matches files under a root and skips node_modules', () => {
     const files = matchGlobs(fixture, ['**/*.test.mjs']);
-    expect(files).toEqual(['test/flaky.test.mjs', 'test/redact.test.mjs']);
+    expect(files).toEqual(['test/export-mocked.test.mjs', 'test/flaky.test.mjs', 'test/redact.test.mjs']);
+  });
+
+  it('never descends into node_modules, .git, dist, coverage or .testguard — a dependency\'s or a build\'s test files are not this project\'s', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-walk-'));
+    for (const f of ['test/real.test.mjs', 'node_modules/pkg/inner.test.mjs', 'dist/built.test.mjs', 'coverage/lcov.test.mjs', '.testguard/scratch.test.mjs', '.git/hooks/x.test.mjs']) {
+      mkdirSync(dirname(join(dir, f)), { recursive: true });
+      writeFileSync(join(dir, f), '');
+    }
+    expect(walk(dir)).toEqual(['test/real.test.mjs']);
+    expect(matchGlobs(dir, ['**/*.test.mjs'])).toEqual(['test/real.test.mjs']);
+    rmSync(dir, { recursive: true, force: true });
   });
 
   it('returns nothing for no globs', () => {
