@@ -112,10 +112,19 @@ npx testguard-cli scaffold src/x.ts   # propose faults for a file, as a draft to
    files that import the fault's target, by relative path or resolved alias.
    `NOCOVER` then means exactly "no test file imports this source".
 
-   Runners: **vitest** and **jest** (`--runner auto` picks the first that
-   resolves; both read the same jest-compatible JSON report). Anything else
-   goes through `--runner-cmd`. Each runner is proven against its own copy
-   of the known-answer fixture.
+   Runners: **vitest** and **jest** are project runners (`--runner auto`
+   picks the first that resolves; both read the same jest-compatible JSON
+   report). **Playwright** is a *per-file* runner: a defender under
+   `playwright.config.*`'s `testDir` runs under Playwright whatever the
+   project runner is, so one claim can list a unit test and a browser spec
+   and the evidence says which file ran where (`defenders.byRunner`,
+   `run.runners`). Playwright's own statuses map onto the verdict rules:
+   `timedOut` is a timeout, never a kill; `flaky` (failed, then passed on
+   retry) is **not a green run**, so a defender that only passes on retry is
+   `FLAKY-DEFENDER` even though Playwright exits 0. Anything else goes
+   through `--runner-cmd`. Each runner is proven against its own copy of the
+   known-answer fixture; the Playwright one is browserless on purpose and
+   carries its own dependencies.
 
    Practical loop: first pass `--no-escalate` (escalation re-runs the whole
    suite N times per survivor); iterate on one claim with `--claim <ID>` and
@@ -219,7 +228,7 @@ things make that safe:
 ### Authoring faults mechanically
 
 Writing faults by hand means reading the code to find exact anchors. Two
-field reports found that ~80% of hand-written faults are one of seven shapes,
+field reports found that ~80% of hand-written faults are one of nine shapes,
 so `scaffold` proposes them for you:
 
 ```bash
@@ -236,6 +245,8 @@ npx testguard-cli scaffold src/auth.ts --claim AUTH-ADMIN   # every proposal und
 | `call-removed` | a bare `verify…()` / `validate…()` / `check…()` / `authorize…()` call removed |
 | `field-dropped` | a field removed from an object that is returned, built by an arrow, assigned to a payload-ish name, passed to a `save`/`update`/`send`/`write`/… call, or is a `z.object({…})`-style schema; a string entry removed from an allow-list array; a `...base,` line or inline `{ ...base, … }` merge dropped. Only a line that can go on its own (balanced, comma-terminated or followed by the closer); never inside tests, fixtures or migrations |
 | `argument-swapped` | a call kept, its first argument swapped for `undefined` (and `{}` when the argument is itself a call) — only when that argument is derived from a parameter of the enclosing function or a request-like value (`req`, `ctx`, `event`, …). The seam fault: `decide(deriveFrom(input), now)` → `decide(undefined, now)` |
+| `element-removed` | a one-line JSX element — self-closing (`<Toggle … />`) or paired (`<button …>Save</button>`) — removed; the UI shape behind "the toggle is invisible", killable by a browser-layer defender |
+| `handler-dropped` | an `on<Event>={…}` prop removed, whether it is its own line or inline in the tag; the control renders and does nothing |
 
 Every proposal's `find` is the exact line with `expectHits`/`occurrence`
 computed from the file, so it is verifiable by construction; provenance is
@@ -271,15 +282,15 @@ through every verdict.
 
 ## Status
 
-**v0.4.** Eight commands, vitest and jest runners, hand-authored faults plus
+**v0.4.** Eight commands, vitest, jest and Playwright runners, hand-authored faults plus
 a mechanical scaffold, an agent operating layer (`status`, `init`) and a
 change gate (`gate`). The contract
 spine — eight JSON Schemas shared with the other Guard tools — is under
 [`spec/`](spec/). One exact-pinned runtime dependency (`ajv`, for schema validation); Node ≥ 20.
 
 Not yet: test generation (the two-gate acceptance loop), runners beyond
-vitest and jest, AST-aware producers, and calibration of fault classes
-against real escaped bugs. Each is designed for; none is claimed.
+vitest, jest and Playwright, AST-aware producers, and calibration of fault
+classes against real escaped bugs. Each is designed for; none is claimed.
 
 ## Licence
 

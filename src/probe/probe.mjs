@@ -92,6 +92,7 @@ export async function probe({
   const records = [];
   let runnerVersion;
   let runner = RUNNERS[runnerName === 'auto' ? 'vitest' : runnerName];
+  const runnersUsed = new Map(); // every runner that ran defenders, beyond the project runner
   try {
     const commandTemplate = runnerCommand ? parseCommandTemplate(runnerCommand) : undefined;
     if (!commandTemplate) {
@@ -104,11 +105,11 @@ export async function probe({
       runner = sel.runner;
       runnerVersion = sel.version;
     }
+    runnersUsed.set(runner.name, runnerVersion ?? readRunnerVersion(projectDir, runner.name));
     // Files an owning runner (Playwright) claims run under it, whatever the
     // project runner is; it must resolve before the first such defender runs.
     const owned = OWNED_RUNNERS.filter((r) => r !== runner);
     const ownedChecked = new Map();
-    const runnersUsed = new Map();
     const ensureOwned = async (r, file) => {
       if (!ownedChecked.has(r)) ownedChecked.set(r, await r.check({ projectDir: iso.projectDir }));
       const c = ownedChecked.get(r);
@@ -133,7 +134,7 @@ export async function probe({
     /** Which runner each defender runs under, when more than the project runner is involved. */
     const byRunner = (files) => {
       const groups = partitionByRunner(iso.projectDir, files, runner);
-      if (groups.size <= 1 && groups.has(runner)) return undefined;
+      if (groups.size <= 1) return undefined; // one runner ran them all, whichever it was
       return Object.fromEntries([...groups].map(([r, group]) => [r.name, group]));
     };
 
@@ -161,7 +162,7 @@ export async function probe({
       finishedAt: new Date().toISOString(),
       repo: { head, dirty: isDirty(root), ...(snapshot ? { snapshot } : {}) },
       runner: { name: runner.name, ...((runnerVersion ?? readRunnerVersion(projectDir, runner.name)) ? { version: runnerVersion ?? readRunnerVersion(projectDir, runner.name) } : {}) },
-      ...(runnersUsed.size ? { runners: [...runnersUsed].map(([n, v]) => ({ name: n, ...(v ? { version: v } : {}) })) } : {}),
+      ...(runnersUsed.size > 1 ? { runners: [...runnersUsed].map(([n, v]) => ({ name: n, ...(v ? { version: v } : {}) })) } : {}),
       confirmRuns,
       ...(confirmRuns < 3 ? { provisional: true } : {}),
       mode,

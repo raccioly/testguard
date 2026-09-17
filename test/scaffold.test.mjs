@@ -245,3 +245,56 @@ export function untouched(a) {
     expect(t.doc.claims.flatMap((c) => c.faults).filter((f) => f.faultClass === 'field-dropped')).toEqual([]);
   });
 });
+
+describe('element-removed and handler-dropped on a synthetic JSX component', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tg-scaffold-jsx-'));
+  mkdirSync(join(dir, 'src', '__tests__'), { recursive: true });
+  const SOURCE = `import React from 'react';
+export function GreetingRow({ on, save, submit }) {
+  return (
+    <section className="row">
+      <label>Send a greeting</label>
+      <Toggle checked={on} onChange={save} />
+      <input
+        type="checkbox"
+        checked={on}
+        onChange={(e) => save(e.target.checked)}
+      />
+      <button onClick={submit}>Save</button>
+      <Help>
+        long content
+      </Help>
+    </section>
+  );
+}
+`;
+  writeFileSync(join(dir, 'src', 'row.tsx'), SOURCE);
+  writeFileSync(join(dir, 'src', '__tests__', 'row.test.tsx'), "import { GreetingRow } from '../row';\nconst x = <Toggle onChange={save} />;\n");
+  const { doc } = scaffoldFile({ projectDir: dir, file: 'src/row.tsx', toolVersion: 'test' });
+  const all = doc.claims.flatMap((c) => c.faults);
+  const removed = all.filter((f) => f.faultClass === 'element-removed');
+  const handlers = all.filter((f) => f.faultClass === 'handler-dropped');
+
+  it('removes one-line elements only, never a multi-line one', () => {
+    expect(removed.map((f) => f.find.trim())).toEqual(['<label>Send a greeting</label>', '<Toggle checked={on} onChange={save} />', '<button onClick={submit}>Save</button>']);
+    for (const f of removed) expect(f.replace).toBe('');
+    expect(removed.map((f) => f.description)).toEqual(expect.arrayContaining([expect.stringContaining('`<Toggle>` is no longer rendered')]));
+  });
+
+  it('drops a handler prop on its own line and inline in a tag, keeping the element', () => {
+    expect(handlers.map((f) => [f.find.trim(), f.replace.trim()])).toEqual(expect.arrayContaining([
+      ['onChange={(e) => save(e.target.checked)}', ''],
+      ['<Toggle checked={on} onChange={save} />', '<Toggle checked={on} />'],
+      ['<button onClick={submit}>Save</button>', '<button>Save</button>'],
+    ]));
+    expect(handlers).toHaveLength(3);
+  });
+
+  it('every proposal anchors, the draft conforms, and a test file gets none of the UI shapes', () => {
+    const source = readFileSync(join(dir, 'src', 'row.tsx'), 'utf8');
+    for (const f of all) expect(locate(source, f).status, f.description).toBe('ok');
+    expect(validate('claims', doc).errors).toEqual([]);
+    const t = scaffoldFile({ projectDir: dir, file: 'src/__tests__/row.test.tsx', toolVersion: 'test' });
+    expect(t.doc.claims.flatMap((c) => c.faults).filter((f) => /element-removed|handler-dropped/.test(f.faultClass))).toEqual([]);
+  });
+});

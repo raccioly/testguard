@@ -16,6 +16,10 @@
  *                      an allow-list, a schema, or a spread merge (issue #14)
  *   argument-swapped   a call kept, its parameter-derived argument swapped for
  *                      a trivial value (issue #22)
+ *   element-removed    a one-line JSX element (self-closing or paired) removed
+ *                      (issue #15)
+ *   handler-dropped    an on<Event>={…} prop removed from a JSX element
+ *                      (issue #15)
  */
 
 const COMMENT = /^\s*(\/\/|\*|\/\*)/;
@@ -52,6 +56,13 @@ const METHOD_LINE = /^\s*(?:async\s+)?(?:get\s+|set\s+)?[\w$]+\s*\([^)]*\)\s*\{\
 const SPREAD_LINE = /^\s*\.\.\.[\w$.()]+\s*,?\s*$/;
 const STRING_ENTRY = /^\s*(['"])[^'"]+\1\s*,?\s*$/;
 const INLINE_SPREAD_MERGE = /\{\s*\.\.\.([\w$.()]+)\s*,\s*(?=[^}]*\S)/;
+
+// ── element-removed / handler-dropped (JSX) ──
+// One-line elements only, so the removal is syntactically safe by construction.
+const JSX_SELF_CLOSING = /^\s*<[A-Za-z][\w.-]*\b[^<>]*\/>\s*$/;
+const JSX_PAIRED_LINE = /^\s*<([A-Za-z][\w.-]*)\b[^<>]*>[^<>]*<\/\1>\s*$/;
+const JSX_HANDLER_PROP_LINE = /^\s*on[A-Z]\w*=\{(?:[^{}]|\{[^{}]*\})*\}\s*$/;
+const JSX_INLINE_HANDLER = /\s+on[A-Z]\w*=\{(?:[^{}]|\{[^{}]*\})*\}/;
 
 // ── argument-swapped ──
 // A call whose first argument is derived from a parameter or a request-like
@@ -181,6 +192,26 @@ function fieldDropProposals(lines, i) {
   return out;
 }
 
+function jsxProposals(lines, i) {
+  const line = lines[i];
+  const out = [];
+  if (JSX_SELF_CLOSING.test(line) || JSX_PAIRED_LINE.test(line)) {
+    const tag = /<([A-Za-z][\w.-]*)/.exec(line)[1];
+    out.push({ faultClass: 'element-removed', description: `Element removed: \`<${tag}>\` is no longer rendered.`, replace: '' });
+  }
+  if (JSX_HANDLER_PROP_LINE.test(line)) {
+    const name = /on[A-Z]\w*/.exec(line)[0];
+    out.push({ faultClass: 'handler-dropped', description: `Handler dropped: \`${name}\` is no longer wired.`, replace: '' });
+  } else {
+    const m = JSX_INLINE_HANDLER.exec(line);
+    if (m && /<[A-Za-z]/.test(line)) {
+      const name = /on[A-Z]\w*/.exec(m[0])[0];
+      out.push({ faultClass: 'handler-dropped', description: `Handler dropped: \`${name}\` is no longer wired.`, replace: line.replace(m[0], '') });
+    }
+  }
+  return out;
+}
+
 function isDerived(arg, params) {
   const idents = arg.match(/[\w$]+/g) ?? [];
   if (idents.some((id) => params.has(id))) return true;
@@ -211,7 +242,9 @@ function argumentSwapProposals(lines, i, params) {
  * Proposals for one line. Each: { faultClass, description, replace } where
  * find is the line itself. `ctx.params` is the enclosing function's parameter
  * set (for argument-swapped); `ctx.fieldDrops = false` disables the
- * field-dropped shape (test files, fixtures, migrations).
+ * data/UI shapes — field-dropped, element-removed, handler-dropped — for
+ * test files, fixtures and migrations, where an object or element is data,
+ * not the product's output.
  */
 export function proposalsForLine(lines, i, ctx = {}) {
   const line = lines[i];
@@ -254,7 +287,10 @@ export function proposalsForLine(lines, i, ctx = {}) {
     out.push({ faultClass: 'literal-changed', description: `Window widened ×1000: \`${m[1]}\` ${m[3]} becomes ${Number(m[3]) * 1000}.`, replace: line.replace(m[0], `${m[1]}${m[2] === ':' ? ': ' : ' = '}${Number(m[3]) * 1000}`) });
   }
 
-  if (ctx.fieldDrops !== false) out.push(...fieldDropProposals(lines, i));
+  if (ctx.fieldDrops !== false) {
+    out.push(...fieldDropProposals(lines, i));
+    out.push(...jsxProposals(lines, i));
+  }
   out.push(...argumentSwapProposals(lines, i, params));
   return out;
 }
