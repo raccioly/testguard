@@ -1,0 +1,26 @@
+{
+  "$schema": "../../schemas/replay.schema.json",
+  "schemaVersion": 1,
+  "tool": { "name": "testguard", "version": "0.5.0" },
+  "run": { "id": "replay-1", "startedAt": "2026-09-17T22:00:00Z", "range": "HEAD~5..HEAD", "confirmRuns": 1 },
+  "records": [
+    {
+      "commit": "4a1c9f2e77b0d3a8c5e61f04b9d27a3e8c6f01b2",
+      "patchId": "9f2e77b0d3a8c5e61f04b9d27a3e8c6f01b24a1c",
+      "verdict": "blind",
+      "source": ["src/redact.mjs"],
+      "removedTests": [],
+      "ranTests": 1,
+      "runs": [{ "outcome": "pass", "assertionFailures": 0, "durationMs": 10 }]
+    },
+    {
+      "commit": "ffffffffffffffffffffffffffffffffffffffff",
+      "patchId": "9f2e77b0d3a8c5e61f04b9d27a3e8c6f01b24a1c",
+      "verdict": "blind",
+      "source": ["src/redact.mjs"],
+      "removedTests": [],
+      "ranTests": 1,
+      "runs": [{ "outcome": "pass", "assertionFailures": 0, "durationMs": 10 }]
+    }
+  ]
+}

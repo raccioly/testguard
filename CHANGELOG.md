@@ -65,6 +65,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   way: a `--theirs` conflict resolution dropped two self-claims during this
   release and nothing noticed. Self-claim `TG-REMOVED-CLAIM-IS-A-FINDING`. (#57)
 
+- **`testguard replay --since <range>`** — would this suite have caught the
+  bugs that already escaped? For each fix commit in the range (one that
+  changes source *and* a test together), it reverts only the source to the
+  parent in a scratch worktree, removes the test the fix shipped, and runs the
+  tests that import the reverted code: `caught`, `blind`, `nocover`, `flaky`
+  or `unverifiable`. One patch counts once (`git patch-id`). It reports and
+  never gates — a bug that escaped is history, not a regression in this
+  change. An injected fault is one somebody thought of; a bug that shipped is
+  ground truth, with no equivalent-mutant argument to have about it.
+- **Fault-class labelling and the first calibration.** Each replayed bug is
+  labelled with the injected-fault class its diff most resembles — the
+  scaffold producers read in reverse, deterministic, `other` rather than a
+  guess — and a `calibration` document is written beside the replay one:
+  per class, the share of real escaped bugs the suite missed, with a Wilson
+  interval and n. Only `caught` and `blind` carry information; the rest are
+  excluded from both sides. `calibration.schema.json` has had no producer
+  until now. The open question it exists to answer — does a calibration
+  learned on a repository with history transfer to a greenfield one — stays
+  open; this is the instrument, not the answer. (#35)
+- New spec kind **`replay`** (`replay.schema.json`), with semantic rules:
+  `caught` needs every run to fail by assertion, `blind` needs every run to
+  pass, `flaky` needs runs that disagree, `nocover` cannot have run tests,
+  and a duplicate patch-id is rejected. Conformance example plus two
+  must-reject documents. Self-claims
+  `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT`, `TG-REPLAY-DEDUPES-BY-PATCH` and
+  `TG-CALIBRATION-EXCLUDES-UNINFORMATIVE`.
+
 ### Spec
 
 - `evidence.schema.json`: `detail.independence` and `detail.flakeRate`, with

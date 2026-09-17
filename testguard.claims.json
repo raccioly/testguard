@@ -1414,6 +1414,102 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-REPLAY-FLAKY-IS-NEVER-CAUGHT",
+      "statement": "A replayed bug whose runs disagree is flaky, never caught; flakiness biases this metric optimistically because one flaky failure reads as detection and hides a blind spot.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#replay-reports-it-never-gates"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/replay.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A single failing run is enough to call the bug caught, so a flaky suite reports itself as having detected what it missed.",
+          "faultClass": "condition-forced",
+          "file": "src/replay/replay.mjs",
+          "find": "  if (runs.every(isCatch)) return { verdict: 'caught' };",
+          "replace": "  if (runs.some(isCatch)) return { verdict: 'caught' };",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-REPLAY-DEDUPES-BY-PATCH",
+      "statement": "The same fix appearing under more than one commit sha is counted once; a dual-branch topology never inflates the corpus a calibration is computed from.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#replay-reports-it-never-gates"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/replay.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "De-duplication keys on the commit sha instead of the patch id, so the same fix under two shas is counted twice.",
+          "faultClass": "variable-swap",
+          "file": "src/replay/replay.mjs",
+          "find": "    const id = patchId || c.commit;",
+          "replace": "    const id = c.commit;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CALIBRATION-EXCLUDES-UNINFORMATIVE",
+      "statement": "Only caught and blind outcomes enter a calibration bucket; nocover, flaky and unverifiable carry no information about detection and are excluded from both the numerator and the denominator.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/calibration.schema.json"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/replay.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every verdict enters the denominator, so a corpus full of nocover rows reports a low blind rate that means nothing.",
+          "faultClass": "condition-forced",
+          "file": "src/replay/replay.mjs",
+          "find": "    if (!['caught', 'blind'].includes(r.verdict)) continue;",
+          "replace": "    if (false) continue;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }
