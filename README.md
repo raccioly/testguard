@@ -185,7 +185,7 @@ detected base that does not resolve is a warning for `status` and `brief`
 # GitHub Actions
 - uses: actions/checkout@v4
   with: { fetch-depth: 0 }
-- uses: raccioly/testguard@v0.3.1
+- uses: raccioly/testguard@v0.4.0
   with: { command: gate }
 
 # GitLab CI — or include: remote: the template in packaging/gitlab/
