@@ -1,0 +1,31 @@
+{
+  "confirmRuns": 3,
+  "expected": {
+    "TOGGLE-001/F1": {
+      "verdict": "survived",
+      "why": "Verified by hand 2026-09-17: with the checkbox lines removed the vitest unit test still passes (it checks the label text only)."
+    },
+    "TOGGLE-002/F1": {
+      "verdict": "killed",
+      "why": "Verified by hand: both Playwright specs fail by assertion with the checkbox removed."
+    },
+    "TOGGLE-003/F1": {
+      "verdict": "killed",
+      "why": "Mixed defenders: vitest stays green, Playwright fails by assertion; the merged run is a kill and defenders.byRunner names which file ran where."
+    },
+    "TOGGLE-004/F1": {
+      "verdict": "killed",
+      "why": "Verified by hand: 'the toggle carries its change handler' fails by assertion; the checkbox spec still passes."
+    },
+    "TOGGLE-005/F1": {
+      "verdict": "timeout",
+      "reason": "test-timed-out",
+      "why": "Verified by hand: the awaiting spec exceeds Playwright's 2000ms test timeout; status timedOut is counted as a timeout, never an assertion failure."
+    },
+    "FLAKY-PW/F1": {
+      "verdict": "flaky-defender",
+      "reason": "defenders-not-green",
+      "why": "e2e/flaky.spec.mjs fails its first attempt and passes on retry every run: Playwright exits 0 and reports `flaky`; the adapter counts that as a non-green run, so the baseline is never green N/N."
+    }
+  }
+}

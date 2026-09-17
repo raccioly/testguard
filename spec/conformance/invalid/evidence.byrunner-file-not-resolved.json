@@ -15,8 +15,7 @@
     },
     "runner": {
       "name": "vitest",
-      "version": "5.0.1",
-      "source": "project"
+      "version": "5.0.1"
     },
     "confirmRuns": 3,
     "mode": "worktree",
@@ -277,7 +276,7 @@
             "test/redact.test.mjs"
           ],
           "playwright": [
-            "e2e/redact.spec.mjs"
+            "e2e/other.spec.mjs"
           ]
         }
       },
@@ -359,19 +358,11 @@
         "probeRuns": []
       },
       "defenders": {
-        "requested": [],
-        "resolved": [],
-        "nocover": true,
-        "discovered": true,
-        "mocking": [
-          "test/rules-mocked.test.mjs"
+        "requested": [
+          "test/rules.test.mjs"
         ],
-        "signals": [
-          {
-            "file": "test/rules-mocked.test.mjs",
-            "signal": "mocked-never-asserted"
-          }
-        ]
+        "resolved": [],
+        "nocover": true
       },
       "inputs": {
         "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

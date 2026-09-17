@@ -31,8 +31,8 @@ node cli/testguard.mjs scaffold src/probe/classify.mjs --json   # what the produ
 - `src/probe/probe.mjs` — orchestrator: isolation → baseline (cached per defender set) → apply → probe → escalate → restore → classify → rank.
 - `fixtures/known-answer/expected.json` — the oracle. Never edit it to match output.
 - `testguard.claims.json` — claims about this codebase, probed in CI.
-- `src/scaffold/producers.mjs` — the seven fault shapes. Deterministic line heuristics; no AST, no LLM. A new shape needs a synthetic-file test and a README row.
-- `src/probe/runners/` — one module per runner (`name`, `testGlobs`, `check`, `tests`, `run`) over `shared.mjs` (jest-compatible report parsing, budgeted process runner). A new runner needs its own fixture copy with the same `expected.json`.
+- `src/scaffold/producers.mjs` — the nine fault shapes. Deterministic line heuristics; no AST, no LLM. A new shape needs a synthetic-file test and a README row.
+- `src/probe/runners/` — one module per runner (`name`, `testGlobs`, `check`, `tests`, `run`, optionally `owns` for a per-file runner) over `shared.mjs` (jest-compatible report parsing, budgeted process runner, pluggable `parse`/`env`). `playwright.mjs` is a per-file runner: it owns the files under its `testDir`; `index.mjs` partitions defenders by runner and merges their runs pessimistically. A new runner needs its own fixture copy with its own `expected.json`, verified by hand.
 - `src/gate/changed.mjs` — claim coverage of a change (`gate --changed`). File-level, delta-only; an uncovered file exits 1; every ignore reliance is reported. Its rules are a section of `GATE-SEMANTICS.md`.
 - `src/status/status.mjs` — the state machine every rendering derives from. A new state or action is a spec change (`status.schema.json`) and a skill-template change (`src/init/templates/SKILL.md`) in the same PR.
 

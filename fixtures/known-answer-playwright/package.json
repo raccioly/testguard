@@ -1,0 +1,12 @@
+{
+  "name": "testguard-known-answer-fixture-playwright",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The known-answer fixture for mixed defenders: a vitest unit test that is blind to the toggle, and browserless Playwright specs that see it. FLAKY BY DESIGN (e2e/flaky.spec.mjs). Dependencies live here, not in the tool: `npm ci` in this directory.",
+  "type": "module",
+  "scripts": { "test": "vitest run && playwright test" },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "vitest": "^5.0.1"
+  }
+}

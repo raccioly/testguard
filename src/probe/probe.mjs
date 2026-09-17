@@ -8,7 +8,7 @@ import { classifyDefenders } from './mocks.mjs';
 import { createScratch, inPlace, PreconditionError } from './worktree.mjs';
 import { applyFault, locate } from './inject.mjs';
 import { resolveDefenders, parseCommandTemplate } from './runners/shared.mjs';
-import { selectRunner, RUNNERS } from './runners/index.mjs';
+import { selectRunner, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns } from './runners/index.mjs';
 import { classify, shouldStopEarly } from './classify.mjs';
 import { blastRadius, rank } from './rank.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
@@ -107,6 +107,7 @@ export async function probe({
   let runnerVersion;
   let runnerSource;
   let runner = RUNNERS[runnerName === 'auto' ? 'vitest' : runnerName];
+  const runnersUsed = new Map(); // every runner that ran defenders, beyond the project runner
   try {
     const commandTemplate = runnerCommand ? parseCommandTemplate(runnerCommand) : undefined;
     if (!commandTemplate) {
@@ -120,12 +121,38 @@ export async function probe({
       runnerVersion = sel.version;
       runnerSource = sel.source;
     }
-    const allTests = runner.tests(iso.projectDir);
+    runnersUsed.set(runner.name, runnerVersion ?? readRunnerVersion(projectDir, runner.name));
+    // Files an owning runner (Playwright) claims run under it, whatever the
+    // project runner is; it must resolve before the first such defender runs.
+    const owned = OWNED_RUNNERS.filter((r) => r !== runner);
+    const ownedChecked = new Map();
+    const ensureOwned = async (r, file) => {
+      if (!ownedChecked.has(r)) ownedChecked.set(r, await r.check({ projectDir: iso.projectDir }));
+      const c = ownedChecked.get(r);
+      if (!c.ok) throw new PreconditionError(`${file} is a ${r.name} test (it lives under ${r.name}'s testDir) but ${r.name} is not resolvable in the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${c.message}).`);
+      runnersUsed.set(r.name, c.version);
+    };
+    const allTests = [...new Set([...runner.tests(iso.projectDir).filter((t) => !owned.some((r) => r.owns(iso.projectDir, t))), ...owned.flatMap((r) => r.tests(iso.projectDir))])].sort();
     const baselineCache = new Map();
     const prior = previous && previous.run.confirmRuns === confirmRuns
       ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
       : new Map();
-    const runDefenders = (files) => runner.run({ projectDir: iso.projectDir, files, budgetMs, commandTemplate });
+    const runDefenders = async (files) => {
+      if (commandTemplate) return runner.run({ projectDir: iso.projectDir, files, budgetMs, commandTemplate });
+      const groups = partitionByRunner(iso.projectDir, files, runner);
+      const parts = [];
+      for (const [r, group] of groups) {
+        if (r !== runner) await ensureOwned(r, group[0]);
+        parts.push(await r.run({ projectDir: iso.projectDir, files: group, budgetMs }));
+      }
+      return mergeRuns(parts);
+    };
+    /** Which runner each defender runs under, when more than the project runner is involved. */
+    const byRunner = (files) => {
+      const groups = partitionByRunner(iso.projectDir, files, runner);
+      if (groups.size <= 1) return undefined; // one runner ran them all, whichever it was
+      return Object.fromEntries([...groups].map(([r, group]) => [r.name, group]));
+    };
 
     for (const claim of claims.claims) {
       if (selected && !selected.has(claim.id)) continue;
@@ -138,7 +165,7 @@ export async function probe({
         const mockInfo = declared ? classifyDefenders(iso.projectDir, fault.file, declared) : discoverDefendersDetailed(iso.projectDir, fault.file);
         const defenders = declared ?? mockInfo.canDetect;
         const stage = (name, i, n) => onStage({ claimId: claim.id, faultId: fault.id, stage: name, i, n });
-        const record = await probeOne({ claim, fault, defenders, discovered: declared === null, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, mocking: mockInfo.mocking, signals: mockInfo.signals });
+        const record = await probeOne({ claim, fault, defenders, discovered: declared === null, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, byRunner: byRunner(defenders), mocking: mockInfo.mocking, signals: mockInfo.signals });
         records.push(record);
         onProgress(record);
       }
@@ -155,7 +182,8 @@ export async function probe({
       startedAt,
       finishedAt: new Date().toISOString(),
       repo: { head, dirty: isDirty(root), ...(snapshot ? { snapshot } : {}), ...(ignoredDirty.length ? { ignoredDirty } : {}) },
-      runner: { name: runner.name, ...((runnerVersion ?? readRunnerVersion(projectDir, runner.name)) ? { version: runnerVersion ?? readRunnerVersion(projectDir, runner.name) } : {}), ...(runnerSource ? { source: runnerSource } : {}) },
+      runner: { name: runner.name, ...((runnerVersion ?? readRunnerVersion(projectDir, runner.name)) ? { version: runnerVersion ?? readRunnerVersion(projectDir, runner.name) } : {}) },
+      ...(runnersUsed.size > 1 ? { runners: [...runnersUsed].map(([n, v]) => ({ name: n, ...(v ? { version: v } : {}) })) } : {}),
       confirmRuns,
       ...(confirmRuns < 3 ? { provisional: true } : {}),
       mode,
@@ -164,7 +192,7 @@ export async function probe({
   };
 }
 
-async function probeOne({ claim, fault, defenders, discovered, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior, priorRunId, mocking = [], signals = [] }) {
+async function probeOne({ claim, fault, defenders, discovered, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior, priorRunId, byRunner, mocking = [], signals = [] }) {
   const targetPath = join(iso.projectDir, fault.file);
   const targetExists = existsSync(targetPath);
   const inputs = {
@@ -261,7 +289,7 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
     subject: { kind: 'fault', id: fault.id, description: fault.description, file: fault.file, faultClass: fault.faultClass, producedBy: fault.producedBy, contentHash: sha256(`${fault.find}\n${fault.replace}`) },
     verdict,
     detail,
-    defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}), ...(mocking.length ? { mocking } : {}), ...(signals.length ? { signals } : {}) },
+    defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}), ...(byRunner ? { byRunner } : {}), ...(mocking.length ? { mocking } : {}), ...(signals.length ? { signals } : {}) },
     inputs,
     rank: rank({ severity: claim.severity, sourceKind: claim.source.kind, blast }),
   };
