@@ -790,6 +790,70 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-INDEPENDENCE-IS-NEVER-A-VERDICT",
+      "statement": "A kill by a test written in the same change as the code it guards is recorded as co-authored; a defender written separately is separate-change, and a missing history is unknown rather than assumed independent.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/evidence.schema.json"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/independence.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A defender with no history is assumed independent instead of unknown; every untracked or shallow case silently reports separate-change.",
+          "faultClass": "return-altered",
+          "file": "src/probe/independence.mjs",
+          "find": "    if (!def) return { class: 'unknown', targetCommit: target.commit };",
+          "replace": "    if (!def) return { class: 'separate-change', targetCommit: target.commit };",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RANK-ABSENT-SIGNAL-IS-NEUTRAL",
+      "statement": "A record with no independence signal ranks exactly as it did before the signal existed; an absent signal is neutral, never a penalty, so reused verdicts and evidence from an older version keep their order.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/independence.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A missing independence signal is treated as co-authored, silently re-ranking every record written before the signal existed.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/rank.mjs",
+          "find": "(INDEPENDENCE_WEIGHT[independence] ?? 1)",
+          "replace": "(INDEPENDENCE_WEIGHT[independence] ?? 0.85)",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

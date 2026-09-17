@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **L3 independence, recorded on every kill.** `detail.independence`
+  (`class`: `co-authored` · `separate-change` · `unknown`, plus
+  `defenderCommit`, `targetCommit`, `sameAuthor`) answers a question nothing
+  else in this category asks: was the test that killed the fault written by
+  the same change, or the same author, as the code it guards? Computed from
+  `git log -1` for the killing defender and the fault's target; the most
+  independent defender decides, and a missing history is `unknown`, never
+  guessed. It is a **signal, not a verdict**: `classify()` never sees it,
+  ranking weights a co-authored kill slightly below an independent one,
+  `status.counts.killedCoAuthored` counts them and `brief` says it in one
+  line. Spec: `evidence.schema.json` gains `detail.independence` with a
+  semantic rule that only `killed` records may carry it and a known class
+  must name both commits; `status.schema.json` gains
+  `counts.killedCoAuthored`. Self-claims `TG-INDEPENDENCE-IS-NEVER-A-VERDICT`
+  and `TG-RANK-ABSENT-SIGNAL-IS-NEUTRAL` (evidence without the signal ranks
+  exactly as before it existed).
+
 ### Docs
 
 - README: a **Properties** block (deterministic measurement; no network, no

@@ -270,6 +270,17 @@ things make that safe:
   acceptable fix, the two-gate rule for any test the agent writes), the
   `brief --text` session-start hook, an `AGENTS.md` section and the
   `.gitignore` lines. Idempotent.
+- **Independence is recorded (L3).** `probe` measures *power* — would this
+  test notice if the code were wrong. It also records, on every kill, whether
+  the killing test was last touched by the same change (or the same author) as
+  the code it guards: `detail.independence` is `co-authored`,
+  `separate-change` or `unknown`. A co-authored kill is legitimate — a fix
+  *should* ship with its regression test — but a repository where every kill
+  is co-authored has no independent verification, whatever its claim
+  verification rate says. It is a **signal**: ranking reads it, verdicts never
+  do, and the brief says it in one line. Nothing else in this category
+  measures it, and agents saturate the tests they can see
+  ([SpecBench](https://arxiv.org/abs/2605.21384)).
 - **Gaming is visible.** The cheapest way to make a survivor disappear is to
   weaken its fault, not to write a test. Evidence records every fault's
   content hash; `status` lists any fault edited after it survived, with its
