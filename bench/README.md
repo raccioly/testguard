@@ -44,3 +44,22 @@ it, and runs `testguard` against the project by path.
 | `flaky-defender` | the defenders are not green N/N unmodified — the project's flake, not the tool's; nothing about the fault can be concluded |
 | `killed` where `survived` was expected | either the suite was hardened since, or the previous measurement ran once and a flake read as a detection |
 | `survived` where `killed` was expected | the declared defenders are not the tests that actually catch it; escalation will say whether anything does |
+
+## What a field report should carry
+
+The two reports that shaped 0.1.2 and 0.1.3 were written from the human
+table. Since 0.3.0 the tool also states, in machine-readable form, where a
+project is and what it would tell an agent to do next. Capture both, from
+the project directory, after the final probe:
+
+```bash
+testguard status --json  > ~/bench/<project>/status.json     # state, next action, changed faults, findings
+testguard brief --text   > ~/bench/<project>/brief.txt       # exactly what an agent sees at session start
+testguard status --json --changed <base-ref> > ~/bench/<project>/status-changed.json   # 0.5.0+: unclaimed changed files
+```
+
+and include them with the evidence. They answer the questions a report
+otherwise has to argue in prose: *was anything stale when the numbers were
+taken? did the tool point at the right next fix? would an agent have known
+what to do?* If `status.next` disagrees with what you did next, that
+disagreement is the most useful line in the report.
