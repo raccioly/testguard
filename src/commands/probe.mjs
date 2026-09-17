@@ -43,6 +43,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
     mode: values['in-place'] ? 'in-place' : 'worktree',
     ref: values.ref,
     runnerCommand: values['runner-cmd'],
+    runnerName: values.runner,
     nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
     only,
     escalate: !values['no-escalate'],

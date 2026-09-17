@@ -1,0 +1,7 @@
+{
+  "name": "testguard-known-answer-fixture-jest",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The known-answer fixture in CommonJS for jest. Same claims, same expected verdicts. FLAKY BY DESIGN (test/flaky.test.js).",
+  "scripts": { "test": "jest" }
+}

@@ -1,7 +1,7 @@
 # TestGuard for GitLab CI. Include it from a project's .gitlab-ci.yml:
 #
 #   include:
-#     - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.3.1/packaging/gitlab/testguard.gitlab-ci.yml'
+#     - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.4.0/packaging/gitlab/testguard.gitlab-ci.yml'
 #
 # Two jobs. `testguard:gate` runs on every merge request pipeline and fails
 # when a changed source file carries no claim (and no excusing ignore entry).
@@ -13,7 +13,7 @@
 # On other pipelines set TESTGUARD_CHANGED_REF (and fetch that ref).
 
 variables:
-  TESTGUARD_VERSION: "0.3.1"
+  TESTGUARD_VERSION: "0.4.0"
   TESTGUARD_DIR: "."
   GIT_DEPTH: "0" # the probe builds a scratch worktree from HEAD; full history is the safe default
 

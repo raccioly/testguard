@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { listTestFiles } from './runner-vitest.mjs';
+import { listTestFiles } from './runners/shared.mjs';
 import { fileImports } from './rank.mjs';
 
 /**
