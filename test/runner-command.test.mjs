@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseCommandTemplate, expandCommand, checkRunner } from '../src/probe/runner-vitest.mjs';
+import { parseCommandTemplate, expandCommand, checkBinary } from '../src/probe/runners/shared.mjs';
 
 describe('parseCommandTemplate / expandCommand', () => {
   it('splits words, honours quotes, and substitutes {files} and {out}', () => {
@@ -22,12 +22,12 @@ describe('parseCommandTemplate / expandCommand', () => {
 describe('checkRunner', () => {
   it('reports the runner unresolvable when nothing on PATH can provide it (and does not crash when npx itself is missing)', async () => {
     const empty = mkdtempSync(join(tmpdir(), 'tg-norunner-'));
-    const r = await checkRunner({ projectDir: empty, budgetMs: 30_000, env: { PATH: empty } });
+    const r = await checkBinary({ projectDir: empty, bin: 'vitest', budgetMs: 30_000, env: { PATH: empty } });
     expect(r.ok).toBe(false);
     expect(r.message).toBeTruthy();
   }, 40_000);
   it('finds vitest from this repository', async () => {
-    const r = await checkRunner({ projectDir: process.cwd(), budgetMs: 30_000 });
+    const r = await checkBinary({ projectDir: process.cwd(), bin: 'vitest', budgetMs: 30_000 });
     expect(r.ok).toBe(true);
     expect(r.version).toMatch(/^\d+\.\d+\.\d+/);
   }, 40_000);

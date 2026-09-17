@@ -6,7 +6,8 @@ import { repoRoot as gitRoot, headSha, isDirty, snapshotWorkingTree } from '../g
 import { discoverDefenders } from './discover.mjs';
 import { createScratch, inPlace, PreconditionError } from './worktree.mjs';
 import { applyFault, locate } from './inject.mjs';
-import * as vitest from './runner-vitest.mjs';
+import { resolveDefenders, parseCommandTemplate } from './runners/shared.mjs';
+import { selectRunner, RUNNERS } from './runners/index.mjs';
 import { classify, shouldStopEarly } from './classify.mjs';
 import { blastRadius, rank } from './rank.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
@@ -14,9 +15,9 @@ import { fingerprint } from '../../spec/lib/fingerprint.mjs';
 
 const isKill = (r) => r.outcome === 'fail' && r.assertionFailures > 0;
 
-function readRunnerVersion(projectDir) {
+function readRunnerVersion(projectDir, name = 'vitest') {
   try {
-    return JSON.parse(readFileSync(createRequire(join(projectDir, 'noop.js')).resolve('vitest/package.json'), 'utf8')).version;
+    return JSON.parse(readFileSync(createRequire(join(projectDir, 'noop.js')).resolve(`${name}/package.json`), 'utf8')).version;
   } catch {
     return undefined;
   }
@@ -34,6 +35,7 @@ export async function probe({
   ref = 'HEAD',
   budgetMs = 120_000,
   runnerCommand,
+  runnerName = 'auto',
   nodeModules,
   only,
   includeDirty = false,
@@ -75,7 +77,7 @@ export async function probe({
       const watched = new Set(targets);
       for (const claim of claims.claims) {
         if (selected && !selected.has(claim.id)) continue;
-        const declared = claim.defendedBy?.length ? vitest.resolveDefenders(projectDir, claim.defendedBy) : claim.faults.flatMap((f) => discoverDefenders(projectDir, f.file));
+        const declared = claim.defendedBy?.length ? resolveDefenders(projectDir, claim.defendedBy) : claim.faults.flatMap((f) => discoverDefenders(projectDir, f.file));
         for (const d of declared) watched.add(relative(root, join(projectDir, d)));
         for (const g of claim.defendedBy ?? []) if (!g.includes('*')) watched.add(relative(root, join(projectDir, g)));
       }
@@ -89,27 +91,29 @@ export async function probe({
   const iso = mode === 'worktree' ? createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules }) : inPlace({ repoRoot: root, projectDir });
   const records = [];
   let runnerVersion;
+  let runner = RUNNERS[runnerName === 'auto' ? 'vitest' : runnerName];
   try {
-    const commandTemplate = runnerCommand ? vitest.parseCommandTemplate(runnerCommand) : undefined;
+    const commandTemplate = runnerCommand ? parseCommandTemplate(runnerCommand) : undefined;
     if (!commandTemplate) {
       // An unresolvable runner is a precondition failure, not a flaky defender.
-      const check = await vitest.checkRunner({ projectDir: iso.projectDir });
-      if (!check.ok) {
-        throw new PreconditionError(`test runner is not resolvable in the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${check.message}). ` +
+      const sel = await selectRunner({ projectDir: iso.projectDir, name: runnerName });
+      if (sel.error) {
+        throw new PreconditionError(`test runner is not resolvable in the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${sel.error}). ` +
           (mode === 'worktree' ? 'No usable node_modules was linked: pass --node-modules <path>, or run with --in-place.' : 'Install dependencies first.'));
       }
-      runnerVersion = check.version;
+      runner = sel.runner;
+      runnerVersion = sel.version;
     }
-    const allTests = vitest.listTestFiles(iso.projectDir);
+    const allTests = runner.tests(iso.projectDir);
     const baselineCache = new Map();
     const prior = previous && previous.run.confirmRuns === confirmRuns
       ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
       : new Map();
-    const runDefenders = (files) => vitest.runVitest({ projectDir: iso.projectDir, files, budgetMs, commandTemplate });
+    const runDefenders = (files) => runner.run({ projectDir: iso.projectDir, files, budgetMs, commandTemplate });
 
     for (const claim of claims.claims) {
       if (selected && !selected.has(claim.id)) continue;
-      const declared = claim.defendedBy?.length ? vitest.resolveDefenders(iso.projectDir, claim.defendedBy) : null;
+      const declared = claim.defendedBy?.length ? resolveDefenders(iso.projectDir, claim.defendedBy) : null;
       for (const fault of claim.faults) {
         const defenders = declared ?? discoverDefenders(iso.projectDir, fault.file);
         const stage = (name, i, n) => onStage({ claimId: claim.id, faultId: fault.id, stage: name, i, n });
@@ -130,7 +134,7 @@ export async function probe({
       startedAt,
       finishedAt: new Date().toISOString(),
       repo: { head, dirty: isDirty(root), ...(snapshot ? { snapshot } : {}) },
-      runner: { name: vitest.name, ...((runnerVersion ?? readRunnerVersion(projectDir)) ? { version: runnerVersion ?? readRunnerVersion(projectDir) } : {}) },
+      runner: { name: runner.name, ...((runnerVersion ?? readRunnerVersion(projectDir, runner.name)) ? { version: runnerVersion ?? readRunnerVersion(projectDir, runner.name) } : {}) },
       confirmRuns,
       ...(confirmRuns < 3 ? { provisional: true } : {}),
       mode,

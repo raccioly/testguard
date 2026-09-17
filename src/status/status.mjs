@@ -4,7 +4,7 @@ import { readSpecDoc } from '../evidence/writer.mjs';
 import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
 import { gate } from '../baseline/baseline.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
-import { resolveDefenders } from '../probe/runner-vitest.mjs';
+import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { sortForReport } from '../render.mjs';
 
