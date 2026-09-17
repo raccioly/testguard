@@ -21,7 +21,7 @@ describe('glob', () => {
 
   it('matches files under a root and skips node_modules', () => {
     const files = matchGlobs(fixture, ['**/*.test.mjs']);
-    expect(files).toEqual(['test/flaky.test.mjs', 'test/redact.test.mjs']);
+    expect(files).toEqual(['test/export-mocked.test.mjs', 'test/flaky.test.mjs', 'test/redact.test.mjs']);
   });
 
   it('returns nothing for no globs', () => {
