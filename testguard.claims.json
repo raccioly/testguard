@@ -522,11 +522,11 @@
       "faults": [
         {
           "id": "F1",
-          "description": "The unclaimed block is never rendered in the TEXT brief (the markdown renderer has its own claim).",
+          "description": "The unclaimed block is never rendered.",
           "faultClass": "condition-forced",
           "file": "src/brief/brief.mjs",
-          "find": "  if (brief.unclaimed) {\n    const n = brief.unclaimed.files.length;\n    lines.push('', `UNCLAIMED CHANGES since",
-          "replace": "  if (false) {\n    const n = brief.unclaimed.files.length;\n    lines.push('', `UNCLAIMED CHANGES since",
+          "find": "  if (brief.unclaimed) {",
+          "replace": "  if (false) {",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -921,29 +921,29 @@
       ]
     },
     {
-      "id": "TG-BRIEF-MARKDOWN-UNCLAIMED-FIRST",
-      "statement": "The markdown brief lists unclaimed changed files before any finding, exactly as the text brief does; a reviewer reading the merge-request note sees the claim gap first.",
+      "id": "TG-RESTAMP-REQUIRES-SAME-FINGERPRINTS",
+      "statement": "baseline --restamp moves head only when a clean probe reproduced exactly the baseline's fingerprints; a frozen contract is never silently rewritten.",
       "source": {
         "kind": "spec",
-        "ref": "spec/GATE-SEMANTICS.md"
+        "ref": "spec/GATE-SEMANTICS.md#baseline-and-delta"
       },
-      "severity": "medium",
+      "severity": "critical",
       "producedBy": {
         "producer": "human",
         "by": "maintainer",
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/brief.test.mjs"
+        "test/baseline.test.mjs"
       ],
       "faults": [
         {
           "id": "F1",
-          "description": "The markdown renderer drops the unclaimed-changes section; the text renderer keeps it.",
+          "description": "The fingerprint comparison is skipped; any clean probe re-stamps the baseline.",
           "faultClass": "condition-forced",
-          "file": "src/brief/brief.mjs",
-          "find": "  if (brief.unclaimed) {\n    const n = brief.unclaimed.files.length;\n    lines.push('', `### Unclaimed changes since",
-          "replace": "  if (false) {\n    const n = brief.unclaimed.files.length;\n    lines.push('', `### Unclaimed changes since",
+          "file": "src/baseline/baseline.mjs",
+          "find": "  if (!sameFingerprints(baseline.fingerprints, current)) return",
+          "replace": "  if (false) return",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -953,11 +953,11 @@
       ]
     },
     {
-      "id": "TG-GITLAB-PROBE-EXIT-PRESERVED",
-      "statement": "The GitLab probe job exits with the probe's own status; writing the brief and posting the note afterwards never turns a red probe green.",
+      "id": "TG-BASELINE-CARRIES-SNAPSHOT",
+      "statement": "A baseline frozen from working-tree-snapshot evidence records the snapshot commit, so a reader can tell its head is the parent of the commit that carries the tests.",
       "source": {
         "kind": "spec",
-        "ref": "packaging/gitlab/testguard.gitlab-ci.yml"
+        "ref": "spec/GATE-SEMANTICS.md#baseline-and-delta"
       },
       "severity": "high",
       "producedBy": {
@@ -966,16 +966,48 @@
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/gitlab-template.test.mjs"
+        "test/baseline.test.mjs"
       ],
       "faults": [
         {
           "id": "F1",
-          "description": "The job ends with exit 0 regardless of the probe's status; the pipeline is green with unproven claims.",
-          "faultClass": "literal-changed",
-          "file": "packaging/gitlab/testguard.gitlab-ci.yml",
-          "find": "    - exit $status\n",
-          "replace": "    - exit 0\n",
+          "description": "The snapshot is dropped; the baseline looks like a clean freeze of its parent commit.",
+          "faultClass": "field-dropped",
+          "file": "src/baseline/baseline.mjs",
+          "find": "...(repo.snapshot ? { snapshot: repo.snapshot } : {}), ",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-IS-ANCESTOR-ASKS-GIT",
+      "statement": "Ancestry between a baseline's head and HEAD is decided by git (merge-base --is-ancestor); a commit that is not in HEAD's history is never reported as an ancestor.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#baseline-and-delta"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/status.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every commit counts as an ancestor; a rewritten or foreign baseline head is never noticed.",
+          "faultClass": "return-altered",
+          "file": "src/git.mjs",
+          "find": "  return spawnSync('git', ['merge-base', '--is-ancestor', ancestor, ref], { cwd: dir }).status === 0;",
+          "replace": "  return true;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
