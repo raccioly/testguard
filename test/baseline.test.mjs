@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { buildBaseline, gate } from '../src/baseline/baseline.mjs';
+import { buildBaseline, gate, restampBaseline, sameFingerprints } from '../src/baseline/baseline.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 
 const evidence = JSON.parse(readFileSync(new URL('../spec/conformance/examples/evidence.json', import.meta.url), 'utf8'));
@@ -43,5 +43,34 @@ describe('gate', () => {
   it('baseline wins over the floor', () => {
     const g = gate(evidence.records, buildBaseline(evidence), { severityFloor: 'critical' });
     expect(g.belowFloor).toEqual([]);
+  });
+});
+
+describe('a baseline frozen from a working-tree snapshot, and re-stamping it', () => {
+  const snapEvidence = { ...evidence, run: { ...evidence.run, repo: { head: evidence.run.repo.head, dirty: true, snapshot: 'b'.repeat(40) } } };
+  const frozen = buildBaseline(snapEvidence, { createdAt: '2026-09-17T00:00:00Z' });
+  it('carries the snapshot and conforms', () => {
+    expect(frozen.snapshot).toBe('b'.repeat(40));
+    expect(frozen.dirty).toBe(true);
+    expect(validate('baseline', frozen).errors).toEqual([]);
+  });
+  it('re-stamps to a later CLEAN probe that reproduced the same fingerprints, dropping the snapshot and keeping createdAt', () => {
+    const later = { ...evidence, run: { ...evidence.run, repo: { head: 'c'.repeat(40), dirty: false } } };
+    const r = restampBaseline(frozen, later, { restampedAt: '2026-09-18T00:00:00Z' });
+    expect(r.ok).toBe(true);
+    expect(r.baseline).toMatchObject({ head: 'c'.repeat(40), dirty: false, createdAt: '2026-09-17T00:00:00Z', restampedAt: '2026-09-18T00:00:00Z' });
+    expect(r.baseline.snapshot).toBeUndefined();
+    expect(sameFingerprints(r.baseline.fingerprints, frozen.fingerprints)).toBe(true);
+    expect(validate('baseline', r.baseline).errors).toEqual([]);
+  });
+  it('refuses a dirty or snapshot probe, and refuses when the fingerprints differ — a frozen contract is never silently rewritten', () => {
+    expect(restampBaseline(frozen, snapEvidence).ok).toBe(false);
+    expect(restampBaseline(frozen, snapEvidence).reason).toMatch(/snapshot/);
+    const dirty = { ...evidence, run: { ...evidence.run, repo: { head: 'c'.repeat(40), dirty: true } } };
+    expect(restampBaseline(frozen, dirty).reason).toMatch(/dirty tree/);
+    const fewer = { ...evidence, run: { ...evidence.run, repo: { head: 'c'.repeat(40), dirty: false } }, records: evidence.records.slice(1) };
+    const r = restampBaseline(frozen, fewer);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/does not reproduce/);
   });
 });

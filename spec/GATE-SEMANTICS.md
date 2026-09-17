@@ -72,6 +72,15 @@ derived from identities and outcome, never from the fault's `find`/`replace`
 text, so repairing a rotted anchor does not churn the baseline — while a
 change of verdict on the same claim+subject does surface as new.
 
+A baseline records the commit its evidence was taken at. When that evidence
+came from a working-tree snapshot, the baseline says so (`snapshot`) and its
+`head` is the **parent** of the commit that will carry the tests. A tool may
+offer to re-stamp such a baseline onto a later commit, but only when a clean
+probe of that commit reproduced exactly the same fingerprints; otherwise the
+user re-probes and freezes a new baseline. A frozen contract is never
+silently rewritten, and a status document notes a baseline that predates
+HEAD without turning that into a state.
+
 Adopting tools may reconcile an existing baseline format (for example a
 `{version, fingerprints:{hash:count}}` file) by mapping it onto this shape;
 the suppress-up-to-count semantics are identical.

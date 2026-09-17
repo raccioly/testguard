@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`baseline --restamp`** (#25). A baseline frozen from `--include-dirty`
+  evidence now records the snapshot commit and, once you commit, a clean
+  `probe` plus `--restamp` moves its `head` to that commit — only when the
+  fingerprints are identical and the tree is clean; a frozen contract is
+  never silently rewritten. `status` gains informational `notes` (never a
+  state): a baseline frozen from a snapshot or a dirty tree that predates
+  HEAD, or one whose head is not an ancestor of HEAD.
+
 ### Changed
 
 - CI: TestGuard's self-probe runs on one Node leg instead of three, without
