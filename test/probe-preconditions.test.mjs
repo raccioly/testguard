@@ -34,4 +34,19 @@ describe('probe preconditions', () => {
     await expect(probe({ projectDir: dir, claims, mode: 'in-place', includeDirty: true, toolVersion: 't' })).rejects.toThrow(/--include-dirty applies to worktree mode/);
     await expect(probe({ projectDir: dir, claims, mode: 'worktree', includeDirty: true, ref: 'HEAD~0', toolVersion: 't' })).rejects.toThrow(/cannot be combined with --ref/);
   });
+  it('an explicit --ref (even HEAD) is honoured over a dirty defender: a warning names the files and the evidence records them; --ignore-dirty does the same for the implicit HEAD', async () => {
+    const { dir, claims } = dirtyRepo();
+    const warnings = [];
+    const ev = await probe({ projectDir: dir, claims, mode: 'worktree', ref: 'HEAD', refExplicit: true, confirmRuns: 1, budgetMs: 30_000, escalate: false, toolVersion: 't', onWarn: (m) => warnings.push(m) });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/test\/a\.test\.mjs.*probing HEAD \([a-f0-9]{7}\) as committed.*NOT what is being probed/s);
+    expect(ev.run.repo.ignoredDirty).toEqual(['test/a.test.mjs']);
+    expect(ev.run.repo.snapshot).toBeUndefined();
+    const again = [];
+    const ev2 = await probe({ projectDir: dir, claims, mode: 'worktree', ignoreDirty: true, confirmRuns: 1, budgetMs: 30_000, escalate: false, toolVersion: 't', onWarn: (m) => again.push(m) });
+    expect(again).toHaveLength(1);
+    expect(ev2.run.repo.ignoredDirty).toEqual(['test/a.test.mjs']);
+    // the implicit HEAD without --ignore-dirty is still refused (the message now offers --ignore-dirty)
+    await expect(probe({ projectDir: dir, claims, mode: 'worktree', toolVersion: 't' })).rejects.toThrow(/--ignore-dirty/);
+  }, 120_000);
 });

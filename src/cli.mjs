@@ -35,9 +35,12 @@ probe
   --out <path>         evidence file           (default: <dir>/.testguard/evidence.json)
   --baseline <path>    baseline to gate against (default: <dir>/.testguard/baseline.json if present)
   --severity <level>   gate only at or above   (default: low)
-  --ref <commit>       probe this commit in the scratch worktree (default: HEAD)
+  --ref <commit>       probe this commit in the scratch worktree (default: HEAD). An explicit --ref is honoured even when
+                       defender/target files are dirty: a warning names them, the evidence records them (repo.ignoredDirty)
+  --ignore-dirty       probe HEAD as committed although defender/target files are dirty (same warning and record)
   --claim <ID,ID>      probe only these claims; writes .testguard/evidence-partial.json
   --include-dirty      probe the working tree (a snapshot commit) instead of HEAD; uncommitted tests count
+                       (without it, a dirty defender/target with the implicit HEAD is refused: the silent-mismatch trap)
   --verbose            also print each killed fault (default: only unproven ones, plus a count)
                        --confirm below 3 is PROVISIONAL: verdicts print with "?", evidence goes to .testguard/evidence-provisional.json
   --runner <name>      vitest | jest | auto (default: auto — first of vitest, jest that resolves)
@@ -86,7 +89,8 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         baseline: { type: 'string' },
         severity: { type: 'string', default: 'low' },
         max: { type: 'string', default: '20' },
-        ref: { type: 'string', default: 'HEAD' },
+        ref: { type: 'string' },
+        'ignore-dirty': { type: 'boolean', default: false },
         claim: { type: 'string' },
         'include-dirty': { type: 'boolean', default: false },
         changed: { type: 'string' },

@@ -25,6 +25,12 @@
             "snapshot": {
               "description": "When the working tree was probed instead of `head`: the dangling commit that captured it. Not a ref; may be garbage-collected.",
               "$ref": "urn:guard-spec:v1:common#/$defs/gitSha"
+            },
+            "ignoredDirty": {
+              "description": "Defender/target files that had uncommitted changes when `head` was probed as committed (an explicit --ref, or --ignore-dirty). The working-tree versions of these files are NOT what the verdicts describe.",
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" }
             }
           },
           "additionalProperties": false

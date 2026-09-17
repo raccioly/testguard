@@ -102,11 +102,15 @@ npx testguard-cli scaffold src/x.ts   # propose faults for a file, as a draft to
    it is written.
 
    Worktree mode probes a **commit**. If a defender or target file has
-   uncommitted changes, `probe` refuses and says so — otherwise your new
-   tests would be silently absent and the same survivors would come back
-   with no hint why. `--include-dirty` snapshots the working tree (tracked
-   edits and new files) into a throwaway commit and probes that; your tree,
-   HEAD and index are never touched. Every summary names the commit probed.
+   uncommitted changes and you asked for the implicit HEAD, `probe` refuses
+   and says so — otherwise your new tests would be silently absent and the
+   same survivors would come back with no hint why. `--include-dirty`
+   snapshots the working tree (tracked edits and new files) into a throwaway
+   commit and probes that; your tree, HEAD and index are never touched. An
+   **explicit `--ref`** (a pre-fix commit in a post-mortem, say) is honoured
+   over a dirty tree, as is `--ignore-dirty`: a warning names the files and
+   the evidence records them as `repo.ignoredDirty`, so the run says what it
+   did not look at. Every summary names the commit probed.
 
    A claim with no `defendedBy` has its defenders **discovered**: the test
    files that import the fault's target, by relative path or resolved alias.
