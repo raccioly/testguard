@@ -5,7 +5,16 @@ export const formatVerdict = (v) => (v === 'killed' ? 'killed' : v.toUpperCase()
 
 export function renderRecord(r) {
   const head = `${formatVerdict(r.verdict).padEnd(15)} ${r.claim.id}/${r.subject.id}`.padEnd(38);
-  const why = r.detail.reason ? `  [${r.detail.reason}]` : '';
+  let why = '';
+  if (r.detail.reason === 'killed-by-undeclared-tests' && r.detail.undeclaredKillers?.length) {
+    const files = [...new Set(r.detail.undeclaredKillers.map((k) => k.split('::')[0]))];
+    why = `  [killed-by-undeclared-tests: ${files.join(', ')}]`;
+  } else if (r.detail.reason === 'anchor-ambiguous' && r.detail.anchor) {
+    why = `  [anchor-ambiguous: ${r.detail.anchor.hits} hits, expected ${r.detail.anchor.expected}]`;
+  } else if (r.detail.reason) {
+    why = `  [${r.detail.reason}]`;
+  }
+  if (r.defenders.discovered) why += '  (defenders discovered by import)';
   return `${head} ${r.claim.severity.padEnd(8)} ${r.subject.file}  ${r.subject.description}${why}`;
 }
 
@@ -15,12 +24,13 @@ export function summarize(records) {
   return byVerdict;
 }
 
-export function renderSummary(records) {
+export function renderSummary(records, run) {
   const byVerdict = summarize(records);
   const parts = ORDER.filter((v) => byVerdict[v]).map((v) => `${byVerdict[v]} ${formatVerdict(v)}`);
   const unproven = records.filter((r) => r.verdict !== 'killed');
   const claims = new Set(unproven.map((r) => r.claim.id)).size;
-  return `${records.length} faults probed: ${parts.join(', ')}. ${unproven.length} unproven fault${unproven.length === 1 ? '' : 's'} across ${claims} claim${claims === 1 ? '' : 's'}.`;
+  const where = run ? ` Probed ${run.repo.snapshot ? `working tree (snapshot ${run.repo.snapshot.slice(0, 7)} of ${run.repo.head.slice(0, 7)})` : run.mode === 'in-place' ? `in place at ${run.repo.head.slice(0, 7)}${run.repo.dirty ? ' (dirty)' : ''}` : run.repo.head.slice(0, 7)}.` : '';
+  return `${records.length} faults probed: ${parts.join(', ')}. ${unproven.length} unproven fault${unproven.length === 1 ? '' : 's'} across ${claims} claim${claims === 1 ? '' : 's'}.${where}`;
 }
 
 /** Survivors first, then by rank score; killed last. */

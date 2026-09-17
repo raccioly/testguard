@@ -5,10 +5,19 @@
     {
       "id": "TG-KILL-NEEDS-N",
       "statement": "A fault is killed only when every one of the N probe runs fails with an assertion; a mixed result is never a kill.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#verdicts rule 2 and 4" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 2 and 4"
+      },
       "severity": "critical",
-      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-09-17T00:00:00Z" },
-      "defendedBy": ["test/classify.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/classify.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -17,17 +26,29 @@
           "file": "src/probe/classify.mjs",
           "find": "if (probeRuns.length === confirmRuns && killedRuns.length === confirmRuns) return { verdict: 'killed' };",
           "replace": "if (killedRuns.length >= 1) return { verdict: 'killed' };",
-          "producedBy": { "producer": "human", "by": "maintainer" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
         }
       ]
     },
     {
       "id": "TG-TIMEOUT-NEVER-KILLS",
       "statement": "A timeout is never counted as a detection.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#verdicts rule 3" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 3"
+      },
       "severity": "critical",
-      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-09-17T00:00:00Z" },
-      "defendedBy": ["test/classify.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/classify.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -36,17 +57,29 @@
           "file": "src/probe/classify.mjs",
           "find": "if (probeRuns.some((r) => r.outcome === 'timeout' || r.timeouts > 0)) return { verdict: 'timeout', reason: 'test-timed-out' };",
           "replace": "/* fault: timeout check removed */",
-          "producedBy": { "producer": "human", "by": "maintainer" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
         }
       ]
     },
     {
       "id": "TG-WRITER-REFUSES",
       "statement": "The tool never writes a spec document that does not conform to the spec.",
-      "source": { "kind": "spec", "ref": "AGENTS.md rule 2; CONTRIBUTING.md rule 1" },
+      "source": {
+        "kind": "spec",
+        "ref": "AGENTS.md rule 2; CONTRIBUTING.md rule 1"
+      },
       "severity": "high",
-      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-09-17T00:00:00Z" },
-      "defendedBy": ["test/writer.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/writer.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -55,17 +88,29 @@
           "file": "src/evidence/writer.mjs",
           "find": "if (!result.ok) throw new SpecDocError('refusing to write: ' + describe(kind, path, result));",
           "replace": "/* fault: validation ignored */",
-          "producedBy": { "producer": "human", "by": "maintainer" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
         }
       ]
     },
     {
       "id": "TG-FINGERPRINT-VERDICT",
       "statement": "The fingerprint includes the verdict, so a change of verdict on the same claim and subject surfaces as a new finding.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#baseline-and-delta" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#baseline-and-delta"
+      },
       "severity": "high",
-      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-09-17T00:00:00Z" },
-      "defendedBy": ["spec/conformance/schemas.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "spec/conformance/schemas.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -74,17 +119,29 @@
           "file": "spec/lib/fingerprint.mjs",
           "find": ".update([claimId, subjectId, file, verdict].join('\\n'))",
           "replace": ".update([claimId, subjectId, file].join('\\n'))",
-          "producedBy": { "producer": "human", "by": "maintainer" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
         }
       ]
     },
     {
       "id": "TG-RESTORE-ALWAYS",
       "statement": "After a fault is applied in place, restore() puts the original file content back.",
-      "source": { "kind": "spec", "ref": "README.md#how-it-works; SECURITY.md#security-model" },
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#how-it-works; SECURITY.md#security-model"
+      },
       "severity": "critical",
-      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-09-17T00:00:00Z" },
-      "defendedBy": ["test/inject.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/inject.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -93,26 +150,165 @@
           "file": "src/probe/inject.mjs",
           "find": "    live.delete(restore);\n    writeFileSync(path, original);",
           "replace": "    live.delete(restore);",
-          "producedBy": { "producer": "human", "by": "maintainer" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
         }
       ]
     },
     {
       "id": "TG-ESCALATION-N-RUNS",
       "statement": "A test outside the declared defenders is credited with a kill only if it fails in all N escalation runs; a single failing run is never attribution.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#verdicts rule 5" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 5"
+      },
       "severity": "high",
-      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-09-17T00:00:00Z" },
-      "defendedBy": ["test/probe.fixture.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/probe.fixture.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
           "description": "Single-run attribution: any escalation run with a failure credits the undeclared tests (the exact defect logged as bug-001 during development).",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "if (killers.size > 0 && runs.length === confirmRuns && runs.every(isKill)) detail.reason = 'killed-by-undeclared-tests';",
-          "replace": "if (runs.some(isKill)) detail.reason = 'killed-by-undeclared-tests';",
-          "producedBy": { "producer": "human", "by": "maintainer" }
+          "find": "if (killers.size > 0 && runs.length === confirmRuns && runs.every(isKill)) {",
+          "replace": "if (runs.some(isKill)) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SYMLINK-NODE-MODULES",
+      "statement": "A symlinked node_modules in the probed repository is linked into the scratch worktree like a real one.",
+      "source": {
+        "kind": "spec",
+        "ref": "CHANGELOG 0.1.2; field report 1"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/worktree.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Symlinks are not treated as directories; a symlinked node_modules is skipped.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/worktree.mjs",
+          "find": "    if (e.isDirectory()) return true;\n    if (!e.isSymbolicLink()) return false;",
+          "replace": "    return e.isDirectory();",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-DIRTY-DEFENDERS-REFUSED",
+      "statement": "Worktree mode refuses to probe HEAD while a defender or fault target has uncommitted changes.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md rule 6"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/probe-preconditions.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The dirty check is disabled; uncommitted defender edits are silently ignored (field report 2, finding 1).",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "      if (dirty.length) {\n        throw new PreconditionError(",
+          "replace": "      if (false) {\n        throw new PreconditionError(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-DISCOVERY-BY-IMPORT",
+      "statement": "With no defendedBy, the defenders are the test files that import the fault's target.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/claims.schema.json defendedBy"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/discover.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Discovery returns nothing; every undeclared claim becomes nocover (the pre-0.1.3 behaviour).",
+          "faultClass": "return-altered",
+          "file": "src/probe/discover.mjs",
+          "find": "return listTestFiles(projectDir).filter((t) => fileImports(projectDir, join(projectDir, t), targetRel));",
+          "replace": "return [];",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COMPILE-ERROR-NAMED",
+      "statement": "A replacement that does not compile is reported as replacement-does-not-compile, including esbuild's wording.",
+      "source": {
+        "kind": "spec",
+        "ref": "CHANGELOG 0.1.3; field report 2 finding 4"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/classify.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Only the vitest wording is matched; esbuild's `Expected \u2026 but found` falls back to suite-failed-to-load.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/classify.mjs",
+          "find": "/syntax|parse|transform failed|expected .+ but found|unexpected token/i",
+          "replace": "/syntax|parse/i",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
         }
       ]
     }

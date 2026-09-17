@@ -24,6 +24,7 @@ evidence comes from running against a real codebase with real history.
 | REDACT-006 | `mask()` replaces with equal-length asterisks | F1 syntax error | fault-invalid |
 | EXPORT-001 | Exported rows never include `content` | F1 keeps content | nocover |
 | FLAKY-001 | (defender is flaky) | F1 anything | flaky-defender |
+| DISCOVER-001 | Every match is replaced (no `defendedBy`) | F1 loop body removed | killed — defenders **discovered** by import |
 
 ## The exhibit — REDACT-001/F1
 

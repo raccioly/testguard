@@ -21,7 +21,11 @@
           "required": ["head", "dirty"],
           "properties": {
             "head": { "$ref": "urn:guard-spec:v1:common#/$defs/gitSha" },
-            "dirty": { "type": "boolean" }
+            "dirty": { "type": "boolean" },
+            "snapshot": {
+              "description": "When the working tree was probed instead of `head`: the dangling commit that captured it. Not a ref; may be garbage-collected.",
+              "$ref": "urn:guard-spec:v1:common#/$defs/gitSha"
+            }
           },
           "additionalProperties": false
         },
@@ -149,6 +153,22 @@
             "escalationRuns": {
               "type": "array",
               "items": { "$ref": "#/$defs/testRun" }
+            },
+            "undeclaredKillers": {
+              "description": "With reason `killed-by-undeclared-tests`: the tests (as `file::name`) that failed in every escalation run. Names what to add to `defendedBy`.",
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1, "maxLength": 1024 }
+            },
+            "anchor": {
+              "description": "With an anchor-related reason: how many times `find` occurred versus how many were expected.",
+              "type": "object",
+              "required": ["hits", "expected"],
+              "properties": {
+                "hits": { "type": "integer", "minimum": 0 },
+                "expected": { "type": "integer", "minimum": 1 }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -159,7 +179,11 @@
           "properties": {
             "requested": { "type": "array", "items": { "type": "string" } },
             "resolved": { "type": "array", "items": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" } },
-            "nocover": { "type": "boolean" }
+            "nocover": { "type": "boolean" },
+            "discovered": {
+              "description": "True when no defenders were declared and `resolved` was found by static import of the subject's file.",
+              "type": "boolean"
+            }
           },
           "additionalProperties": false
         },

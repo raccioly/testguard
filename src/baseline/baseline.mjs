@@ -7,7 +7,7 @@ export function buildBaseline(evidence, { createdAt = new Date().toISOString() }
     if (r.verdict === 'killed') continue;
     fingerprints[r.fingerprint] = (fingerprints[r.fingerprint] ?? 0) + 1;
   }
-  return { schemaVersion: 1, tool: evidence.tool, createdAt, head: evidence.run.repo.head, fingerprints };
+  return { schemaVersion: 1, tool: evidence.tool, createdAt, head: evidence.run.repo.head, dirty: evidence.run.repo.dirty, fingerprints };
 }
 
 /**

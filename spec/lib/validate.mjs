@@ -72,6 +72,9 @@ const semantic = {
       if (r.verdict === 'nocover' && !r.defenders.nocover) {
         errors.push({ path: `${p}/defenders/nocover`, message: 'nocover verdict requires defenders.nocover = true' });
       }
+      if (r.detail.undeclaredKillers && r.detail.reason !== 'killed-by-undeclared-tests') {
+        errors.push({ path: `${p}/detail/undeclaredKillers`, message: 'undeclaredKillers is only meaningful with reason killed-by-undeclared-tests' });
+      }
       if (r.verdict === 'unverifiable' && !r.detail.reason) {
         errors.push({ path: `${p}/detail/reason`, message: 'unverifiable requires a reason (e.g. anchor-missing, anchor-ambiguous)' });
       }

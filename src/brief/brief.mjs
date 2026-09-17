@@ -11,7 +11,7 @@ export function hintFor(r) {
     case 'survived':
       return r.detail.reason === 'killed-by-undeclared-tests'
         ? `Only tests outside its declared defenders (${defenders}) catch this; fix the claim's defendedBy or move the assertion.`
-        : `${defenders} stayed green with this fault applied; add an assertion that fails on it and passes on HEAD.`;
+        : `${defenders} stayed green with this fault applied; add an assertion that fails on it and passes on HEAD. If no test's outcome can change, first check the fault is observable at all.`;
     case 'nocover':
       return `No test file matches ${r.defenders.requested.join(', ') || '(no defenders declared)'}; nothing defends this claim.`;
     case 'unverifiable':

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { cpSync, mkdtempSync, rmSync, symlinkSync, readFileSync, existsSync } from 'node:fs';
+import { cpSync, mkdtempSync, rmSync, symlinkSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -89,6 +89,12 @@ describe('probe reproduces the known-answer fixture', () => {
     }
   });
 
+  it('discovers defenders by import when none are declared, and records that it did', () => {
+    const r = evidence.records.find((x) => x.claim.id === 'DISCOVER-001');
+    expect(r.verdict).toBe('killed');
+    expect(r.defenders).toMatchObject({ requested: [], resolved: ['test/redact.test.mjs'], nocover: false, discovered: true });
+  });
+
   it('ranks the critical survivor above the high one', () => {
     const by = Object.fromEntries(evidence.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r.rank.score]));
     expect(by['REDACT-001/F1']).toBeGreaterThan(by['REDACT-003/F1']);
@@ -168,6 +174,55 @@ describe('probe reproduces the known-answer fixture', () => {
       expect(new Set(reasons.filter((x) => x !== 'defenders-failed-to-load'))).toEqual(new Set(['anchor-missing', 'anchor-ambiguous']));
       expect(validate('evidence', ev).errors).toEqual([]);
     }, 120_000);
+
+    it('default output lists only unproven faults plus a killed count; --verbose lists everything', async () => {
+      const a = capture();
+      await main(['probe', scratch, '--claim', 'REDACT-001', '--budget', '30000', '--no-reuse'], a.io);
+      expect(a.lines.out.some((l) => /^killed/.test(l))).toBe(false);
+      expect(a.lines.out.join('\n')).toMatch(/1 killed \(not listed; --verbose to see them\)/);
+      const b = capture();
+      await main(['probe', scratch, '--claim', 'REDACT-001', '--budget', '30000', '--verbose'], b.io);
+      expect(b.lines.out.some((l) => /^killed\s+REDACT-001\/F2/.test(l))).toBe(true);
+    }, 90_000);
+
+    it('refuses worktree mode when a defender has uncommitted changes, naming it and the probed commit', async () => {
+      const file = join(scratch, 'test', 'redact.test.mjs');
+      const original = readFileSync(file, 'utf8');
+      writeFileSync(file, original + '\n// uncommitted edit\n');
+      try {
+        await expect(probe({ projectDir: scratch, claims: loadClaims(join(scratch, 'testguard.claims.json')), confirmRuns: 3, mode: 'worktree', budgetMs: 30_000, toolVersion: 'test' }))
+          .rejects.toThrow(/test\/redact\.test\.mjs.*probes HEAD.*--include-dirty/s);
+      } finally {
+        writeFileSync(file, original);
+      }
+    });
+
+    it('--include-dirty probes the working tree: an uncommitted test that kills a survivor turns it killed, HEAD untouched', async () => {
+      const file = join(scratch, 'test', 'redact.test.mjs');
+      const original = readFileSync(file, 'utf8');
+      const headBefore = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: scratch, encoding: 'utf8' }).stdout.trim();
+      writeFileSync(file, original + `
+it('fails closed on a missing scope (uncommitted)', async () => {
+  await expect(redact('x', RULES, {}, { writeAudit: vi.fn() })).rejects.toThrow(/scope/);
+});
+`);
+      try {
+        const ev = await probe({ projectDir: scratch, claims: loadClaims(join(scratch, 'testguard.claims.json')), confirmRuns: 3, mode: 'worktree', includeDirty: true, only: ['REDACT-003'], escalate: false, budgetMs: 30_000, toolVersion: 'test' });
+        expect(ev.records).toHaveLength(1);
+        expect(ev.records[0].verdict).toBe('killed');
+        expect(ev.run.repo.snapshot).toMatch(/^[a-f0-9]{40}$/);
+        expect(ev.run.repo.head).toBe(headBefore);
+        expect(spawnSync('git', ['rev-parse', 'HEAD'], { cwd: scratch, encoding: 'utf8' }).stdout.trim()).toBe(headBefore);
+        expect(validate('evidence', ev).errors).toEqual([]);
+      } finally {
+        writeFileSync(file, original);
+      }
+    }, 120_000);
+
+    it('baseline records whether the tree was dirty', () => {
+      const b = readSpecDoc('baseline', join(scratch, '.testguard', 'baseline.json'));
+      expect(typeof b.dirty).toBe('boolean');
+    });
 
     it('brief --text on a repo with no evidence exits 0 silently, so a session-start hook never breaks', async () => {
       const { lines, io } = capture();

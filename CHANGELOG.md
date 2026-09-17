@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-09-17
+
+From a second field report on a real codebase (456 tests, 27 claims, 35
+faults; 13 survived on the first run, two critical claims with zero coverage).
+
+### Fixed
+
+- **Worktree mode probed HEAD while reading the claims file from the working
+  tree**, so uncommitted defender changes were silently ignored — the same
+  survivors came back with no hint why. `probe` now refuses (exit 2) when any
+  resolved defender or fault target has uncommitted changes, naming the files
+  and the commit it would have probed. Every summary names the commit probed.
+- `killed-by-undeclared-tests` never said which tests killed the fault; the
+  author could not fix `defendedBy` without grepping the suite. Evidence now
+  carries `detail.undeclaredKillers` and the CLI names the files.
+- `anchor-ambiguous` did not say how many hits; `detail.anchor { hits,
+  expected }` is recorded and printed.
+- A replacement with an unbalanced paren was `suite-failed-to-load`, not
+  `replacement-does-not-compile`: esbuild/vitest wording is now matched.
+- The claims schema promised defender discovery for an absent `defendedBy`;
+  the tool answered `nocover`. Discovery is implemented: the test files that
+  import the fault's target (relative or alias), recorded as
+  `defenders.discovered`. `nocover` now means exactly "no test file imports
+  this source".
+- `baseline.json` records `dirty`, as evidence already did.
+
+### Added
+
+- `--include-dirty`: snapshot the working tree (tracked edits and untracked,
+  non-ignored files) into a throwaway commit and probe that. HEAD, index and
+  the user's tree are never touched; `run.repo.snapshot` records the commit.
+- A one-line progress indicator on stderr (TTY only) so a minute of silence
+  is not mistaken for a hang.
+- Fixture: a claim with no `defendedBy` whose defender is discovered.
+
+### Changed
+
+- **Default output shows only unproven faults plus a killed count.**
+  `--verbose` restores the full stream.
+- The `survived` hint reminds the author to check that the fault is
+  observable at all before writing a test for it.
+- README: `$schema` path for consumers, `min-release-age` note, the
+  worktree-vs-working-tree rule, `brief` writes `brief.json` by default.
+
 ## [0.1.2] - 2026-09-17
 
 From a field report on a real codebase (63 test files, 458 tests, 39 faults).

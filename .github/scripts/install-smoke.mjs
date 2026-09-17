@@ -31,7 +31,7 @@ try {
   const version = run(bin, ['--version'], consumer).trim();
   const claims = run(bin, ['claims', '.'], consumer);
   if (!/^\d+\.\d+\.\d+/.test(version)) throw new Error(`unexpected --version output: ${version}`);
-  if (!claims.includes('8 claims')) throw new Error(`claims did not list the fixture:\n${claims}`);
+  if (!/^\d+ claims in /.test(claims)) throw new Error(`claims did not list the fixture:\n${claims}`);
   const deps = Object.keys(JSON.parse(run(npm, ['ls', '--omit=dev', '--json', '--depth=0'], consumer)).dependencies ?? {});
   console.log(`install smoke OK — testguard ${version} runs from the installed tarball; consumer deps: ${deps.join(', ')}`);
 } finally {

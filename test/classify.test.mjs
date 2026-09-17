@@ -30,6 +30,8 @@ describe('classify — the order of checks is the spec', () => {
   it('fault-invalid when the suite cannot load, naming a parse error when the runner does', () => {
     expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [err], confirmRuns: N })).toEqual({ verdict: 'fault-invalid', reason: 'suite-failed-to-load' });
     expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [{ ...err, loadMessage: 'Failed to parse source: invalid JS syntax' }], confirmRuns: N }).reason).toBe('replacement-does-not-compile');
+    expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [{ ...err, loadMessage: 'Transform failed with 1 error: Expected ")" but found ";"' }], confirmRuns: N }).reason).toBe('replacement-does-not-compile');
+    expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [{ ...err, loadMessage: 'Cannot find module ./gone' }], confirmRuns: N }).reason).toBe('suite-failed-to-load');
   });
 
   it('timeout is never a kill, whether test-level or budget-level', () => {

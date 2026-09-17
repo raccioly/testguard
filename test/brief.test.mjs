@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { buildBrief, HEADING, hintFor } from '../src/brief/brief.mjs';
 import { buildBaseline } from '../src/baseline/baseline.mjs';
 import { validate } from '../spec/lib/validate.mjs';
-import { renderSummary } from '../src/render.mjs';
+import { renderSummary, renderRecord } from '../src/render.mjs';
 
 const evidence = JSON.parse(readFileSync(new URL('../spec/conformance/examples/evidence.json', import.meta.url), 'utf8'));
 
@@ -52,5 +52,16 @@ describe('renderSummary', () => {
     const unproven = evidence.records.filter((r) => r.verdict !== 'killed');
     expect(line).toContain(`${unproven.length} unproven fault`);
     expect(line).toContain(`across ${new Set(unproven.map((r) => r.claim.id)).size} claim`);
+  });
+});
+
+describe('renderRecord', () => {
+  it('names the undeclared killers by file and shows anchor hit counts', () => {
+    const base = evidence.records[0];
+    const killed = { ...base, detail: { ...base.detail, reason: 'killed-by-undeclared-tests', undeclaredKillers: ['test/a.test.mjs::x', 'test/a.test.mjs::y', 'test/b.test.mjs::z'] } };
+    expect(renderRecord(killed)).toContain('[killed-by-undeclared-tests: test/a.test.mjs, test/b.test.mjs]');
+    const amb = { ...base, verdict: 'unverifiable', detail: { reason: 'anchor-ambiguous', anchor: { hits: 6, expected: 1 }, baselineRuns: [], probeRuns: [] } };
+    expect(renderRecord(amb)).toContain('[anchor-ambiguous: 6 hits, expected 1]');
+    expect(renderRecord({ ...base, defenders: { ...base.defenders, discovered: true } })).toContain('(defenders discovered by import)');
   });
 });
