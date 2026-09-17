@@ -64,7 +64,7 @@ init       --force (replace an existing skill file)  --json
 every command accepts --json; probe/baseline emit the status document plus their own result
 claims     --json
 baseline   --evidence <path>  --out <path>  --allow-provisional (freeze unconfirmed evidence; normally refused)
-brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; safe for hooks)
+brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; safe for hooks)  --markdown (print only, as a merge-request note)
 
 exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift, or unclaimed changes) · 2 precondition failed · 3 usage
 `;
@@ -106,6 +106,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         quiet: { type: 'boolean', default: false },
         json: { type: 'boolean', default: false },
         text: { type: 'boolean', default: false },
+        markdown: { type: 'boolean', default: false },
         help: { type: 'boolean', short: 'h', default: false },
         version: { type: 'boolean', short: 'v', default: false },
       },

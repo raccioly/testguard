@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { readSpecDoc, writeSpecDoc } from '../evidence/writer.mjs';
-import { buildBrief, buildUnclaimedBrief } from '../brief/brief.mjs';
+import { buildBrief, buildUnclaimedBrief, renderBriefMarkdown, renderUnclaimedMarkdown } from '../brief/brief.mjs';
 import { computeStatus } from '../status/status.mjs';
 import { evidencePath, baselinePath } from './probe.mjs';
 import { resolveChangedRef, withChangedRef } from '../gate/changed.mjs';
@@ -20,8 +20,11 @@ export async function briefCommand({ projectDir, values, version }, io) {
   if (!existsSync(evPath)) {
     // A missing brief must never break an agent's session start — but unclaimed
     // changes are still said, because the claim comes before the probe.
-    if (values.text) {
-      if (status?.changes?.uncovered?.length) io.out(buildUnclaimedBrief({ tool: { name: 'testguard', version }, next: status.next, changes: status.changes }).text.trimEnd());
+    if (values.text || values.markdown) {
+      if (status?.changes?.uncovered?.length) {
+        const args = { tool: { name: 'testguard', version }, next: status.next, changes: status.changes };
+        io.out((values.markdown ? renderUnclaimedMarkdown(args) : buildUnclaimedBrief(args).text).trimEnd());
+      }
       return 0;
     }
     io.err(`no evidence at ${evPath}; run \`testguard probe\` first`);
@@ -36,7 +39,8 @@ export async function briefCommand({ projectDir, values, version }, io) {
     return 3;
   }
   const brief = buildBrief(evidence, baseline, { max, next: status?.next, changes: status?.changes });
-  if (!values.text) writeSpecDoc('brief', values.out ? resolve(values.out) : join(projectDir, '.testguard', 'brief.json'), brief);
-  io.out(values.json ? JSON.stringify(brief, null, 2) : brief.text.trimEnd());
+  if (!values.text && !values.markdown) writeSpecDoc('brief', values.out ? resolve(values.out) : join(projectDir, '.testguard', 'brief.json'), brief);
+  if (values.markdown) io.out(renderBriefMarkdown({ ...brief, provisional: Boolean(evidence.run.provisional) }, { hasBaseline: Boolean(baseline), total: evidence.records.length }).trimEnd());
+  else io.out(values.json ? JSON.stringify(brief, null, 2) : brief.text.trimEnd());
   return 0;
 }

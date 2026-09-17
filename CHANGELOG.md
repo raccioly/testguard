@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`brief --markdown`** — the brief as a merge-request note for the human
+  reviewer: marker line, heading, one summary line, unclaimed changes first,
+  `next`, then a table of at most `--max` findings with the hint each one
+  carries. Print-only and hook-safe like `--text`. Every platform quality
+  tool renders its verdict in the PR; TestGuard's brief was written for the
+  agent only, and the risk-tiered human reviewer saw nothing.
+- **GitLab CI/CD component-shaped template** (`packaging/gitlab/`): `spec:
+  inputs:` (`version`, `dir`, `image`, `severity`, `confirm`, `budget`,
+  `no_escalate`, `strict`, `post_note`, `stage`) so it works via `include:
+  remote:` today and as a catalog component when mirrored into GitLab; the
+  probe job always writes `brief.json` and `brief.md` as artifacts and, with
+  `post_note: true` and a `TESTGUARD_GITLAB_TOKEN` (api scope), posts the
+  markdown brief as one merge-request note updated in place, found by the
+  marker on its first line. The CLI still makes no network calls; the job
+  does, and only when told to. Self-claim `TG-BRIEF-MARKDOWN-UNCLAIMED-FIRST`.
+
 ### Changed
 
 - CI: TestGuard's self-probe runs on one Node leg instead of three, without

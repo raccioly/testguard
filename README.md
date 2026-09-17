@@ -54,6 +54,7 @@ tests were written against the survivors, 39/39 were killed.
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
 | GitHub Action | `uses: raccioly/testguard@v0.5.0` — see [`action.yml`](./action.yml) |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
+| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.5.0/packaging/gitlab/testguard.gitlab-ci.yml` with `inputs:` — see [`packaging/gitlab/`](./packaging/gitlab/testguard.gitlab-ci.yml) |
 
 Projects that set `min-release-age` in `.npmrc` cannot see a version published
 less than that many days ago (`ENOVERSIONS`); install that one with
@@ -135,7 +136,8 @@ npx testguard-cli scaffold src/x.ts   # propose faults for a file, as a draft to
    in CI costs only what changed.
 4. **Brief** turns evidence plus baseline into a ranked, capped
    `## TEST BLINDSPOT CONTEXT` block, printed and also written to
-   `.testguard/brief.json` (`--text` prints only). Wire it into an agent's session start
+   `.testguard/brief.json` (`--text` prints only; `--markdown` prints the same brief as a
+   merge-request note for the human reviewer, unclaimed changes first). Wire it into an agent's session start
    — for Claude Code, in `.claude/settings.json`:
 
    ```json
@@ -188,12 +190,17 @@ detected base that does not resolve is a warning for `status` and `brief`
 - uses: raccioly/testguard@v0.5.0
   with: { command: gate }
 
-# GitLab CI — or include: remote: the template in packaging/gitlab/
-testguard:gate:
-  image: node:22
-  rules: [{ if: $CI_PIPELINE_SOURCE == "merge_request_event" }]
-  script: [npx -y testguard-cli gate .]
+# GitLab CI — the component-shaped template: gate + probe, brief as an artifact and, opted in, as a merge-request note
+include:
+  - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.5.0/packaging/gitlab/testguard.gitlab-ci.yml'
+    inputs: { dir: backend, post_note: true }   # post_note needs TESTGUARD_GITLAB_TOKEN (api scope); one note, updated in place
 ```
+
+The template carries `spec: inputs:` (`version`, `dir`, `image`, `severity`,
+`confirm`, `budget`, `no_escalate`, `strict`, `post_note`, `stage`), so
+mirrored into a GitLab project it is a catalog component that a compliance
+framework can require on every project in a group. The CLI itself never
+talks to the network; only the job posts, and only when told to.
 
 ### Built for agents to run
 

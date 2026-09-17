@@ -2,6 +2,8 @@ import { gate } from '../baseline/baseline.mjs';
 import { summarize, formatVerdict } from '../render.mjs';
 
 export const HEADING = '## TEST BLINDSPOT CONTEXT';
+/** First line of every markdown brief, so a poster can find and update its own note instead of adding another. */
+export const MARKDOWN_MARKER = '<!-- testguard:brief -->';
 const ORDER = ['survived', 'nocover', 'unverifiable', 'fault-invalid', 'timeout', 'flaky-defender'];
 
 /** One line the agent can act on. Names the mechanism, never just the verdict. */
@@ -111,3 +113,45 @@ export function buildUnclaimedBrief({ tool, next, changes, generatedAt = new Dat
   doc.text = lines.join('\n') + '\n';
   return doc;
 }
+
+const cell = (v) => String(v ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+
+/**
+ * The brief as a merge-request note: same content, same order as the text —
+ * unclaimed changes first, then `next`, then the ranked findings, capped at
+ * `--max` — in GitLab/GitHub-flavoured markdown. Rendering only; the document
+ * it renders is the validated one.
+ */
+export function renderBriefMarkdown(brief, { hasBaseline, total, resolved } = {}) {
+  const unproven = total - (brief.summary.byVerdict.killed ?? 0);
+  const lines = [MARKDOWN_MARKER, brief.heading, ''];
+  if (brief.provisional) lines.push('**PROVISIONAL** — fewer than three confirmation runs; nothing below is confirmed. Re-probe with `--confirm 3`.', '');
+  lines.push(`\`testguard ${brief.tool.version}${resolved ? ` (${resolved})` : ''}\`${brief.head ? ` @ \`${brief.head.slice(0, 12)}\`` : ''} — **${brief.summary.claims}** claims, **${total}** faults probed, **${unproven}** unproven` +
+    (unproven === 0 ? '.' : hasBaseline ? ` (**${brief.summary.new}** new since baseline).` : ' (no baseline; everything is new).'));
+  if (brief.unclaimed) {
+    const n = brief.unclaimed.files.length;
+    lines.push('', `### Unclaimed changes since \`${brief.unclaimed.ref}\``, '', `${n} changed file${n === 1 ? '' : 's'} carr${n === 1 ? 'ies' : 'y'} no claim. State the claim first; nothing below can see this code.`, '');
+    for (const u of brief.unclaimed.files) lines.push(`- \`${u.file}\` (${u.kind}) → \`${u.suggestion}\``);
+  }
+  if (brief.next) lines.push('', `**Next** \`[${brief.next.action}]\`: \`${brief.next.command}\``, '', `> ${brief.next.why}`);
+  if (brief.items.length === 0) {
+    lines.push('', 'Every probed claim is defended. Keep it that way: new claims need a fault and a test that fails on it.');
+    return lines.join('\n') + '\n';
+  }
+  lines.push('', 'Where the test suite is blind, ranked. A **SURVIVED** fault means its defenders stayed green while the claim was false. Do not close these by asserting current behaviour; write a test that fails on the described fault and passes on HEAD.', '');
+  lines.push('| # | verdict | claim / fault | severity | file | what to do |', '|---|---|---|---|---|---|');
+  brief.items.forEach((it, i) => {
+    lines.push(`| ${i + 1} | ${it.isNew ? '**NEW** ' : ''}${formatVerdict(it.verdict)} | \`${cell(it.claimId)}/${cell(it.subjectId ?? '?')}\`<br>${cell(it.statement)} | ${it.severity} | ${it.file ? `\`${cell(it.file)}\`` : ''} | ${cell(it.hint)} |`);
+  });
+  if (unproven > brief.items.length) lines.push('', `… and ${unproven - brief.items.length} more in the evidence file.`);
+  return lines.join('\n') + '\n';
+}
+
+/** Markdown for the no-evidence-yet, unclaimed-changes-only brief. */
+export function renderUnclaimedMarkdown({ tool, next, changes, resolved }) {
+  const lines = [MARKDOWN_MARKER, HEADING, '', `\`testguard ${tool.version}${resolved ? ` (${resolved})` : ''}\` — no evidence yet; **${changes.uncovered.length}** unclaimed changed file${changes.uncovered.length === 1 ? '' : 's'} since \`${changes.ref}\`.`, '', `### Unclaimed changes since \`${changes.ref}\``, '', 'State the claim first; nothing can be probed for this code until it has one.', ''];
+  for (const u of changes.uncovered) lines.push(`- \`${u.file}\` (${u.kind}) → \`${u.suggestion}\``);
+  if (next) lines.push('', `**Next** \`[${next.action}]\`: \`${next.command}\``, '', `> ${next.why}`);
+  return lines.join('\n') + '\n';
+}
+

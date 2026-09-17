@@ -726,6 +726,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-BRIEF-MARKDOWN-UNCLAIMED-FIRST",
+      "statement": "The markdown brief lists unclaimed changed files before any finding, exactly as the text brief does; a reviewer reading the merge-request note sees the claim gap first.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/brief.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The markdown renderer drops the unclaimed-changes section; the text renderer keeps it.",
+          "faultClass": "condition-forced",
+          "file": "src/brief/brief.mjs",
+          "find": "  if (brief.unclaimed) {\n    const n = brief.unclaimed.files.length;\n    lines.push('', `### Unclaimed changes since",
+          "replace": "  if (false) {\n    const n = brief.unclaimed.files.length;\n    lines.push('', `### Unclaimed changes since",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }
