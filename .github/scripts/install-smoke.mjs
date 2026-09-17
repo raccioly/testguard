@@ -30,6 +30,8 @@ try {
   const bin = join(consumer, 'node_modules', '.bin', process.platform === 'win32' ? 'testguard.cmd' : 'testguard');
   const version = run(bin, ['--version'], consumer).trim();
   const claims = run(bin, ['claims', '.'], consumer);
+  const draft = JSON.parse(run(bin, ['scaffold', 'src/redact.mjs', '--json'], consumer));
+  if (!draft.claims?.length) throw new Error('scaffold produced no claims from the installed tarball');
   if (!/^\d+\.\d+\.\d+/.test(version)) throw new Error(`unexpected --version output: ${version}`);
   if (!/^\d+ claims in /.test(claims)) throw new Error(`claims did not list the fixture:\n${claims}`);
   const deps = Object.keys(JSON.parse(run(npm, ['ls', '--omit=dev', '--json', '--depth=0'], consumer)).dependencies ?? {});

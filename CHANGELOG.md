@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-17
+
+### Added
+
+- **`testguard scaffold <file>`** — mechanical fault producer (#6). Proposes
+  the five shapes both field reports found behind ~80% of hand-written
+  faults: guard forced false, single-line guard or state change removed,
+  `return <check>` → `return true`, security literal weakened, check call
+  removed. Every proposal is an exact-line anchor with `expectHits` and
+  `occurrence` computed from the file (verifiable by construction; anything
+  `locate()` would reject is never emitted), `producedBy: derived`,
+  `defendedBy` prefilled from the tests that import the module, grouped
+  under a preceding `@claim` annotation or by enclosing function.
+  Statements are `TODO:` placeholders; the output is a draft under
+  `.testguard/`, never the claims file. `--claim <ID>` puts everything under
+  one claim and copies it if it exists; `--json` prints instead.
+- Self-claim `TG-SCAFFOLD-ANCHORS-HIT`; install smoke exercises `scaffold`.
+
 ## [0.1.3] - 2026-09-17
 
 From a second field report on a real codebase (456 tests, 27 claims, 35

@@ -311,6 +311,37 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-SCAFFOLD-ANCHORS-HIT",
+      "statement": "Every fault scaffold proposes carries an expectHits/occurrence computed from the real source, so the anchor is verifiable by construction even when the line is duplicated.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #6 acceptance"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/scaffold.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "expectHits is always declared as 1; a duplicated line becomes anchor-ambiguous.",
+          "faultClass": "literal-changed",
+          "file": "src/scaffold/scaffold.mjs",
+          "find": "...(p.expectHits > 1 ? { expectHits: p.expectHits, occurrence: p.occurrence } : {}),",
+          "replace": "...{},",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
     }
   ]
 }
