@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-17
+
+Everything the field asked for. Two independent field reports on private
+AI-authored codebases drove eleven issues; this release closes all of them,
+alongside the roadmap work that landed beside it.
+
+**Read this before upgrading.** Defender discovery is now mock-aware: a test
+that `vi.mock`s or `jest.mock`s the subject can detect no fault in it and is
+no longer counted. Claims defended only by such tests therefore move to
+`NOCOVER`, which is the truth those verdicts always should have told. Expect
+new findings on the first probe after upgrading, and re-freeze your baseline
+once you have read them — they are not regressions in your code, they are
+blind spots that were previously invisible.
+
 ### Added
 
 - **`testguard mcp`** — the operating loop, served over the Model Context
@@ -31,11 +45,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never written, because a harness config is the person's file. Self-claims
   `TG-MCP-IS-READ-ONLY` and
   `TG-MCP-TOOL-FAILURE-IS-NOT-A-PROTOCOL-ERROR`. (#30)
-
-### Added
-
-
-
 - **Contention detection and `--serial`** (#26). `probe` looks for other test
   runners before the first run, warns naming their pids, and records them on
   the evidence (`run.contention`) — a contended machine turns a slow suite
@@ -136,11 +145,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TG-ADMIT-NEEDS-ALL-KILLED`.
 
 ### Changed
-
-
-
-
-
 
 - **`init` installs the agent layer at the git root** (#23): the skill,
   the session-start hook and the `AGENTS.md` section go where agent
