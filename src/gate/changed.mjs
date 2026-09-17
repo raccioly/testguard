@@ -3,7 +3,7 @@ import { extname, join, relative, resolve, dirname } from 'node:path';
 import { git, repoRoot, headSha, GitError } from '../git.mjs';
 import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
 import { readSpecDoc } from '../evidence/writer.mjs';
-import { resolveDefenders } from '../probe/runner-vitest.mjs';
+import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { globToRegExp } from '../util/glob.mjs';
 

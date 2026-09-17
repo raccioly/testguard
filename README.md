@@ -52,7 +52,7 @@ tests were written against the survivors, 39/39 were killed.
 | npm | `npm i -D testguard-cli` then `npx testguard probe` |
 | pip | `pip install testguard-cli` then `testguard probe` (needs Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.3.1` — see [`action.yml`](./action.yml) |
+| GitHub Action | `uses: raccioly/testguard@v0.4.0` — see [`action.yml`](./action.yml) |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
 
 Projects that set `min-release-age` in `.npmrc` cannot see a version published
@@ -111,6 +111,11 @@ npx testguard-cli scaffold src/x.ts   # propose faults for a file, as a draft to
    A claim with no `defendedBy` has its defenders **discovered**: the test
    files that import the fault's target, by relative path or resolved alias.
    `NOCOVER` then means exactly "no test file imports this source".
+
+   Runners: **vitest** and **jest** (`--runner auto` picks the first that
+   resolves; both read the same jest-compatible JSON report). Anything else
+   goes through `--runner-cmd`. Each runner is proven against its own copy
+   of the known-answer fixture.
 
    Practical loop: first pass `--no-escalate` (escalation re-runs the whole
    suite N times per survivor); iterate on one claim with `--claim <ID>` and
@@ -264,15 +269,15 @@ through every verdict.
 
 ## Status
 
-**v0.4.** Eight commands, vitest runner, hand-authored faults plus a
-mechanical scaffold, an agent operating layer (`status`, `init`) and a
+**v0.4.** Eight commands, vitest and jest runners, hand-authored faults plus
+a mechanical scaffold, an agent operating layer (`status`, `init`) and a
 change gate (`gate`). The contract
 spine — eight JSON Schemas shared with the other Guard tools — is under
 [`spec/`](spec/). One exact-pinned runtime dependency (`ajv`, for schema validation); Node ≥ 20.
 
-Not yet: test generation (the two-gate acceptance loop), other runners,
-AST-aware producers, and calibration of fault classes against real escaped
-bugs. Each is designed for; none is claimed.
+Not yet: test generation (the two-gate acceptance loop), runners beyond
+vitest and jest, AST-aware producers, and calibration of fault classes
+against real escaped bugs. Each is designed for; none is claimed.
 
 ## Licence
 

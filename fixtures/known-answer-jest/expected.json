@@ -1,0 +1,54 @@
+{
+  "confirmRuns": 3,
+  "expected": {
+    "REDACT-001/F1": {
+      "verdict": "survived",
+      "why": "The audit-row test asserts with objectContaining and omits `content`; a row carrying the raw input passes."
+    },
+    "REDACT-001/F2": {
+      "verdict": "killed",
+      "why": "The masked-output test asserts the secret is absent."
+    },
+    "REDACT-002/F1": {
+      "verdict": "killed",
+      "why": "The invalid-rule test asserts compileRules does not throw."
+    },
+    "REDACT-003/F1": {
+      "verdict": "survived",
+      "why": "No test exercises a missing scope; the fail-closed guard is undefended."
+    },
+    "REDACT-004/F1": {
+      "verdict": "timeout",
+      "why": "Tests awaiting redact() hit the 1s jest testTimeout; a timeout is not an assertion failure and is not a kill."
+    },
+    "REDACT-005/F1": {
+      "verdict": "unverifiable",
+      "reason": "anchor-missing",
+      "why": "The find string is not present in the source."
+    },
+    "REDACT-005/F2": {
+      "verdict": "unverifiable",
+      "reason": "anchor-ambiguous",
+      "why": "`return null;` occurs twice; expectHits is 1."
+    },
+    "REDACT-006/F1": {
+      "verdict": "fault-invalid",
+      "reason": "replacement-does-not-compile",
+      "why": "The replacement introduces a syntax error; the suite cannot load."
+    },
+    "EXPORT-001/F1": {
+      "verdict": "nocover",
+      "why": "test/export.test.js does not exist; no defender resolves."
+    },
+    "FLAKY-001/F1": {
+      "verdict": "flaky-defender",
+      "reason": "defenders-not-green",
+      "why": "test/flaky.test.js fails every other run; the baseline is not green N/N."
+    },
+    "DISCOVER-001/F1": {
+      "verdict": "killed",
+      "why": "No defendedBy; test/redact.test.js is discovered because it imports src/redact.js, and its masked-output test fails."
+    }
+  },
+  "runner": "jest"
+}
