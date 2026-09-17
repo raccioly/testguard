@@ -21,7 +21,7 @@ const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..
 const USAGE = `testguard ${VERSION} — proves a test suite defends the claims a project makes
 
   testguard status [dir]     where the project is and the ONE next action; --json is the machine entry point
-  testguard init [dir]       install the agent layer: skill, session-start hook, AGENTS.md section, .gitignore lines
+  testguard init [dir]       install the agent layer at the git root (skill, session-start hook, AGENTS.md section) and the .gitignore lines in [dir]
   testguard claims [dir]     list the claims file and report drift against @claim annotations in code
   testguard probe [dir]      inject each claim's faults, run its defenders, report what survived
   testguard baseline [dir]   freeze today's unproven findings so only new ones gate
@@ -68,7 +68,9 @@ gate       --changed <ref>   measure the change since merge-base(ref, HEAD); aut
            exit 0 every changed source file is claimed or excused · 1 unclaimed file · 2 cannot evaluate · 3 no reference
 status     --json (exit 0 clean · 1 unproven/stale/unclaimed · 2 nothing to probe yet)
            --changed <ref>   also compute claim coverage of the change; unclaimed-changes then precedes every evidence state
-init       --force (replace an existing skill file)  --json
+init       --force (replace an existing skill file)  --here (keep the agent layer in [dir] instead of the git root)  --json
+           agent layer (skill, SessionStart hook, AGENTS.md section) → git root; project layer (.gitignore lines) → [dir]
+           the hook prefers a local install, falls back to npx --no-install, never fetches; exit 1 if a written file is gitignored
 every command accepts --json; probe/baseline emit the status document plus their own result
 claims     --json
 baseline   --evidence <path>  --out <path>  --allow-provisional (freeze unconfirmed evidence; normally refused)
@@ -109,6 +111,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         'allow-provisional': { type: 'boolean', default: false },
         restamp: { type: 'boolean', default: false },
         force: { type: 'boolean', default: false },
+        here: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'runner-cmd': { type: 'string' },
         runner: { type: 'string', default: 'auto' },

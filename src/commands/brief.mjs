@@ -35,7 +35,9 @@ export async function briefCommand({ projectDir, values, version }, io) {
     io.err('--max must be an integer from 1 to 50');
     return 3;
   }
-  const brief = buildBrief(evidence, baseline, { max, next: status?.next, changes: status?.changes });
+  // Where this binary came from, so a stale install is visible in the session-start context.
+  const install = /[\\/]node_modules[\\/]/.test(process.argv[1] ?? '') ? 'local install' : 'global';
+  const brief = buildBrief(evidence, baseline, { max, next: status?.next, changes: status?.changes, install });
   if (!values.text) writeSpecDoc('brief', values.out ? resolve(values.out) : join(projectDir, '.testguard', 'brief.json'), brief);
   io.out(values.json ? JSON.stringify(brief, null, 2) : brief.text.trimEnd());
   return 0;

@@ -44,7 +44,7 @@ function orderItems(a, b) {
   return (b.isNew - a.isNew) || (ORDER.indexOf(a.verdict) - ORDER.indexOf(b.verdict)) || ((b.rank ?? 0) - (a.rank ?? 0));
 }
 
-export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Date().toISOString(), next, changes } = {}) {
+export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Date().toISOString(), next, changes, install } = {}) {
   const g = gate(evidence.records, baseline);
   const toItem = (r, isNew) => ({
     fingerprint: r.fingerprint,
@@ -69,7 +69,7 @@ export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Dat
   };
   const unclaimed = changes?.uncovered?.length ? { ref: changes.ref, files: changes.uncovered } : undefined;
   const doc = { schemaVersion: 1, tool: evidence.tool, generatedAt, head: evidence.run.repo.head, heading: HEADING, summary, ...(next ? { next: { action: next.action, command: next.command, why: next.why } } : {}), ...(unclaimed ? { unclaimed } : {}), items, text: '' };
-  doc.text = renderBriefText({ ...doc, provisional: Boolean(evidence.run.provisional) }, { hasBaseline: Boolean(baseline), total: evidence.records.length });
+  doc.text = renderBriefText({ ...doc, provisional: Boolean(evidence.run.provisional), install }, { hasBaseline: Boolean(baseline), total: evidence.records.length });
   return doc;
 }
 
@@ -79,7 +79,7 @@ export function renderBriefText(brief, { hasBaseline, total }) {
     brief.heading,
     '',
     ...(brief.provisional ? ['**PROVISIONAL** — this evidence came from fewer than three confirmation runs; treat every verdict below as unconfirmed and re-probe with --confirm 3 before acting on it.', ''] : []),
-    `testguard ${brief.tool.version}${brief.head ? ` @ ${brief.head.slice(0, 12)}` : ''} — ${brief.summary.claims} claims, ${total} faults probed, ${unproven} unproven` +
+    `testguard ${brief.tool.version}${brief.install ? ` (${brief.install})` : ''}${brief.head ? ` @ ${brief.head.slice(0, 12)}` : ''} — ${brief.summary.claims} claims, ${total} faults probed, ${unproven} unproven` +
       (unproven === 0 ? '.' : hasBaseline ? ` (${brief.summary.new} new since baseline).` : ' (no baseline; everything is new).'),
   ];
   // Unclaimed changes come before everything else: the claim is written

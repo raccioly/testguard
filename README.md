@@ -187,12 +187,15 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
 
    ```json
    { "hooks": { "SessionStart": [ { "hooks": [
-     { "type": "command", "command": "npx testguard-cli brief --text" }
+     { "type": "command", "command": "node_modules/.bin/testguard brief --text 2>/dev/null || npx --no-install testguard brief --text 2>/dev/null || true" }
    ] } ] } }
    ```
 
-   `--text` prints only, and exits 0 silently when there is no evidence yet,
-   so the hook can never break a session.
+   `--text` prints only, and exits 0 silently when there is no evidence yet;
+   the command prefers the project's own install, never fetches from the
+   network, and ends in `true` — so the hook can never break a session. The
+   brief's first line says which install answered (`local install` or
+   `global`), so a stale one is visible.
 
 ### Every change needs a claim
 
@@ -284,11 +287,17 @@ things make that safe:
   working tree. Every human rendering — the CLI text, the session-start
   brief, the skill — derives from it, so they cannot disagree. Every command
   accepts `--json`.
-- **An installable operating loop.** `testguard init` writes
+- **An installable operating loop.** `testguard init [dir]` writes the
+  **agent layer at the git root**, where agent sessions run —
   `.claude/skills/testguard/SKILL.md` (state → action, verdict → the only
   acceptable fix, the two-gate rule for any test the agent writes), the
-  `brief --text` session-start hook, an `AGENTS.md` section and the
-  `.gitignore` lines. Idempotent.
+  `brief --text` session-start hook, an `AGENTS.md` section — and the
+  **project layer** (`.gitignore` lines) beside the claims file. A second
+  project in the same repository adds a hook line and an `AGENTS.md`
+  bullet; `--here` keeps everything in the subdirectory. The hook prefers a
+  local install, falls back to `npx --no-install`, and **never fetches from
+  the network**; a pre-0.6 `npx -y` hook is replaced. A written file that
+  `.gitignore` swallows is reported, not offered for commit. Idempotent.
 - **Gaming is visible.** The cheapest way to make a survivor disappear is to
   weaken its fault, not to write a test. Evidence records every fault's
   content hash; `status` lists any fault edited after it survived, with its
