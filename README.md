@@ -309,6 +309,25 @@ talks to the network; only the job posts, and only when told to.
   assertion would notice. `NOCOVER` here means no test even imports the
   file; everything above that is measured by injecting the fault.
 
+A claim that **disappeared** is invisible to all of the above: `probe`
+verifies the claims that exist, `gate` sees the source file covered by some
+other claim, and `status` says clean. Deleting a claim is therefore cheaper
+than weakening its fault — and `changedFaults` exists precisely because
+weakening was the cheap escape. So:
+
+```bash
+npx testguard-cli claims --since origin/main    # what existed there and does not now
+```
+
+`removed-claim` and `removed-fault` gate; a rename that keeps the statement
+verbatim is reported as `renamed-claim` and does not. Where evidence is
+present, the line names the verdict the claim last had, because *"it was
+SURVIVED when it was removed"* is the sentence that matters. The escape hatch
+is the same one as everywhere else: a `claim` entry in
+`testguard.ignore.json` with a reason, expiring if you give it an `expires`.
+Removal is allowed — claims can be wrong, superseded or split — and it is
+never silent.
+
 ### Built for agents to run
 
 TestGuard is meant to be driven by an AI agent, not typed by a person. Three

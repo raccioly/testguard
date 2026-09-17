@@ -75,6 +75,7 @@ init       --force (replace an existing skill file)  --here (keep the agent laye
            the hook prefers a local install, falls back to npx --no-install, never fetches; exit 1 if a written file is gitignored
 every command accepts --json; probe/baseline emit the status document plus their own result
 claims     --json
+           --since <ref>     report every claim and fault that existed at <ref> and does not now; a claim entry in testguard.ignore.json (with a reason) excuses one. exit 1 on any unexcused removal
 baseline   --evidence <path>  --out <path>  --allow-provisional (freeze unconfirmed evidence; normally refused)
            --restamp          move head to the commit of a later CLEAN probe that reproduced the same fingerprints
                               (a baseline frozen from a snapshot points at the parent of the commit that carries its tests)
@@ -106,6 +107,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         fault: { type: 'string' },
         'include-dirty': { type: 'boolean', default: false },
         changed: { type: 'string' },
+        since: { type: 'string' },
         exclude: { type: 'string', multiple: true },
         strict: { type: 'boolean', default: false },
         explain: { type: 'boolean', default: false },

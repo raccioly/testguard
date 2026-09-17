@@ -53,6 +53,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `calibration.schema.json`. `status.counts` gains `flakyDefenderSets` and
   `worstFlakeRate`; the brief's hint names the degree. (#34)
 
+- **`claims --since <ref>`** — a claim that disappeared was invisible to every
+  other check: `probe` verifies what is there, `gate` sees the file covered by
+  another claim, `status` says clean. Since deleting a claim is cheaper than
+  weakening its fault (which `changedFaults` already surfaces), removal is now
+  reported: `removed-claim` and `removed-fault` gate, a rename that keeps the
+  statement verbatim is `renamed-claim` and does not, and where evidence exists
+  the finding names the verdict the claim last had. Excused by a `claim` entry
+  in `testguard.ignore.json` with a reason, with expiry honoured as everywhere
+  else. This repository's CI runs it on its own pull requests. Found the hard
+  way: a `--theirs` conflict resolution dropped two self-claims during this
+  release and nothing noticed. Self-claim `TG-REMOVED-CLAIM-IS-A-FINDING`. (#57)
+
 ### Spec
 
 - `evidence.schema.json`: `detail.independence` and `detail.flakeRate`, with
