@@ -790,6 +790,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-IS-ANCESTOR-ASKS-GIT",
+      "statement": "Ancestry between a baseline's head and HEAD is decided by git (merge-base --is-ancestor); a commit that is not in HEAD's history is never reported as an ancestor.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#baseline-and-delta"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/status.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every commit counts as an ancestor; a rewritten or foreign baseline head is never noticed.",
+          "faultClass": "return-altered",
+          "file": "src/git.mjs",
+          "find": "  return spawnSync('git', ['merge-base', '--is-ancestor', ancestor, ref], { cwd: dir }).status === 0;",
+          "replace": "  return true;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

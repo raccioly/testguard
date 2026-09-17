@@ -164,5 +164,8 @@ describe('computeStatus — every state, with a conforming document', () => {
     const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
     writeSpecDoc('baseline', join(dir, '.testguard', 'baseline.json'), { ...b, head, dirty: false });
     expect(computeStatus({ projectDir: dir }).notes).toEqual([]);
+    // a clean baseline at a commit that is NOT in HEAD's history (rewritten or foreign): a different note
+    writeSpecDoc('baseline', join(dir, '.testguard', 'baseline.json'), { ...b, head: 'd'.repeat(40), dirty: false });
+    expect(computeStatus({ projectDir: dir }).notes).toEqual([expect.stringMatching(/baseline head ddddddd is not an ancestor of HEAD/)]);
   });
 });
