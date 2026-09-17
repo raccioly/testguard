@@ -79,6 +79,13 @@
             "version": {
               "type": "string",
               "maxLength": 64
+            },
+            "source": {
+              "description": "`project`: the runner package resolved from the project and its own bin script ran. `path`: no such package in the project; an executable of that name on PATH ran instead (a legitimate monorepo setup, but not the project's pinned version).",
+              "enum": [
+                "project",
+                "path"
+              ]
             }
           },
           "additionalProperties": false

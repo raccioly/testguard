@@ -105,6 +105,7 @@ export async function probe({
   const iso = mode === 'worktree' ? createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules }) : inPlace({ repoRoot: root, projectDir });
   const records = [];
   let runnerVersion;
+  let runnerSource;
   let runner = RUNNERS[runnerName === 'auto' ? 'vitest' : runnerName];
   const runnersUsed = new Map(); // every runner that ran defenders, beyond the project runner
   try {
@@ -118,6 +119,7 @@ export async function probe({
       }
       runner = sel.runner;
       runnerVersion = sel.version;
+      runnerSource = sel.source;
     }
     runnersUsed.set(runner.name, runnerVersion ?? readRunnerVersion(projectDir, runner.name));
     // Files an owning runner (Playwright) claims run under it, whatever the

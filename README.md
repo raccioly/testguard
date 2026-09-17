@@ -140,19 +140,14 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    there is, and the exact signature of one escaped bug in the field
    reports. Silence it, visibly, with `// unasserted: <why>` above the mock.
 
-   Runners: **vitest** and **jest** are project runners (`--runner auto`
-   picks the first that resolves; both read the same jest-compatible JSON
-   report). **Playwright** is a *per-file* runner: a defender under
-   `playwright.config.*`'s `testDir` runs under Playwright whatever the
-   project runner is, so one claim can list a unit test and a browser spec
-   and the evidence says which file ran where (`defenders.byRunner`,
-   `run.runners`). Playwright's own statuses map onto the verdict rules:
-   `timedOut` is a timeout, never a kill; `flaky` (failed, then passed on
-   retry) is **not a green run**, so a defender that only passes on retry is
-   `FLAKY-DEFENDER` even though Playwright exits 0. Anything else goes
-   through `--runner-cmd`. Each runner is proven against its own copy of the
-   known-answer fixture; the Playwright one is browserless on purpose and
-   carries its own dependencies.
+   Runners: **vitest** and **jest** (`--runner auto` picks the first that
+   resolves; both read the same jest-compatible JSON report). A runner is
+   resolved from the **project's own package** first — its pinned version,
+   its own bin script — and only then from an executable on PATH, which the
+   evidence records as `runner.source: "path"`; `npx` is never asked,
+   because its cache answers for packages a project does not have. Anything
+   else goes through `--runner-cmd`. Each runner is proven against its own
+   copy of the known-answer fixture.
 
    The two-gate rule, as one verb: `testguard admit <test-file> --claim <ID>`
    runs the claim's faults against your uncommitted test and answers

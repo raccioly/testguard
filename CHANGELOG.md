@@ -81,6 +81,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+
 - `probe` honours an explicit `--ref` (even `--ref HEAD`) when defender or
   target files are dirty, and gains `--ignore-dirty` for the implicit HEAD
   (#19). Both warn with the file names and record them in the evidence as
