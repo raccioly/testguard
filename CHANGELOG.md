@@ -7,9 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-17
+
+### Fixed
+
+- **0.1.0 did not run when installed.** `ajv`, which validates every document
+  against the spec, was declared as a devDependency, so `testguard` crashed on
+  startup from npm, `npx`, `pip` and Homebrew. It is now an exact-pinned
+  runtime dependency — the project's one dependency.
+- CI and the release job now pack the tarball, install it into a scratch
+  project with production dependencies only, and run the CLI from there
+  (`npm run test:install`). The suite alone runs from the checkout and could
+  not see this class of defect.
+
 ### Changed
 
-- Homebrew formula carries the sha256 of the published `testguard-cli-0.1.0.tgz`.
+- Homebrew formula carries the sha256 of the published tarball; description
+  shortened to satisfy `brew audit --strict`.
 
 ## [0.1.0] - 2026-09-17
 

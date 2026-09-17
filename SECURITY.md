@@ -18,7 +18,9 @@ You will get an acknowledgement within 48 hours and a timeline for a fix.
 
 TestGuard is a local CLI with a deliberately small surface:
 
-- **Zero runtime dependencies.** `ajv` and `vitest` are development-only.
+- **One runtime dependency, exact-pinned:** `ajv`, which validates every
+  document the tool reads or writes against the spec. Install scripts are
+  disabled (`.npmrc`). `vitest` is development-only.
 - **No network access.** Nothing is uploaded, fetched, or reported anywhere.
 - **No credentials.** There is nothing to authenticate to.
 - **Writes are confined** to `.testguard/` in the probed project and to

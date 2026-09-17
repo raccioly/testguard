@@ -6,7 +6,8 @@ Read this before changing anything. It is short on purpose.
 
 A CLI that proves a test suite defends the claims a project makes, by
 injecting the faults those claims forbid and reporting every one the tests
-miss. **Not a test generator.** Node ≥ 20, ESM, zero runtime dependencies.
+miss. **Not a test generator.** Node ≥ 20, ESM, one exact-pinned runtime
+dependency (`ajv`).
 The shared formats under `spec/` are a contract other tools adopt; the CLI is
 their first consumer.
 
@@ -16,6 +17,7 @@ their first consumer.
 npm test               # unit + fixture acceptance (~15s)
 npm run test:spec      # conformance suite only
 npm run self:probe     # TestGuard probes its own claims; must exit 0
+npm run test:install   # the packed tarball must run with production deps only
 node cli/testguard.mjs claims fixtures/known-answer
 ```
 

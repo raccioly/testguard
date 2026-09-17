@@ -7,8 +7,7 @@ updates:
     groups:
       all-npm:
         patterns: ["*"]
-    # devDependencies only (ajv for the conformance suite, vitest as the test
-    # runner). The published package has zero runtime dependencies.
+    # One runtime dependency (ajv, exact-pinned) plus vitest for tests.
   - package-ecosystem: "pip"
     directory: "/"
     schedule:

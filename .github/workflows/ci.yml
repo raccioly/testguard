@@ -30,13 +30,20 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Install (devDependencies only; zero runtime deps)
+      - name: Install
         run: npm ci
 
       # ── Syntax-check EVERY source, not just what the entry point eagerly
       #    imports; a lazily loaded module's parse error would otherwise slip. ──
       - name: Syntax-check all sources
         run: find cli src spec -name '*.mjs' -print0 | xargs -0 -n1 node --check
+
+      # ── Install-from-tarball smoke: the package must run as INSTALLED, with
+      #    production dependencies only. 0.1.0 shipped unrunnable because the
+      #    schema validator's dependency was a devDependency; the suite, which
+      #    runs from the checkout, could not see it. ──
+      - name: Install smoke (pack → install --omit=dev → run)
+        run: npm run test:install
 
       - name: Python wrapper imports (PyPI surface)
         run: python3 -c "import testguard_cli.wrapper; print('testguard_cli.wrapper OK')"

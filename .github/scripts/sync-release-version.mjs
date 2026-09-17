@@ -20,6 +20,7 @@ const surfaces = [
   ['pyproject.toml', /^version = "[^"]+"/m, `version = "${version}"`],
   ['action.yml', /(\n  version:\n    description: [^\n]*\n    required: false\n    default: ')[^']*(')/, `$1${version}$2`],
   ['packaging/homebrew/testguard.rb', /testguard-cli-\d+\.\d+\.\d+\.tgz/g, `testguard-cli-${version}.tgz`],
+  ['README.md', /raccioly\/testguard@v\d+\.\d+\.\d+/g, `raccioly/testguard@v${version}`],
 ];
 
 let drift = 0;

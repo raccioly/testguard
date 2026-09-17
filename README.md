@@ -5,7 +5,7 @@
 [![PyPI](https://img.shields.io/pypi/v/testguard-cli.svg)](https://pypi.org/project/testguard-cli/)
 [![node](https://img.shields.io/node/v/testguard-cli.svg)](https://nodejs.org)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![zero deps](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](./package.json)
+[![deps](https://img.shields.io/badge/runtime%20deps-1%20pinned-brightgreen.svg)](./package.json)
 
 > Proves that a test suite actually defends the claims a project makes — by
 > injecting the faults those claims say cannot happen, and reporting every
@@ -43,7 +43,7 @@ on known-broken code. The largest gap was a compliance-critical path with
 | npm | `npm i -D testguard-cli` then `npx testguard probe` |
 | pip | `pip install testguard-cli` then `testguard probe` (needs Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.1.0` — see [`action.yml`](./action.yml) |
+| GitHub Action | `uses: raccioly/testguard@v0.1.1` — see [`action.yml`](./action.yml) |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
 
 ## How it works
@@ -123,7 +123,7 @@ through every verdict.
 
 **v0.1.** Four commands, vitest runner, hand-authored faults. The contract
 spine — six JSON Schemas shared with the other Guard tools — is under
-[`spec/`](spec/). Zero runtime dependencies; Node ≥ 20.
+[`spec/`](spec/). One exact-pinned runtime dependency (`ajv`, for schema validation); Node ≥ 20.
 
 Not yet: test generation (the two-gate acceptance loop), other runners,
 mechanical fault producers, and calibration of fault classes against real
