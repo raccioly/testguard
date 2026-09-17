@@ -80,7 +80,7 @@ describe('probe reproduces the known-answer fixture', () => {
 
   it('escalated the survivors to the whole suite; the flaky test there did not get the credit', () => {
     const survivors = evidence.records.filter((x) => x.verdict === 'survived');
-    expect(survivors).toHaveLength(2);
+    expect(survivors).toHaveLength(3);
     for (const r of survivors) {
       expect(r.detail.escalated).toBe(true);
       expect(r.detail.reason).toBeUndefined();
@@ -119,9 +119,9 @@ describe('probe reproduces the known-answer fixture', () => {
       writeSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json'), evidence);
       const { lines, io } = capture();
       expect(await main(['baseline', scratch], io)).toBe(0);
-      expect(lines.out[0]).toMatch(/^baseline: 8 unproven findings frozen/);
+      expect(lines.out[0]).toMatch(/^baseline: 9 unproven findings frozen/);
       const b = readSpecDoc('baseline', join(scratch, '.testguard', 'baseline.json'));
-      expect(Object.keys(b.fingerprints)).toHaveLength(8);
+      expect(Object.keys(b.fingerprints)).toHaveLength(9);
     });
 
     it('probe again: every verdict is reused (inputs unchanged) and nothing is new against the baseline → exit 0', async () => {
@@ -131,7 +131,7 @@ describe('probe reproduces the known-answer fixture', () => {
       expect(Date.now() - started).toBeLessThan(5000);
       const again = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json'));
       expect(again.records.every((r) => r.reusedFrom === evidence.run.id)).toBe(true);
-      expect(lines.out.join('\n')).toMatch(/0 new since baseline, 8 baselined/);
+      expect(lines.out.join('\n')).toMatch(/0 new since baseline, 9 baselined/);
     }, 30_000);
 
     it('brief --text: prints the block without writing a file; new-since-baseline is zero', async () => {
@@ -152,7 +152,7 @@ describe('probe reproduces the known-answer fixture', () => {
       // the baseline frozen above already holds REDACT-001/F1, so nothing is new → exit 0
       expect(await main(['probe', scratch, '--claim', 'REDACT-001', '--budget', '30000', '--quiet'], io)).toBe(0);
       const partial = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence-partial.json'));
-      expect(partial.records.map((r) => r.claim.id)).toEqual(['REDACT-001', 'REDACT-001']);
+      expect(partial.records.map((r) => r.claim.id)).toEqual(['REDACT-001', 'REDACT-001', 'REDACT-001']);
       expect(readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json')).records).toHaveLength(before);
       expect(lines.out.join('\n')).toContain('partial: --claim REDACT-001');
       expect(validate('evidence', partial).ok).toBe(true);
@@ -266,7 +266,7 @@ it('fails closed on a missing scope (uncommitted)', async () => {
       const c = capture();
       const pc = await main(['probe', scratch, '--claim', 'REDACT-001', '--budget', '30000', '--json'], c.io);
       const out = JSON.parse(c.lines.out.join('\n'));
-      expect(out.run).toMatchObject({ records: 2, exitCode: pc });
+      expect(out.run).toMatchObject({ records: 3, exitCode: pc });
       expect(out.state).toBeDefined();
     }, 90_000);
 

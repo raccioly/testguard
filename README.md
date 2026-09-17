@@ -219,7 +219,7 @@ things make that safe:
 ### Authoring faults mechanically
 
 Writing faults by hand means reading the code to find exact anchors. Two
-field reports found that ~80% of hand-written faults are one of five shapes,
+field reports found that ~80% of hand-written faults are one of seven shapes,
 so `scaffold` proposes them for you:
 
 ```bash
@@ -234,6 +234,8 @@ npx testguard-cli scaffold src/auth.ts --claim AUTH-ADMIN   # every proposal und
 | `return-altered` | `return <check>;` (`===`, `.includes(`, `&&`, …) → `return true;` |
 | `literal-changed` | `httpOnly`/`secure` flipped, `sameSite` → `none`, a cost/rounds → `1`, a ttl/tolerance/window/limit ×1000 |
 | `call-removed` | a bare `verify…()` / `validate…()` / `check…()` / `authorize…()` call removed |
+| `field-dropped` | a field removed from an object that is returned, built by an arrow, assigned to a payload-ish name, passed to a `save`/`update`/`send`/`write`/… call, or is a `z.object({…})`-style schema; a string entry removed from an allow-list array; a `...base,` line or inline `{ ...base, … }` merge dropped. Only a line that can go on its own (balanced, comma-terminated or followed by the closer); never inside tests, fixtures or migrations |
+| `argument-swapped` | a call kept, its first argument swapped for `undefined` (and `{}` when the argument is itself a call) — only when that argument is derived from a parameter of the enclosing function or a request-like value (`req`, `ctx`, `event`, …). The seam fault: `decide(deriveFrom(input), now)` → `decide(undefined, now)` |
 
 Every proposal's `find` is the exact line with `expectHits`/`occurrence`
 computed from the file, so it is verifiable by construction; provenance is
