@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join, relative, resolve, sep } from 'node:path';
-import { npx, runProcess, checkBinary, listTestFiles, firstInformativeLine } from './shared.mjs';
+import { npx, runProcess, listTestFiles, firstInformativeLine } from './shared.mjs';
 import { globToRegExp } from '../../util/glob.mjs';
 
 /**
@@ -68,13 +69,22 @@ export function owns(projectDir, file) {
   return cfg.testDir === '.' ? true : file.startsWith(cfg.testDir + '/');
 }
 
-/** Resolvable = the binary answers and a config exists; both are stated in the message when not. */
-export async function check(opts) {
-  const cfg = loadConfig(opts.projectDir);
+/**
+ * Resolvable = a config exists AND `@playwright/test` resolves from the
+ * project. Deliberately not `npx --no-install playwright --version`: the npx
+ * cache and a Python `playwright` on PATH both answer that from a project
+ * that has no Playwright at all, and `playwright test` would then run
+ * against nothing. The package `playwright test` needs is the precondition.
+ */
+export async function check({ projectDir }) {
+  const cfg = loadConfig(projectDir);
   if (!cfg) return { ok: false, message: 'no playwright.config.* in the project' };
-  const c = await checkBinary({ ...opts, bin: 'playwright' });
-  if (!c.ok) return c;
-  return { ok: true, version: c.version.replace(/^Version\s+/i, '') };
+  try {
+    const pkg = JSON.parse(readFileSync(createRequire(join(projectDir, 'noop.js')).resolve('@playwright/test/package.json'), 'utf8'));
+    return { ok: true, version: pkg.version };
+  } catch {
+    return { ok: false, message: '@playwright/test is not installed in the project (npm i -D @playwright/test)' };
+  }
 }
 
 export const tests = (projectDir) => listTestFiles(projectDir, SPEC_GLOBS).filter((f) => owns(projectDir, f));

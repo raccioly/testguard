@@ -726,6 +726,166 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-PW-FLAKY-IS-NOT-GREEN",
+      "statement": "A Playwright test that failed and then passed on retry (status `flaky`) makes the run non-green, even though Playwright exits 0.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/runner-playwright.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A flaky test no longer fails the run; a retry-only pass looks green.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/playwright.mjs",
+          "find": "  else if (unexpected.length > 0 || flaky > 0) outcome = 'fail';",
+          "replace": "  else if (unexpected.length > 0) outcome = 'fail';",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PW-TIMEOUT-NEVER-KILLS",
+      "statement": "A Playwright test reported as timedOut counts as a timeout and never as an assertion failure.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/runner-playwright.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Timed-out tests are counted as assertion failures; a hang would kill.",
+          "faultClass": "other",
+          "file": "src/probe/runners/playwright.mjs",
+          "find": "  const assertionFailures = unexpected.length - timeouts;",
+          "replace": "  const assertionFailures = unexpected.length;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-MERGE-RUNS-PESSIMISTIC",
+      "statement": "When defenders ran under several runners, the merged run is an error if any part errored, a timeout if any part timed out, a failure if any part failed.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/runner-playwright.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A load error in one runner is hidden unless every runner errored.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/index.mjs",
+          "find": "const outcome = runs.some((r) => r.outcome === 'error') ? 'error'",
+          "replace": "const outcome = runs.every((r) => r.outcome === 'error') ? 'error'",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-OWNED-RUNNER-MUST-RESOLVE",
+      "statement": "A defender owned by a per-file runner that is not resolvable is a precondition failure, never a verdict.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#exit-codes"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/runner-playwright.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The owning runner's check is ignored; its defenders run under a binary that is not there and the failure becomes a verdict.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "      if (!c.ok) throw new PreconditionError(`${file} is a ${r.name} test",
+          "replace": "      if (false) throw new PreconditionError(`${file} is a ${r.name} test",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RUN-ENV-OUT-SUBSTITUTED",
+      "statement": "A runner that names its JSON report through an environment variable gets the report path substituted for {out}; the report is then read from that file and parsed with the runner's own parser.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#how-it-works"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/runner-playwright.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "{out} is passed through literally; the runner writes nowhere useful and every run is 'runner produced no report'.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "[k, String(v).replaceAll('{out}', outFile)]",
+          "replace": "[k, String(v)]",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }
