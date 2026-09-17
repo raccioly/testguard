@@ -51,7 +51,7 @@
     {
       "id": "REDACT-003",
       "statement": "A missing scope is an error; the engine never performs an unscoped scan.",
-      "source": { "kind": "comment", "ref": "src/redact.mjs: 'Fails closed'" },
+      "source": { "kind": "annotation", "ref": "src/redact.mjs @claim REDACT-003" },
       "severity": "high",
       "producedBy": { "producer": "human", "by": "fixture author" },
       "defendedBy": ["test/redact.test.mjs"],

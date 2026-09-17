@@ -17,7 +17,7 @@ evidence comes from running against a real codebase with real history.
 | REDACT-001 | The audit row never contains the original input | F1 raw input in row | **survived** — the exhibit |
 | | | F2 masking skipped | killed |
 | REDACT-002 | An invalid rule pattern is skipped, never aborts | F1 rethrow | killed |
-| REDACT-003 | A missing scope fails closed | F1 guard removed | **survived** |
+| REDACT-003 | A missing scope fails closed (`@claim` annotation in source) | F1 guard removed | **survived** |
 | REDACT-004 | `redact()` settles for every input | F1 never settles | timeout |
 | REDACT-005 | `findRule()` returns null for unknown id | F1 rotted anchor | unverifiable (anchor-missing) |
 | | | F2 ambiguous anchor | unverifiable (anchor-ambiguous) |

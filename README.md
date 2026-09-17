@@ -30,31 +30,86 @@ on known-broken code. The largest gap was a compliance-critical path with
 
 ## How it works
 
-1. **`testguard claims`** — list the claims a project makes: a statement, its
-   source, and one or more *faults* that would make it false, each expressed
-   as a deterministic source change.
-2. **`testguard probe`** — for each fault: confirm the defending tests are
-   green unmodified, apply the fault in a scratch git worktree, run the
-   defenders N times, restore. Report `killed`, `survived`, `nocover`,
-   `unverifiable`, `timeout`, `fault-invalid` or `flaky-defender` — never a
-   single score.
-3. **`testguard baseline`** — freeze today's survivors so only new ones gate.
-4. **`testguard brief`** — emit a ranked blind-spot block for an agent's
-   session-start context, so it knows where the suite lies before it writes.
+```bash
+npx testguard-cli claims      # what does this project claim, and is every claim probeable?
+npx testguard-cli probe       # try to falsify each claim; report what the tests missed
+npx testguard-cli baseline    # freeze today's unproven findings; from now on only new ones gate
+npx testguard-cli brief       # tell the agent where the suite is blind, before it writes
+```
+
+1. **Claims** live in `testguard.claims.json`: a statement, where it comes
+   from, which tests supposedly defend it, and one or more *faults* — each a
+   deterministic source change that would make the statement false. Every
+   claim and every fault records who produced it. `testguard claims`
+   validates the file and reports drift against `@claim <ID>` annotations in
+   source.
+2. **Probe** confirms the defenders are green N times unmodified, applies
+   each fault in a scratch git worktree (your tree is never touched), runs
+   the defenders N times, re-runs survivors against the whole suite with
+   N-run attribution, restores, and classifies. Verdicts are a closed set:
+
+   | Verdict | Meaning |
+   |---|---|
+   | `killed` | a test body rejected the behaviour, N/N — the only pass |
+   | `SURVIVED` | the defenders stayed green while the claim was false |
+   | `NOCOVER` | no test file defends the claim at all |
+   | `UNVERIFIABLE` | the fault's anchor is missing or ambiguous — loud, never a skip |
+   | `TIMEOUT` | the defenders hung; a hang is not a detection |
+   | `FAULT-INVALID` | the replacement does not load — a bad fault, not a finding |
+   | `FLAKY-DEFENDER` | the defenders are not reliably green, or disagreed across runs |
+
+   Never a single score. Findings are ranked by severity, claim provenance
+   and blast radius, and written to `.testguard/evidence.json` — validated
+   against the spec before it is written.
+3. **Baseline** freezes every non-passing fingerprint. Later probes suppress
+   what was already known and exit non-zero only on what is new. Claims whose
+   source and defenders are unchanged reuse their prior verdict, so a probe
+   in CI costs only what changed.
+4. **Brief** turns evidence plus baseline into a ranked, capped
+   `## TEST BLINDSPOT CONTEXT` block. Wire it into an agent's session start
+   — for Claude Code, in `.claude/settings.json`:
+
+   ```json
+   { "hooks": { "SessionStart": [ { "hooks": [
+     { "type": "command", "command": "npx testguard-cli brief --text" }
+   ] } ] } }
+   ```
+
+   `--text` prints only, and exits 0 silently when there is no evidence yet,
+   so the hook can never break a session.
+
+**Commit `.testguard/baseline.json`; ignore `evidence.json` and `brief.json`.**
+The baseline is the frozen contract; the other two are regenerated per run.
 
 The fault model is the auditable artifact. You never reach 100% of
 correctness; you reach **100% of stated claims verified**, and the statement
-of claims is what an assessor reads.
+of claims is what an assessor reads. A claims file is code — its `replace`
+strings run under your test runner — so review it like code.
+
+## Try it
+
+The repository ships a known-answer fixture with a real blind spot:
+
+```bash
+git clone <this repo> && cd testguard && npm install
+npm test                                  # includes probing the fixture end to end
+```
+
+`fixtures/known-answer/` is a tiny project whose audit-row test asserts with
+`expect.objectContaining({...})` and omits the `content` key. Swap the
+redacted text for the raw input and the test stays green. `probe` reports it
+as `SURVIVED`; the fixture's [README](fixtures/known-answer/README.md) walks
+through every verdict.
 
 ## Status
 
-**v0.1 in progress.** The contract spine — six shared JSON Schemas and their
-conformance suite — is drafted under [`spec/`](spec/). The CLI is next.
+**v0.1.** Four commands, vitest runner, hand-authored faults. The contract
+spine — six JSON Schemas shared with the other Guard tools — is under
+[`spec/`](spec/). Zero runtime dependencies; Node ≥ 20.
 
-```bash
-npm install
-npm run test:spec
-```
+Not yet: test generation (the two-gate acceptance loop), other runners,
+mechanical fault producers, and calibration of fault classes against real
+escaped bugs. Each is designed for; none is claimed.
 
 ## Licence
 

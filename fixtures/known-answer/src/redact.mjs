@@ -43,7 +43,7 @@ export function mask(input, rules) {
 
 /**
  * Redact a message and write an audit row when anything was masked.
- * Fails closed: a missing scope is an error, never an unscoped scan.
+ * @claim REDACT-003 Fails closed: a missing scope is an error, never an unscoped scan.
  * The audit row must never carry the original input.
  */
 export async function redact(input, rules, ctx, store) {

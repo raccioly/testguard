@@ -7,6 +7,13 @@ import { spawnSync } from 'node:child_process';
 import { probe } from '../src/probe/probe.mjs';
 import { loadClaims } from '../src/claims/load.mjs';
 import { validate } from '../spec/lib/validate.mjs';
+import { writeSpecDoc, readSpecDoc } from '../src/evidence/writer.mjs';
+import { main } from '../src/cli.mjs';
+
+const capture = () => {
+  const lines = { out: [], err: [] };
+  return { lines, io: { out: (s) => lines.out.push(s), err: (s) => lines.err.push(s) } };
+};
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'fixtures', 'known-answer');
@@ -85,5 +92,53 @@ describe('probe reproduces the known-answer fixture', () => {
   it('ranks the critical survivor above the high one', () => {
     const by = Object.fromEntries(evidence.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r.rank.score]));
     expect(by['REDACT-001/F1']).toBeGreaterThan(by['REDACT-003/F1']);
+  });
+
+  describe('then the other three commands, on the same repo', () => {
+    it('claims: lists the file and finds no drift (REDACT-003 is annotated in source)', async () => {
+      const { lines, io } = capture();
+      expect(await main(['claims', scratch], io)).toBe(0);
+      expect(lines.out.join('\n')).toContain('REDACT-001');
+      expect(lines.out.join('\n')).toContain('NO DEFENDER');
+      expect(lines.out.join('\n')).not.toMatch(/UNDECLARED|STALE/);
+    });
+
+    it('baseline: freezes every unproven finding and conforms', async () => {
+      writeSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json'), evidence);
+      const { lines, io } = capture();
+      expect(await main(['baseline', scratch], io)).toBe(0);
+      expect(lines.out[0]).toMatch(/^baseline: 8 unproven findings frozen/);
+      const b = readSpecDoc('baseline', join(scratch, '.testguard', 'baseline.json'));
+      expect(Object.keys(b.fingerprints)).toHaveLength(8);
+    });
+
+    it('probe again: every verdict is reused (inputs unchanged) and nothing is new against the baseline → exit 0', async () => {
+      const { lines, io } = capture();
+      const started = Date.now();
+      expect(await main(['probe', scratch, '--budget', '30000'], io)).toBe(0);
+      expect(Date.now() - started).toBeLessThan(5000);
+      const again = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json'));
+      expect(again.records.every((r) => r.reusedFrom === evidence.run.id)).toBe(true);
+      expect(lines.out.join('\n')).toMatch(/0 new since baseline, 8 baselined/);
+    }, 30_000);
+
+    it('brief --text: prints the block without writing a file; new-since-baseline is zero', async () => {
+      const { lines, io } = capture();
+      expect(await main(['brief', scratch, '--text'], io)).toBe(0);
+      const text = lines.out.join('\n');
+      expect(text.startsWith('## TEST BLINDSPOT CONTEXT')).toBe(true);
+      expect(text).toContain('0 new since baseline');
+      expect(text).toContain('SURVIVED  REDACT-001/F1 (critical)');
+      expect(text).not.toContain('[NEW]');
+      expect(existsSync(join(scratch, '.testguard', 'brief.json'))).toBe(false);
+      expect(validate('brief', (await import('../src/brief/brief.mjs')).buildBrief(evidence, readSpecDoc('baseline', join(scratch, '.testguard', 'baseline.json')))).ok).toBe(true);
+    });
+
+    it('brief --text on a repo with no evidence exits 0 silently, so a session-start hook never breaks', async () => {
+      const { lines, io } = capture();
+      expect(await main(['brief', mkdtempSync(join(tmpdir(), 'tg-empty-')), '--text'], io)).toBe(0);
+      expect(lines.out).toEqual([]);
+      expect(lines.err).toEqual([]);
+    });
   });
 });

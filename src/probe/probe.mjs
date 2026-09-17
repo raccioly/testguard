@@ -33,6 +33,7 @@ export async function probe({
   escalate = true,
   scratchBase,
   toolVersion = '0.0.0',
+  previous,
   onProgress = () => {},
 }) {
   projectDir = resolve(projectDir);
@@ -51,12 +52,15 @@ export async function probe({
   try {
     const allTests = vitest.listTestFiles(iso.projectDir);
     const baselineCache = new Map();
+    const prior = previous && previous.run.confirmRuns === confirmRuns
+      ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
+      : new Map();
     const runDefenders = (files) => vitest.runVitest({ projectDir: iso.projectDir, files, budgetMs });
 
     for (const claim of claims.claims) {
       const defenders = vitest.resolveDefenders(iso.projectDir, claim.defendedBy);
       for (const fault of claim.faults) {
-        const record = await probeOne({ claim, fault, defenders, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders });
+        const record = await probeOne({ claim, fault, defenders, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id });
         records.push(record);
         onProgress(record);
       }
@@ -81,9 +85,19 @@ export async function probe({
   };
 }
 
-async function probeOne({ claim, fault, defenders, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders }) {
+async function probeOne({ claim, fault, defenders, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, prior, priorRunId }) {
   const targetPath = join(iso.projectDir, fault.file);
   const targetExists = existsSync(targetPath);
+  const inputs = {
+    targetHash: targetExists ? hashFile(targetPath) : sha256(''),
+    defenderHashes: Object.fromEntries(defenders.map((f) => [f, hashFile(join(iso.projectDir, f))])),
+  };
+
+  // Same source, same defenders, same N: the verdict cannot have changed.
+  if (prior && sameInputs(prior, inputs, claim.defendedBy ?? [], defenders)) {
+    return { ...prior, reusedFrom: prior.reusedFrom ?? priorRunId };
+  }
+
   const detail = { baselineRuns: [], probeRuns: [] };
   const rawProbeRuns = []; // spec testRun + the runner's timeout count, which classify needs
   let anchor = null;
@@ -143,10 +157,6 @@ async function probeOne({ claim, fault, defenders, allTests, iso, confirmRuns, e
   const { verdict, reason } = classify({ defenders, anchor, baselineRuns: detail.baselineRuns, probeRuns: rawProbeRuns, confirmRuns });
   if (reason && !detail.reason) detail.reason = reason;
 
-  const inputs = {
-    targetHash: targetExists ? hashFile(targetPath) : sha256(''),
-    defenderHashes: Object.fromEntries(defenders.map((f) => [f, hashFile(join(iso.projectDir, f))])),
-  };
   const blast = targetExists ? blastRadius(iso.projectDir, fault.file) : 0;
 
   return {
@@ -159,4 +169,12 @@ async function probeOne({ claim, fault, defenders, allTests, iso, confirmRuns, e
     inputs,
     rank: rank({ severity: claim.severity, sourceKind: claim.source.kind, blast }),
   };
+}
+
+function sameInputs(prior, inputs, requested, resolved) {
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  return prior.inputs.targetHash === inputs.targetHash
+    && same(prior.inputs.defenderHashes, inputs.defenderHashes)
+    && same(prior.defenders.requested, requested)
+    && same(prior.defenders.resolved, resolved);
 }
