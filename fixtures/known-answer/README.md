@@ -16,6 +16,7 @@ evidence comes from running against a real codebase with real history.
 |---|---|---|---|
 | REDACT-001 | The audit row never contains the original input | F1 raw input in row | **survived** — the exhibit |
 | | | F2 masking skipped | killed |
+| | | F3 `content` field dropped from the row (`field-dropped`) | **survived** — same blind spot as F1 |
 | REDACT-002 | An invalid rule pattern is skipped, never aborts | F1 rethrow | killed |
 | REDACT-003 | A missing scope fails closed (`@claim` annotation in source) | F1 guard removed | **survived** |
 | REDACT-004 | `redact()` settles for every input | F1 never settles | timeout |
@@ -25,6 +26,7 @@ evidence comes from running against a real codebase with real history.
 | EXPORT-001 | Exported rows never include `content` | F1 keeps content | nocover |
 | EXPORT-002 | `exportRows()` strips `content` (no `defendedBy`; the only importing test **mocks** the module) | F1 keeps content | nocover — a mock is not a defender; evidence lists it under `mocking` with `mocked-never-asserted` |
 | FLAKY-001 | (defender is flaky) | F1 anything | flaky-defender |
+| REDACT-007 | `redact()` masks with the configured rules | F1 `mask(input, [])` (`argument-swapped`) | killed — the audit-row test notices nothing was masked |
 | DISCOVER-001 | Every match is replaced (no `defendedBy`) | F1 loop body removed | killed — defenders **discovered** by import |
 
 ## The exhibit — REDACT-001/F1

@@ -45,6 +45,14 @@
       "reason": "defenders-not-green",
       "why": "test/flaky.test.mjs fails every other run; the baseline is not green N/N."
     },
+    "REDACT-001/F3": {
+      "verdict": "survived",
+      "why": "Verified by hand 2026-09-17: with the content line removed, all four tests pass. objectContaining lists action/scope/ruleCount only, so a row with no content at all is indistinguishable from a correct one."
+    },
+    "REDACT-007/F1": {
+      "verdict": "killed",
+      "why": "Verified by hand 2026-09-17: mask(input, []) masks nothing, so the audit row is never written and 'writes an audit row when something was masked' fails by assertion (1 of 4)."
+    },
     "DISCOVER-001/F1": {
       "verdict": "killed",
       "why": "No defendedBy; test/redact.test.mjs is discovered because it imports src/redact.mjs, and its masked-output test fails."

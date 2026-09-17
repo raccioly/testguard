@@ -51,6 +51,7 @@ probe
 scaffold   --claim <ID> (put every proposal under this claim; copies it if it exists)  --out <path>  --json
            shapes: if-guard → if (false) · single-line guard/mutation removed · return <check> → return true
                    · security flag/window/cost literal weakened · verify/validate/check call removed
+                   · field dropped from a payload/allow-list/schema/merge · parameter-derived argument swapped for undefined/{}
 gate       --changed <ref>   measure the change since merge-base(ref, HEAD); auto-detected in GitHub Actions / GitLab CI
            --include-dirty   compare the working tree (staged, unstaged and untracked) instead of HEAD — the pre-commit shape
            --exclude <glob>  (repeatable) more files that never carry claims; --explain lists the defaults

@@ -43,7 +43,7 @@
       ]
     },
     "faultClass": {
-      "description": "Taxonomy of the injected change. Required on every fault so calibration (fault class → real-bug predictiveness) can be computed later.",
+      "description": "Taxonomy of the injected change. Required on every fault so calibration (fault class → real-bug predictiveness) can be computed later. `field-dropped` = a field removed from a persisted/transmitted object, allow-list, schema or merge; `argument-swapped` = a call kept with a parameter-derived argument replaced by a trivial value.",
       "enum": [
         "guard-removed",
         "condition-forced",
@@ -53,6 +53,8 @@
         "call-removed",
         "return-altered",
         "exception-swallowed",
+        "field-dropped",
+        "argument-swapped",
         "other"
       ]
     },

@@ -662,6 +662,70 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-SCAFFOLD-FIELD-DROP-COMPLETE-LINE",
+      "statement": "scaffold proposes field-dropped only for a line that can be removed on its own: balanced brackets, and comma-terminated or followed by the closer. A multi-line property is never proposed.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#authoring-faults-mechanically"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/scaffold.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The completeness check is defeated; a property whose value continues on the next line is proposed and the fault would not compile.",
+          "faultClass": "return-altered",
+          "file": "src/scaffold/producers.mjs",
+          "find": "  if (!balanced(line)) return false;",
+          "replace": "  if (!balanced(line)) return true;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SCAFFOLD-ARG-SWAP-NEEDS-DERIVATION",
+      "statement": "scaffold proposes argument-swapped only when the argument is derived from a parameter of the enclosing function or a request-like value; a call with a literal or unrelated argument is never proposed.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#authoring-faults-mechanically"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/scaffold.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every first argument counts as derived.",
+          "faultClass": "condition-forced",
+          "file": "src/scaffold/producers.mjs",
+          "find": "    if (!isDerived(arg, params)) continue;",
+          "replace": "    if (false) continue;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

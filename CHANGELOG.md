@@ -13,6 +13,19 @@ The change gate: unclaimed code is now a finding.
 
 ### Added
 
+- **Two `scaffold` shapes and two fault classes.** `field-dropped` (#14):
+  a field removed from an object that is returned, built by an arrow,
+  assigned to a payload-ish name, passed to a persistence/transport call,
+  or is a schema; an entry removed from an allow-list; a spread base dropped
+  from a merge. Only lines that can go on their own; never inside tests,
+  fixtures or migrations. `argument-swapped` (#22): a call kept with its
+  parameter-derived first argument swapped for `undefined` (and `{}` when
+  the argument is a call) — the seam fault a field report found behind an
+  escaped bug that no earlier shape could express. The known-answer fixture
+  gains one of each, verified by hand: the dropped `content` field
+  **survives** (the same `objectContaining` blind spot as the exhibit), the
+  swapped argument is killed.
+
 - **`testguard gate --changed <ref>`** — the change gate. Every escaped
   defect in the field reports was a *claim gap*: the feature shipped green
   with zero claims, and `probe` is silent about unclaimed code by

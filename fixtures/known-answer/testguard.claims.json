@@ -41,6 +41,18 @@
             "producer": "human",
             "by": "fixture author"
           }
+        },
+        {
+          "id": "F3",
+          "description": "The content field is dropped from the audit row entirely (the field-dropped shape). Same blind spot as F1: objectContaining never lists `content`.",
+          "faultClass": "field-dropped",
+          "file": "src/redact.mjs",
+          "find": "      content: redacted,\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
         }
       ]
     },
@@ -286,6 +298,36 @@
           "file": "src/redact.mjs",
           "find": "out = out.replace(rule.re, (m) => '*'.repeat(m.length));",
           "replace": "/* fault: replacement removed */",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "REDACT-007",
+      "statement": "redact() masks with the configured rules, not with an empty rule set.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "test/redact.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The call is kept but its rules argument is swapped for an empty array (the argument-swapped shape); nothing is ever masked.",
+          "faultClass": "argument-swapped",
+          "file": "src/redact.mjs",
+          "find": "const redacted = mask(input, rules);",
+          "replace": "const redacted = mask(input, []);",
           "producedBy": {
             "producer": "human",
             "by": "fixture author"
