@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Homebrew formula carries the sha256 of the published `testguard-cli-0.1.0.tgz`.
+
 ## [0.1.0] - 2026-09-17
 
 First release. A claim verifier, not a test generator.
