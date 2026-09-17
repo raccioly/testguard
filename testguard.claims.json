@@ -728,6 +728,38 @@
       ]
     },
     {
+      "id": "TG-ADMIT-NEEDS-ALL-KILLED",
+      "statement": "admit says ADMITTED only when every probed fault of the claim is killed; a single surviving, uncovered, unverifiable, invalid, timed-out or flaky fault blocks admission.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#two-gate"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/admit.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "One killed fault is enough to admit; a test that kills F2 but lets F1 survive is admitted.",
+          "faultClass": "condition-forced",
+          "file": "src/admit/admit.mjs",
+          "find": "const admitted = records.every((r) => r.verdict === 'killed');",
+          "replace": "const admitted = records.some((r) => r.verdict === 'killed');",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-PW-FLAKY-IS-NOT-GREEN",
       "statement": "A Playwright test that failed and then passed on retry (status `flaky`) makes the run non-green, even though Playwright exits 0.",
       "source": {

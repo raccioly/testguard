@@ -132,15 +132,32 @@ jobs:
       # ── Self-verification: TestGuard is governed by the standard it defines.
       #    testguard.claims.json states invariants of the tool itself; every
       #    fault must be killed by the tool's own tests. Exit 0 = all defended. ──
+      #    Runs on ONE Node leg: the verdicts do not depend on the Node minor,
+      #    and each from-scratch probe is ~14 minutes. The previous run's
+      #    evidence is restored from the cache so claims whose target and
+      #    defenders did not change reuse their verdict (the tool's own
+      #    reuse rule); only what changed is re-probed. No escalation in CI:
+      #    a survivor here is a failure either way. ──
+      - name: Restore previous self-probe evidence (verdict reuse)
+        if: matrix.node-version == 22
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .testguard/ci-self-evidence.json
+          key: self-evidence-${{ hashFiles('testguard.claims.json') }}-${{ github.sha }}
+          restore-keys: |
+            self-evidence-${{ hashFiles('testguard.claims.json') }}-
+            self-evidence-
+
       - name: probe TestGuard's own claims
-        run: node cli/testguard.mjs probe . --budget 180000 --out "$RUNNER_TEMP/self-evidence.json"
+        if: matrix.node-version == 22
+        run: node cli/testguard.mjs probe . --budget 180000 --no-escalate --out .testguard/ci-self-evidence.json
 
       - name: Upload self-probe evidence
-        if: always()
+        if: always() && matrix.node-version == 22
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: testguard-self-evidence-node-${{ matrix.node-version }}
-          path: ${{ runner.temp }}/self-evidence.json
+          name: testguard-self-evidence
+          path: .testguard/ci-self-evidence.json
           if-no-files-found: warn
 
   # ── Playwright: the per-file runner is proven against its own browserless
