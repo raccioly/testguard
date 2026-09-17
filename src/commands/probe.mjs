@@ -41,7 +41,12 @@ export async function probeCommand({ projectDir, values, version }, io) {
     only,
     escalate: !values['no-escalate'],
     toolVersion: version,
-    onProgress: values.quiet ? undefined : (r) => io.out(renderRecord(r) + (r.reusedFrom ? '  (reused)' : '')),
+    includeDirty: values['include-dirty'],
+    onStage: !values.quiet && process.stderr.isTTY ? ({ claimId, faultId, stage, i, n }) => process.stderr.write(`\r\x1b[K  … ${claimId}/${faultId} ${stage} ${i}/${n}`) : undefined,
+    onProgress: values.quiet ? undefined : (r) => {
+      if (process.stderr.isTTY) process.stderr.write('\r\x1b[K');
+      if (values.verbose || r.verdict !== 'killed') io.out(renderRecord(r) + (r.reusedFrom ? '  (reused)' : ''));
+    },
   });
   writeSpecDoc('evidence', outPath, evidence);
 
@@ -52,7 +57,11 @@ export async function probeCommand({ projectDir, values, version }, io) {
     for (const r of sortForReport(evidence.records).filter((x) => x.verdict !== 'killed')) io.out('  ' + tag(r) + renderRecord(r));
   }
   io.out('');
-  io.out(renderSummary(evidence.records) + (baseline ? ` ${g.new.length} new since baseline, ${g.baselined.length} baselined.` : ' No baseline.'));
+  if (!values.quiet && !values.verbose) {
+    const killed = evidence.records.filter((r) => r.verdict === 'killed').length;
+    if (killed) io.out(`  ${killed} killed (not listed; --verbose to see them)`);
+  }
+  io.out(renderSummary(evidence.records, evidence.run) + (baseline ? ` ${g.new.length} new since baseline, ${g.baselined.length} baselined.` : ' No baseline.'));
   io.out(`evidence: ${outPath}${only ? ` (partial: --claim ${only.join(',')}; not the canonical evidence file)` : ''}`);
   return g.new.length > 0 ? 1 : 0;
 }

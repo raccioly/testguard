@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
 import { scanAnnotations, reconcile } from '../claims/annotations.mjs';
 import { resolveDefenders } from '../probe/runner-vitest.mjs';
+import { discoverDefenders } from '../probe/discover.mjs';
 
 export async function claimsCommand({ projectDir, values }, io) {
   const path = values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir);
@@ -16,8 +17,9 @@ export async function claimsCommand({ projectDir, values }, io) {
     io.out(`${claims.claims.length} claims in ${path} — ${annotated.size} carry a @claim annotation in source (test files are not scanned)`);
     io.out('');
     for (const c of claims.claims) {
-      const defenders = resolveDefenders(projectDir, c.defendedBy);
-      const cover = defenders.length ? `${defenders.length} defender${defenders.length === 1 ? '' : 's'}` : 'NO DEFENDER';
+      const declared = c.defendedBy?.length > 0;
+      const defenders = declared ? resolveDefenders(projectDir, c.defendedBy) : [...new Set(c.faults.flatMap((f) => discoverDefenders(projectDir, f.file)))];
+      const cover = defenders.length ? `${defenders.length} ${declared ? 'defender' : 'discovered'}${defenders.length === 1 ? '' : 's'}` : 'NO DEFENDER';
       io.out(`${annotated.has(c.id) ? '@ ' : '  '}${c.id.padEnd(14)} ${c.severity.padEnd(8)} ${c.source.kind.padEnd(10)} ${String(c.faults.length).padStart(2)} fault${c.faults.length === 1 ? ' ' : 's'}  ${cover.padEnd(12)}  ${c.statement}`);
     }
     if (drift.undeclared.length || drift.stale.length) io.out('');

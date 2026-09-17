@@ -15,7 +15,8 @@ export function classify({ defenders, anchor, baselineRuns, probeRuns, confirmRu
   }
   const loadError = probeRuns.find((r) => r.outcome === 'error');
   if (loadError) {
-    const parseError = /syntax|parse/i.test(loadError.loadMessage ?? '');
+    // esbuild/vitest wording: "Transform failed with 1 error", `Expected ")" but found ";"`, "Unexpected token"
+    const parseError = /syntax|parse|transform failed|expected .+ but found|unexpected token/i.test(loadError.loadMessage ?? '');
     return { verdict: 'fault-invalid', reason: parseError ? 'replacement-does-not-compile' : 'suite-failed-to-load' };
   }
   if (probeRuns.some((r) => r.outcome === 'timeout' || r.timeouts > 0)) return { verdict: 'timeout', reason: 'test-timed-out' };

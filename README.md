@@ -52,8 +52,12 @@ tests were written against the survivors, 39/39 were killed.
 | npm | `npm i -D testguard-cli` then `npx testguard probe` |
 | pip | `pip install testguard-cli` then `testguard probe` (needs Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.1.2` — see [`action.yml`](./action.yml) |
+| GitHub Action | `uses: raccioly/testguard@v0.1.3` — see [`action.yml`](./action.yml) |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
+
+Projects that set `min-release-age` in `.npmrc` cannot see a version published
+less than that many days ago (`ENOVERSIONS`); install that one with
+`npm i -D testguard-cli --min-release-age=0`.
 
 ## How it works
 
@@ -64,9 +68,11 @@ npx testguard-cli baseline    # freeze today's unproven findings; from now on on
 npx testguard-cli brief       # tell the agent where the suite is blind, before it writes
 ```
 
-1. **Claims** live in `testguard.claims.json`: a statement, where it comes
-   from, which tests supposedly defend it, and one or more *faults* — each a
-   deterministic source change that would make the statement false. Every
+1. **Claims** live in `testguard.claims.json` (editors validate it against
+   `"$schema": "./node_modules/testguard-cli/spec/schemas/claims.schema.json"`):
+   a statement, where it comes from, which tests supposedly defend it, and
+   one or more *faults* — each a deterministic source change that would make
+   the statement false. Every
    claim and every fault records who produced it. `testguard claims`
    validates the file and reports drift against `@claim <ID>` annotations in
    source. Test files are deliberately not scanned — a claim asserted by a test is the authorship trap the tool exists for — and annotation ids must contain a hyphen so prose is never mistaken for one.
@@ -91,10 +97,23 @@ npx testguard-cli brief       # tell the agent where the suite is blind, before 
    written to `.testguard/evidence.json` — validated against the spec before
    it is written.
 
+   Worktree mode probes a **commit**. If a defender or target file has
+   uncommitted changes, `probe` refuses and says so — otherwise your new
+   tests would be silently absent and the same survivors would come back
+   with no hint why. `--include-dirty` snapshots the working tree (tracked
+   edits and new files) into a throwaway commit and probes that; your tree,
+   HEAD and index are never touched. Every summary names the commit probed.
+
+   A claim with no `defendedBy` has its defenders **discovered**: the test
+   files that import the fault's target, by relative path or resolved alias.
+   `NOCOVER` then means exactly "no test file imports this source".
+
    Practical loop: first pass `--no-escalate` (escalation re-runs the whole
-   suite N times per survivor); iterate on one claim with
-   `--claim <ID> --in-place` — only the files faults are applied to must be
-   committed, test files may be dirty; final pass with defaults. A custom
+   suite N times per survivor); iterate on one claim with `--claim <ID>` and
+   either `--include-dirty` or `--in-place` (only fault target files must be
+   clean there; test files may be dirty); final pass with defaults. By default
+   the stream shows only unproven faults plus a killed count — `--verbose`
+   shows every fault. A custom
    runner (`pnpm --filter`, a specific config) goes in
    `--runner-cmd "<cmd> {files} … {out}"`; if the scratch worktree cannot
    see your `node_modules`, pass `--node-modules <dir>`.
@@ -103,7 +122,8 @@ npx testguard-cli brief       # tell the agent where the suite is blind, before 
    source and defenders are unchanged reuse their prior verdict, so a probe
    in CI costs only what changed.
 4. **Brief** turns evidence plus baseline into a ranked, capped
-   `## TEST BLINDSPOT CONTEXT` block. Wire it into an agent's session start
+   `## TEST BLINDSPOT CONTEXT` block, printed and also written to
+   `.testguard/brief.json` (`--text` prints only). Wire it into an agent's session start
    — for Claude Code, in `.claude/settings.json`:
 
    ```json

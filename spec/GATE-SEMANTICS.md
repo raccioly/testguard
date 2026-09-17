@@ -35,10 +35,16 @@ Rules that follow from the table:
    reporting `survived` would be wrong the other way. It is `flaky-defender`.
 5. **Escalation never upgrades a verdict.** A fault that survives its declared
    defenders may be re-run against the whole suite. If the wider suite kills
-   it, the verdict stays `survived` with reason `killed-by-undeclared-tests`:
-   the claim's stated evidence chain is broken even though the suite is not
-   blind. It gates, and ranks below a true survivor.
-6. **Never a single global score.** Output is per claim, ranked. Blindness is
+   it, the verdict stays `survived` with reason `killed-by-undeclared-tests`
+   and `detail.undeclaredKillers` names the tests, so the author can fix
+   `defendedBy`. The claim's stated evidence chain is broken even though the
+   suite is not blind. It gates, and ranks below a true survivor.
+6. **A verdict names the commit it is about.** Evidence records `repo.head`;
+   when the working tree was probed instead, `repo.snapshot` holds the
+   throwaway commit that captured it. A tool must refuse to probe a commit
+   while defenders or targets have uncommitted changes, unless told to
+   snapshot the working tree — otherwise the answer looks right and is not.
+7. **Never a single global score.** Output is per claim, ranked. Blindness is
    concentrated, and one number hides where.
 
 ## Baseline and delta

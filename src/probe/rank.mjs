@@ -94,6 +94,20 @@ function resolvesTo(fromFile, specifier, targetAbs, aliases) {
   return bases.some((b) => expandBase(b).includes(targetAbs));
 }
 
+/** Does the file at `absFile` import `targetRel` (relative or alias-resolved)? */
+export function fileImports(projectDir, absFile, targetRel) {
+  const targetAbs = resolve(projectDir, targetRel);
+  const aliases = loadAliases(projectDir);
+  let src;
+  try {
+    src = readFileSync(absFile, 'utf8');
+  } catch {
+    return false;
+  }
+  for (const m of src.matchAll(IMPORT_RE)) if (resolvesTo(absFile, m[1], targetAbs, aliases)) return true;
+  return false;
+}
+
 /**
  * Number of non-test source files that import `targetRel`: relative specifiers,
  * tsconfig/jsconfig `paths` aliases and package.json `imports` are resolved;

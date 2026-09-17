@@ -127,6 +127,9 @@
             "assertionFailures": 0,
             "durationMs": 310
           }
+        ],
+        "undeclaredKillers": [
+          "test/other.test.mjs::x"
         ]
       },
       "defenders": {

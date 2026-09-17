@@ -42,7 +42,7 @@
         "severity": { "$ref": "urn:guard-spec:v1:common#/$defs/severity" },
         "producedBy": { "$ref": "urn:guard-spec:v1:common#/$defs/provenance" },
         "defendedBy": {
-          "description": "Globs (repo-relative) for the test files that supposedly defend this claim. Empty or absent means: let the runner discover related tests. If the globs resolve to zero files the verdict is `nocover`.",
+          "description": "Globs (project-relative) for the test files that supposedly defend this claim. Empty or absent means: discover defenders as the test files that import each fault's target file (relative paths and resolved aliases). If nothing resolves, the verdict is `nocover`.",
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "uniqueItems": true

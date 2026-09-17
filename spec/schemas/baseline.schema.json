@@ -11,6 +11,10 @@
     "tool": { "$ref": "urn:guard-spec:v1:common#/$defs/tool" },
     "createdAt": { "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime" },
     "head": { "$ref": "urn:guard-spec:v1:common#/$defs/gitSha" },
+    "dirty": {
+      "description": "Whether the working tree had uncommitted changes when the evidence behind this baseline was taken.",
+      "type": "boolean"
+    },
     "fingerprints": {
       "type": "object",
       "propertyNames": { "pattern": "^[a-f0-9]{64}$" },
