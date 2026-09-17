@@ -147,7 +147,9 @@ export async function probe({
         const mockInfo = declared ? classifyDefenders(iso.projectDir, fault.file, declared) : discoverDefendersDetailed(iso.projectDir, fault.file);
         const defenders = declared ?? mockInfo.canDetect;
         const stage = (name, i, n) => onStage({ claimId: claim.id, faultId: fault.id, stage: name, i, n });
-        const record = await probeOne({ claim, fault, defenders, discovered: declared === null, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root,
+        const record = await probeOne({ claim, fault, defenders, discovered: declared === null, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id,
+          mocking: mockInfo.mocking, signals: mockInfo.signals,
+          historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root,
           // A path from the runner is absolute inside the SCRATCH worktree, or
           // project-relative. Either way history is read from the real
           // repository, so both must land on a repo-root-relative path.
@@ -155,7 +157,6 @@ export async function probe({
           // worktree path may not be one — realpath both sides or every
           // comparison silently misses. (Same trap as projectDir above.)
           toRepoPath: (p) => relative(root, join(projectDir, isAbsolute(p) ? relative(isoReal, realpathSync(p)) : p)) });
-        const record = await probeOne({ claim, fault, defenders, discovered: declared === null, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, mocking: mockInfo.mocking, signals: mockInfo.signals });
         records.push(record);
         onProgress(record);
       }
@@ -181,8 +182,7 @@ export async function probe({
   };
 }
 
-async function probeOne({ claim, fault, defenders, discovered, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior, priorRunId, historyRef, historyDir, toRepoPath }) {
-async function probeOne({ claim, fault, defenders, discovered, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior, priorRunId, mocking = [], signals = [] }) {
+async function probeOne({ claim, fault, defenders, discovered, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior, priorRunId, mocking = [], signals = [], historyRef, historyDir, toRepoPath }) {
   const targetPath = join(iso.projectDir, fault.file);
   const targetExists = existsSync(targetPath);
   const inputs = {
