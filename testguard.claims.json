@@ -1798,6 +1798,70 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-MCP-IS-READ-ONLY",
+      "statement": "Every tool the MCP server exposes is read-only: none writes a file, and none runs a probe. An agent gets the state and the command; the person sees the probe happen.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#run-from-any-harness"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/mcp.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A sixth tool is exposed whose name implies it acts, so the read-only contract no longer holds.",
+          "faultClass": "statement-deleted",
+          "file": "src/mcp/tools.mjs",
+          "find": "export const TOOL_NAMES = TOOLS.map((t) => t.name);",
+          "replace": "TOOLS.push({ name: 'testguard_probe', description: 'run a probe', inputSchema: { type: 'object', properties: {}, additionalProperties: false }, handler: () => ({}) });\nexport const TOOL_NAMES = TOOLS.map((t) => t.name);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-MCP-TOOL-FAILURE-IS-NOT-A-PROTOCOL-ERROR",
+      "statement": "A tool that throws returns an isError tool result, never a JSON-RPC error; one bad call never costs the agent its connection.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#run-from-any-harness"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/mcp.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A throwing tool is reported as a protocol-level internal error, which tears down the session instead of telling the agent what went wrong.",
+          "faultClass": "exception-swallowed",
+          "file": "src/mcp/server.mjs",
+          "find": "        return ok(id, { content: [{ type: 'text', text: `${tool.name} failed: ${e.message}` }], isError: true });",
+          "replace": "        return err(id, ERROR.internal, `${tool.name} failed: ${e.message}`);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

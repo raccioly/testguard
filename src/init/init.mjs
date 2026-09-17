@@ -94,13 +94,15 @@ exec testguard brief . --text --evidence "$OUT/.testguard/evidence.json"
 `,
 };
 
-export function initProject({ projectDir, force = false, here = false, ciEvidence }) {
+export function initProject({ projectDir, force = false, here = false, ciEvidence, mcp = false }) {
   projectDir = realpathSync(resolve(projectDir));
   const root = here ? null : gitRoot(projectDir);
   const agentRoot = root ?? projectDir;
   const ignoreRoot = root ?? gitRoot(projectDir);
   const dir = (relative(agentRoot, projectDir).split(sep).join('/')) || '.';
   const done = [];
+  const notes = [];
+  let mcpConfig;
   const skipped = [];
   const warnings = [];
   const rel = (p) => relative(agentRoot, p).split(sep).join('/');
@@ -193,5 +195,16 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
       skipped.push('.testguard/fetch-ci-evidence.sh exists (use --force to replace)');
     }
   }
-  return { done, skipped, warnings, agentRoot, projectDir, dir };
+  if (mcp) {
+    // Printed, never written: a harness's own config is the person's file
+    // (and often global), so init shows the snippet and lets them place it.
+    const cmd = { command: 'npx', args: ['-y', 'testguard-cli', 'mcp'] };
+    mcpConfig = {
+      'Claude Code — .mcp.json in the project root, or `claude mcp add`': { mcpServers: { testguard: cmd } },
+      'Cursor — .cursor/mcp.json': { mcpServers: { testguard: cmd } },
+      'Codex CLI — ~/.codex/config.toml': '[mcp_servers.testguard]\ncommand = "npx"\nargs = ["-y", "testguard-cli", "mcp"]',
+    };
+    notes.push('MCP: five read-only tools (status, brief, claims, evidence, next_command). Nothing there runs a probe.');
+  }
+  return { done, skipped, warnings, agentRoot, projectDir, dir, ...(mcpConfig ? { mcpConfig } : {}) };
 }
