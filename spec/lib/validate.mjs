@@ -45,6 +45,8 @@ const semantic = {
   evidence(doc) {
     const errors = [];
     const n = doc.run.confirmRuns;
+    if (n < 3 && doc.run.provisional !== true) errors.push({ path: '/run/provisional', message: `confirmRuns ${n} is below 3; the run must declare provisional: true` });
+    if (n >= 3 && doc.run.provisional === true) errors.push({ path: '/run/provisional', message: `confirmRuns ${n} is confirmed; provisional must be absent or false` });
     doc.records.forEach((r, i) => {
       const p = `/records/${i}`;
       const expected = fingerprint({ claimId: r.claim.id, subjectId: r.subject.id, file: r.subject.file ?? '', verdict: r.verdict });

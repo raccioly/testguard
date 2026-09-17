@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-17
+
+### Added
+
+- **Provisional verdicts** (#5). A run with `--confirm` below 3 declares
+  `run.provisional: true` — a spec field whose equivalence with
+  `confirmRuns < 3` the validator enforces both ways. Provisional verdicts
+  print with a `?`, the summary is prefixed `PROVISIONAL`, a warning is
+  printed on stderr, evidence is written to `.testguard/evidence-provisional.json`
+  so the canonical file only ever holds confirmed runs, `brief` warns at the
+  top, and `baseline` refuses provisional evidence unless
+  `--allow-provisional`. A confirmed prior verdict is never reused by a
+  provisional run, nor the reverse.
+
 ## [0.2.0] - 2026-09-17
 
 ### Added

@@ -9,10 +9,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const load = (dir, f) => JSON.parse(readFileSync(join(here, dir, f), 'utf8'));
 
 describe('Guard spec v1 — conformance', () => {
-  describe('every kind has one valid example that passes', () => {
-    for (const kind of KINDS) {
-      it(kind, () => {
-        const result = validate(kind, load('examples', `${kind}.json`));
+  describe('every valid example passes', () => {
+    for (const f of readdirSync(join(here, 'examples')).filter((f) => f.endsWith('.json'))) {
+      const kind = KINDS.find((k) => f.startsWith(k));
+      it(f, () => {
+        expect(kind).toBeDefined();
+        const result = validate(kind, load('examples', f));
         expect(result.errors).toEqual([]);
         expect(result.ok).toBe(true);
       });

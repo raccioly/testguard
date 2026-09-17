@@ -22,7 +22,11 @@ Rules that follow from the table:
 1. **Green baseline first.** Defenders run N times unmodified before any fault
    is applied. Anything short of N/N pass is `flaky-defender` and stops there.
 2. **Confirm over N runs.** `killed` and `survived` both require exactly N
-   probe runs, all agreeing. Default N is 3.
+   probe runs, all agreeing. Default N is 3. **Fewer than three runs is
+   provisional**: the evidence declares `run.provisional: true`, every
+   rendering marks the verdicts as unconfirmed, and a provisional run is
+   never frozen into a baseline. Provisional runs exist for the fix loop —
+   a fast signal while writing a test — not for a gate.
 3. **Only a test body rejecting the behaviour kills.** A test that fails by
    assertion — or by an exception the fault provoked inside it — counts. A
    timeout does not, and a suite that fails to load does not: neither is

@@ -224,6 +224,27 @@ it('fails closed on a missing scope (uncommitted)', async () => {
       expect(typeof b.dirty).toBe('boolean');
     });
 
+    it('--confirm 1 is provisional: warns, writes evidence-provisional.json (canonical untouched), marks verdicts, and baseline refuses it unless allowed', async () => {
+      const canonicalBefore = readFileSync(join(scratch, '.testguard', 'evidence.json'), 'utf8');
+      const a = capture();
+      const code = await main(['probe', scratch, '--confirm', '1', '--budget', '30000', '--no-escalate'], a.io);
+      expect([0, 1]).toContain(code);
+      expect(a.lines.err.join('\n')).toMatch(/^PROVISIONAL — confirmRuns 1/m);
+      expect(a.lines.out.join('\n')).toMatch(/SURVIVED\?/);
+      expect(a.lines.out.join('\n')).toMatch(/evidence-provisional\.json \(provisional/);
+      expect(readFileSync(join(scratch, '.testguard', 'evidence.json'), 'utf8')).toBe(canonicalBefore);
+      const prov = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence-provisional.json'));
+      expect(prov.run).toMatchObject({ confirmRuns: 1, provisional: true });
+      expect(prov.records.every((r) => !r.reusedFrom)).toBe(true); // a confirmed prior is never reused by a provisional run
+
+      const b = capture();
+      expect(await main(['baseline', scratch, '--evidence', join(scratch, '.testguard', 'evidence-provisional.json'), '--out', join(scratch, '.testguard', 'b-prov.json')], b.io)).toBe(2);
+      expect(b.lines.err.join('\n')).toMatch(/provisional.*--allow-provisional/s);
+      const c = capture();
+      expect(await main(['baseline', scratch, '--evidence', join(scratch, '.testguard', 'evidence-provisional.json'), '--out', join(scratch, '.testguard', 'b-prov.json'), '--allow-provisional'], c.io)).toBe(0);
+      expect(c.lines.out[0]).toContain('FROM PROVISIONAL EVIDENCE');
+    }, 120_000);
+
     it('brief --text on a repo with no evidence exits 0 silently, so a session-start hook never breaks', async () => {
       const { lines, io } = capture();
       expect(await main(['brief', mkdtempSync(join(tmpdir(), 'tg-empty-')), '--text'], io)).toBe(0);

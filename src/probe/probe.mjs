@@ -132,6 +132,7 @@ export async function probe({
       repo: { head, dirty: isDirty(root), ...(snapshot ? { snapshot } : {}) },
       runner: { name: vitest.name, ...((runnerVersion ?? readRunnerVersion(projectDir)) ? { version: runnerVersion ?? readRunnerVersion(projectDir) } : {}) },
       confirmRuns,
+      ...(confirmRuns < 3 ? { provisional: true } : {}),
       mode,
     },
     records,

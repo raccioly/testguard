@@ -65,3 +65,18 @@ describe('renderRecord', () => {
     expect(renderRecord({ ...base, defenders: { ...base.defenders, discovered: true } })).toContain('(defenders discovered by import)');
   });
 });
+
+describe('provisional rendering', () => {
+  it('marks verdicts with "?" and prefixes the summary when the run is provisional', () => {
+    const r = evidence.records[0];
+    expect(renderRecord(r, { provisional: true })).toMatch(/^SURVIVED\?/);
+    expect(renderRecord(r)).toMatch(/^SURVIVED /);
+    expect(renderSummary(evidence.records, { ...evidence.run, confirmRuns: 1, provisional: true })).toMatch(/^PROVISIONAL: .*SURVIVED\?/);
+  });
+  it('brief warns at the top when the evidence is provisional', () => {
+    const prov = { ...evidence, run: { ...evidence.run, confirmRuns: 1, provisional: true } };
+    const b = buildBrief(prov, undefined);
+    expect(b.text.split('\n')[2]).toMatch(/^\*\*PROVISIONAL\*\*/);
+    expect(buildBrief(evidence, undefined).text).not.toContain('PROVISIONAL');
+  });
+});

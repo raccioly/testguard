@@ -52,7 +52,7 @@ tests were written against the survivors, 39/39 were killed.
 | npm | `npm i -D testguard-cli` then `npx testguard probe` |
 | pip | `pip install testguard-cli` then `testguard probe` (needs Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.2.0` — see [`action.yml`](./action.yml) |
+| GitHub Action | `uses: raccioly/testguard@v0.2.1` — see [`action.yml`](./action.yml) |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
 
 Projects that set `min-release-age` in `.npmrc` cannot see a version published
@@ -112,7 +112,10 @@ npx testguard-cli scaffold src/x.ts   # propose faults for a file, as a draft to
    Practical loop: first pass `--no-escalate` (escalation re-runs the whole
    suite N times per survivor); iterate on one claim with `--claim <ID>` and
    either `--include-dirty` or `--in-place` (only fault target files must be
-   clean there; test files may be dirty); final pass with defaults. By default
+   clean there; test files may be dirty), optionally `--confirm 1` for a fast
+   **provisional** signal — verdicts print with a `?`, evidence goes to
+   `evidence-provisional.json`, and `baseline` refuses it; final pass with
+   defaults. By default
    the stream shows only unproven faults plus a killed count — `--verbose`
    shows every fault. A custom
    runner (`pnpm --filter`, a specific config) goes in

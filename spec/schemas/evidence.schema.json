@@ -43,6 +43,10 @@
           "type": "integer",
           "minimum": 1
         },
+        "provisional": {
+          "description": "True iff confirmRuns < 3. A provisional run's verdicts are not confirmed: they must not be frozen into a baseline and must be rendered as provisional wherever they appear. Validators enforce the equivalence in both directions.",
+          "type": "boolean"
+        },
         "mode": {
           "description": "`worktree` = faults were applied in a scratch git worktree (default). `in-place` = the user's working tree was mutated and restored.",
           "enum": ["worktree", "in-place"]
