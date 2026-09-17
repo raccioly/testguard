@@ -6,6 +6,7 @@ import { writeSpecDoc, readSpecDoc } from '../evidence/writer.mjs';
 import { gate } from '../baseline/baseline.mjs';
 import { renderRecord, renderSummary, sortForReport, PROVISIONAL_WARNING } from '../render.mjs';
 import { computeStatus } from '../status/status.mjs';
+import { resolveChangedRef, withChangedRef } from '../gate/changed.mjs';
 export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
@@ -58,7 +59,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
 
   const g = gate(evidence.records, baseline, { severityFloor: values.severity });
   if (values.json) {
-    const status = computeStatus({ projectDir, toolVersion: version });
+    const status = withChangedRef(resolveChangedRef({ explicit: values.changed }), (changedRef) => computeStatus({ projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'] }), io.err);
     io.out(JSON.stringify({ ...status, run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode: g.new.length > 0 ? 1 : 0 } }, null, 2));
     return g.new.length > 0 ? 1 : 0;
   }

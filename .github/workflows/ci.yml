@@ -122,6 +122,13 @@ jobs:
             console.log('jest fixture verdicts match expected.json:', ev.records.length);
           "
 
+      # ── Every change needs a claim: the gate runs on this repository's own
+      #    pull requests. A new source file without a claim (or an excusing
+      #    ignore entry with a reason) turns the PR red. ──
+      - name: gate — every changed source file carries a claim
+        if: github.event_name == 'pull_request'
+        run: node cli/testguard.mjs gate . --changed "origin/${{ github.base_ref }}"
+
       # ── Self-verification: TestGuard is governed by the standard it defines.
       #    testguard.claims.json states invariants of the tool itself; every
       #    fault must be killed by the tool's own tests. Exit 0 = all defended. ──

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { buildBrief, HEADING, hintFor } from '../src/brief/brief.mjs';
+import { buildBrief, buildUnclaimedBrief, HEADING, hintFor } from '../src/brief/brief.mjs';
 import { buildBaseline } from '../src/baseline/baseline.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { renderSummary, renderRecord } from '../src/render.mjs';
@@ -78,5 +78,24 @@ describe('provisional rendering', () => {
     const b = buildBrief(prov, undefined);
     expect(b.text.split('\n')[2]).toMatch(/^\*\*PROVISIONAL\*\*/);
     expect(buildBrief(evidence, undefined).text).not.toContain('PROVISIONAL');
+  });
+  it('puts unclaimed changes before every finding, and can brief them with no evidence at all', () => {
+    const changes = { ref: 'origin/main', base: 'a'.repeat(40), changed: 2, evaluated: 1, excluded: 1, uncovered: [{ file: 'src/export.mjs', kind: 'source', suggestion: 'testguard scaffold src/export.mjs' }], reliedOn: [], expired: [] };
+    const next = { action: 'claim', command: 'testguard scaffold src/export.mjs', why: 'src/export.mjs carries no claim.' };
+    const b = buildBrief(evidence, undefined, { next, changes });
+    expect(validate('brief', b).errors).toEqual([]);
+    expect(b.unclaimed).toEqual({ ref: 'origin/main', files: changes.uncovered });
+    const text = b.text;
+    expect(text.indexOf('UNCLAIMED CHANGES since origin/main')).toBeGreaterThan(text.indexOf(HEADING));
+    expect(text.indexOf('UNCLAIMED CHANGES since origin/main')).toBeLessThan(text.indexOf('NEXT [claim]'));
+    expect(text.indexOf('UNCLAIMED CHANGES since origin/main')).toBeLessThan(text.indexOf('1. '));
+    expect(text).toContain('  - src/export.mjs (source) → testguard scaffold src/export.mjs');
+    expect(buildBrief(evidence, undefined, { next }).unclaimed).toBeUndefined();
+
+    const u = buildUnclaimedBrief({ tool: { name: 'testguard', version: 't' }, next, changes });
+    expect(validate('brief', u).errors).toEqual([]);
+    expect(u.text.startsWith(HEADING)).toBe(true);
+    expect(u.text).toContain('no evidence yet; 1 unclaimed changed file since origin/main');
+    expect(u.items).toEqual([]);
   });
 });

@@ -10,6 +10,7 @@
 #         rev: v0.1.0
 #         hooks:
 #           - id: testguard-claims        # fast: validates the claims file + drift
+#           - id: testguard-gate          # fast: every changed source file must carry a claim
 #           - id: testguard-probe         # slow: pre-push stage, runs the faults
 #
 #     # install the push-stage hook once per clone:
@@ -19,6 +20,14 @@
   name: TestGuard claims (validate + drift)
   description: Validates testguard.claims.json against the spec and reports @claim drift. Fast.
   entry: testguard claims
+  language: node
+  pass_filenames: false
+  always_run: true
+
+- id: testguard-gate
+  name: TestGuard gate (every change needs a claim)
+  description: Fails when a source file in this commit carries no claim, does not defend one, and is not excused by testguard.ignore.json. Fast; runs no tests.
+  entry: testguard gate --changed HEAD --include-dirty --quiet
   language: node
   pass_filenames: false
   always_run: true

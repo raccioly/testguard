@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, cpSync, rmSync } f
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { computeStatus, faultContentHash } from '../src/status/status.mjs';
 import { writeSpecDoc } from '../src/evidence/writer.mjs';
 import { buildBaseline } from '../src/baseline/baseline.mjs';
@@ -11,6 +12,15 @@ import { hashFile } from '../src/util/hash.mjs';
 import { fingerprint } from '../spec/lib/fingerprint.mjs';
 
 const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'known-answer');
+
+/** Turn a project directory into a one-commit repository so a change can be measured. */
+function gitInit(dir) {
+  const g = (...args) => {
+    const r = spawnSync('git', ['-c', 'user.email=s@example.invalid', '-c', 'user.name=s', ...args], { cwd: dir, encoding: 'utf8' });
+    if (r.status !== 0) throw new Error(r.stderr);
+  };
+  g('init', '-q'); g('add', '-A'); g('commit', '-q', '-m', 'base');
+}
 
 /** A copy of the fixture we can mutate, with helpers to fabricate evidence that matches its current inputs. */
 function project() {
@@ -114,5 +124,24 @@ describe('computeStatus — every state, with a conforming document', () => {
     expect(s.next).toMatchObject({ action: 'review-fault-change', target: { claimId: 'REDACT-003', verdict: 'survived' } });
     expect(s.next.why).toMatch(/weakened fault/);
     expect(validate('status', s).errors).toEqual([]);
+  });
+  it('unclaimed-changes precedes every evidence state when a reference is known, and names the file; no-claims points scaffold at it', () => {
+    const { dir, evidence } = project();
+    gitInit(dir);
+    writeSpecDoc('evidence', join(dir, '.testguard', 'evidence.json'), evidence((c, f) => (c.id === 'REDACT-001' && f.id === 'F1' ? 'survived' : 'killed')));
+    expect(computeStatus({ projectDir: dir, changedRef: 'HEAD', includeDirty: true }).state).toBe('unproven'); // nothing changed yet
+    writeFileSync(join(dir, 'src', 'newfeature.mjs'), 'export const f = () => 1;\n');
+    const s = computeStatus({ projectDir: dir, changedRef: 'HEAD', includeDirty: true });
+    expect(s.state).toBe('unclaimed-changes');
+    expect(s.next).toMatchObject({ action: 'claim', command: 'testguard scaffold src/newfeature.mjs --claim REDACT-001', file: 'src/newfeature.mjs' });
+    expect(s.next.why).toMatch(/1 changed file since HEAD carries no claim/);
+    expect(s.changes).toMatchObject({ ref: 'HEAD', changed: 2, evaluated: 1, excluded: 1, uncovered: [{ file: 'src/newfeature.mjs', kind: 'source' }] }); // the untracked .testguard/evidence.json is a change too, excluded by default
+    expect(validate('status', s).errors).toEqual([]);
+    expect(computeStatus({ projectDir: dir }).state).toBe('unproven'); // without a reference, nothing about the change is claimed to be known
+
+    rmSync(join(dir, 'testguard.claims.json'));
+    const none = computeStatus({ projectDir: dir, changedRef: 'HEAD', includeDirty: true });
+    expect(none).toMatchObject({ state: 'no-claims', next: { action: 'scaffold', command: 'testguard scaffold src/newfeature.mjs', file: 'src/newfeature.mjs' } });
+    expect(validate('status', none).errors).toEqual([]);
   });
 });

@@ -8,6 +8,7 @@ coverage/
 .testguard/evidence-provisional.json
 .testguard/evidence-partial.json
 .testguard/brief.json
+.testguard/gate.json
 .testguard/scaffold-*.json
 # Local agent tooling — not part of the public project
 .wolf/

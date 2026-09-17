@@ -77,6 +77,33 @@
       },
       "additionalProperties": false
     },
+    "uncoveredFile": {
+      "description": "A changed source or test file that no claim covers and no unexpired ignore entry excuses. Shared by the gate and status documents.",
+      "type": "object",
+      "required": ["file", "kind", "suggestion"],
+      "properties": {
+        "file": { "$ref": "#/$defs/repoPath" },
+        "kind": { "enum": ["source", "test"] },
+        "nearestClaimId": {
+          "description": "The claim whose fault files share the longest directory prefix with this file — where to attach, not a verdict.",
+          "$ref": "#/$defs/identifier"
+        },
+        "suggestion": { "type": "string", "minLength": 1, "maxLength": 1024 }
+      },
+      "additionalProperties": false
+    },
+    "ignoreReliance": {
+      "description": "An ignore entry the gate relied on (or would have, had it not expired), with the changed files it matched.",
+      "type": "object",
+      "required": ["pattern", "reason", "files"],
+      "properties": {
+        "pattern": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "reason": { "type": "string", "minLength": 8, "maxLength": 2000 },
+        "expires": { "$ref": "#/$defs/isoDateTime" },
+        "files": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/repoPath" } }
+      },
+      "additionalProperties": false
+    },
     "annotation": {
       "description": "Strictly additive. An annotation never changes, suppresses, or drops a finding; it only attaches context to it.",
       "type": "object",

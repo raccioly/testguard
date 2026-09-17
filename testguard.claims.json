@@ -374,6 +374,294 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-GATE-EXPIRED-NEVER-EXCUSES",
+      "statement": "An expired ignore entry never excuses a changed file; it is reported as expired and the file stays uncovered.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#claim-coverage-of-a-change"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/gate.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Expiry ignored: an expired path entry still excuses the file.",
+          "faultClass": "condition-forced",
+          "file": "src/gate/changed.mjs",
+          "find": "const active = pathEntries.find((p) => !p.expired && p.re.test(file));",
+          "replace": "const active = pathEntries.find((p) => p.re.test(file));",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-GATE-TEST-NEEDS-CLAIM",
+      "statement": "A changed test file is covered only when it resolves as a defender of some claim; a test that defends nothing is uncovered.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#claim-coverage-of-a-change"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/gate.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Any test file counts as covered, whether or not a claim names it.",
+          "faultClass": "condition-forced",
+          "file": "src/gate/changed.mjs",
+          "find": "if (isTest && defenderFiles.has(file)) {",
+          "replace": "if (isTest || defenderFiles.has(file)) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-GATE-UNCLAIMED-EXITS-1",
+      "statement": "The gate exits 1 whenever at least one changed source file is uncovered; it never passes over unclaimed code.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#claim-coverage-of-a-change"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/gate.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Uncovered files no longer decide the exit code.",
+          "faultClass": "condition-forced",
+          "file": "src/gate/changed.mjs",
+          "find": "const exitCode = uncovered.length > 0 ? 1 : strict && changed.length > 0 && evaluated === 0 ? 1 : 0;",
+          "replace": "const exitCode = strict && changed.length > 0 && evaluated === 0 ? 1 : 0;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-STATUS-UNCLAIMED-FIRST",
+      "statement": "When a reference is known and the change touches unclaimed source files, status reports unclaimed-changes before any evidence state, with the file as the next action.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/status.schema.json#state"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/status.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Unclaimed changes never become the state; evidence states hide them.",
+          "faultClass": "condition-forced",
+          "file": "src/status/status.mjs",
+          "find": "if (changes && changes.uncovered.length > 0) {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-BRIEF-UNCLAIMED-FIRST",
+      "statement": "The brief renders unclaimed changes before the ranked findings, so an agent writes the claim before more code.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/brief.schema.json#unclaimed"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/brief.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The unclaimed block is never rendered.",
+          "faultClass": "condition-forced",
+          "file": "src/brief/brief.mjs",
+          "find": "  if (brief.unclaimed) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-GATE-DOC-NEVER-PASSES-UNCLAIMED",
+      "statement": "A gate document with an uncovered file and exit code 0 does not conform; the validator rejects it.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#claim-coverage-of-a-change"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "spec/conformance/schemas.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The exit-code rule is removed from the validator.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (doc.uncovered.length > 0 && doc.exitCode !== 1) errors.push(",
+          "replace": "if (false) errors.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-INIT-IDEMPOTENT",
+      "statement": "Running init twice installs the SessionStart hook once.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#built-for-agents-to-run"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/init.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The already-installed check is defeated; every init appends another hook.",
+          "faultClass": "literal-changed",
+          "file": "src/init/init.mjs",
+          "find": "const already = JSON.stringify(settings.hooks.SessionStart).includes(HOOK_CMD);",
+          "replace": "const already = false;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CHANGED-REF-EXPLICIT-IS-REQUIRED",
+      "statement": "An explicit --changed reference that does not resolve is an error; only a reference detected from CI variables may be dropped, with a warning.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#claim-coverage-of-a-change"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/gate.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An unresolvable explicit reference is silently dropped like a detected one.",
+          "faultClass": "condition-forced",
+          "file": "src/gate/changed.mjs",
+          "find": "if (resolved.required || !(e instanceof GitError)) throw e;",
+          "replace": "if (!(e instanceof GitError)) throw e;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT",
+      "statement": "The release version check exits non-zero when any version surface is out of step with package.json; a release can never ship with drifting version strings.",
+      "source": {
+        "kind": "spec",
+        "ref": "CONTRIBUTING.md#releases"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/release-sync.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Drift is reported but the check exits 0; release.yml would proceed.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/sync-release-version.mjs",
+          "find": "if (check && drift) process.exit(1);",
+          "replace": "if (false) process.exit(1);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

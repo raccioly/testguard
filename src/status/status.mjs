@@ -7,6 +7,7 @@ import { hashFile, sha256 } from '../util/hash.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { sortForReport } from '../render.mjs';
+import { computeChangedGate, defaultIgnorePath } from '../gate/changed.mjs';
 
 export const faultContentHash = (fault) => sha256(`${fault.find}\n${fault.replace}`);
 
@@ -22,7 +23,7 @@ const P = (projectDir) => ({
  * Reads the claims file, evidence, baseline and the working tree; never
  * trusts a cached verdict whose inputs have changed.
  */
-export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20 }) {
+export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20, changedRef, includeDirty = false }) {
   const rel = (p) => relative(projectDir, p) || '.';
   const doc = {
     schemaVersion: 1,
@@ -37,7 +38,32 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
     findings: [],
     paths: {},
   };
-  if (!existsSync(paths.claims)) return doc;
+  // ── Claim coverage of the change, when a reference is known ──
+  // Computed before anything about evidence: a change that touches unclaimed
+  // code is the finding every field report shared, and TestGuard is silent
+  // about unclaimed code by construction. The claim is written first.
+  // The reference is the caller's: this function never reads the environment,
+  // so a library caller or a test in a temp directory is never surprised by CI.
+  const ref = changedRef;
+  let changes;
+  if (ref) {
+    const g = computeChangedGate({ projectDir, ref, includeDirty, toolVersion });
+    changes = { ref: g.ref, base: g.base, includeDirty: g.includeDirty, changed: g.changed, evaluated: g.evaluated, excluded: g.excluded.length, uncovered: g.uncovered, reliedOn: g.reliedOn, expired: g.expired };
+    doc.changes = changes;
+    if (existsSync(defaultIgnorePath(projectDir))) doc.paths.ignore = rel(defaultIgnorePath(projectDir));
+  }
+  const unclaimedWhy = () => {
+    const files = changes.uncovered.map((u) => u.file);
+    return `${files.length} changed file${files.length === 1 ? '' : 's'} since ${changes.ref} carr${files.length === 1 ? 'ies' : 'y'} no claim and no excusing ignore entry: ${files.slice(0, 3).join(', ')}${files.length > 3 ? ', …' : ''}. State the claim before writing more code — TestGuard is silent about unclaimed code by construction.`;
+  };
+
+  if (!existsSync(paths.claims)) {
+    if (changes?.uncovered.length) {
+      const u = changes.uncovered[0];
+      doc.next = { action: 'scaffold', command: `testguard scaffold ${u.file}`, why: `No testguard.claims.json in this project, and ${unclaimedWhy()}`, file: u.file };
+    }
+    return doc;
+  }
   doc.paths.claims = rel(paths.claims);
 
   const claims = loadClaims(paths.claims);
@@ -45,6 +71,13 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   doc.counts.faults = claims.claims.reduce((n, c) => n + c.faults.length, 0);
   const faultIndex = new Map();
   for (const c of claims.claims) for (const f of c.faults) faultIndex.set(`${c.id}/${f.id}`, { claim: c, fault: f });
+
+  if (changes && changes.uncovered.length > 0) {
+    const u = changes.uncovered[0];
+    doc.state = 'unclaimed-changes';
+    doc.next = { action: 'claim', command: u.suggestion, why: unclaimedWhy(), file: u.file };
+    return doc;
+  }
 
   const hasEvidence = existsSync(paths.evidence);
   const hasProvisional = existsSync(paths.provisional);
@@ -155,6 +188,13 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
 
 export function renderStatus(doc) {
   const lines = [`state: ${doc.state}${doc.provisional ? ' (provisional)' : ''} — ${doc.counts.claims} claims / ${doc.counts.faults} faults` + (doc.counts.byVerdict ? `; ${Object.entries(doc.counts.byVerdict).map(([k, v]) => `${v} ${k}`).join(', ')}; ${doc.counts.new ?? 0} new, ${doc.counts.baselined ?? 0} baselined` : '')];
+  if (doc.changes) {
+    const c = doc.changes;
+    lines.push(`changes:  ${c.changed} file${c.changed === 1 ? '' : 's'} since ${c.ref}; ${c.evaluated} evaluated, ${c.excluded} excluded, ${c.uncovered.length} unclaimed`);
+    for (const u of c.uncovered) lines.push(`UNCLAIMED ${u.file} (${u.kind}) → ${u.suggestion}`);
+    for (const r of c.reliedOn) lines.push(`excused   ${r.files.join(', ')} by ignore "${r.pattern}": ${r.reason}`);
+    for (const e of c.expired) lines.push(`EXPIRED   ignore "${e.pattern}" no longer excuses ${e.files.join(', ')}`);
+  }
   for (const c of doc.changedFaults) lines.push(`CHANGED   ${c.claimId}/${c.subjectId} edited since it ${c.previousVerdict} (${c.file})`);
   for (const s of doc.stale.slice(0, 8)) lines.push(`stale     ${s}`);
   lines.push(`next:     [${doc.next.action}] ${doc.next.command}`);

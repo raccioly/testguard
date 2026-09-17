@@ -8,7 +8,7 @@ branding:
 
 inputs:
   command:
-    description: 'Command to run: probe, claims, baseline, brief'
+    description: 'Command to run: probe, claims, baseline, brief, gate'
     required: false
     default: 'probe'
   working-directory:
@@ -33,6 +33,14 @@ inputs:
     default: '120000'
   no-escalate:
     description: 'Skip re-running survivors against the whole suite'
+    required: false
+    default: 'false'
+  changed-ref:
+    description: 'gate only: the reference the change is measured against (default: origin/<base branch> of the pull request). Check out with fetch-depth: 0 so it resolves.'
+    required: false
+    default: ''
+  strict:
+    description: 'gate only: fail a change whose files were all excluded instead of passing with a note'
     required: false
     default: 'false'
   version:
@@ -68,5 +76,14 @@ runs:
           [ "${{ inputs.no-escalate }}" = "true" ] && ARGS+=(--no-escalate)
         fi
         [ "${{ inputs.command }}" = "brief" ] && ARGS+=(--text)
+        if [ "${{ inputs.command }}" = "gate" ]; then
+          REF="${{ inputs.changed-ref }}"
+          if [ -z "$REF" ] && [ -n "${GITHUB_BASE_REF:-}" ]; then
+            git fetch --no-tags --quiet origin "$GITHUB_BASE_REF" || true
+            REF="origin/${GITHUB_BASE_REF}"
+          fi
+          [ -n "$REF" ] && ARGS+=(--changed "$REF")
+          [ "${{ inputs.strict }}" = "true" ] && ARGS+=(--strict)
+        fi
         echo "evidence=$(pwd)/.testguard/evidence.json" >> "$GITHUB_OUTPUT"
         npx -y "testguard-cli@${{ inputs.version }}" "${{ inputs.command }}" . "${ARGS[@]}"

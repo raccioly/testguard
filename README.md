@@ -68,6 +68,7 @@ npx testguard-cli claims      # what does this project claim, and is every claim
 npx testguard-cli probe       # try to falsify each claim; report what the tests missed
 npx testguard-cli baseline    # freeze today's unproven findings; from now on only new ones gate
 npx testguard-cli brief       # tell the agent where the suite is blind, before it writes
+npx testguard-cli gate --changed origin/main   # fail when a changed source file carries no claim at all
 npx testguard-cli scaffold src/x.ts   # propose faults for a file, as a draft to keep or drop
 ```
 
@@ -146,6 +147,54 @@ npx testguard-cli scaffold src/x.ts   # propose faults for a file, as a draft to
    `--text` prints only, and exits 0 silently when there is no evidence yet,
    so the hook can never break a session.
 
+### Every change needs a claim
+
+`probe` can only verify claims that exist. Every escaped defect in the field
+reports so far was a **claim gap**: the feature shipped green with zero
+claims, and a verifier with no claim about a feature is silent about it by
+construction. `gate` closes that hole on the delta:
+
+```bash
+npx testguard-cli gate --changed origin/main            # in a PR: the files changed since the base branch
+npx testguard-cli gate --changed HEAD --include-dirty   # before a commit: the working tree, staged or not
+```
+
+Every changed source file must carry a fault, resolve as a defender of a
+claim (test files), or be excused by an unexpired `path` entry in
+`testguard.ignore.json` — with a reason a reviewer will accept. One
+unclaimed file exits `1`; there is no percentage. Every reliance on an ignore
+entry is printed, so a reviewer sees *why* the gate passed; an expired entry
+excuses nothing. Non-source files and documented never-claimed patterns
+(`*.d.ts`, `*.config.*`, fixtures, mocks; `--explain` lists them) are
+excluded and said so; `--strict` fails a change that evaluated nothing.
+
+With a reference known, `status --changed <ref>` reports `unclaimed-changes`
+**before** any evidence state and makes the claim the next action; the brief
+lists the unclaimed files first. The claim is written before more code.
+
+**In CI the base is detected** — GitHub Actions (`GITHUB_BASE_REF`) and GitLab
+merge request pipelines (`CI_MERGE_REQUEST_DIFF_BASE_SHA`, then
+`CI_MERGE_REQUEST_TARGET_BRANCH_NAME`); `TESTGUARD_CHANGED_REF` overrides both.
+The base must exist locally: GitHub — `actions/checkout` with `fetch-depth: 0`;
+GitLab — the diff base sha needs nothing extra on a merge request pipeline,
+the branch name needs `GIT_DEPTH: 0` or a `git fetch origin <target>`. A
+detected base that does not resolve is a warning for `status` and `brief`
+(they keep working) and an error for `gate` (its whole job is the measurement).
+
+```yaml
+# GitHub Actions
+- uses: actions/checkout@v4
+  with: { fetch-depth: 0 }
+- uses: raccioly/testguard@v0.4.0
+  with: { command: gate }
+
+# GitLab CI — or include: remote: the template in packaging/gitlab/
+testguard:gate:
+  image: node:22
+  rules: [{ if: $CI_PIPELINE_SOURCE == "merge_request_event" }]
+  script: [npx -y testguard-cli gate .]
+```
+
 ### Built for agents to run
 
 TestGuard is meant to be driven by an AI agent, not typed by a person. Three
@@ -220,9 +269,10 @@ through every verdict.
 
 ## Status
 
-**v0.4.** Seven commands, vitest and jest runners, hand-authored faults plus
-a mechanical scaffold, and an agent operating layer (`status`, `init`). The contract
-spine — six JSON Schemas shared with the other Guard tools — is under
+**v0.4.** Eight commands, vitest and jest runners, hand-authored faults plus
+a mechanical scaffold, an agent operating layer (`status`, `init`) and a
+change gate (`gate`). The contract
+spine — eight JSON Schemas shared with the other Guard tools — is under
 [`spec/`](spec/). One exact-pinned runtime dependency (`ajv`, for schema validation); Node ≥ 20.
 
 Not yet: test generation (the two-gate acceptance loop), runners beyond

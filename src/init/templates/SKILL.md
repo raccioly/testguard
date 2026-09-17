@@ -21,13 +21,31 @@ which files exist. `state` is one of:
 | state | meaning | you do |
 |---|---|---|
 | `no-claims` | no `testguard.claims.json` | `testguard scaffold <file>` for a file with guards; replace every `TODO:` statement with what the code guarantees; keep or drop each proposal; move the claims into `testguard.claims.json` |
+| `unclaimed-changes` | files you changed carry no claim (only when a reference is known: `--changed <ref>`, or CI's base branch) | `next.file` names the first; `testguard scaffold <file>` and state the claim, or add a `testguard.ignore.json` path entry with a reason a reviewer will accept. **Before** writing more code. |
 | `unprobed` | claims never probed | `testguard probe` |
 | `evidence-stale` | code, tests or claims changed since the evidence | `testguard probe --include-dirty` (or `--claim <ID>` for one) |
 | `provisional-only` | only `--confirm 1` evidence exists | `testguard probe --confirm 3` |
 | `unproven` | a finding is not covered by the baseline | `next.target` names it; see the verdict table |
 | `clean` | everything killed or baselined | `testguard baseline` if `next` says so; otherwise nothing |
 
-Exit codes: `0` clean · `1` unproven claims (or drift) · `2` precondition failed / nothing to do yet · `3` usage.
+Exit codes: `0` clean · `1` unproven claims (or drift, or unclaimed changes) · `2` precondition failed / nothing to do yet · `3` usage.
+
+## Every change needs a claim
+
+`probe` verifies only the claims that exist; it is silent about unclaimed
+code by construction. So, for every source file you create or change:
+
+1. `testguard gate --changed HEAD --include-dirty` (the pre-commit shape; in a
+   PR, `--changed origin/<base>`). One unclaimed file exits `1`.
+2. For each `UNCLAIMED` file: `testguard scaffold <file>` proposes faults;
+   state what the code guarantees; add the claim, its faults and its
+   `defendedBy` to `testguard.claims.json`. A new test file must be named in
+   some claim's `defendedBy`, or it is unclaimed too.
+3. Only when a file genuinely carries nothing to claim (generated code, a
+   thin wrapper whose logic is claimed elsewhere): a `path` entry in
+   `testguard.ignore.json` with a reason and, where possible, an `expires`.
+   The gate prints every entry it relied on; a reviewer reads them.
+4. Then `testguard probe --claim <ID> --include-dirty` for the new claim.
 
 ## Verdict → action
 

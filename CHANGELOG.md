@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`testguard gate --changed <ref>`** — the change gate. Every escaped
+  defect in the field reports was a *claim gap*: the feature shipped green
+  with zero claims, and `probe` is silent about unclaimed code by
+  construction. `gate` measures the files changed since
+  `merge-base(ref, HEAD)` (or in the working tree with `--include-dirty`)
+  and exits `1` when any changed source file carries no fault, does not
+  resolve as a defender (test files), and is not excused by an unexpired
+  `path` entry in `testguard.ignore.json`. Every reliance on an ignore entry
+  is printed with its reason; expired entries excuse nothing. Non-source
+  files and documented never-claimed patterns are excluded and listed
+  (`--explain`, `--exclude <glob>`); `--strict` fails a change that
+  evaluated nothing. The base branch is detected in GitHub Actions and
+  GitLab CI (`TESTGUARD_CHANGED_REF` overrides). A new spec kind,
+  `gate.schema.json`, with conformance examples.
+- **`status --changed <ref>`** — a new state `unclaimed-changes` and action
+  `claim` that precede every evidence state; `next.file` names the first
+  unclaimed file. `brief` renders unclaimed files before the findings, and
+  briefs them even when there is no evidence yet.
+- `testguard.ignore.json` at the repository root: TestGuard's own excused
+  paths (dispatch, thin command wrappers, rendering), with reasons.
+- Nine new self-claims: the gate, status and brief invariants, explicit
+  `--changed` being required, `init` idempotency, and — because the gate
+  flagged it on its own pull request — the release version-sync check,
+  which had no test before. The gate runs on this repository's own pull
+  requests.
+- GitHub Action `command: gate` with a `changed-ref` input; pre-commit hook
+  `testguard-gate`; a GitLab CI template under `packaging/gitlab/` with
+  `testguard:gate` (merge request pipelines, measured against
+  `CI_MERGE_REQUEST_DIFF_BASE_SHA`) and `testguard:probe`.
+
 ## [0.4.0] - 2026-09-17
 
 ### Added

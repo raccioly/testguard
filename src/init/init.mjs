@@ -14,7 +14,7 @@ Before writing or changing tests, run \`testguard status --json\` and follow \`n
 The full operating loop and the verdict table are in \`.claude/skills/testguard/SKILL.md\`.
 Never make a fault die by editing \`testguard.claims.json\`; write the test. Claim edits are recorded in the evidence.
 ${AGENTS_END}`;
-const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/scaffold-*.json'];
+const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json'];
 
 /**
  * Install the agent operating layer into a consumer project: the skill, the

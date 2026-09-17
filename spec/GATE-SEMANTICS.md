@@ -85,6 +85,57 @@ the suppress-up-to-count semantics are identical.
 - An annotation is **strictly additive**. It never changes, suppresses, or
   drops a finding. Ranking may read annotations; verdicts never do.
 
+## Claim coverage of a change
+
+`probe` asks whether the tests defend the claims that exist. It says nothing
+about code that has no claim, by construction — and every escaped defect the
+field reports share was a *claim gap*, not a defender gap: the feature shipped
+green with zero claims. A repository with ten old claims and one new,
+unclaimed module exits 0 under `probe` forever.
+
+The change gate closes that hole. Given a reference, a tool measures the
+**delta** — the files changed since `merge-base(ref, HEAD)`, or since that
+merge-base in the working tree — file by file:
+
+- A changed file is **excluded** when it is not source (by extension) or
+  matches a documented never-claimed pattern (`*.d.ts`, `*.config.*`,
+  fixtures, mocks, snapshots, the tool's own directory). Exclusions are
+  listed, never silent.
+- A changed source file is **covered** when at least one fault anchors to it,
+  when it is a test file that resolves as a defender of some claim, or when an
+  **unexpired** `path` ignore entry excuses it.
+- Anything else is **uncovered**. The unit is the file, on purpose: a fault
+  anchors to a file, so the file is the smallest unit the rest of the
+  contract already understands.
+
+Rules:
+
+1. **One uncovered file gates.** Exit `1`. There is no threshold and no
+   percentage; a percentage is how the gap hid before.
+2. **Every reliance on an ignore entry is reported.** The gate may pass
+   *because of* an excuse; a reviewer reads which entries carried it, with
+   their reasons and expiry. An expired entry excuses nothing and is reported
+   as expired.
+3. **A test file needs a claim too.** A test that defends no claim is the
+   authorship trap the pattern exists for; it is uncovered until a claim
+   names it in `defendedBy` (or discovery resolves it as a defender).
+4. **Never a silent pass on nothing.** A non-empty change whose files were
+   all excluded passes with an explicit "0 evaluated" line; a tool offers a
+   strict mode that fails it instead. An empty change is an honest `0`.
+5. **The reference is never guessed.** An explicit flag, or a CI-provided base
+   branch, or an error. An upstream that already contains the change has an
+   empty diff and would pass trivially.
+6. **Unclaimed changes precede every evidence state.** When the status
+   document knows a reference and finds uncovered files, its state is
+   `unclaimed-changes` and its next action is to write the claim, before any
+   `unproven` finding is surfaced. The brief renders them first. The claim is
+   written before more code.
+
+Exit codes: `0` every changed source file is claimed or excused (or nothing
+changed); `1` at least one uncovered file (or strict mode over an
+all-excluded change); `2` the change cannot be evaluated (unresolvable
+reference, invalid claims or ignore file, no repository); `3` no reference.
+
 ## Severity floor
 
 `--severity <level>` gates only findings whose claim severity is at or above
