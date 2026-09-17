@@ -66,7 +66,7 @@ export function renderBriefText(brief, { hasBaseline, total }) {
     '',
     ...(brief.provisional ? ['**PROVISIONAL** — this evidence came from fewer than three confirmation runs; treat every verdict below as unconfirmed and re-probe with --confirm 3 before acting on it.', ''] : []),
     `testguard ${brief.tool.version}${brief.head ? ` @ ${brief.head.slice(0, 12)}` : ''} — ${brief.summary.claims} claims, ${total} faults probed, ${unproven} unproven` +
-      (hasBaseline ? ` (${brief.summary.new} new since baseline).` : ' (no baseline; everything is new).'),
+      (unproven === 0 ? '.' : hasBaseline ? ` (${brief.summary.new} new since baseline).` : ' (no baseline; everything is new).'),
   ];
   if (brief.next) lines.push('', `NEXT [${brief.next.action}]: ${brief.next.command}`, `  why: ${brief.next.why}`);
   if (brief.items.length === 0) {
