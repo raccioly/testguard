@@ -132,9 +132,9 @@ describe('probe reproduces the known-answer fixture', () => {
       writeSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json'), evidence);
       const { lines, io } = capture();
       expect(await main(['baseline', scratch], io)).toBe(0);
-      expect(lines.out[0]).toMatch(/^baseline: 9 unproven findings frozen/);
+      expect(lines.out[0]).toMatch(/^baseline: 10 unproven findings frozen/);
       const b = readSpecDoc('baseline', join(scratch, '.testguard', 'baseline.json'));
-      expect(Object.keys(b.fingerprints)).toHaveLength(9);
+      expect(Object.keys(b.fingerprints)).toHaveLength(10);
     });
 
     it('probe again: every verdict is reused (inputs unchanged) and nothing is new against the baseline → exit 0', async () => {
@@ -144,7 +144,7 @@ describe('probe reproduces the known-answer fixture', () => {
       expect(Date.now() - started).toBeLessThan(5000);
       const again = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json'));
       expect(again.records.every((r) => r.reusedFrom === evidence.run.id)).toBe(true);
-      expect(lines.out.join('\n')).toMatch(/0 new since baseline, 9 baselined/);
+      expect(lines.out.join('\n')).toMatch(/0 new since baseline, 10 baselined/);
     }, 30_000);
 
     it('brief --text: prints the block without writing a file; new-since-baseline is zero', async () => {

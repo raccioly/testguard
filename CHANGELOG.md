@@ -39,6 +39,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+
+
+- **Mock-aware defender discovery** (#20). A test file that `vi.mock`s /
+  `jest.mock`s the target cannot detect any fault in it and is no longer a
+  discovered defender; `NOCOVER` now means "no test imports this source
+  without mocking it". The evidence lists such files under
+  `defenders.mocking` (a *declared* defender that mocks the subject stays,
+  and is listed, as a broken evidence chain); `claims` prints the split
+  (`18 import · 16 mock · 2 can detect`).
+- **`mocked-never-asserted`** (#21): a static signal for a test that mocks
+  the target and never `expect(...)`s anything imported from it — the exact
+  signature of an escaped bug in a field report. Recorded on the evidence
+  (`defenders.signals`), printed by `claims`, carried into the brief's hints.
+  `// unasserted: <why>` above the mock silences it visibly
+  (`unasserted-annotated` with the reason).
+- Alias resolution follows tsconfig `references` (the Vite layout, where
+  `paths` live in `tsconfig.app.json`) and reads vite/vitest `resolve.alias`
+  as text, so importers from nested `__tests__/` directories are found.
+- Both known-answer fixtures gain a claim whose only importing test mocks
+  the module: expected `NOCOVER`, with the mocking file and the signal
+  recorded.
+
 - **`testguard admit <test-file> --claim <ID>`** — the two-gate rule as a
   named verb. Sugar over `probe --claim <ID> --include-dirty --no-escalate`:
   the named test must be a declared or discovered defender of the claim
@@ -54,7 +77,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   claim is false", and it is now one command. `status.next` for `unproven`
   and the installed skill's fix loop point at it. Self-claim
   `TG-ADMIT-NEEDS-ALL-KILLED`.
+
 ### Changed
+
+
+
 
 
 - `probe` honours an explicit `--ref` (even `--ref HEAD`) when defender or

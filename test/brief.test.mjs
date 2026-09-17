@@ -39,7 +39,10 @@ describe('buildBrief', () => {
   it('hints name the mechanism, not just the verdict', () => {
     const byVerdict = Object.fromEntries(evidence.records.map((r) => [r.verdict, r]));
     expect(hintFor(byVerdict.survived)).toContain('stayed green');
-    expect(hintFor(byVerdict.nocover)).toContain('No test file matches');
+    // the example's nocover record is discovered with a mocking candidate: the hint says so, and names the signal
+    expect(hintFor(byVerdict.nocover)).toContain('No test file imports the target without mocking it');
+    expect(hintFor(byVerdict.nocover)).toMatch(/test\/rules-mocked\.test\.mjs mocks it and never asserts on it/);
+    expect(hintFor({ ...byVerdict.nocover, defenders: { requested: ['test/rules.test.mjs'], resolved: [], nocover: true } })).toContain('No test file matches test/rules.test.mjs');
     expect(hintFor(byVerdict.unverifiable)).toContain('anchor-missing');
     expect(hintFor(byVerdict['flaky-defender'])).toContain('not reliably green');
   });

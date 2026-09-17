@@ -83,6 +83,13 @@ const semantic = {
       if (r.detail.undeclaredKillers && r.detail.reason !== 'killed-by-undeclared-tests') {
         errors.push({ path: `${p}/detail/undeclaredKillers`, message: 'undeclaredKillers is only meaningful with reason killed-by-undeclared-tests' });
       }
+      if (r.defenders.mocking && r.defenders.discovered) {
+        for (const f of r.defenders.mocking) if (r.defenders.resolved.includes(f)) errors.push({ path: `${p}/defenders/mocking`, message: `${f} mocks the subject and was discovered; it cannot also be a resolved defender` });
+      }
+      for (const s of r.defenders.signals ?? []) {
+        if (s.signal === 'unasserted-annotated' && !s.reason) errors.push({ path: `${p}/defenders/signals`, message: `unasserted-annotated on ${s.file} requires the annotation's reason` });
+        if (!(r.defenders.mocking ?? []).includes(s.file)) errors.push({ path: `${p}/defenders/signals`, message: `${s.file} carries a mock signal but is not listed in defenders.mocking` });
+      }
       if (r.verdict === 'unverifiable' && !r.detail.reason) {
         errors.push({ path: `${p}/detail/reason`, message: 'unverifiable requires a reason (e.g. anchor-missing, anchor-ambiguous)' });
       }
