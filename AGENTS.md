@@ -30,7 +30,7 @@ node cli/testguard.mjs scaffold src/probe/classify.mjs --json   # what the produ
 - `src/probe/probe.mjs` — orchestrator: isolation → baseline (cached per defender set) → apply → probe → escalate → restore → classify → rank.
 - `fixtures/known-answer/expected.json` — the oracle. Never edit it to match output.
 - `testguard.claims.json` — claims about this codebase, probed in CI.
-- `src/scaffold/producers.mjs` — the five fault shapes. Deterministic line heuristics; no AST, no LLM. A new shape needs a synthetic-file test and a README row.
+- `src/scaffold/producers.mjs` — the seven fault shapes. Deterministic line heuristics; no AST, no LLM. A new shape needs a synthetic-file test and a README row.
 - `src/gate/changed.mjs` — claim coverage of a change (`gate --changed`). File-level, delta-only; an uncovered file exits 1; every ignore reliance is reported. Its rules are a section of `GATE-SEMANTICS.md`.
 - `src/status/status.mjs` — the state machine every rendering derives from. A new state or action is a spec change (`status.schema.json`) and a skill-template change (`src/init/templates/SKILL.md`) in the same PR.
 

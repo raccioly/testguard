@@ -43,6 +43,30 @@
             "by": "maintainer",
             "at": "2026-09-17T02:00:00Z"
           }
+        },
+        {
+          "id": "F9",
+          "description": "The content field is dropped from the persisted row.",
+          "faultClass": "field-dropped",
+          "file": "src/redact.mjs",
+          "find": "      content: redacted,\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "derived",
+            "by": "testguard scaffold 0.4.0"
+          }
+        },
+        {
+          "id": "F10",
+          "description": "mask is called with an empty rule set instead of the configured rules.",
+          "faultClass": "argument-swapped",
+          "file": "src/redact.mjs",
+          "find": "const redacted = mask(input, rules);",
+          "replace": "const redacted = mask(input, []);",
+          "producedBy": {
+            "producer": "derived",
+            "by": "testguard scaffold 0.4.0"
+          }
         }
       ],
       "tags": [

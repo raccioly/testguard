@@ -1,11 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
-import { proposalsForLine, functionHead } from './producers.mjs';
+import { proposalsForLine, functionHead, functionParams } from './producers.mjs';
 import { locate } from '../probe/inject.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { validate } from '../../spec/lib/validate.mjs';
 
 const ANNOTATION = /@claim\s+([A-Za-z0-9]+(?:[._]?[A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9])\b/;
+// field-dropped is never proposed inside tests, fixtures or migrations: an
+// object literal there is data, not a payload the product writes.
+const NO_FIELD_DROPS = /\.(test|spec)\.[cm]?[jt]sx?$|(^|\/)(__tests__|__fixtures__|__mocks__|fixtures|migrations)\//;
 
 const idPart = (s) => s.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').toUpperCase();
 
@@ -43,6 +46,8 @@ export function scaffoldFile({ projectDir, file, claimId, existingClaims, toolVe
   let offset = 0;
   let fn = null;
   let fnDepth = 0;
+  let params = new Set();
+  const fieldDrops = !NO_FIELD_DROPS.test(file);
   let depth = 0;
   let pendingAnnotation = null;
   const proposals = [];
@@ -54,9 +59,10 @@ export function scaffoldFile({ projectDir, file, claimId, existingClaims, toolVe
     if (head) {
       fn = head;
       fnDepth = depth;
+      params = new Set(functionParams(line));
     }
 
-    for (const p of proposalsForLine(lines, i)) {
+    for (const p of proposalsForLine(lines, i, { params, fieldDrops })) {
       const find = line;
       const { hits, occurrence } = anchorFor(source, find, offset);
       const fault = { ...p, find, replace: p.replace, expectHits: hits, occurrence, line: i + 1, fn, annotation: pendingAnnotation };
@@ -65,7 +71,7 @@ export function scaffoldFile({ projectDir, file, claimId, existingClaims, toolVe
     }
 
     depth += (line.match(/\{/g) ?? []).length - (line.match(/\}/g) ?? []).length;
-    if (fn && depth <= fnDepth && !head) fn = null;
+    if (fn && depth <= fnDepth && !head) { fn = null; params = new Set(); }
     if (pendingAnnotation && !ann && !head && line.trim() && !/^\s*(\/\/|\*|\/\*)/.test(line)) pendingAnnotation = null;
     offset += line.length + 1;
   });
