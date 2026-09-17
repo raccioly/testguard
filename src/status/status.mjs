@@ -170,7 +170,7 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
       action: fixClaim ? 'probe' : 'write-test',
       command: fixClaim
         ? `edit ${top.claimId}/${top.subjectId} in testguard.claims.json, then: testguard probe --claim ${top.claimId} --include-dirty`
-        : `write a test in ${where} that fails on ${top.claimId}/${top.subjectId} and passes on HEAD, then: testguard probe --claim ${top.claimId} --include-dirty`,
+        : `write a test in ${where} that fails on ${top.claimId}/${top.subjectId} and passes on HEAD, then: testguard admit ${defenders[0] ?? '<that test file>'} --claim ${top.claimId}`,
       why: whyByVerdict[top.verdict] ?? `${top.claimId}/${top.subjectId} is ${top.verdict}.`,
       target: { claimId: top.claimId, subjectId: top.subjectId, ...(top.file ? { file: top.file } : {}), verdict: top.verdict },
     };
