@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`init` installs the agent layer at the git root** (#23): the skill,
+  the session-start hook and the `AGENTS.md` section go where agent
+  sessions run; the `.gitignore` lines stay beside the claims file. A
+  second project in the same repository adds a hook line and an
+  `AGENTS.md` bullet; `--here` keeps the old placement. A written file
+  that `.gitignore` swallows is reported (exit 1), never offered for
+  commit.
+- **The session-start hook never fetches from the network** (#24):
+  `node_modules/.bin/testguard … || npx --no-install testguard … || true`
+  instead of `npx -y testguard-cli …`; a pre-0.6 hook is replaced on the
+  next `init`. The brief's first line names the install that answered.
+
 ## [0.5.0] - 2026-09-17
 
 The change gate: unclaimed code is now a finding.

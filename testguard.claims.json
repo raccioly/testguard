@@ -589,8 +589,8 @@
           "description": "The already-installed check is defeated; every init appends another hook.",
           "faultClass": "literal-changed",
           "file": "src/init/init.mjs",
-          "find": "const already = JSON.stringify(settings.hooks.SessionStart).includes(HOOK_CMD);",
-          "replace": "const already = false;",
+          "find": "  const hasCmd = settings.hooks.SessionStart.some((e) => JSON.stringify(e).includes(cmd));",
+          "replace": "  const hasCmd = false;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -719,6 +719,70 @@
           "file": "src/scaffold/producers.mjs",
           "find": "    if (!isDerived(arg, params)) continue;",
           "replace": "    if (false) continue;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-INIT-HOOK-NO-NETWORK",
+      "statement": "The session-start hook init installs never fetches from the network: it prefers a local install, falls back to npx --no-install, and ends in `true` so it can never break a session; `npx -y` never appears.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#built-for-agents-to-run"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/init.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The fallback fetches the published package with npx -y on every session start.",
+          "faultClass": "literal-changed",
+          "file": "src/init/init.mjs",
+          "find": "`npx --no-install testguard brief --text${arg} 2>/dev/null`",
+          "replace": "`npx -y testguard-cli brief --text${arg} 2>/dev/null`",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-INIT-AGENT-LAYER-AT-ROOT",
+      "statement": "For a project in a subdirectory of a repository, init installs the skill, the hook and the AGENTS.md section at the git root, where agent sessions run, unless --here is given.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#built-for-agents-to-run"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/init.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The agent layer is written beside the claims file in the subdirectory, where no session ever reads it.",
+          "faultClass": "variable-swap",
+          "file": "src/init/init.mjs",
+          "find": "  const agentRoot = root ?? projectDir;",
+          "replace": "  const agentRoot = projectDir;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
