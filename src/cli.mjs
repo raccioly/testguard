@@ -74,6 +74,8 @@ init       --force (replace an existing skill file)  --here (keep the agent laye
 every command accepts --json; probe/baseline emit the status document plus their own result
 claims     --json
 baseline   --evidence <path>  --out <path>  --allow-provisional (freeze unconfirmed evidence; normally refused)
+           --restamp          move head to the commit of a later CLEAN probe that reproduced the same fingerprints
+                              (a baseline frozen from a snapshot points at the parent of the commit that carries its tests)
 brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; safe for hooks)
 
 exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift, or unclaimed changes) · 2 precondition failed · 3 usage
@@ -107,6 +109,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         explain: { type: 'boolean', default: false },
         ignore: { type: 'string' },
         'allow-provisional': { type: 'boolean', default: false },
+        restamp: { type: 'boolean', default: false },
         force: { type: 'boolean', default: false },
         here: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },

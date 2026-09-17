@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+- **`baseline --restamp`** (#25). A baseline frozen from `--include-dirty`
+  evidence now records the snapshot commit and, once you commit, a clean
+  `probe` plus `--restamp` moves its `head` to that commit — only when the
+  fingerprints are identical and the tree is clean; a frozen contract is
+  never silently rewritten. `status` gains informational `notes` (never a
+  state): a baseline frozen from a snapshot or a dirty tree that predates
+  HEAD, or one whose head is not an ancestor of HEAD.
+
+
 - **Mock-aware defender discovery** (#20). A test file that `vi.mock`s /
   `jest.mock`s the target cannot detect any fault in it and is no longer a
   discovered defender; `NOCOVER` now means "no test imports this source
@@ -55,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
 - **`init` installs the agent layer at the git root** (#23): the skill,
   the session-start hook and the `AGENTS.md` section go where agent
   sessions run; the `.gitignore` lines stay beside the claims file. A
@@ -66,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `node_modules/.bin/testguard … || npx --no-install testguard … || true`
   instead of `npx -y testguard-cli …`; a pre-0.6 hook is replaced on the
   next `init`. The brief's first line names the install that answered.
+
 
 
 
