@@ -1,0 +1,59 @@
+{
+  "$schema": "../../schemas/replay.schema.json",
+  "schemaVersion": 1,
+  "tool": { "name": "testguard", "version": "0.5.0" },
+  "run": {
+    "id": "replay-20260917T220000",
+    "startedAt": "2026-09-17T22:00:00Z",
+    "finishedAt": "2026-09-17T22:14:00Z",
+    "range": "HEAD~50..HEAD",
+    "runner": { "name": "vitest", "version": "5.0.1" },
+    "confirmRuns": 3,
+    "candidates": 12,
+    "duplicates": 4
+  },
+  "records": [
+    {
+      "commit": "4a1c9f2e77b0d3a8c5e61f04b9d27a3e8c6f01b2",
+      "patchId": "9f2e77b0d3a8c5e61f04b9d27a3e8c6f01b24a1c",
+      "subject": "fix(redact): keep the raw input out of the audit row",
+      "verdict": "blind",
+      "source": ["src/redact.mjs"],
+      "removedTests": ["test/audit-fix.test.mjs"],
+      "ranTests": 4,
+      "faultClass": "field-dropped",
+      "runs": [
+        { "outcome": "pass", "tests": { "total": 4, "passed": 4, "failed": 0 }, "assertionFailures": 0, "durationMs": 620 },
+        { "outcome": "pass", "tests": { "total": 4, "passed": 4, "failed": 0 }, "assertionFailures": 0, "durationMs": 604 },
+        { "outcome": "pass", "tests": { "total": 4, "passed": 4, "failed": 0 }, "assertionFailures": 0, "durationMs": 611 }
+      ]
+    },
+    {
+      "commit": "b7d3e0a1c48f95726de1b0c3a95f8e27d40b1a6c",
+      "patchId": "e0a1c48f95726de1b0c3a95f8e27d40b1a6cb7d3",
+      "subject": "fix(redact): mask every match",
+      "verdict": "caught",
+      "source": ["src/redact.mjs"],
+      "removedTests": ["test/mask-fix.test.mjs"],
+      "ranTests": 4,
+      "faultClass": "statement-deleted",
+      "runs": [
+        { "outcome": "fail", "tests": { "total": 4, "passed": 3, "failed": 1 }, "assertionFailures": 1, "durationMs": 640 },
+        { "outcome": "fail", "tests": { "total": 4, "passed": 3, "failed": 1 }, "assertionFailures": 1, "durationMs": 628 },
+        { "outcome": "fail", "tests": { "total": 4, "passed": 3, "failed": 1 }, "assertionFailures": 1, "durationMs": 633 }
+      ]
+    },
+    {
+      "commit": "c81f4a05d29e6b3714c0a8fe5d92b063a17e4f8d",
+      "patchId": "4a05d29e6b3714c0a8fe5d92b063a17e4f8dc81f",
+      "subject": "fix(export): drop the content column from the CSV export",
+      "verdict": "nocover",
+      "reason": "no-test-imports-the-reverted-source",
+      "source": ["src/export.mjs"],
+      "removedTests": ["test/export-fix.test.mjs"],
+      "ranTests": 0,
+      "faultClass": "field-dropped",
+      "runs": [{ "outcome": "error", "durationMs": 0 }]
+    }
+  ]
+}

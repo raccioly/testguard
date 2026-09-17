@@ -14,6 +14,7 @@ import { scaffoldCommand } from './commands/scaffold.mjs';
 import { statusCommand } from './commands/status.mjs';
 import { initCommand } from './commands/init.mjs';
 import { gateCommand } from './commands/gate.mjs';
+import { replayCommand } from './commands/replay.mjs';
 import { admitCommand } from './commands/admit.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
@@ -28,6 +29,7 @@ const USAGE = `testguard ${VERSION} — proves a test suite defends the claims a
   testguard brief [dir]      emit the blind-spot block for an agent's session-start context
   testguard gate [dir]       fail when a changed source file carries no claim and no excusing ignore entry
   testguard scaffold <file>  propose faults mechanically for one source file, as a draft claims document
+  testguard replay [dir]     would this suite have caught the bugs that already escaped? Replays real fix commits and calibrates fault classes against them
   testguard admit <test> --claim <ID>   the two-gate rule as one verb: is this test green on HEAD and does it fail on every fault of the claim?
 
 probe
@@ -58,6 +60,11 @@ scaffold   --claim <ID> (put every proposal under this claim; copies it if it ex
            shapes: if-guard → if (false) · single-line guard/mutation removed · return <check> → return true
                    · security flag/window/cost literal weakened · verify/validate/check call removed
                    · field dropped from a payload/allow-list/schema/merge · parameter-derived argument swapped for undefined/{}
+replay     --since <range>   commit range to search for fix commits (HEAD~50..HEAD, a tag, origin/main..HEAD)
+           --max <n>         replay at most n fixes (they are slow: one worktree and N runs each)
+           --confirm <n>     runs per verdict (default 3); a flaky failure reads as "the suite caught it", so mixed runs are never caught
+           --out <path>       replay document (default: <dir>/.testguard/replay.json); the calibration goes beside it
+           reports, never gates: a bug that escaped is history, not a regression in this change
                    · one-line JSX element removed · on<Event> handler prop dropped
 admit      --claim <ID> (required)  --fault <FID> (one fault only)  --confirm <n>  --json
            ADMITTED (exit 0) only when every fault of the claim is killed N/N by defenders that are green N/N; anything else is NOT ADMITTED (exit 1) and names the first blocking fault
@@ -86,7 +93,7 @@ brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; 
 exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift, or unclaimed changes) · 2 precondition failed · 3 usage
 `;
 
-const COMMANDS = { probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand, admit: admitCommand };
+const COMMANDS = { replay: replayCommand, probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand, admit: admitCommand };
 
 export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') }) {
   let parsed;
