@@ -3,7 +3,8 @@ import { git } from '../git.mjs';
 import { createRequire } from 'node:module';
 import { join, relative, resolve } from 'node:path';
 import { repoRoot as gitRoot, headSha, isDirty, snapshotWorkingTree } from '../git.mjs';
-import { discoverDefenders } from './discover.mjs';
+import { discoverDefenders, discoverDefendersDetailed } from './discover.mjs';
+import { classifyDefenders } from './mocks.mjs';
 import { createScratch, inPlace, PreconditionError } from './worktree.mjs';
 import { applyFault, locate } from './inject.mjs';
 import { resolveDefenders, parseCommandTemplate } from './runners/shared.mjs';
@@ -115,9 +116,14 @@ export async function probe({
       if (selected && !selected.has(claim.id)) continue;
       const declared = claim.defendedBy?.length ? resolveDefenders(iso.projectDir, claim.defendedBy) : null;
       for (const fault of claim.faults) {
-        const defenders = declared ?? discoverDefenders(iso.projectDir, fault.file);
+        // Mock-awareness: a discovered file that mocks the target is not a
+        // defender; a declared one that mocks it stays (the author named it)
+        // but is listed, because a declared defender that mocks the subject
+        // is a broken evidence chain the author should see.
+        const mockInfo = declared ? classifyDefenders(iso.projectDir, fault.file, declared) : discoverDefendersDetailed(iso.projectDir, fault.file);
+        const defenders = declared ?? mockInfo.canDetect;
         const stage = (name, i, n) => onStage({ claimId: claim.id, faultId: fault.id, stage: name, i, n });
-        const record = await probeOne({ claim, fault, defenders, discovered: declared === null, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id });
+        const record = await probeOne({ claim, fault, defenders, discovered: declared === null, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, mocking: mockInfo.mocking, signals: mockInfo.signals });
         records.push(record);
         onProgress(record);
       }
@@ -143,7 +149,7 @@ export async function probe({
   };
 }
 
-async function probeOne({ claim, fault, defenders, discovered, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior, priorRunId }) {
+async function probeOne({ claim, fault, defenders, discovered, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior, priorRunId, mocking = [], signals = [] }) {
   const targetPath = join(iso.projectDir, fault.file);
   const targetExists = existsSync(targetPath);
   const inputs = {
@@ -240,7 +246,7 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
     subject: { kind: 'fault', id: fault.id, description: fault.description, file: fault.file, faultClass: fault.faultClass, producedBy: fault.producedBy, contentHash: sha256(`${fault.find}\n${fault.replace}`) },
     verdict,
     detail,
-    defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}) },
+    defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}), ...(mocking.length ? { mocking } : {}), ...(signals.length ? { signals } : {}) },
     inputs,
     rank: rank({ severity: claim.severity, sourceKind: claim.source.kind, blast }),
   };

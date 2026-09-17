@@ -48,6 +48,10 @@
     "DISCOVER-001/F1": {
       "verdict": "killed",
       "why": "No defendedBy; test/redact.test.mjs is discovered because it imports src/redact.mjs, and its masked-output test fails."
+    },
+    "EXPORT-002/F1": {
+      "verdict": "nocover",
+      "why": "The only test that imports the export module mocks it (vi.mock / jest.mock) and never asserts on it. A mock cannot detect a fault in the module it replaces, so discovery excludes it: no defender, and the evidence records the file under defenders.mocking with a mocked-never-asserted signal."
     }
   }
 }
