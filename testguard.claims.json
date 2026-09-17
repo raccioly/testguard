@@ -522,11 +522,11 @@
       "faults": [
         {
           "id": "F1",
-          "description": "The unclaimed block is never rendered.",
+          "description": "The unclaimed block is never rendered in the TEXT brief (the markdown renderer has its own claim).",
           "faultClass": "condition-forced",
           "file": "src/brief/brief.mjs",
-          "find": "  if (brief.unclaimed) {",
-          "replace": "  if (false) {",
+          "find": "  if (brief.unclaimed) {\n    const n = brief.unclaimed.files.length;\n    lines.push('', `UNCLAIMED CHANGES since",
+          "replace": "  if (false) {\n    const n = brief.unclaimed.files.length;\n    lines.push('', `UNCLAIMED CHANGES since",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -1343,6 +1343,198 @@
           "file": "src/probe/runners/shared.mjs",
           "find": "[k, String(v).replaceAll('{out}', outFile)]",
           "replace": "[k, String(v)]",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-BRIEF-MARKDOWN-UNCLAIMED-FIRST",
+      "statement": "The markdown brief lists unclaimed changed files before any finding, exactly as the text brief does; a reviewer reading the merge-request note sees the claim gap first.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/brief.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The markdown renderer drops the unclaimed-changes section; the text renderer keeps it.",
+          "faultClass": "condition-forced",
+          "file": "src/brief/brief.mjs",
+          "find": "  if (brief.unclaimed) {\n    const n = brief.unclaimed.files.length;\n    lines.push('', `### Unclaimed changes since",
+          "replace": "  if (false) {\n    const n = brief.unclaimed.files.length;\n    lines.push('', `### Unclaimed changes since",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-GITLAB-PROBE-EXIT-PRESERVED",
+      "statement": "The GitLab probe job exits with the probe's own status; writing the brief and posting the note afterwards never turns a red probe green.",
+      "source": {
+        "kind": "spec",
+        "ref": "packaging/gitlab/testguard.gitlab-ci.yml"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/gitlab-template.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The job ends with exit 0 regardless of the probe's status; the pipeline is green with unproven claims.",
+          "faultClass": "literal-changed",
+          "file": "packaging/gitlab/testguard.gitlab-ci.yml",
+          "find": "    - exit $status\n",
+          "replace": "    - exit 0\n",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PROVIDED-EVIDENCE-STILL-STALE-CHECKED",
+      "statement": "Evidence supplied with --evidence is checked for staleness from its recorded input hashes exactly as local evidence is; a foreign document never makes a changed file look proven.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/status.schema.json"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/status.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Provided evidence skips the target-hash staleness check; a locally edited file keeps CI's verdict.",
+          "faultClass": "condition-forced",
+          "file": "src/status/status.mjs",
+          "find": "    if (existsSync(target) && hashFile(target) !== r.inputs.targetHash) doc.stale.push(`${cur.fault.file} changed since ${key} was probed`);",
+          "replace": "    if (false && existsSync(target) && hashFile(target) !== r.inputs.targetHash) doc.stale.push(`${cur.fault.file} changed since ${key} was probed`);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-INDEPENDENCE-IS-NEVER-A-VERDICT",
+      "statement": "A kill by a test written in the same change as the code it guards is recorded as co-authored; a defender written separately is separate-change, and a missing history is unknown rather than assumed independent.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/evidence.schema.json"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/independence.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A defender with no history is assumed independent instead of unknown; every untracked or shallow case silently reports separate-change.",
+          "faultClass": "return-altered",
+          "file": "src/probe/independence.mjs",
+          "find": "    if (!def) return { class: 'unknown', targetCommit: target.commit };",
+          "replace": "    if (!def) return { class: 'separate-change', targetCommit: target.commit };",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RANK-ABSENT-SIGNAL-IS-NEUTRAL",
+      "statement": "A record with no independence signal ranks exactly as it did before the signal existed; an absent signal is neutral, never a penalty, so reused verdicts and evidence from an older version keep their order.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/independence.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A missing independence signal is treated as co-authored, silently re-ranking every record written before the signal existed.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/rank.mjs",
+          "find": "(INDEPENDENCE_WEIGHT[independence] ?? 1)",
+          "replace": "(INDEPENDENCE_WEIGHT[independence] ?? 0.85)",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FLAKE-RATE-EXCLUDES-NON-RUNS",
+      "statement": "The flake rate counts only baseline runs that actually ran; a load error or a timeout measures nothing about stability and is excluded from both numbers, so a suite that cannot load is never reported as flaky.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/evidence.schema.json"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/probe.fixture.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Load errors and timeouts are counted as flake failures; an unverifiable claim then also reports a flake rate, which the validator rejects as a contradiction.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "      const measured = baseline.runs.filter((r) => r.outcome === 'pass' || r.outcome === 'fail');",
+          "replace": "      const measured = baseline.runs;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",

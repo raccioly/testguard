@@ -9,6 +9,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`brief --markdown`** — the brief as a merge-request note for the human
+  reviewer: marker line, heading, one summary line, unclaimed changes first,
+  `next`, then a table of at most `--max` findings with the hint each carries.
+  Print-only and hook-safe like `--text`. Every platform quality tool renders
+  its verdict where the reviewer looks; TestGuard's brief was written for the
+  agent only. (#32)
+- **GitLab CI/CD component-shaped template** (`packaging/gitlab/`): `spec:
+  inputs:` (`version`, `dir`, `image`, `severity`, `confirm`, `budget`,
+  `no_escalate`, `strict`, `post_note`, `stage`) so it works via `include:
+  remote:` today and as a catalog component when mirrored into GitLab; the
+  probe job always writes `brief.json` and `brief.md` as artifacts, exits with
+  the probe's own status, and with `post_note: true` and a
+  `TESTGUARD_GITLAB_TOKEN` (api scope) posts the markdown brief as one merge
+  request note, updated in place and found by its marker. The CLI still makes
+  no network calls; the job does, and only when told to. (#32)
+- **Read CI's evidence locally.** `status --evidence <path>` accepts a
+  document taken elsewhere: `evidenceSource: provided`, the commit it
+  describes recorded as `evidenceHead` beside the tree's `head` and printed
+  when they differ, and staleness still computed from the recorded input
+  hashes — so a foreign document is trusted only for the faults whose inputs
+  still match. `brief --evidence` passes the same file to `status`.
+  `init --ci-evidence github|gitlab` writes `.testguard/fetch-ci-evidence.sh`,
+  an **on-demand** helper that downloads the branch-named artifact with the
+  platform CLI and briefs from it; the session-start hook stays offline. CI
+  uploads `testguard-evidence-<branch>` on pushes. (#33)
+- **L3 independence, recorded on every kill.** `detail.independence`
+  (`class`: `co-authored` · `separate-change` · `unknown`, plus
+  `defenderCommit`, `targetCommit`, `sameAuthor`) answers what nothing else in
+  this category asks: was the test that killed the fault written by the same
+  change, or the same author, as the code it guards? A **signal, not a
+  verdict** — `classify()` never sees it, ranking weights a co-authored kill
+  slightly below an independent one and an absent signal is neutral,
+  `status.counts.killedCoAuthored` counts them and `brief` says it in one
+  line. (#31)
+- **`detail.flakeRate`** — the observed instability of a claim's defenders on
+  unmodified source, as `{runs, failures}`. The decision still stops at the
+  first non-green run; the remaining runs are then completed for that defender
+  set only, cached, and only when it is already broken, so the degree is known
+  at bounded cost. Only runs that actually ran are counted, so a suite that
+  cannot load is never reported as flaky. A stable defender records
+  `{runs: N, failures: 0}` — the first real input to
+  `calibration.schema.json`. `status.counts` gains `flakyDefenderSets` and
+  `worstFlakeRate`; the brief's hint names the degree. (#34)
+
+### Spec
+
+- `evidence.schema.json`: `detail.independence` and `detail.flakeRate`, with
+  semantic rules — only `killed` records carry independence, a known class
+  names both commits, `flakeRate.failures > 0` requires the `flaky-defender`
+  verdict.
+- `status.schema.json`: `evidenceSource`, `evidenceHead`, `head`, and
+  `counts.killedCoAuthored`, `counts.flakyDefenderSets`,
+  `counts.worstFlakeRate`; evidence that was read must name its commit.
+
+### Self-application
+
+Six new self-claims: `TG-BRIEF-MARKDOWN-UNCLAIMED-FIRST`,
+`TG-GITLAB-PROBE-EXIT-PRESERVED`, `TG-PROVIDED-EVIDENCE-STILL-STALE-CHECKED`,
+`TG-INDEPENDENCE-IS-NEVER-A-VERDICT`, `TG-RANK-ABSENT-SIGNAL-IS-NEUTRAL`,
+`TG-FLAKE-RATE-EXCLUDES-NON-RUNS`. `TG-BRIEF-UNCLAIMED-FIRST` was re-anchored:
+the markdown renderer duplicated its one-line anchor, which CI's self-probe
+caught as `UNVERIFIABLE`.
+
+### Added
+
 
 
 

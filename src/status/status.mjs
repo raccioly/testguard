@@ -24,7 +24,13 @@ const P = (projectDir) => ({
  * Reads the claims file, evidence, baseline and the working tree; never
  * trusts a cached verdict whose inputs have changed.
  */
-export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20, changedRef, includeDirty = false }) {
+/**
+ * `evidence` overrides the project's own evidence file: a document taken on
+ * ANOTHER commit (CI's, fetched as an artifact) is legitimate input. Staleness
+ * is computed from the recorded input hashes exactly as for a local run, so a
+ * foreign document is trusted only for the faults whose inputs still match.
+ */
+export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20, changedRef, includeDirty = false, evidence: evidenceOverride }) {
   const rel = (p) => relative(projectDir, p) || '.';
   const doc = {
     schemaVersion: 1,
@@ -81,7 +87,8 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
     return doc;
   }
 
-  const hasEvidence = existsSync(paths.evidence);
+  const evidenceFile = evidenceOverride ?? paths.evidence;
+  const hasEvidence = existsSync(evidenceFile);
   const hasProvisional = existsSync(paths.provisional);
   if (hasProvisional) doc.paths.provisionalEvidence = rel(paths.provisional);
   if (!hasEvidence) {
@@ -95,8 +102,15 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
     }
     return doc;
   }
-  doc.paths.evidence = rel(paths.evidence);
-  const evidence = readSpecDoc('evidence', paths.evidence);
+  doc.paths.evidence = rel(evidenceFile);
+  doc.evidenceSource = evidenceOverride ? 'provided' : 'local';
+  const evidence = readSpecDoc('evidence', evidenceFile);
+  // A verdict is about a commit. When the evidence describes a different one,
+  // say both: "looks right and is not" is the failure mode this prevents.
+  doc.evidenceHead = evidence.run.repo.snapshot ?? evidence.run.repo.head;
+  const localHead = (() => { try { return headSha(projectDir); } catch { return null; } })();
+  if (localHead) doc.head = localHead;
+
   const baseline = existsSync(paths.baseline) ? readSpecDoc('baseline', paths.baseline) : undefined;
   if (baseline) doc.paths.baseline = rel(paths.baseline);
 
@@ -137,6 +151,14 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   const counts = {};
   for (const r of evidence.records) counts[r.verdict] = (counts[r.verdict] ?? 0) + 1;
   doc.counts.byVerdict = counts;
+  // L3 independence and observed flakiness, as numbers rather than adjectives.
+  const kills = evidence.records.filter((r) => r.verdict === 'killed');
+  if (kills.length) doc.counts.killedCoAuthored = kills.filter((r) => r.detail.independence?.class === 'co-authored').length;
+  const flaky = evidence.records.filter((r) => r.detail.flakeRate?.failures > 0);
+  if (flaky.length) {
+    doc.counts.flakyDefenderSets = new Set(flaky.map((r) => r.defenders.resolved.join('\n'))).size;
+    doc.counts.worstFlakeRate = Math.max(...flaky.map((r) => r.detail.flakeRate.failures / r.detail.flakeRate.runs));
+  }
   doc.counts.new = g.new.length + g.belowFloor.length;
   doc.counts.baselined = g.baselined.length;
   const ranked = sortForReport([...g.new, ...g.belowFloor, ...g.baselined]);
@@ -200,7 +222,12 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
 }
 
 export function renderStatus(doc) {
-  const lines = [`state: ${doc.state}${doc.provisional ? ' (provisional)' : ''} — ${doc.counts.claims} claims / ${doc.counts.faults} faults` + (doc.counts.byVerdict ? `; ${Object.entries(doc.counts.byVerdict).map(([k, v]) => `${v} ${k}`).join(', ')}; ${doc.counts.new ?? 0} new, ${doc.counts.baselined ?? 0} baselined` : '')];
+  const lines = [];
+  if (doc.evidenceSource === 'provided') {
+    lines.push(`evidence: ${doc.paths.evidence} (provided)` + (doc.evidenceHead ? ` describes ${doc.evidenceHead.slice(0, 7)}` : '') + (doc.head && doc.evidenceHead && doc.head !== doc.evidenceHead ? `; this tree is ${doc.head.slice(0, 7)}` : ''));
+  }
+  lines.push(`state: ${doc.state}${doc.provisional ? ' (provisional)' : ''} — ${doc.counts.claims} claims / ${doc.counts.faults} faults` + (doc.counts.byVerdict ? `; ${Object.entries(doc.counts.byVerdict).map(([k, v]) => `${v} ${k}`).join(', ')}; ${doc.counts.new ?? 0} new, ${doc.counts.baselined ?? 0} baselined` : '')
+  );
   if (doc.changes) {
     const c = doc.changes;
     lines.push(`changes:  ${c.changed} file${c.changed === 1 ? '' : 's'} since ${c.ref}; ${c.evaluated} evaluated, ${c.excluded} excluded, ${c.uncovered.length} unclaimed`);

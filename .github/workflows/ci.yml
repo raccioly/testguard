@@ -152,6 +152,17 @@ jobs:
         if: matrix.node-version == 22
         run: node cli/testguard.mjs probe . --budget 180000 --no-escalate --out .testguard/ci-self-evidence.json
 
+      # A stable, branch-named artifact so a developer can fetch the evidence
+      # CI produced without knowing a run id (README: read CI's evidence
+      # locally). One Node leg is enough; the verdicts are identical.
+      - name: Upload evidence under a stable, branch-named artifact
+        if: always() && matrix.node-version == 22 && github.event_name == 'push'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: testguard-evidence-${{ github.ref_name }}
+          path: .testguard/ci-self-evidence.json
+          if-no-files-found: warn
+
       - name: Upload self-probe evidence
         if: always() && matrix.node-version == 22
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

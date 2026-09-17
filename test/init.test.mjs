@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, realpathSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, realpathSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -124,5 +124,34 @@ describe('init', () => {
     writeFileSync(join(dir, '.claude', 'settings.json'), '{not json');
     expect(() => initProject({ projectDir: dir })).toThrow(/not valid JSON/);
     expect(existsSync(join(dir, 'AGENTS.md'))).toBe(false);
+  });
+  describe('--ci-evidence writes an on-demand helper, never a hook that fetches', () => {
+    for (const platform of ['github', 'gitlab']) {
+      it(`${platform}: the helper is executable, uses the platform CLI, falls back silently, and the hook stays offline`, () => {
+        const dir = mkdtempSync(join(tmpdir(), `tg-ci-ev-${platform}-`));
+        const r = initProject({ projectDir: dir, ciEvidence: platform });
+        expect(r.done.some((x) => /fetch-ci-evidence\.sh/.test(x))).toBe(true);
+        const helper = join(dir, '.testguard', 'fetch-ci-evidence.sh');
+        const body = readFileSync(helper, 'utf8');
+        expect(statSync(helper).mode & 0o111).toBeTruthy();
+        expect(body).toContain(platform === 'github' ? 'gh run download' : 'glab ci artifact');
+        expect(body).toContain('--evidence');
+        // no CLI on this machine → exits 0 with a message, never a failure
+        // an empty PATH (with /bin/sh addressed absolutely) is "the platform CLI is not installed"
+        const run = spawnSync('/bin/sh', [helper], { cwd: dir, encoding: 'utf8', env: { ...process.env, PATH: mkdtempSync(join(tmpdir(), 'tg-empty-path-')) } });
+        expect(run.status).toBe(0);
+        expect(run.stderr).toMatch(platform === 'github' ? /gh is not installed/ : /glab is not installed/);
+        // the session-start hook is unchanged and still touches nothing
+        const r2 = initProject({ projectDir: dir });
+        const settingsPath = join(r2.agentRoot ?? dir, '.claude', 'settings.json');
+        const hook = JSON.stringify(JSON.parse(readFileSync(settingsPath, 'utf8')).hooks.SessionStart);
+        expect(hook).not.toMatch(/gh |glab |curl|wget/);
+        expect(initProject({ projectDir: dir, ciEvidence: platform }).skipped.some((x) => /fetch-ci-evidence\.sh exists/.test(x))).toBe(true);
+      });
+    }
+    it('rejects an unknown platform', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'tg-ci-ev-bad-'));
+      expect(() => initProject({ projectDir: dir, ciEvidence: 'bitbucket' })).toThrow(/--ci-evidence must be github or gitlab/);
+    });
   });
 });

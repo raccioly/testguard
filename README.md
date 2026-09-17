@@ -67,6 +67,7 @@ raises coverage. TestGuard admits it because it fails when the claim is false.
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
 | GitHub Action | `uses: raccioly/testguard@v0.5.0` — see [`action.yml`](./action.yml) |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
+| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.5.0/packaging/gitlab/testguard.gitlab-ci.yml` with `inputs:` — see [`packaging/gitlab/`](./packaging/gitlab/testguard.gitlab-ci.yml) |
 
 Projects that set `min-release-age` in `.npmrc` cannot see a version published
 less than that many days ago (`ENOVERSIONS`); install that one with
@@ -107,7 +108,7 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    | `UNVERIFIABLE` | the fault's anchor is missing or ambiguous — loud, never a skip |
    | `TIMEOUT` | the defenders hung; a hang is not a detection |
    | `FAULT-INVALID` | the replacement does not load — a bad fault, not a finding |
-   | `FLAKY-DEFENDER` | the defenders are not reliably green, or disagreed across runs |
+   | `FLAKY-DEFENDER` | the defenders are not reliably green, or disagreed across runs — `detail.flakeRate` says how often (`failures` of `runs` on unmodified source) |
 
    Never a single score. Findings are ranked by severity, claim provenance
    and blast radius (relative imports, `tsconfig` path aliases and
@@ -182,7 +183,8 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    HEAD without making it a state.
 4. **Brief** turns evidence plus baseline into a ranked, capped
    `## TEST BLINDSPOT CONTEXT` block, printed and also written to
-   `.testguard/brief.json` (`--text` prints only). Wire it into an agent's session start
+   `.testguard/brief.json` (`--text` prints only; `--markdown` prints the same brief as a
+   merge-request note for the human reviewer, unclaimed changes first). Wire it into an agent's session start
    — for Claude Code, in `.claude/settings.json`:
 
    ```json
@@ -196,6 +198,31 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    network, and ends in `true` — so the hook can never break a session. The
    brief's first line says which install answered (`local install` or
    `global`), so a stale one is visible.
+
+### Read CI's evidence locally
+
+Verdict reuse makes a probe cheap, but the evidence lives where `probe` ran
+and is gitignored. On a fresh clone, or on a laptop where CI does the
+probing, the session-start brief is empty and `status` says `unprobed` while
+the default branch has full evidence. Point either command at CI's document:
+
+```bash
+testguard status . --evidence .testguard/ci/ci-self-evidence.json
+testguard brief . --text --evidence .testguard/ci/ci-self-evidence.json
+```
+
+A foreign document is not trusted blindly. `status` marks it
+`evidenceSource: provided`, prints the commit it describes next to the
+commit in your tree, and still computes staleness from the recorded input
+hashes — so a file you have edited since CI probed it goes `evidence-stale`
+for exactly those claims.
+
+`testguard init --ci-evidence github` (or `gitlab`) writes
+`.testguard/fetch-ci-evidence.sh`, which downloads the branch-named artifact
+with the platform CLI you already have and then briefs from it. **It is an
+on-demand helper, not a hook**: the session-start hook never touches the
+network, and the helper exits 0 with a message when the CLI or the artifact
+is missing. TestGuard itself still makes no network calls.
 
 ### Every change needs a claim
 
@@ -238,12 +265,17 @@ detected base that does not resolve is a warning for `status` and `brief`
 - uses: raccioly/testguard@v0.5.0
   with: { command: gate }
 
-# GitLab CI — or include: remote: the template in packaging/gitlab/
-testguard:gate:
-  image: node:22
-  rules: [{ if: $CI_PIPELINE_SOURCE == "merge_request_event" }]
-  script: [npx -y testguard-cli gate .]
+# GitLab CI — the component-shaped template: gate + probe, brief as an artifact and, opted in, as a merge-request note
+include:
+  - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.5.0/packaging/gitlab/testguard.gitlab-ci.yml'
+    inputs: { dir: backend, post_note: true }   # post_note needs TESTGUARD_GITLAB_TOKEN (api scope); one note, updated in place
 ```
+
+The template carries `spec: inputs:` (`version`, `dir`, `image`, `severity`,
+`confirm`, `budget`, `no_escalate`, `strict`, `post_note`, `stage`), so
+mirrored into a GitLab project it is a catalog component that a compliance
+framework can require on every project in a group. The CLI itself never
+talks to the network; only the job posts, and only when told to.
 
 ### Properties
 
@@ -298,6 +330,17 @@ things make that safe:
   local install, falls back to `npx --no-install`, and **never fetches from
   the network**; a pre-0.6 `npx -y` hook is replaced. A written file that
   `.gitignore` swallows is reported, not offered for commit. Idempotent.
+- **Independence is recorded (L3).** `probe` measures *power* — would this
+  test notice if the code were wrong. It also records, on every kill, whether
+  the killing test was last touched by the same change (or the same author) as
+  the code it guards: `detail.independence` is `co-authored`,
+  `separate-change` or `unknown`. A co-authored kill is legitimate — a fix
+  *should* ship with its regression test — but a repository where every kill
+  is co-authored has no independent verification, whatever its claim
+  verification rate says. It is a **signal**: ranking reads it, verdicts never
+  do, and the brief says it in one line. Nothing else in this category
+  measures it, and agents saturate the tests they can see
+  ([SpecBench](https://arxiv.org/abs/2605.21384)).
 - **Gaming is visible.** The cheapest way to make a survivor disappear is to
   weaken its fault, not to write a test. Evidence records every fault's
   content hash; `status` lists any fault edited after it survived, with its
