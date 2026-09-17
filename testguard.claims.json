@@ -823,6 +823,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-WALK-SKIPS-TOOL-DIRS",
+      "statement": "File walking never descends into node_modules, .git, dist, coverage or .testguard; test discovery and defender globs cannot pick up a dependency's or a build's test files.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#how-it-works"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/glob.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The skip list is ignored; node_modules and build output are walked.",
+          "faultClass": "guard-removed",
+          "file": "src/util/glob.mjs",
+          "find": "        if (!SKIP_DIRS.has(entry.name)) visit(join(dir, entry.name), relPath);",
+          "replace": "        visit(join(dir, entry.name), relPath);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }
