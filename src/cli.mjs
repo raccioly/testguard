@@ -15,6 +15,7 @@ import { statusCommand } from './commands/status.mjs';
 import { initCommand } from './commands/init.mjs';
 import { gateCommand } from './commands/gate.mjs';
 import { replayCommand } from './commands/replay.mjs';
+import { mcpCommand } from './commands/mcp.mjs';
 import { admitCommand } from './commands/admit.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
@@ -29,6 +30,7 @@ const USAGE = `testguard ${VERSION} — proves a test suite defends the claims a
   testguard brief [dir]      emit the blind-spot block for an agent's session-start context
   testguard gate [dir]       fail when a changed source file carries no claim and no excusing ignore entry
   testguard scaffold <file>  propose faults mechanically for one source file, as a draft claims document
+  testguard mcp              serve the read-only status/brief/claims/evidence tools over MCP on stdio, so the loop works in any agent harness
   testguard replay [dir]     would this suite have caught the bugs that already escaped? Replays real fix commits and calibrates fault classes against them
   testguard admit <test> --claim <ID>   the two-gate rule as one verb: is this test green on HEAD and does it fail on every fault of the claim?
 
@@ -63,6 +65,9 @@ scaffold   --claim <ID> (put every proposal under this claim; copies it if it ex
            shapes: if-guard → if (false) · single-line guard/mutation removed · return <check> → return true
                    · security flag/window/cost literal weakened · verify/validate/check call removed
                    · field dropped from a payload/allow-list/schema/merge · parameter-derived argument swapped for undefined/{}
+mcp        no options. JSON-RPC 2.0 over stdio; five READ-ONLY tools (status, brief, claims, evidence, next_command).
+           Nothing here runs a probe: next_command hands back the shell line for you to run where the person can see it.
+           Register it with your harness — testguard init --mcp prints the config for Claude Code, Cursor and Codex.
 replay     --since <range>   commit range to search for fix commits (HEAD~50..HEAD, a tag, origin/main..HEAD)
            --max <n>         replay at most n fixes (they are slow: one worktree and N runs each)
            --confirm <n>     runs per verdict (default 3); a flaky failure reads as "the suite caught it", so mixed runs are never caught
@@ -85,6 +90,7 @@ init       --force (replace an existing skill file)  --here (keep the agent laye
            --ci-evidence github|gitlab   write .testguard/fetch-ci-evidence.sh, an ON-DEMAND helper that downloads CI's evidence artifact and briefs from it; the session-start hook stays offline
            agent layer (skill, SessionStart hook, AGENTS.md section) → git root; project layer (.gitignore lines) → [dir]
            the hook prefers a local install, falls back to npx --no-install, never fetches; exit 1 if a written file is gitignored
+           --mcp             print the MCP server config for Claude Code, Cursor and Codex (printed, never written: a harness config is yours)
 every command accepts --json; probe/baseline emit the status document plus their own result
 claims     --json
            --since <ref>     report every claim and fault that existed at <ref> and does not now; a claim entry in testguard.ignore.json (with a reason) excuses one. exit 1 on any unexcused removal
@@ -96,7 +102,7 @@ brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; 
 exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift, or unclaimed changes) · 2 precondition failed · 3 usage
 `;
 
-const COMMANDS = { replay: replayCommand, probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand, admit: admitCommand };
+const COMMANDS = { mcp: mcpCommand, replay: replayCommand, probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand, admit: admitCommand };
 
 export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') }) {
   let parsed;
@@ -128,6 +134,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         'allow-provisional': { type: 'boolean', default: false },
         restamp: { type: 'boolean', default: false },
         force: { type: 'boolean', default: false },
+        mcp: { type: 'boolean', default: false },
         'ci-evidence': { type: 'string' },
         here: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },

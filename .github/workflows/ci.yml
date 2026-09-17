@@ -122,6 +122,31 @@ jobs:
             console.log('jest fixture verdicts match expected.json:', ev.records.length);
           "
 
+      # ── The MCP server, driven as a client would: handshake, list, call.
+      #    A harness-independent surface is only worth having if it actually
+      #    speaks the protocol from a cold start. ──
+      - name: mcp — handshake, tools/list, tools/call over stdio
+        shell: bash
+        run: |
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+            '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"testguard_status","arguments":{"dir":"."}}}' \
+            | node cli/testguard.mjs mcp > "$RUNNER_TEMP/mcp.jsonl"
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const msgs = readFileSync(process.env.RUNNER_TEMP + '/mcp.jsonl', 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+            if (msgs.length !== 3) { console.error('expected 3 replies (the notification is never answered), got', msgs.length); process.exit(1); }
+            const [init, list, call] = msgs;
+            if (!init.result.protocolVersion) { console.error('no protocolVersion'); process.exit(1); }
+            if (list.result.tools.length !== 5) { console.error('expected 5 tools, got', list.result.tools.length); process.exit(1); }
+            if (!list.result.tools.every((t) => t.annotations.readOnlyHint)) { console.error('a tool is not marked read-only'); process.exit(1); }
+            if (call.result.isError) { console.error('status call failed:', call.result.content[0].text); process.exit(1); }
+            if (!call.result.structuredContent.next.action) { console.error('status carried no next action'); process.exit(1); }
+            console.log('mcp:', list.result.tools.map((t) => t.name).join(', '), '→ state', call.result.structuredContent.state);
+          "
+
       # ── Every change needs a claim: the gate runs on this repository's own
       #    pull requests. A new source file without a claim (or an excusing
       #    ignore entry with a reason) turns the PR red. ──

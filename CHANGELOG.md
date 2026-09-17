@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`testguard mcp`** — the operating loop, served over the Model Context
+  Protocol on stdio, so it survives a change of agent harness. The loop has
+  lived in a Claude Code skill and a session-start hook, and both vanish the
+  moment the harness is Cursor, Codex or whatever comes next. Five tools,
+  all **read-only**: `testguard_status`, `testguard_brief`,
+  `testguard_claims`, `testguard_evidence` and `testguard_next_command`.
+  **No tool runs a probe** — a probe is long-running, budgeted and the
+  person should see it happen, so `next_command` returns the shell line
+  instead; and no tool writes a file, because editing a claims file through
+  a connector would defeat recording every fault edit. The server declares
+  only a `tools` capability, and a tool that throws returns an `isError`
+  tool result rather than a protocol error, so one bad call never costs the
+  connection.
+  Hand-written against a pinned protocol version rather than built on the
+  official SDK: this tool keeps its single exact-pinned runtime dependency,
+  and the surface is three methods that will not grow. The tests speak the
+  wire format to a real child process and check every tool against the CLI's
+  own `--json` output, so the two cannot drift.
+  `init --mcp` prints the config for Claude Code, Cursor and Codex — printed,
+  never written, because a harness config is the person's file. Self-claims
+  `TG-MCP-IS-READ-ONLY` and
+  `TG-MCP-TOOL-FAILURE-IS-NOT-A-PROTOCOL-ERROR`. (#30)
+
+### Added
+
 
 
 - **Contention detection and `--serial`** (#26). `probe` looks for other test

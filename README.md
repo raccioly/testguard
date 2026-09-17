@@ -382,6 +382,34 @@ is the same one as everywhere else: a `claim` entry in
 Removal is allowed — claims can be wrong, superseded or split — and it is
 never silent.
 
+### Run it from any harness
+
+The operating loop above lives in a Claude Code skill and a session-start
+hook. Both vanish the moment the harness is Cursor, Codex, Devin or whatever
+comes next — and the harness is exactly the layer most likely to change. So
+the same documents are also served over the Model Context Protocol:
+
+```bash
+npx testguard-cli mcp            # JSON-RPC 2.0 on stdio
+npx testguard-cli init --mcp     # prints the config for Claude Code, Cursor and Codex
+```
+
+Five tools, all **read-only**: `testguard_status`, `testguard_brief`,
+`testguard_claims`, `testguard_evidence`, `testguard_next_command`.
+
+**No tool runs a probe.** A probe is long-running, budgeted, and the person
+should see it happen, so `next_command` hands back the exact shell line for
+the agent to run in its own terminal. Nothing here writes a file either —
+editing a claims file through a connector would defeat the point of recording
+every fault edit. The server declares only a `tools` capability: no prompts,
+no resources, no sampling.
+
+It is hand-written against a pinned protocol version rather than built on the
+official SDK, because this tool has one exact-pinned runtime dependency and
+keeps it that way. The surface is three methods and five tools and will not
+grow; tests speak the wire format to a real child process and check each
+tool against the CLI's own `--json` output, so the two cannot drift.
+
 ### Built for agents to run
 
 TestGuard is meant to be driven by an AI agent, not typed by a person. Three
@@ -477,7 +505,7 @@ through every verdict.
 
 ## Status
 
-**v0.5.** Ten commands (`status`, `init`, `claims`, `probe`, `admit`, `replay`, `baseline`, `brief`, `gate`, `scaffold`), vitest and jest runners, hand-authored faults plus
+**v0.5.** Eleven commands (`status`, `init`, `claims`, `probe`, `admit`, `replay`, `baseline`, `brief`, `gate`, `scaffold`, `mcp`), vitest and jest runners, hand-authored faults plus
 **v0.5.** Nine commands (`status`, `init`, `claims`, `probe`, `admit`, `baseline`, `brief`, `gate`, `scaffold`), vitest, jest and Playwright runners, hand-authored faults plus
 a mechanical scaffold, an agent operating layer (`status`, `init`) and a
 change gate (`gate`). The contract
