@@ -7,7 +7,6 @@ import { spawnSync } from 'node:child_process';
 import { computeStatus, renderStatus, faultContentHash } from '../src/status/status.mjs';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-import { computeStatus, faultContentHash } from '../src/status/status.mjs';
 import { writeSpecDoc } from '../src/evidence/writer.mjs';
 import { buildBaseline } from '../src/baseline/baseline.mjs';
 import { validate } from '../spec/lib/validate.mjs';

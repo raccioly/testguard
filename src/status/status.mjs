@@ -8,7 +8,6 @@ import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { sortForReport } from '../render.mjs';
 import { computeChangedGate, defaultIgnorePath } from '../gate/changed.mjs';
-import { headSha } from '../git.mjs';
 import { headSha, isAncestor } from '../git.mjs';
 
 export const faultContentHash = (fault) => sha256(`${fault.find}\n${fault.replace}`);
@@ -111,6 +110,7 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   doc.evidenceHead = evidence.run.repo.snapshot ?? evidence.run.repo.head;
   const localHead = (() => { try { return headSha(projectDir); } catch { return null; } })();
   if (localHead) doc.head = localHead;
+
   const baseline = existsSync(paths.baseline) ? readSpecDoc('baseline', paths.baseline) : undefined;
   if (baseline) doc.paths.baseline = rel(paths.baseline);
 
