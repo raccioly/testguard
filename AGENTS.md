@@ -27,6 +27,7 @@ node cli/testguard.mjs scaffold src/probe/classify.mjs --json   # what the produ
 - `spec/schemas/common.schema.json` — verdicts, fault classes, provenance. The closed sets.
 - `spec/lib/validate.mjs` — semantic rules (green baseline, N/N agreement, assertion-only kills, fingerprint derivation).
 - `src/probe/classify.mjs` — the verdict function. Pure. Its check order *is* `GATE-SEMANTICS.md`.
+- `src/probe/mocks.mjs` — mock-awareness: which candidate tests mock the target (never defenders), and the `mocked-never-asserted` signal. `src/probe/rank.mjs` resolves aliases (tsconfig `paths` through `extends`/`references`, vite/vitest `resolve.alias`, package.json `imports`).
 - `src/probe/probe.mjs` — orchestrator: isolation → baseline (cached per defender set) → apply → probe → escalate → restore → classify → rank.
 - `fixtures/known-answer/expected.json` — the oracle. Never edit it to match output.
 - `testguard.claims.json` — claims about this codebase, probed in CI.
