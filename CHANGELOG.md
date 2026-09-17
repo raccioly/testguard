@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Piping output to a closed reader (`testguard claims | head`) no longer
+  crashes with an `EPIPE` stack trace.
+
+### Changed
+
+- Staged Homebrew formula carries the sha256 of the published 0.1.1 tarball.
+
 ## [0.1.1] - 2026-09-17
 
 ### Fixed
