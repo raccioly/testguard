@@ -50,6 +50,12 @@ Rules that follow from the table:
    snapshot the working tree — otherwise the answer looks right and is not.
 7. **Never a single global score.** Output is per claim, ranked. Blindness is
    concentrated, and one number hides where.
+8. **A changed fault is a finding.** Editing a claim is legitimate — claims
+   can be wrong — but the cheapest way to make a survivor disappear without
+   writing a test is to weaken its fault. Evidence records each fault's
+   content hash; the status document lists every fault whose content
+   changed since it was probed, with its previous verdict. The change is
+   allowed; it is never invisible.
 
 ## Baseline and delta
 

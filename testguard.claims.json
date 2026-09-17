@@ -342,6 +342,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-FAULT-EDIT-VISIBLE",
+      "statement": "Every evidence record carries the fault's content hash, so a fault edited after it survived is surfaced by status as a changed fault.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md rule 8"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/probe.fixture.test.mjs",
+        "test/status.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The content hash is not recorded; a weakened fault is indistinguishable from the original.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": ", contentHash: sha256(`${fault.find}\\n${fault.replace}`) },",
+          "replace": " },",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
     }
   ]
 }

@@ -5,6 +5,7 @@ import { probe } from '../probe/probe.mjs';
 import { writeSpecDoc, readSpecDoc } from '../evidence/writer.mjs';
 import { gate } from '../baseline/baseline.mjs';
 import { renderRecord, renderSummary, sortForReport, PROVISIONAL_WARNING } from '../render.mjs';
+import { computeStatus } from '../status/status.mjs';
 export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
@@ -46,8 +47,8 @@ export async function probeCommand({ projectDir, values, version }, io) {
     escalate: !values['no-escalate'],
     toolVersion: version,
     includeDirty: values['include-dirty'],
-    onStage: !values.quiet && process.stderr.isTTY ? ({ claimId, faultId, stage, i, n }) => process.stderr.write(`\r\x1b[K  … ${claimId}/${faultId} ${stage} ${i}/${n}`) : undefined,
-    onProgress: values.quiet ? undefined : (r) => {
+    onStage: !values.quiet && !values.json && process.stderr.isTTY ? ({ claimId, faultId, stage, i, n }) => process.stderr.write(`\r\x1b[K  … ${claimId}/${faultId} ${stage} ${i}/${n}`) : undefined,
+    onProgress: values.quiet || values.json ? undefined : (r) => {
       if (process.stderr.isTTY) process.stderr.write('\r\x1b[K');
       if (values.verbose || r.verdict !== 'killed') io.out(renderRecord(r, { provisional }) + (r.reusedFrom ? '  (reused)' : ''));
     },
@@ -55,6 +56,11 @@ export async function probeCommand({ projectDir, values, version }, io) {
   writeSpecDoc('evidence', outPath, evidence);
 
   const g = gate(evidence.records, baseline, { severityFloor: values.severity });
+  if (values.json) {
+    const status = computeStatus({ projectDir, toolVersion: version });
+    io.out(JSON.stringify({ ...status, run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode: g.new.length > 0 ? 1 : 0 } }, null, 2));
+    return g.new.length > 0 ? 1 : 0;
+  }
   if (!values.quiet && baseline) {
     io.out('');
     const tag = (r) => (g.new.includes(r) ? '[NEW]      ' : g.baselined.includes(r) ? '[baseline] ' : '[below floor] ');

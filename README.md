@@ -52,7 +52,7 @@ tests were written against the survivors, 39/39 were killed.
 | npm | `npm i -D testguard-cli` then `npx testguard probe` |
 | pip | `pip install testguard-cli` then `testguard probe` (needs Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.2.1` — see [`action.yml`](./action.yml) |
+| GitHub Action | `uses: raccioly/testguard@v0.3.0` — see [`action.yml`](./action.yml) |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
 
 Projects that set `min-release-age` in `.npmrc` cannot see a version published
@@ -62,6 +62,8 @@ less than that many days ago (`ENOVERSIONS`); install that one with
 ## How it works
 
 ```bash
+npx testguard-cli init        # install the agent layer: skill, session-start hook, AGENTS.md section
+npx testguard-cli status --json   # where the project is and the ONE next action — the machine entry point
 npx testguard-cli claims      # what does this project claim, and is every claim probeable?
 npx testguard-cli probe       # try to falsify each claim; report what the tests missed
 npx testguard-cli baseline    # freeze today's unproven findings; from now on only new ones gate
@@ -139,6 +141,27 @@ npx testguard-cli scaffold src/x.ts   # propose faults for a file, as a draft to
    `--text` prints only, and exits 0 silently when there is no evidence yet,
    so the hook can never break a session.
 
+### Built for agents to run
+
+TestGuard is meant to be driven by an AI agent, not typed by a person. Three
+things make that safe:
+
+- **One source of truth.** `testguard status --json` computes `state` and the
+  one `next` action from the claims file, the evidence, the baseline and the
+  working tree. Every human rendering — the CLI text, the session-start
+  brief, the skill — derives from it, so they cannot disagree. Every command
+  accepts `--json`.
+- **An installable operating loop.** `testguard init` writes
+  `.claude/skills/testguard/SKILL.md` (state → action, verdict → the only
+  acceptable fix, the two-gate rule for any test the agent writes), the
+  `brief --text` session-start hook, an `AGENTS.md` section and the
+  `.gitignore` lines. Idempotent.
+- **Gaming is visible.** The cheapest way to make a survivor disappear is to
+  weaken its fault, not to write a test. Evidence records every fault's
+  content hash; `status` lists any fault edited after it survived, with its
+  previous verdict, and makes reviewing that edit the next action. Editing a
+  claim is allowed — claims can be wrong — but it is never invisible.
+
 ### Authoring faults mechanically
 
 Writing faults by hand means reading the code to find exact anchors. Two
@@ -192,8 +215,8 @@ through every verdict.
 
 ## Status
 
-**v0.2.** Five commands, vitest runner, hand-authored faults plus a
-mechanical scaffold for the five common shapes. The contract
+**v0.3.** Seven commands, vitest runner, hand-authored faults plus a
+mechanical scaffold, and an agent operating layer (`status`, `init`). The contract
 spine — six JSON Schemas shared with the other Guard tools — is under
 [`spec/`](spec/). One exact-pinned runtime dependency (`ajv`, for schema validation); Node ≥ 20.
 

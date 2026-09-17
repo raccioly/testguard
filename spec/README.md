@@ -20,7 +20,8 @@ The pattern all such tools run:
 | `baseline` | [`schemas/baseline.schema.json`](schemas/baseline.schema.json) | Frozen fingerprints of existing debt. Gate only what is new. |
 | `ignore` | [`schemas/ignore.schema.json`](schemas/ignore.schema.json) | Reviewable scoping. Every entry has a reason. |
 | `calibration` | [`schemas/calibration.schema.json`](schemas/calibration.schema.json) | P(finding is real) per bucket, with a Wilson interval and the sample size behind it. |
-| `brief` | [`schemas/brief.schema.json`](schemas/brief.schema.json) | What to tell an agent before it writes code — ranked, capped, never a single score. |
+| `brief` | [`schemas/brief.schema.json`](schemas/brief.schema.json) | What to tell an agent before it writes code — ranked, capped, never a single score, and carrying the one next action. |
+| `status` | [`schemas/status.schema.json`](schemas/status.schema.json) | Where the project is and what happens next — the single machine-readable truth every human rendering derives from. Surfaces faults whose content changed since they were probed. |
 
 Shared definitions (verdicts, fault classes, provenance, annotations) live in
 [`schemas/common.schema.json`](schemas/common.schema.json). Gate behaviour —

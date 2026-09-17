@@ -44,5 +44,10 @@
       "isNew": true
     }
   ],
-  "text": "## TEST BLINDSPOT CONTEXT\n\nSource: testguard 0.1.0 @ deadbeefcafe. 2 claims; 1 killed, 1 survived, 1 unverifiable, 1 nocover, 1 flaky-defender. 1 new since baseline.\n\n1. [NEW] REDACT-002 unverifiable (high) src/redact.mjs — Anchor not found; re-author the fault.\n2. REDACT-001 SURVIVED (critical) src/redact.mjs — test/redact.test.mjs asserts with objectContaining and omits the `content` key.\n"
+  "text": "## TEST BLINDSPOT CONTEXT\n\nSource: testguard 0.1.0 @ deadbeefcafe. 2 claims; 1 killed, 1 survived, 1 unverifiable, 1 nocover, 1 flaky-defender. 1 new since baseline.\n\n1. [NEW] REDACT-002 unverifiable (high) src/redact.mjs — Anchor not found; re-author the fault.\n2. REDACT-001 SURVIVED (critical) src/redact.mjs — test/redact.test.mjs asserts with objectContaining and omits the `content` key.\n",
+  "next": {
+    "action": "write-test",
+    "command": "write a test in test/redact.test.mjs that fails on REDACT-001/F1 and passes on HEAD, then: testguard probe --claim REDACT-001 --include-dirty",
+    "why": "REDACT-001/F1 (critical) survived: the audit row can carry the raw input and no test notices."
+  }
 }

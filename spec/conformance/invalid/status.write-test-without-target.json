@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.1.0"
+  },
+  "generatedAt": "2026-09-17T02:00:00Z",
+  "state": "unproven",
+  "next": {
+    "action": "write-test",
+    "command": "write a test in test/redact.test.mjs that fails on REDACT-001/F1 and passes on HEAD, then: testguard probe --claim REDACT-001 --include-dirty",
+    "why": "REDACT-001/F1 (critical) survived."
+  },
+  "provisional": false,
+  "counts": {
+    "claims": 2,
+    "faults": 6,
+    "byVerdict": {
+      "killed": 1,
+      "survived": 1,
+      "unverifiable": 1,
+      "nocover": 1,
+      "flaky-defender": 2
+    },
+    "new": 1,
+    "baselined": 4
+  },
+  "stale": [],
+  "changedFaults": [
+    {
+      "claimId": "REDACT-002",
+      "subjectId": "F1",
+      "previousVerdict": "unverifiable",
+      "file": "src/redact.mjs"
+    }
+  ],
+  "findings": [
+    {
+      "fingerprint": "01876384493be6809da455cb1a1c4bc92e7564e9898506d790b9589200502163",
+      "claimId": "REDACT-001",
+      "subjectId": "F1",
+      "verdict": "survived",
+      "severity": "critical",
+      "file": "src/redact.mjs",
+      "rank": 9.5,
+      "isNew": true
+    }
+  ],
+  "paths": {
+    "claims": "testguard.claims.json",
+    "evidence": ".testguard/evidence.json",
+    "baseline": ".testguard/baseline.json"
+  }
+}
