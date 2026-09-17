@@ -11,9 +11,10 @@ export function git(args, cwd) {
 
 export const repoRoot = (dir) => git(['rev-parse', '--show-toplevel'], dir);
 
-export function headSha(dir) {
+/** Full sha of `ref` (default HEAD), or null when it does not resolve. */
+export function headSha(dir, ref = 'HEAD') {
   try {
-    return git(['rev-parse', '--verify', 'HEAD'], dir);
+    return git(['rev-parse', '--verify', `${ref}^{commit}`], dir);
   } catch {
     return null;
   }

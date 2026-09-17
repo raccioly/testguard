@@ -27,6 +27,7 @@ probe
   --out <path>         evidence file           (default: <dir>/.testguard/evidence.json)
   --baseline <path>    baseline to gate against (default: <dir>/.testguard/baseline.json if present)
   --severity <level>   gate only at or above   (default: low)
+  --ref <commit>       probe this commit in the scratch worktree (default: HEAD)
   --in-place           mutate the working tree instead of a scratch worktree
   --no-escalate        do not re-run survivors against the whole suite
   --no-reuse           re-probe claims whose inputs have not changed
@@ -56,6 +57,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         baseline: { type: 'string' },
         severity: { type: 'string', default: 'low' },
         max: { type: 'string', default: '20' },
+        ref: { type: 'string', default: 'HEAD' },
         'in-place': { type: 'boolean', default: false },
         'no-escalate': { type: 'boolean', default: false },
         'no-reuse': { type: 'boolean', default: false },

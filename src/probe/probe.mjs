@@ -29,6 +29,7 @@ export async function probe({
   claims,
   confirmRuns = 3,
   mode = 'worktree',
+  ref = 'HEAD',
   budgetMs = 120_000,
   escalate = true,
   scratchBase,
@@ -38,8 +39,9 @@ export async function probe({
 }) {
   projectDir = resolve(projectDir);
   const root = gitRoot(projectDir);
-  const head = headSha(root);
-  if (!head) throw new PreconditionError('repository has no commits; every verdict is tied to a commit');
+  if (mode === 'in-place' && ref !== 'HEAD') throw new PreconditionError('--ref needs a scratch worktree; drop --in-place');
+  const head = headSha(root, ref);
+  if (!head) throw new PreconditionError(ref === 'HEAD' ? 'repository has no commits; every verdict is tied to a commit' : `ref ${ref} does not resolve to a commit`);
 
   const targets = [...new Set(claims.claims.flatMap((c) => c.faults.map((f) => relative(root, join(projectDir, f.file)))))];
   if (mode === 'in-place' && isDirty(root, targets)) {
@@ -47,7 +49,7 @@ export async function probe({
   }
 
   const startedAt = new Date().toISOString();
-  const iso = mode === 'worktree' ? createScratch({ repoRoot: root, projectDir, scratchBase }) : inPlace({ repoRoot: root, projectDir });
+  const iso = mode === 'worktree' ? createScratch({ repoRoot: root, projectDir, ref, scratchBase }) : inPlace({ repoRoot: root, projectDir });
   const records = [];
   try {
     const allTests = vitest.listTestFiles(iso.projectDir);

@@ -36,12 +36,13 @@ function findNodeModules(root, depth = 3) {
  * A scratch git worktree at HEAD, with the main tree's node_modules linked in.
  * Faults are applied here; the user's tree is never touched.
  */
-export function createScratch({ repoRoot, projectDir, scratchBase = tmpdir() }) {
-  if (!headSha(repoRoot)) {
-    throw new PreconditionError('repository has no commits; commit first, or run with --in-place');
+export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase = tmpdir() }) {
+  const sha = headSha(repoRoot, ref);
+  if (!sha) {
+    throw new PreconditionError(ref === 'HEAD' ? 'repository has no commits; commit first, or run with --in-place' : `ref ${ref} does not resolve to a commit`);
   }
   const dest = mkdtempSync(join(scratchBase, 'testguard-'));
-  addWorktree(repoRoot, dest);
+  addWorktree(repoRoot, dest, sha);
   for (const rel of findNodeModules(repoRoot)) {
     const target = join(dest, rel);
     if (existsSync(target)) continue;
@@ -50,6 +51,7 @@ export function createScratch({ repoRoot, projectDir, scratchBase = tmpdir() }) 
   }
   return {
     mode: 'worktree',
+    sha,
     root: dest,
     projectDir: join(dest, relative(repoRoot, projectDir)),
     cleanup: () => removeWorktree(repoRoot, dest),

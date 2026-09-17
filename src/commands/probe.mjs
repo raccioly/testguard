@@ -33,6 +33,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
     confirmRuns,
     budgetMs,
     mode: values['in-place'] ? 'in-place' : 'worktree',
+    ref: values.ref,
     escalate: !values['no-escalate'],
     toolVersion: version,
     onProgress: values.quiet ? undefined : (r) => io.out(renderRecord(r) + (r.reusedFrom ? '  (reused)' : '')),
