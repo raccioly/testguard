@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 
+
 - **Mock-aware defender discovery** (#20). A test file that `vi.mock`s /
   `jest.mock`s the target cannot detect any fault in it and is no longer a
   discovered defender; `NOCOVER` now means "no test imports this source
@@ -30,7 +31,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the module: expected `NOCOVER`, with the mocking file and the signal
   recorded.
 
+- **`testguard admit <test-file> --claim <ID>`** — the two-gate rule as a
+  named verb. Sugar over `probe --claim <ID> --include-dirty --no-escalate`:
+  the named test must be a declared or discovered defender of the claim
+  (exit `3` otherwise, with the `defendedBy` line to add); `ADMITTED`
+  (exit `0`) only when every fault of the claim is `killed` N/N on defenders
+  that were green N/N unmodified; anything else is `NOT ADMITTED` (exit `1`)
+  and names the first blocking fault with the hint the brief would give.
+  `--fault <FID>` judges one fault, `--confirm 1` gives a provisional
+  `ADMITTED?`, `--json` returns `{admitted, provisional, faults[], evidence,
+  command}`. Evidence goes to `.testguard/evidence-partial.json`; nothing new
+  in the evidence schema. The market's acceptance signal for a generated
+  test is "compiles, passes, raises coverage"; this one is "fails when the
+  claim is false", and it is now one command. `status.next` for `unproven`
+  and the installed skill's fix loop point at it. Self-claim
+  `TG-ADMIT-NEEDS-ALL-KILLED`.
+
 ### Changed
+
 
 
 - CI: TestGuard's self-probe runs on one Node leg instead of three, without
