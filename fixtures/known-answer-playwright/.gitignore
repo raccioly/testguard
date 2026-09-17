@@ -1,0 +1,4 @@
+# written by e2e/flaky.spec.mjs to alternate fail/pass deterministically
+.flake-counter
+node_modules/
+test-results/

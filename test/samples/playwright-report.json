@@ -1,0 +1,295 @@
+{
+ "suites": [
+  {
+   "title": "flaky.spec.mjs",
+   "file": "flaky.spec.mjs",
+   "specs": [
+    {
+     "title": "is flaky by design",
+     "ok": true,
+     "tags": [],
+     "tests": [
+      {
+       "timeout": 2000,
+       "annotations": [],
+       "expectedStatus": "passed",
+       "projectId": "",
+       "projectName": "",
+       "results": [
+        {
+         "workerIndex": 0,
+         "parallelIndex": 0,
+         "status": "failed",
+         "duration": 4,
+         "error": {
+          "message": "Error: attempt 1 is odd and fails on purpose\n\nexpect(received).toBe(expected) // Object.is equality\n\nExpected: 0\nReceived: 1"
+         },
+         "errors": [
+          {
+           "message": "Error: attempt 1 is odd and fails on purpose\n\nexpect(received).toBe(expected) // Object.is equality\n\nExpected: 0\nReceived: 1\n\n  13 |   n += 1;\n  14 |   writeFileSync(COUNTER, String(n));\n> 15 |   expect(n % 2, `attempt ${n} is odd and fails on purpose`).toBe(0);\n     |                                                             ^\n  16 | });\n  17 |\n    at <path>"
+          }
+         ],
+         "retry": 0,
+         "annotations": [],
+         "errorLocation": {
+          "file": "<path>",
+          "column": 61,
+          "line": 15
+         }
+        },
+        {
+         "workerIndex": 1,
+         "parallelIndex": 0,
+         "status": "passed",
+         "duration": 2,
+         "errors": [],
+         "retry": 1,
+         "annotations": []
+        }
+       ],
+       "status": "flaky"
+      }
+     ],
+     "id": "fae0d48bcd0a586e0a93-30238fe89078af1bbcf0",
+     "file": "flaky.spec.mjs",
+     "line": 10,
+     "column": 1
+    }
+   ]
+  },
+  {
+   "title": "tmp-sample.spec.mjs",
+   "file": "tmp-sample.spec.mjs",
+   "specs": [
+    {
+     "title": "fails outright",
+     "ok": false,
+     "tags": [],
+     "tests": [
+      {
+       "timeout": 2000,
+       "annotations": [],
+       "expectedStatus": "passed",
+       "projectId": "",
+       "projectName": "",
+       "results": [
+        {
+         "workerIndex": 1,
+         "parallelIndex": 0,
+         "status": "failed",
+         "duration": 1,
+         "error": {
+          "message": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 2\nReceived: 1"
+         },
+         "errors": [
+          {
+           "message": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 2\nReceived: 1\n\n  1 | import { test, expect } from '@playwright/test';\n> 2 | test('fails outright', () => { expect(1).toBe(2); });\n    |                                          ^\n  3 | test('times out', async () => { test.setTimeout(150); await new Promise((r) => setTimeout(r, 1000)); });\n  4 | test.skip('is skipped', () => {});\n  5 |\n    at <path>"
+          }
+         ],
+         "retry": 0,
+         "annotations": [],
+         "errorLocation": {
+          "file": "<path>",
+          "column": 42,
+          "line": 2
+         }
+        },
+        {
+         "workerIndex": 2,
+         "parallelIndex": 0,
+         "status": "failed",
+         "duration": 3,
+         "error": {
+          "message": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 2\nReceived: 1"
+         },
+         "errors": [
+          {
+           "message": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 2\nReceived: 1\n\n  1 | import { test, expect } from '@playwright/test';\n> 2 | test('fails outright', () => { expect(1).toBe(2); });\n    |                                          ^\n  3 | test('times out', async () => { test.setTimeout(150); await new Promise((r) => setTimeout(r, 1000)); });\n  4 | test.skip('is skipped', () => {});\n  5 |\n    at <path>"
+          }
+         ],
+         "retry": 1,
+         "annotations": [],
+         "errorLocation": {
+          "file": "<path>",
+          "column": 42,
+          "line": 2
+         }
+        }
+       ],
+       "status": "unexpected"
+      }
+     ],
+     "id": "4ac31a454fd3c3121c14-f558727ad290d42df495",
+     "file": "tmp-sample.spec.mjs",
+     "line": 2,
+     "column": 1
+    },
+    {
+     "title": "times out",
+     "ok": false,
+     "tags": [],
+     "tests": [
+      {
+       "timeout": 150,
+       "annotations": [],
+       "expectedStatus": "passed",
+       "projectId": "",
+       "projectName": "",
+       "results": [
+        {
+         "workerIndex": 3,
+         "parallelIndex": 0,
+         "status": "timedOut",
+         "duration": 152,
+         "error": {
+          "message": "Test timeout of 150ms exceeded."
+         },
+         "errors": [
+          {
+           "message": "Test timeout of 150ms exceeded."
+          }
+         ],
+         "retry": 0,
+         "annotations": []
+        },
+        {
+         "workerIndex": 4,
+         "parallelIndex": 0,
+         "status": "timedOut",
+         "duration": 152,
+         "error": {
+          "message": "Test timeout of 150ms exceeded."
+         },
+         "errors": [
+          {
+           "message": "Test timeout of 150ms exceeded."
+          }
+         ],
+         "retry": 1,
+         "annotations": []
+        }
+       ],
+       "status": "unexpected"
+      }
+     ],
+     "id": "4ac31a454fd3c3121c14-c1a7f1f2a0af13c86227",
+     "file": "tmp-sample.spec.mjs",
+     "line": 3,
+     "column": 1
+    },
+    {
+     "title": "is skipped",
+     "ok": true,
+     "tags": [],
+     "tests": [
+      {
+       "timeout": 2000,
+       "annotations": [
+        {
+         "type": "skip"
+        }
+       ],
+       "expectedStatus": "skipped",
+       "projectId": "",
+       "projectName": "",
+       "results": [
+        {
+         "workerIndex": -1,
+         "parallelIndex": -1,
+         "status": "skipped",
+         "duration": 0,
+         "errors": [],
+         "retry": 0,
+         "annotations": [
+          {
+           "type": "skip"
+          }
+         ]
+        }
+       ],
+       "status": "skipped"
+      }
+     ],
+     "id": "4ac31a454fd3c3121c14-f1d068f9fd9ae69980f1",
+     "file": "tmp-sample.spec.mjs",
+     "line": 4,
+     "column": 6
+    }
+   ]
+  },
+  {
+   "title": "toggle.spec.mjs",
+   "file": "toggle.spec.mjs",
+   "specs": [
+    {
+     "title": "the greeting toggle is a visible checkbox",
+     "ok": true,
+     "tags": [],
+     "tests": [
+      {
+       "timeout": 2000,
+       "annotations": [],
+       "expectedStatus": "passed",
+       "projectId": "",
+       "projectName": "",
+       "results": [
+        {
+         "workerIndex": 5,
+         "parallelIndex": 0,
+         "status": "passed",
+         "duration": 3,
+         "errors": [],
+         "retry": 0,
+         "annotations": []
+        }
+       ],
+       "status": "expected"
+      }
+     ],
+     "id": "174f2a5c4c04c31dc234-2595750513da6b11a056",
+     "file": "toggle.spec.mjs",
+     "line": 7,
+     "column": 1
+    },
+    {
+     "title": "the toggle carries its change handler",
+     "ok": true,
+     "tags": [],
+     "tests": [
+      {
+       "timeout": 2000,
+       "annotations": [],
+       "expectedStatus": "passed",
+       "projectId": "",
+       "projectName": "",
+       "results": [
+        {
+         "workerIndex": 5,
+         "parallelIndex": 0,
+         "status": "passed",
+         "duration": 0,
+         "errors": [],
+         "retry": 0,
+         "annotations": []
+        }
+       ],
+       "status": "expected"
+      }
+     ],
+     "id": "174f2a5c4c04c31dc234-39a26b8bac0ce8868908",
+     "file": "toggle.spec.mjs",
+     "line": 14,
+     "column": 1
+    }
+   ]
+  }
+ ],
+ "errors": [],
+ "stats": {
+  "duration": 1837.055,
+  "expected": 2,
+  "skipped": 1,
+  "unexpected": 2,
+  "flaky": 1
+ }
+}

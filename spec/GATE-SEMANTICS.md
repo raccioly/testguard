@@ -32,7 +32,14 @@ Rules that follow from the table:
    timeout does not, and a suite that fails to load does not: neither is
    evidence that the suite defends the claim. Tools parse the runner's
    structured report, never its exit code, because the exit code cannot tell
-   these apart.
+   these apart. A runner's own retry mechanism does not change this: a test
+   that failed and then passed on retry (Playwright's `flaky`) is a
+   **non-green run** even when the runner exits 0, and a test the runner
+   reports as timed out (`timedOut`) is a timeout, never an assertion
+   failure. When one claim's defenders run under several runners, their
+   runs merge pessimistically — any load error is an error, any timeout is
+   a timeout, any failure is a failure — and the evidence names which file
+   ran under which runner.
 4. **A mixed result is not a kill.** If some of the N probe runs fail and
    others pass, the defender's response to the fault is nondeterministic.
    Reporting `killed` would be the optimistic bias flakiness introduces;

@@ -178,6 +178,50 @@ jobs:
           path: .testguard/ci-self-evidence.json
           if-no-files-found: warn
 
+  # ── Playwright: the per-file runner is proven against its own browserless
+  #    fixture, whose dependencies live in the fixture (never in the tool's
+  #    package.json). Installed and run here only. ──
+  playwright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            fixtures/known-answer-playwright/package-lock.json
+      - name: Install (tool + fixture)
+        run: |
+          npm ci
+          npm ci --prefix fixtures/known-answer-playwright
+      - name: Playwright adapter units + mixed-defender acceptance
+        run: npx vitest run test/runner-playwright.test.mjs test/probe.playwright.test.mjs
+      - name: probe the playwright fixture through the bin (mixed defenders, auto runner)
+        shell: bash
+        run: |
+          set -o pipefail
+          S=$(mktemp -d)
+          cp -R fixtures/known-answer-playwright/. "$S/"
+          rm -rf "$S/node_modules" "$S/.flake-counter" "$S/.testguard" "$S/test-results"
+          ln -s "$GITHUB_WORKSPACE/fixtures/known-answer-playwright/node_modules" "$S/node_modules"
+          git -C "$S" init -q && git -C "$S" -c user.email=ci@example.invalid -c user.name=ci add -A && git -C "$S" -c user.email=ci@example.invalid -c user.name=ci commit -qm fixture
+          status=0; node cli/testguard.mjs probe "$S" --budget 60000 --quiet --no-escalate || status=$?
+          [ "$status" -eq 1 ] || { echo "::error::expected exit 1, got $status"; exit 1; }
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const ev = JSON.parse(readFileSync('$S/.testguard/evidence.json','utf8'));
+            const exp = JSON.parse(readFileSync('fixtures/known-answer-playwright/expected.json','utf8')).expected;
+            const names = (ev.run.runners ?? []).map(r => r.name).sort().join(',');
+            if (names !== 'playwright,vitest') { console.error('runners were', names); process.exit(1); }
+            const bad = ev.records.filter(r => exp[r.claim.id+'/'+r.subject.id].verdict !== r.verdict);
+            if (bad.length) { console.error('MISMATCH', bad.map(r => r.claim.id+'/'+r.subject.id+':'+r.verdict)); process.exit(1); }
+            console.log('playwright fixture verdicts match expected.json:', ev.records.length);
+          "
+
   # ── npm publish dry-run on tags ──
   publish-check:
     runs-on: ubuntu-latest
