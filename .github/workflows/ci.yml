@@ -4,6 +4,7 @@ on:
   workflow_dispatch: # manual recovery for pushes that don't auto-trigger (e.g. release PRs opened by GITHUB_TOKEN)
   push:
     branches: [main]
+    tags: ['v*'] # publish-check below runs on tags only
   pull_request:
     branches: [main]
 

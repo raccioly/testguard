@@ -33,22 +33,35 @@ jobs:
     outputs:
       version: ${{ steps.check.outputs.version }}
       changed: ${{ steps.check.outputs.changed }}
+      tag_missing: ${{ steps.check.outputs.tag_missing }}
+      npm_missing: ${{ steps.check.outputs.npm_missing }}
+      pypi_missing: ${{ steps.check.outputs.pypi_missing }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
-      - name: Does this version need releasing?
+      - name: What does this version still need?
         id: check
+        # Each surface is gated on ITS OWN registry, not on the tag. A tag
+        # whose npm or PyPI publish failed (e.g. Trusted Publishing not yet
+        # configured) is retried by simply re-running this workflow.
         run: |
           CURRENT=$(node -p "require('./package.json').version")
           TAG="v${CURRENT}"
-          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "refs/tags/$TAG$"; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "⏭️ $TAG already released — nothing to do"
-          else
-            echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "refs/tags/$TAG$"; then TAGM=false; else TAGM=true; fi
+          if npm view "testguard-cli@${CURRENT}" version >/dev/null 2>&1; then NPMM=false; else NPMM=true; fi
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/testguard-cli/${CURRENT}/json")
+          if [ "$CODE" = "200" ]; then PYPIM=false; else PYPIM=true; fi
+          echo "tag_missing=$TAGM" >> "$GITHUB_OUTPUT"
+          echo "npm_missing=$NPMM" >> "$GITHUB_OUTPUT"
+          echo "pypi_missing=$PYPIM" >> "$GITHUB_OUTPUT"
+          if [ "$TAGM" = true ] || [ "$NPMM" = true ] || [ "$PYPIM" = true ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "✅ $TAG is not yet released — releasing"
+            echo "✅ $TAG — tag missing: $TAGM · npm missing: $NPMM · PyPI missing: $PYPIM"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "⏭️ $TAG is fully released everywhere — nothing to do"
           fi
 
   test:
@@ -72,6 +85,7 @@ jobs:
   create-release:
     needs: [detect-version, test]
     if: needs.detect-version.outputs.changed == 'true'
+    # Runs even when the tag exists: every step inside is idempotent.
     runs-on: ubuntu-latest
     outputs:
       tag: v${{ needs.detect-version.outputs.version }}
@@ -108,6 +122,7 @@ jobs:
 
   publish-npm:
     needs: [detect-version, test, create-release]
+    if: needs.detect-version.outputs.npm_missing == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -139,6 +154,7 @@ jobs:
 
   publish-pypi:
     needs: [detect-version, test, create-release]
+    if: needs.detect-version.outputs.pypi_missing == 'true'
     runs-on: ubuntu-latest
     environment: pypi
     permissions:

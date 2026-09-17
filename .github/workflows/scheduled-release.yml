@@ -115,14 +115,7 @@ jobs:
           git add -A
           git commit -m "release: v${NEW_VERSION} — automated weekly batch"
           git push origin "$BRANCH"
-          PR=$(gh pr create --base main --head "$BRANCH" \
-            --title "release: v${NEW_VERSION} — automated weekly batch" \
-            --body "Automated weekly release. Version bump + CHANGELOG entry + synced version surfaces. Merging tags and publishes to npm and PyPI via release.yml.
-
-CI does not start automatically on PRs opened by GITHUB_TOKEN — run:
-
-    gh workflow run ci.yml --ref ${BRANCH}
-
-Auto-merge is armed; it completes once required checks pass.")
+          printf 'Automated weekly release. Version bump + CHANGELOG entry + synced version surfaces. Merging tags and publishes to npm and PyPI via release.yml.\n\nCI does not start automatically on PRs opened by GITHUB_TOKEN. Run:\n\n    gh workflow run ci.yml --ref %s\n\nAuto-merge is armed; it completes once the required checks pass.\n' "$BRANCH" > /tmp/pr-body.md
+          PR=$(gh pr create --base main --head "$BRANCH" --title "release: v${NEW_VERSION} — automated weekly batch" --body-file /tmp/pr-body.md)
           gh pr merge --auto --squash "$PR"
           echo "Release PR: $PR"
