@@ -38,6 +38,20 @@
           },
           "additionalProperties": false
         },
+        "runners": {
+          "description": "Every runner that produced part of this evidence when defenders were split by file (the project runner plus, e.g., Playwright for the files under its testDir). Absent when one runner ran everything.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+              "version": { "type": "string", "maxLength": 64 }
+            },
+            "additionalProperties": false
+          }
+        },
         "confirmRuns": {
           "description": "N — how many times the defenders were run both unmodified (baseline) and with each fault applied.",
           "type": "integer",
@@ -191,6 +205,12 @@
             "discovered": {
               "description": "True when no defenders were declared and `resolved` was found by static import of the subject's file.",
               "type": "boolean"
+            },
+            "byRunner": {
+              "description": "When the resolved defenders ran under more than one runner: runner name → the files it ran. Every file appears in `resolved`. Absent when the project runner ran them all.",
+              "type": "object",
+              "propertyNames": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+              "additionalProperties": { "type": "array", "minItems": 1, "items": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" } }
             }
           },
           "additionalProperties": false
