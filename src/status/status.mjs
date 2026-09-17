@@ -8,6 +8,7 @@ import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { sortForReport } from '../render.mjs';
 import { computeChangedGate, defaultIgnorePath } from '../gate/changed.mjs';
+import { headSha, isAncestor } from '../git.mjs';
 
 export const faultContentHash = (fault) => sha256(`${fault.find}\n${fault.replace}`);
 
@@ -36,6 +37,7 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
     stale: [],
     changedFaults: [],
     findings: [],
+    notes: [],
     paths: {},
   };
   // ── Claim coverage of the change, when a reference is known ──
@@ -97,6 +99,17 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   const evidence = readSpecDoc('evidence', paths.evidence);
   const baseline = existsSync(paths.baseline) ? readSpecDoc('baseline', paths.baseline) : undefined;
   if (baseline) doc.paths.baseline = rel(paths.baseline);
+
+  // ── Baseline provenance: informational, never a state. A baseline frozen
+  // from a snapshot or a dirty tree names the PARENT of the commit that carries
+  // its tests; once HEAD moved on, say so and name the way to re-stamp. ──
+  if (baseline?.head) {
+    const head = headSha(projectDir);
+    if (head && head !== baseline.head) {
+      if (baseline.snapshot || baseline.dirty) doc.notes.push(`baseline was frozen from a ${baseline.snapshot ? 'working-tree snapshot' : 'dirty tree'} at ${baseline.head.slice(0, 7)}; HEAD is ${head.slice(0, 7)} — it predates the commit that carries its tests. After a clean probe of HEAD reproduces the same fingerprints: testguard baseline --restamp`);
+      else if (!isAncestor(projectDir, baseline.head, head)) doc.notes.push(`baseline head ${baseline.head.slice(0, 7)} is not an ancestor of HEAD ${head.slice(0, 7)} (rewritten or foreign history); re-probe and re-baseline if the fingerprints changed`);
+    }
+  }
 
   // ── Staleness: does the evidence still describe this claims file and this tree? ──
   const probed = new Map(evidence.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]));
@@ -197,6 +210,7 @@ export function renderStatus(doc) {
   }
   for (const c of doc.changedFaults) lines.push(`CHANGED   ${c.claimId}/${c.subjectId} edited since it ${c.previousVerdict} (${c.file})`);
   for (const s of doc.stale.slice(0, 8)) lines.push(`stale     ${s}`);
+  for (const n of doc.notes ?? []) lines.push(`note      ${n}`);
   lines.push(`next:     [${doc.next.action}] ${doc.next.command}`);
   lines.push(`why:      ${doc.next.why}`);
   return lines.join('\n');

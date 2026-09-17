@@ -11,8 +11,10 @@ function parseJsonc(text) {
 
 /**
  * Alias rules for a project: tsconfig/jsconfig `compilerOptions.paths` (with
- * `baseUrl`, following a relative `extends` a few levels) and package.json
- * `imports`. Bare specifiers that match no rule are ignored, as documented.
+ * `baseUrl`, following a relative `extends` a few levels, and every
+ * `references[].path` — Vite projects keep `paths` in `tsconfig.app.json`),
+ * vite/vitest `resolve.alias` read as text, and package.json `imports`. Bare
+ * specifiers that match no rule are ignored, as documented.
  */
 export function loadAliases(projectDir) {
   if (aliasCache.has(projectDir)) return aliasCache.get(projectDir);
@@ -22,25 +24,69 @@ export function loadAliases(projectDir) {
     rules.push({ prefix, suffix, wildcard: pattern.includes('*'), targets: targets.map((t) => resolve(base, t)) });
   };
 
-  let cfgPath = ['tsconfig.json', 'jsconfig.json'].map((f) => join(projectDir, f)).find(existsSync);
-  let baseUrl;
-  let paths;
-  for (let hop = 0; cfgPath && hop < 5; hop++) {
+  // Every tsconfig in the chain: the root, what it extends, what it references.
+  const seen = new Set();
+  const queue = ['tsconfig.json', 'jsconfig.json'].map((f) => join(projectDir, f)).filter(existsSync).slice(0, 1);
+  while (queue.length && seen.size < 12) {
+    const cfgPath = queue.shift();
+    if (seen.has(cfgPath) || !existsSync(cfgPath)) continue;
+    seen.add(cfgPath);
     let cfg;
     try {
       cfg = parseJsonc(readFileSync(cfgPath, 'utf8'));
     } catch {
-      break;
+      continue;
     }
     const co = cfg.compilerOptions ?? {};
-    if (baseUrl === undefined && co.baseUrl !== undefined) baseUrl = resolve(dirname(cfgPath), co.baseUrl);
-    if (paths === undefined && co.paths !== undefined) paths = { dir: dirname(cfgPath), map: co.paths };
+    if (co.paths) {
+      const base = co.baseUrl !== undefined ? resolve(dirname(cfgPath), co.baseUrl) : dirname(cfgPath);
+      for (const [pattern, targets] of Object.entries(co.paths)) if (Array.isArray(targets)) toRule(pattern, targets, base);
+    }
     const ext = typeof cfg.extends === 'string' && cfg.extends.startsWith('.') ? cfg.extends : null;
-    cfgPath = ext ? resolve(dirname(cfgPath), ext.endsWith('.json') ? ext : ext + '.json') : null;
+    if (ext) queue.push(resolve(dirname(cfgPath), ext.endsWith('.json') ? ext : ext + '.json'));
+    for (const ref of Array.isArray(cfg.references) ? cfg.references : []) {
+      if (typeof ref?.path !== 'string') continue;
+      const p = resolve(dirname(cfgPath), ref.path);
+      queue.push(p.endsWith('.json') ? p : join(p, 'tsconfig.json'));
+    }
   }
-  if (paths) {
-    const base = baseUrl ?? paths.dir;
-    for (const [pattern, targets] of Object.entries(paths.map)) if (Array.isArray(targets)) toRule(pattern, targets, base);
+
+  // vite / vitest config: `resolve.alias` as `{ '@': path.resolve(__dirname, './src') }`,
+  // `{ '@': fileURLToPath(new URL('./src', import.meta.url)) }`, `{ '@': './src' }`
+  // or `[{ find: '@', replacement: … }]`. Read as text: the config may be TypeScript.
+  for (const f of ['vitest.config.ts', 'vitest.config.mts', 'vitest.config.js', 'vitest.config.mjs', 'vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs']) {
+    const path = join(projectDir, f);
+    if (!existsSync(path)) continue;
+    const text = readFileSync(path, 'utf8');
+    const start = /\balias\s*:\s*([\[{])/.exec(text);
+    if (!start) continue;
+    // Take the balanced bracket block that follows `alias:`.
+    const open = start.index + start[0].length - 1;
+    const pairs = { '{': '}', '[': ']' };
+    let depth = 0;
+    let end = -1;
+    for (let i = open; i < text.length; i++) {
+      if (text[i] === '{' || text[i] === '[' || text[i] === '(') depth++;
+      else if (text[i] === '}' || text[i] === ']' || text[i] === ')') { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (end === -1) continue;
+    const block = text.slice(open, end + 1);
+    const PATHLIKE = /(['"])(\.{1,2}\/[^'"]*|src(?:\/[^'"]*)?)\1/;
+    let entries;
+    if (start[1] === '[') {
+      entries = [...block.matchAll(/find\s*:\s*(['"])([^'"]+)\1([\s\S]*?)(?=find\s*:|\]$)/g)].map((m) => [m[2], m[3]]);
+    } else {
+      // key: <value up to the next top-level key>; the value may contain calls with their own commas
+      const keys = [...block.matchAll(/(['"]?)([@#~$\w./-]+)\1\s*:(?!\/)/g)];
+      entries = keys.map((k, i) => [k[2], block.slice(k.index + k[0].length, keys[i + 1]?.index ?? block.length)]);
+    }
+    for (const [key, value] of entries) {
+      const target = PATHLIKE.exec(value)?.[2];
+      if (!key || !target) continue;
+      const abs = resolve(projectDir, target);
+      rules.push({ prefix: key, suffix: '', wildcard: false, targets: [abs] });
+      rules.push({ prefix: key.endsWith('/') ? key : key + '/', suffix: '', wildcard: true, targets: [join(abs, '*')] });
+    }
   }
 
   const pkgPath = join(projectDir, 'package.json');
@@ -93,6 +139,14 @@ function resolvesTo(fromFile, specifier, targetAbs, aliases) {
   const bases = specifier.startsWith('.') ? [resolve(dirname(fromFile), specifier)] : aliasCandidates(specifier, aliases);
   return bases.some((b) => expandBase(b).includes(targetAbs));
 }
+
+/** Does `specifier`, as written in `absFile`, resolve to `targetRel` (relative or alias-resolved)? */
+export function specifierResolvesTo(projectDir, absFile, specifier, targetRel) {
+  return resolvesTo(absFile, specifier, resolve(projectDir, targetRel), loadAliases(projectDir));
+}
+
+/** Clear the alias cache (tests create and delete projects at the same paths). */
+export const resetAliasCache = () => aliasCache.clear();
 
 /** Does the file at `absFile` import `targetRel` (relative or alias-resolved)? */
 export function fileImports(projectDir, absFile, targetRel) {

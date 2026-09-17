@@ -334,6 +334,33 @@
           }
         }
       ]
+    },
+    {
+      "id": "EXPORT-002",
+      "statement": "exportRows() strips the content field (a claim whose only importing test mocks the module).",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Export keeps the content field. No defendedBy: the only test that imports src/export mocks it and never asserts on it, so discovery must find NO defender \u2014 a mock cannot detect a fault in what it replaces.",
+          "faultClass": "statement-deleted",
+          "file": "src/export.mjs",
+          "find": "return rows.map(({ content, ...rest }) => rest);",
+          "replace": "return rows.map((row) => ({ ...row }));",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
     }
   ]
 }

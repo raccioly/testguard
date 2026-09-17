@@ -127,8 +127,18 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    did not look at. Every summary names the commit probed.
 
    A claim with no `defendedBy` has its defenders **discovered**: the test
-   files that import the fault's target, by relative path or resolved alias.
-   `NOCOVER` then means exactly "no test file imports this source".
+   files that import the fault's target, by relative path or resolved alias
+   (tsconfig `paths`, through `extends` and `references`, vite/vitest
+   `resolve.alias`, package.json `imports`) — **minus the files that mock
+   it**. A test that `vi.mock`s / `jest.mock`s the target cannot detect any
+   fault in it; counting it would make `NOCOVER` under-report and waste runs.
+   `NOCOVER` therefore means exactly "no test file imports this source
+   without mocking it". `claims` prints the split (`18 import · 16 mock · 2
+   can detect`), the evidence lists the mocking files, and a mocking file
+   that never `expect(...)`s anything imported from the target carries the
+   static signal `mocked-never-asserted` — the cheapest blind-spot signal
+   there is, and the exact signature of one escaped bug in the field
+   reports. Silence it, visibly, with `// unasserted: <why>` above the mock.
 
    Runners: **vitest** and **jest** are project runners (`--runner auto`
    picks the first that resolves; both read the same jest-compatible JSON
@@ -169,7 +179,12 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
 3. **Baseline** freezes every non-passing fingerprint. Later probes suppress
    what was already known and exit non-zero only on what is new. Claims whose
    source and defenders are unchanged reuse their prior verdict, so a probe
-   in CI costs only what changed.
+   in CI costs only what changed. A baseline frozen from `--include-dirty`
+   evidence records the snapshot and points at the *parent* of the commit
+   that will carry your tests; after you commit, a clean `probe` plus
+   `baseline --restamp` moves it to that commit — only when the fingerprints
+   are identical, never otherwise. `status` notes a baseline that predates
+   HEAD without making it a state.
 4. **Brief** turns evidence plus baseline into a ranked, capped
    `## TEST BLINDSPOT CONTEXT` block, printed and also written to
    `.testguard/brief.json` (`--text` prints only). Wire it into an agent's session start

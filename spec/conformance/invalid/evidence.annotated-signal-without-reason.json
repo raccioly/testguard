@@ -18,17 +18,7 @@
       "version": "5.0.1"
     },
     "confirmRuns": 3,
-    "mode": "worktree",
-    "runners": [
-      {
-        "name": "vitest",
-        "version": "5.0.1"
-      },
-      {
-        "name": "playwright",
-        "version": "1.63.0"
-      }
-    ]
+    "mode": "worktree"
   },
   "records": [
     {
@@ -267,24 +257,14 @@
           "test/redact.test.mjs"
         ],
         "resolved": [
-          "e2e/redact.spec.mjs",
           "test/redact.test.mjs"
         ],
-        "nocover": false,
-        "byRunner": {
-          "vitest": [
-            "test/redact.test.mjs"
-          ],
-          "playwright": [
-            "e2e/redact.spec.mjs"
-          ]
-        }
+        "nocover": false
       },
       "inputs": {
         "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "defenderHashes": {
-          "test/redact.test.mjs": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "e2e/redact.spec.mjs": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          "test/redact.test.mjs": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         }
       }
     },
@@ -368,7 +348,7 @@
         "signals": [
           {
             "file": "test/rules-mocked.test.mjs",
-            "signal": "mocked-never-asserted"
+            "signal": "unasserted-annotated"
           }
         ]
       },
