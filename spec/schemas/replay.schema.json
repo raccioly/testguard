@@ -51,7 +51,7 @@
           },
           "subject": { "description": "The fix commit's subject line, for a human reading the corpus.", "type": "string", "maxLength": 512 },
           "verdict": {
-            "description": "`caught` = a remaining test failed by assertion on the reverted source, every run. `blind` = the suite stayed green on known-broken code. `nocover` = no test exercises the reverted files at all, which is worse than blind. `unverifiable` = the revert did not apply or the suite could not load. `flaky` = the runs disagreed, so nothing can be concluded.",
+            "description": "`caught` = a remaining test failed by assertion on the reverted source, every run. `blind` = the suite stayed green on known-broken code. `nocover` = no test exercises the reverted files at all, which is worse than blind. `unverifiable` = nothing could be concluded: the revert did not apply, the suite could not load, it timed out, or the commit only ADDS source (`no-prior-version` \u2014 there is no earlier behaviour to have been blind to, so it is not a bug the suite could have caught and it never enters a calibration). `flaky` = the runs disagreed, so nothing can be concluded.",
             "enum": ["caught", "blind", "nocover", "unverifiable", "flaky"]
           },
           "reason": { "type": "string", "maxLength": 256 },

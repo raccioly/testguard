@@ -19,7 +19,14 @@ const SOURCE_EXT = /\.[cm]?[jt]sx?$/;
  * behaviour and shipped a test for it — which is what makes bug replay ground
  * truth rather than a synthetic mutant of arguable relevance.
  */
-export function findFixCommits({ dir, range }) {
+export function findFixCommits({ dir, range, projectDir }) {
+  // In a monorepo a fix commit routinely touches several packages. Only the
+  // files under THIS project can be reverted or run here, so scope to them
+  // and drop a commit that has no source-and-test pair inside the project —
+  // otherwise most of the corpus comes back `revert-did-not-apply`, which
+  // looks like a tooling failure and hides the real verdicts.
+  const scope = projectDir && projectDir !== dir ? relative(dir, projectDir).split('\\').join('/') : '';
+  const inScope = (f) => !scope || f === scope || f.startsWith(`${scope}/`);
   let log;
   try {
     log = git(['log', '--no-merges', '--format=%H%x1f%s', range], dir);
@@ -31,8 +38,8 @@ export function findFixCommits({ dir, range }) {
   for (const line of log.split('\n').filter(Boolean)) {
     const [commit, subject] = line.split('\x1f');
     const files = git(['show', '--name-only', '--format=', '--diff-filter=d', commit], dir).split('\n').filter(Boolean);
-    const source = files.filter((f) => SOURCE_EXT.test(f) && !IS_TEST(f));
-    const tests = files.filter((f) => IS_TEST(f));
+    const source = files.filter((f) => inScope(f) && SOURCE_EXT.test(f) && !IS_TEST(f));
+    const tests = files.filter((f) => inScope(f) && IS_TEST(f));
     if (source.length === 0 || tests.length === 0) continue;
     out.push({ commit, subject, source, tests });
   }
@@ -86,7 +93,7 @@ export async function replay({
   const root = repoRoot(projectDir);
   if (!headSha(root)) throw new PreconditionError('repository has no commits; there is nothing to replay');
 
-  const found = findFixCommits({ dir: root, range });
+  const found = findFixCommits({ dir: root, range, projectDir });
   const { unique, duplicates } = dedupeByPatch({ dir: root, commits: found });
   const selected = limit ? unique.slice(0, limit) : unique;
   if (selected.length === 0) {
@@ -160,9 +167,34 @@ async function replayOne({ fix, iso, root, projectDir, confirmRuns, budgetMs, co
     faultClass = 'other';
   }
 
-  // Revert only the source, to the fix's parent.
+  // Revert only the source, to the fix's parent. A fix routinely ADDS a file
+  // as well as changing others, and a file that did not exist at the parent
+  // cannot be checked out of it — reverting such a file means removing it.
+  // Getting this wrong turns half a real corpus into `revert-did-not-apply`,
+  // which reads as a tooling failure and hides every real verdict behind it.
+  const existedBefore = [];
+  const addedByTheFix = [];
+  for (const f of fix.source) {
+    try {
+      git(['cat-file', '-e', `${fix.commit}^:${f}`], iso.projectDir);
+      existedBefore.push(f);
+    } catch {
+      addedByTheFix.push(f);
+    }
+  }
+  // Every source file is new: this commit ADDS behaviour rather than
+  // correcting it. There is no earlier version to have been blind to, so it
+  // is not a bug the suite could have caught, and it must not enter a
+  // calibration as though it were.
+  if (existedBefore.length === 0) {
+    return { ...base, faultClass, verdict: 'unverifiable', reason: 'no-prior-version', runs: [{ outcome: 'error', durationMs: 0 }] };
+  }
   try {
-    git(['checkout', `${fix.commit}^`, '--', ...fix.source.map(rel)], iso.projectDir);
+    if (existedBefore.length) git(['checkout', `${fix.commit}^`, '--', ...existedBefore.map(rel)], iso.projectDir);
+    for (const f of addedByTheFix) {
+      const abs = join(iso.projectDir, rel(f));
+      if (existsSync(abs)) rmSync(inside(abs), { force: true });
+    }
   } catch (e) {
     return { ...base, faultClass, verdict: 'unverifiable', reason: 'revert-did-not-apply', runs: [{ outcome: 'error', durationMs: 0 }] };
   }
