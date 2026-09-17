@@ -7,13 +7,26 @@ const ORDER = ['survived', 'nocover', 'unverifiable', 'fault-invalid', 'timeout'
 /** One line the agent can act on. Names the mechanism, never just the verdict. */
 export function hintFor(r) {
   const defenders = r.defenders.resolved.join(', ');
+  const base = hintBase(r, defenders);
+  const mocked = (r.defenders.mocking ?? []);
+  const never = (r.defenders.signals ?? []).filter((s) => s.signal === 'mocked-never-asserted').map((s) => s.file);
+  const extra = [
+    mocked.length ? `${mocked.length} importing test${mocked.length === 1 ? '' : 's'} mock${mocked.length === 1 ? 's' : ''} the target and cannot detect this (${mocked.join(', ')})` : '',
+    never.length ? `${never.join(', ')} mock${never.length === 1 ? 's' : ''} it and never assert${never.length === 1 ? 's' : ''} on it` : '',
+  ].filter(Boolean);
+  return extra.length ? `${base} ${extra.join('; ')}.` : base;
+}
+
+function hintBase(r, defenders) {
   switch (r.verdict) {
     case 'survived':
       return r.detail.reason === 'killed-by-undeclared-tests'
         ? `Only tests outside its declared defenders (${defenders}) catch this; fix the claim's defendedBy or move the assertion.`
         : `${defenders} stayed green with this fault applied; add an assertion that fails on it and passes on HEAD. If no test's outcome can change, first check the fault is observable at all.`;
     case 'nocover':
-      return `No test file matches ${r.defenders.requested.join(', ') || '(no defenders declared)'}; nothing defends this claim.`;
+      return r.defenders.discovered
+        ? 'No test file imports the target without mocking it; nothing defends this claim.'
+        : `No test file matches ${r.defenders.requested.join(', ') || '(no defenders declared)'}; nothing defends this claim.`;
     case 'unverifiable':
       return `Anchor ${r.detail.reason}; re-author fault ${r.subject.id} in the claims file before trusting this claim.`;
     case 'fault-invalid':

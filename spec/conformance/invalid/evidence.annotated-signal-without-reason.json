@@ -348,7 +348,7 @@
         "signals": [
           {
             "file": "test/rules-mocked.test.mjs",
-            "signal": "mocked-never-asserted"
+            "signal": "unasserted-annotated"
           }
         ]
       },
