@@ -1510,6 +1510,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-LABEL-NEVER-GUESSES",
+      "statement": "A fix diff whose shape the fault model does not have is labelled `other`, never the nearest guess; an honest gap in the calibration is worth more than a confident wrong bucket.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/calibration.schema.json"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/replay.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An unrecognisable diff falls back to the first fault class instead of `other`, so every unclassifiable bug silently lands in one bucket and skews its rate.",
+          "faultClass": "return-altered",
+          "file": "src/replay/label.mjs",
+          "find": "  if (tally.size === 0) return { faultClass: 'other', confident: false };",
+          "replace": "  if (tally.size === 0) return { faultClass: SPECIFICITY[0], confident: false };",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

@@ -89,8 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pass, `flaky` needs runs that disagree, `nocover` cannot have run tests,
   and a duplicate patch-id is rejected. Conformance example plus two
   must-reject documents. Self-claims
-  `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT`, `TG-REPLAY-DEDUPES-BY-PATCH` and
-  `TG-CALIBRATION-EXCLUDES-UNINFORMATIVE`.
+  `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT`, `TG-REPLAY-DEDUPES-BY-PATCH`,
+  `TG-CALIBRATION-EXCLUDES-UNINFORMATIVE` and `TG-LABEL-NEVER-GUESSES`.
 
 ### Spec
 
