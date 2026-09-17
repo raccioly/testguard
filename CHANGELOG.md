@@ -32,6 +32,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TG-MCP-IS-READ-ONLY` and
   `TG-MCP-TOOL-FAILURE-IS-NOT-A-PROTOCOL-ERROR`. (#30)
 
+### Fixed
+
+- **`replay` scopes to the project directory.** In a monorepo a fix commit
+  routinely touches several packages; the harness kept the out-of-project
+  files in the revert, so every cross-package fix came back
+  `revert-did-not-apply` — a tooling failure wearing the costume of a
+  verdict. Found on a real corpus, where it was two of the first three
+  commits. A commit with no source-and-test pair inside the project is no
+  longer a candidate at all. Self-claim `TG-REPLAY-SCOPES-TO-THE-PROJECT`.
+- **`replay` reverts a file the fix ADDED by removing it**, and calls a commit
+  whose source is entirely new `no-prior-version` rather than a failed revert.
+  A fix routinely adds a helper as well as changing a module, and a file that
+  did not exist at the parent cannot be checked out of it: on a real corpus
+  this turned **nineteen of forty** commits into `revert-did-not-apply` — a
+  tooling failure reading as a verdict and hiding every real result behind it.
+  An addition is not a bug the suite could have caught, so it never enters a
+  calibration. Self-claim
+  `TG-REPLAY-ADDED-FILE-IS-REMOVED-NOT-CHECKED-OUT`.
+- `replay --out <path>` now writes the calibration beside it rather than into
+  the project's `.testguard/`: the two documents are one result and splitting
+  them loses the pairing.
+
 ### Added
 
 

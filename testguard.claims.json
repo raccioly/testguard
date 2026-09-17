@@ -1862,6 +1862,70 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-REPLAY-SCOPES-TO-THE-PROJECT",
+      "statement": "Only files under the project directory are considered when finding and reverting a fix commit; in a monorepo a fix that also touches another package is replayed on this project's part of it, never abandoned.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#replay-reports-it-never-gates"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/replay.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Files outside the project are kept in the fix's source list, so the revert targets paths that do not exist here and every cross-package fix reports revert-did-not-apply.",
+          "faultClass": "condition-forced",
+          "file": "src/replay/replay.mjs",
+          "find": "  const inScope = (f) => !scope || f === scope || f.startsWith(`${scope}/`);",
+          "replace": "  const inScope = () => true;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-REPLAY-ADDED-FILE-IS-REMOVED-NOT-CHECKED-OUT",
+      "statement": "A source file the fix added is reverted by removing it, and a commit whose source is entirely new is no-prior-version rather than a failed revert; an addition is not a bug the suite could have caught.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/replay.schema.json"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/replay.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every source file is checked out of the parent, so a file the fix added fails the revert and the whole commit reports revert-did-not-apply.",
+          "faultClass": "condition-forced",
+          "file": "src/replay/replay.mjs",
+          "find": "  if (existedBefore.length === 0) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }
