@@ -1542,6 +1542,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-REMOVED-CLAIM-IS-A-FINDING",
+      "statement": "A claim or fault that existed at the reference and no longer exists is reported and gates, unless an unexpired ignore entry with a reason excuses it; deleting a claim is never a silent way to make a finding disappear.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#every-change-needs-a-claim"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/claims-since.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An expired ignore entry still excuses a removed claim, so a stale exemption hides a deletion forever.",
+          "faultClass": "condition-forced",
+          "file": "src/claims/removed.mjs",
+          "find": "    const active = excuses.find((e) => !e.expired && (e.entry.pattern === target || (f.kind === 'removed-fault' && e.entry.kind === 'claim' && e.entry.pattern === f.claimId)));",
+          "replace": "    const active = excuses.find((e) => (e.entry.pattern === target || (f.kind === 'removed-fault' && e.entry.kind === 'claim' && e.entry.pattern === f.claimId)));",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }
