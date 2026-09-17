@@ -276,7 +276,7 @@
             "test/redact.test.mjs"
           ],
           "playwright": [
-            "e2e/redact.spec.mjs"
+            "e2e/other.spec.mjs"
           ]
         }
       },

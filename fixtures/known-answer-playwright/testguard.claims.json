@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "TOGGLE-001",
+      "statement": "The greeting row renders an ON/OFF checkbox toggle.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "test/toggle.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The checkbox element is removed from the row; only the label text remains. Defended by the unit test alone, which never looks at the input.",
+          "faultClass": "element-removed",
+          "file": "src/toggle.mjs",
+          "find": "    `  <input type=\"checkbox\" data-testid=\"greeting-toggle\"${on ? ' checked' : ''}`,\n    `    onchange=\"${handler}(this.checked)\">`,\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TOGGLE-002",
+      "statement": "The greeting row renders an ON/OFF checkbox toggle (defended by the browser-layer spec).",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "e2e/toggle.spec.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The same fault as TOGGLE-001/F1, defended by the Playwright spec that asserts the checkbox is there.",
+          "faultClass": "element-removed",
+          "file": "src/toggle.mjs",
+          "find": "    `  <input type=\"checkbox\" data-testid=\"greeting-toggle\"${on ? ' checked' : ''}`,\n    `    onchange=\"${handler}(this.checked)\">`,\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TOGGLE-003",
+      "statement": "The greeting row renders an ON/OFF checkbox toggle (defended by both layers: one claim, two runners).",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "test/toggle.test.mjs",
+        "e2e/toggle.spec.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The same fault; the defenders split across vitest and Playwright and the evidence says which file ran where.",
+          "faultClass": "element-removed",
+          "file": "src/toggle.mjs",
+          "find": "    `  <input type=\"checkbox\" data-testid=\"greeting-toggle\"${on ? ' checked' : ''}`,\n    `    onchange=\"${handler}(this.checked)\">`,\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TOGGLE-004",
+      "statement": "The toggle carries its change handler.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "e2e/toggle.spec.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The onchange attribute is dropped; the checkbox renders but does nothing.",
+          "faultClass": "handler-dropped",
+          "file": "src/toggle.mjs",
+          "find": "    `    onchange=\"${handler}(this.checked)\">`,\n",
+          "replace": "    '>',\n",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TOGGLE-005",
+      "statement": "renderToggle() returns promptly.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "e2e/toggle.spec.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "renderToggle() returns a promise that never settles; the awaiting Playwright spec hits its test timeout, which is a TIMEOUT verdict, never a kill.",
+          "faultClass": "return-altered",
+          "file": "src/toggle.mjs",
+          "find": "  return html;",
+          "replace": "  return new Promise(() => {});",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "FLAKY-PW",
+      "statement": "A claim whose Playwright defender passes only on retry cannot be verified.",
+      "source": {
+        "kind": "manual"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "e2e/flaky.spec.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Any fault at all; Playwright's `flaky` status (exit 0) must still be a non-green baseline.",
+          "faultClass": "literal-changed",
+          "file": "src/toggle.mjs",
+          "find": "'<label class=\"toggle\">',",
+          "replace": "'<label class=\"switch\">',",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    }
+  ]
+}
