@@ -14,6 +14,7 @@ import { scaffoldCommand } from './commands/scaffold.mjs';
 import { statusCommand } from './commands/status.mjs';
 import { initCommand } from './commands/init.mjs';
 import { gateCommand } from './commands/gate.mjs';
+import { admitCommand } from './commands/admit.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
 
@@ -27,6 +28,7 @@ const USAGE = `testguard ${VERSION} — proves a test suite defends the claims a
   testguard brief [dir]      emit the blind-spot block for an agent's session-start context
   testguard gate [dir]       fail when a changed source file carries no claim and no excusing ignore entry
   testguard scaffold <file>  propose faults mechanically for one source file, as a draft claims document
+  testguard admit <test> --claim <ID>   the two-gate rule as one verb: is this test green on HEAD and does it fail on every fault of the claim?
 
 probe
   --claims <path>      claims file             (default: <dir>/testguard.claims.json)
@@ -55,6 +57,9 @@ scaffold   --claim <ID> (put every proposal under this claim; copies it if it ex
            shapes: if-guard → if (false) · single-line guard/mutation removed · return <check> → return true
                    · security flag/window/cost literal weakened · verify/validate/check call removed
                    · field dropped from a payload/allow-list/schema/merge · parameter-derived argument swapped for undefined/{}
+admit      --claim <ID> (required)  --fault <FID> (one fault only)  --confirm <n>  --json
+           ADMITTED (exit 0) only when every fault of the claim is killed N/N by defenders that are green N/N; anything else is NOT ADMITTED (exit 1) and names the first blocking fault
+           the test must be a declared or discovered defender of the claim (exit 3 otherwise); evidence goes to .testguard/evidence-partial.json
 gate       --changed <ref>   measure the change since merge-base(ref, HEAD); auto-detected in GitHub Actions / GitLab CI
            --include-dirty   compare the working tree (staged, unstaged and untracked) instead of HEAD — the pre-commit shape
            --exclude <glob>  (repeatable) more files that never carry claims; --explain lists the defaults
@@ -72,7 +77,7 @@ brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; 
 exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift, or unclaimed changes) · 2 precondition failed · 3 usage
 `;
 
-const COMMANDS = { probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand };
+const COMMANDS = { probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand, admit: admitCommand };
 
 export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') }) {
   let parsed;
@@ -92,6 +97,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         ref: { type: 'string' },
         'ignore-dirty': { type: 'boolean', default: false },
         claim: { type: 'string' },
+        fault: { type: 'string' },
         'include-dirty': { type: 'boolean', default: false },
         changed: { type: 'string' },
         exclude: { type: 'string', multiple: true },
@@ -144,7 +150,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
     return 3;
   }
   try {
-    const projectDir = command === 'scaffold' ? resolve('.') : resolve(dirArg ?? '.');
+    const projectDir = command === 'scaffold' || command === 'admit' ? resolve('.') : resolve(dirArg ?? '.');
     return await handler({ projectDir, file: dirArg, values, version: VERSION }, io);
   } catch (e) {
     if (e instanceof ClaimsError || e instanceof PreconditionError || e instanceof GitError || e instanceof SpecDocError) {

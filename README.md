@@ -70,6 +70,7 @@ npx testguard-cli baseline    # freeze today's unproven findings; from now on on
 npx testguard-cli brief       # tell the agent where the suite is blind, before it writes
 npx testguard-cli gate --changed origin/main   # fail when a changed source file carries no claim at all
 npx testguard-cli scaffold src/x.ts   # propose faults for a file, as a draft to keep or drop
+npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD and does it fail on every fault of X? ADMITTED or NOT ADMITTED
 ```
 
 1. **Claims** live in `testguard.claims.json` (editors validate it against
@@ -120,6 +121,16 @@ npx testguard-cli scaffold src/x.ts   # propose faults for a file, as a draft to
    resolves; both read the same jest-compatible JSON report). Anything else
    goes through `--runner-cmd`. Each runner is proven against its own copy
    of the known-answer fixture.
+
+   The two-gate rule, as one verb: `testguard admit <test-file> --claim <ID>`
+   runs the claim's faults against your uncommitted test and answers
+   `ADMITTED` (exit 0: the test is green on unmodified HEAD and fails on
+   every fault, N/N) or `NOT ADMITTED` (exit 1: the first blocking fault and
+   what to do about it). The test must be a declared or discovered defender
+   of the claim. It is sugar over `probe --claim <ID> --include-dirty`, so
+   it can never disagree with the gate. Every generator on the market admits
+   a test because it compiles, passes and raises coverage; `admit` admits it
+   because it fails when the claim is false.
 
    Practical loop: first pass `--no-escalate` (escalation re-runs the whole
    suite N times per survivor); iterate on one claim with `--claim <ID>` and
@@ -281,7 +292,7 @@ change gate (`gate`). The contract
 spine — eight JSON Schemas shared with the other Guard tools — is under
 [`spec/`](spec/). One exact-pinned runtime dependency (`ajv`, for schema validation); Node ≥ 20.
 
-Not yet: test generation (the two-gate acceptance loop), runners beyond
+Not yet: test generation (the acceptance half, `admit`, exists; the generating half stays the agent's), runners beyond
 vitest and jest, AST-aware producers, and calibration of fault classes
 against real escaped bugs. Each is designed for; none is claimed.
 

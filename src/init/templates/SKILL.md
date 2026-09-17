@@ -45,7 +45,7 @@ code by construction. So, for every source file you create or change:
    thin wrapper whose logic is claimed elsewhere): a `path` entry in
    `testguard.ignore.json` with a reason and, where possible, an `expires`.
    The gate prints every entry it relied on; a reviewer reads them.
-4. Then `testguard probe --claim <ID> --include-dirty` for the new claim.
+4. Then `testguard admit <test-file> --claim <ID>` for the new claim's test (or `testguard probe --claim <ID> --include-dirty` for the full report).
 
 ## Verdict → action
 
@@ -63,8 +63,8 @@ code by construction. So, for every source file you create or change:
 
 1. `testguard status --json` → take `next.target`.
 2. Write the test. It must **fail when the fault is applied and pass on HEAD**. To check the first half by hand: apply `find` → `replace` in the target file, run the defender, restore.
-3. `testguard probe --claim <ID> --include-dirty` — probes your uncommitted test without touching the tree. `--confirm 1` gives a fast **provisional** signal; a `?` on a verdict means unconfirmed.
-4. When it is `killed` at `--confirm 3`, commit the test.
+3. `testguard admit <test-file> --claim <ID>` — the two gates as one verb, on your uncommitted test, without touching the tree: `ADMITTED` (exit 0) means the test is green on HEAD and fails on every fault of the claim, 3/3; `NOT ADMITTED` (exit 1) names the first blocking fault and what to do. `--fault <FID>` judges one fault; `--confirm 1` gives a fast **provisional** `ADMITTED?` that must be confirmed at 3 before you commit. (`testguard probe --claim <ID> --include-dirty` is the same run with the full report.)
+4. When it is `ADMITTED` at `--confirm 3`, commit the test.
 5. When everything is killed or baselined, `testguard baseline` if `next` says so, and commit `.testguard/baseline.json`.
 
 ## Rules that are not yours to bend
