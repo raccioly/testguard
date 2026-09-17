@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
 - **Mock-aware defender discovery** (#20). A test file that `vi.mock`s /
   `jest.mock`s the target cannot detect any fault in it and is no longer a
   discovered defender; `NOCOVER` now means "no test imports this source
@@ -50,6 +51,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 
+
+
+
+- `probe` honours an explicit `--ref` (even `--ref HEAD`) when defender or
+  target files are dirty, and gains `--ignore-dirty` for the implicit HEAD
+  (#19). Both warn with the file names and record them in the evidence as
+  `repo.ignoredDirty` (spec: new optional field; a snapshot run can never
+  carry it). The refusal stays for the implicit HEAD without the flag — that
+  is the silent-mismatch trap the check exists for.
 
 - CI: TestGuard's self-probe runs on one Node leg instead of three, without
   escalation, and restores the previous run's evidence from the cache so
