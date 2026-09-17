@@ -3,8 +3,12 @@ dist/
 coverage/
 .DS_Store
 *.log
-# TestGuard's own output when run against this repo
-.testguard/
+# TestGuard: baseline.json and status.json ARE committed (the frozen contract and its snapshot); the rest is regenerated per run
+.testguard/evidence.json
+.testguard/evidence-provisional.json
+.testguard/evidence-partial.json
+.testguard/brief.json
+.testguard/scaffold-*.json
 # Local agent tooling — not part of the public project
 .wolf/
 .claude/
