@@ -522,11 +522,11 @@
       "faults": [
         {
           "id": "F1",
-          "description": "The unclaimed block is never rendered.",
+          "description": "The unclaimed block is never rendered in the TEXT brief (the markdown renderer has its own claim).",
           "faultClass": "condition-forced",
           "file": "src/brief/brief.mjs",
-          "find": "  if (brief.unclaimed) {",
-          "replace": "  if (false) {",
+          "find": "  if (brief.unclaimed) {\n    const n = brief.unclaimed.files.length;\n    lines.push('', `UNCLAIMED CHANGES since",
+          "replace": "  if (false) {\n    const n = brief.unclaimed.files.length;\n    lines.push('', `UNCLAIMED CHANGES since",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
