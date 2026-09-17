@@ -52,7 +52,7 @@ tests were written against the survivors, 39/39 were killed.
 | npm | `npm i -D testguard-cli` then `npx testguard probe` |
 | pip | `pip install testguard-cli` then `testguard probe` (needs Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.1.3` — see [`action.yml`](./action.yml) |
+| GitHub Action | `uses: raccioly/testguard@v0.2.0` — see [`action.yml`](./action.yml) |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
 
 Projects that set `min-release-age` in `.npmrc` cannot see a version published
@@ -66,6 +66,7 @@ npx testguard-cli claims      # what does this project claim, and is every claim
 npx testguard-cli probe       # try to falsify each claim; report what the tests missed
 npx testguard-cli baseline    # freeze today's unproven findings; from now on only new ones gate
 npx testguard-cli brief       # tell the agent where the suite is blind, before it writes
+npx testguard-cli scaffold src/x.ts   # propose faults for a file, as a draft to keep or drop
 ```
 
 1. **Claims** live in `testguard.claims.json` (editors validate it against
@@ -135,6 +136,34 @@ npx testguard-cli brief       # tell the agent where the suite is blind, before 
    `--text` prints only, and exits 0 silently when there is no evidence yet,
    so the hook can never break a session.
 
+### Authoring faults mechanically
+
+Writing faults by hand means reading the code to find exact anchors. Two
+field reports found that ~80% of hand-written faults are one of five shapes,
+so `scaffold` proposes them for you:
+
+```bash
+npx testguard-cli scaffold src/auth.ts          # → .testguard/scaffold-auth.json (a draft, never your claims file)
+npx testguard-cli scaffold src/auth.ts --claim AUTH-ADMIN   # every proposal under one claim; copies it if it exists
+```
+
+| Shape | What it proposes |
+|---|---|
+| `condition-forced` | `if (<guard>) {` → `if (false) {` — a guard is a `!…` condition or one whose body returns, throws or 4xx-es |
+| `statement-deleted` | a single-line guard (`if (…) return …;`) or a state change (`x = …;`) removed |
+| `return-altered` | `return <check>;` (`===`, `.includes(`, `&&`, …) → `return true;` |
+| `literal-changed` | `httpOnly`/`secure` flipped, `sameSite` → `none`, a cost/rounds → `1`, a ttl/tolerance/window/limit ×1000 |
+| `call-removed` | a bare `verify…()` / `validate…()` / `check…()` / `authorize…()` call removed |
+
+Every proposal's `find` is the exact line with `expectHits`/`occurrence`
+computed from the file, so it is verifiable by construction; provenance is
+`producer: derived`; `defendedBy` is prefilled from the tests that import
+the module; proposals are grouped under a preceding `@claim <ID>` annotation
+or by enclosing function. Statements are `TODO:` placeholders — a proposal
+becomes a claim only when a human states what it defends. Deterministic
+heuristics, no AST, no LLM; a proposal the tool cannot anchor is never
+emitted.
+
 **Commit `.testguard/baseline.json`; ignore `evidence.json` and `brief.json`.**
 The baseline is the frozen contract; the other two are regenerated per run.
 
@@ -160,13 +189,14 @@ through every verdict.
 
 ## Status
 
-**v0.1.** Four commands, vitest runner, hand-authored faults. The contract
+**v0.2.** Five commands, vitest runner, hand-authored faults plus a
+mechanical scaffold for the five common shapes. The contract
 spine — six JSON Schemas shared with the other Guard tools — is under
 [`spec/`](spec/). One exact-pinned runtime dependency (`ajv`, for schema validation); Node ≥ 20.
 
 Not yet: test generation (the two-gate acceptance loop), other runners,
-mechanical fault producers, and calibration of fault classes against real
-escaped bugs. Each is designed for; none is claimed.
+AST-aware producers, and calibration of fault classes against real escaped
+bugs. Each is designed for; none is claimed.
 
 ## Licence
 

@@ -10,6 +10,7 @@ import { probeCommand } from './commands/probe.mjs';
 import { claimsCommand } from './commands/claims.mjs';
 import { baselineCommand } from './commands/baseline.mjs';
 import { briefCommand } from './commands/brief.mjs';
+import { scaffoldCommand } from './commands/scaffold.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
 
@@ -19,6 +20,7 @@ const USAGE = `testguard ${VERSION} — proves a test suite defends the claims a
   testguard probe [dir]      inject each claim's faults, run its defenders, report what survived
   testguard baseline [dir]   freeze today's unproven findings so only new ones gate
   testguard brief [dir]      emit the blind-spot block for an agent's session-start context
+  testguard scaffold <file>  propose faults mechanically for one source file, as a draft claims document
 
 probe
   --claims <path>      claims file             (default: <dir>/testguard.claims.json)
@@ -38,6 +40,9 @@ probe
   --no-reuse           re-probe claims whose inputs have not changed
   --quiet              suppress the per-fault stream and ranked block; print only the summary and evidence path
 
+scaffold   --claim <ID> (put every proposal under this claim; copies it if it exists)  --out <path>  --json
+           shapes: if-guard → if (false) · single-line guard/mutation removed · return <check> → return true
+                   · security flag/window/cost literal weakened · verify/validate/check call removed
 claims     --json
 baseline   --evidence <path>  --out <path>
 brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; safe for hooks)
@@ -45,7 +50,7 @@ brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; 
 exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift) · 2 precondition failed · 3 usage
 `;
 
-const COMMANDS = { probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand };
+const COMMANDS = { probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand };
 
 export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') }) {
   let parsed;
@@ -104,7 +109,8 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
     return 3;
   }
   try {
-    return await handler({ projectDir: resolve(dirArg ?? '.'), values, version: VERSION }, io);
+    const projectDir = command === 'scaffold' ? resolve('.') : resolve(dirArg ?? '.');
+    return await handler({ projectDir, file: dirArg, values, version: VERSION }, io);
   } catch (e) {
     if (e instanceof ClaimsError || e instanceof PreconditionError || e instanceof GitError || e instanceof SpecDocError) {
       io.err(`error: ${e.message}`);

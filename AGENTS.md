@@ -19,6 +19,7 @@ npm run test:spec      # conformance suite only
 npm run self:probe     # TestGuard probes its own claims; must exit 0
 npm run test:install   # the packed tarball must run with production deps only
 node cli/testguard.mjs claims fixtures/known-answer
+node cli/testguard.mjs scaffold src/probe/classify.mjs --json   # what the producers propose for a file
 ```
 
 ## Key files
@@ -29,6 +30,7 @@ node cli/testguard.mjs claims fixtures/known-answer
 - `src/probe/probe.mjs` — orchestrator: isolation → baseline (cached per defender set) → apply → probe → escalate → restore → classify → rank.
 - `fixtures/known-answer/expected.json` — the oracle. Never edit it to match output.
 - `testguard.claims.json` — claims about this codebase, probed in CI.
+- `src/scaffold/producers.mjs` — the five fault shapes. Deterministic line heuristics; no AST, no LLM. A new shape needs a synthetic-file test and a README row.
 
 ## Rules
 
