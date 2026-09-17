@@ -31,7 +31,7 @@ function orderItems(a, b) {
   return (b.isNew - a.isNew) || (ORDER.indexOf(a.verdict) - ORDER.indexOf(b.verdict)) || ((b.rank ?? 0) - (a.rank ?? 0));
 }
 
-export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Date().toISOString() } = {}) {
+export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Date().toISOString(), next } = {}) {
   const g = gate(evidence.records, baseline);
   const toItem = (r, isNew) => ({
     fingerprint: r.fingerprint,
@@ -54,7 +54,7 @@ export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Dat
     new: g.new.length + g.belowFloor.length,
     baselined: g.baselined.length,
   };
-  const doc = { schemaVersion: 1, tool: evidence.tool, generatedAt, head: evidence.run.repo.head, heading: HEADING, summary, items, text: '' };
+  const doc = { schemaVersion: 1, tool: evidence.tool, generatedAt, head: evidence.run.repo.head, heading: HEADING, summary, ...(next ? { next: { action: next.action, command: next.command, why: next.why } } : {}), items, text: '' };
   doc.text = renderBriefText({ ...doc, provisional: Boolean(evidence.run.provisional) }, { hasBaseline: Boolean(baseline), total: evidence.records.length });
   return doc;
 }
@@ -68,6 +68,7 @@ export function renderBriefText(brief, { hasBaseline, total }) {
     `testguard ${brief.tool.version}${brief.head ? ` @ ${brief.head.slice(0, 12)}` : ''} — ${brief.summary.claims} claims, ${total} faults probed, ${unproven} unproven` +
       (hasBaseline ? ` (${brief.summary.new} new since baseline).` : ' (no baseline; everything is new).'),
   ];
+  if (brief.next) lines.push('', `NEXT [${brief.next.action}]: ${brief.next.command}`, `  why: ${brief.next.why}`);
   if (brief.items.length === 0) {
     lines.push('', 'Every probed claim is defended. Keep it that way: new claims need a fault and a test that fails on it.');
     return lines.join('\n') + '\n';

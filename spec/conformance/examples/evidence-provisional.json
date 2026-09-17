@@ -48,7 +48,8 @@
           "producer": "human",
           "by": "maintainer",
           "at": "2026-09-17T02:00:00Z"
-        }
+        },
+        "contentHash": "f232f31d9e6eecc8e952f0da1fb0878c5060e1a4dc19724874b041a4ab265aaf"
       },
       "verdict": "survived",
       "detail": {
@@ -142,7 +143,8 @@
         "id": "F2",
         "description": "Redaction skipped.",
         "file": "src/redact.mjs",
-        "faultClass": "statement-deleted"
+        "faultClass": "statement-deleted",
+        "contentHash": "f232f31d9e6eecc8e952f0da1fb0878c5060e1a4dc19724874b041a4ab265aaf"
       },
       "verdict": "killed",
       "detail": {
@@ -203,7 +205,8 @@
         "id": "F1",
         "description": "Invalid pattern rethrows.",
         "file": "src/redact.mjs",
-        "faultClass": "exception-swallowed"
+        "faultClass": "exception-swallowed",
+        "contentHash": "f232f31d9e6eecc8e952f0da1fb0878c5060e1a4dc19724874b041a4ab265aaf"
       },
       "verdict": "unverifiable",
       "detail": {
@@ -247,7 +250,8 @@
         "id": "F1",
         "description": "Invalid pattern rethrows.",
         "file": "src/redact.mjs",
-        "faultClass": "exception-swallowed"
+        "faultClass": "exception-swallowed",
+        "contentHash": "f232f31d9e6eecc8e952f0da1fb0878c5060e1a4dc19724874b041a4ab265aaf"
       },
       "verdict": "nocover",
       "detail": {

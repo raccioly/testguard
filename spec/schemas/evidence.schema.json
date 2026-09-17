@@ -126,7 +126,11 @@
             "description": { "type": "string", "maxLength": 2000 },
             "file": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" },
             "faultClass": { "$ref": "urn:guard-spec:v1:common#/$defs/faultClass" },
-            "producedBy": { "$ref": "urn:guard-spec:v1:common#/$defs/provenance" }
+            "producedBy": { "$ref": "urn:guard-spec:v1:common#/$defs/provenance" },
+            "contentHash": {
+              "description": "sha256 of the subject's content (for a fault: find + newline + replace). Excluded from the fingerprint on purpose, so repairing an anchor does not churn a baseline — and recorded here on purpose, so weakening a fault to make a finding disappear is visible.",
+              "$ref": "urn:guard-spec:v1:common#/$defs/sha256"
+            }
           },
           "additionalProperties": true
         },

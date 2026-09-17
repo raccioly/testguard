@@ -233,7 +233,7 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
   return {
     fingerprint: fingerprint({ claimId: claim.id, subjectId: fault.id, file: fault.file, verdict }),
     claim: { id: claim.id, statement: claim.statement, severity: claim.severity, source: claim.source, producedBy: claim.producedBy },
-    subject: { kind: 'fault', id: fault.id, description: fault.description, file: fault.file, faultClass: fault.faultClass, producedBy: fault.producedBy },
+    subject: { kind: 'fault', id: fault.id, description: fault.description, file: fault.file, faultClass: fault.faultClass, producedBy: fault.producedBy, contentHash: sha256(`${fault.find}\n${fault.replace}`) },
     verdict,
     detail,
     defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}) },

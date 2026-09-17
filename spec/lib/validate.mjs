@@ -6,7 +6,7 @@ import { fingerprint } from './fingerprint.mjs';
 
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 
-export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief']);
+export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status']);
 export const PASSING_VERDICTS = Object.freeze(new Set(['killed']));
 
 const ajv = new Ajv2020({ strict: true, allErrors: true });
@@ -93,6 +93,14 @@ const semantic = {
       if (lo > hi) errors.push({ path: `${p}/ci`, message: `ci lower bound ${lo} exceeds upper bound ${hi}` });
       if (b.p < lo || b.p > hi) errors.push({ path: `${p}/p`, message: `p (${b.p}) lies outside ci [${lo}, ${hi}]` });
     }
+    return errors;
+  },
+
+  status(doc) {
+    const errors = [];
+    if (['write-test', 'review-fault-change'].includes(doc.next.action) && !doc.next.target) errors.push({ path: '/next/target', message: `${doc.next.action} requires a target` });
+    if (doc.state === 'no-claims' && doc.counts.claims !== 0) errors.push({ path: '/counts/claims', message: 'no-claims with a non-zero claim count' });
+    if (doc.state === 'clean' && (doc.counts.new ?? 0) > 0) errors.push({ path: '/state', message: 'clean with new findings' });
     return errors;
   },
 

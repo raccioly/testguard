@@ -3,8 +3,9 @@ import { resolve } from 'node:path';
 import { readSpecDoc, writeSpecDoc } from '../evidence/writer.mjs';
 import { buildBaseline } from '../baseline/baseline.mjs';
 import { evidencePath, baselinePath } from './probe.mjs';
+import { computeStatus } from '../status/status.mjs';
 
-export async function baselineCommand({ projectDir, values }, io) {
+export async function baselineCommand({ projectDir, values, version }, io) {
   const evPath = values.evidence ? resolve(values.evidence) : evidencePath(projectDir);
   if (!existsSync(evPath)) {
     io.err(`no evidence at ${evPath}; run \`testguard probe\` first`);
@@ -19,6 +20,10 @@ export async function baselineCommand({ projectDir, values }, io) {
   const outPath = values.out ? resolve(values.out) : baselinePath(projectDir);
   writeSpecDoc('baseline', outPath, baseline);
   const n = Object.values(baseline.fingerprints).reduce((a, b) => a + b, 0);
+  if (values.json) {
+    io.out(JSON.stringify({ ...computeStatus({ projectDir, toolVersion: version }), baseline: { path: outPath, frozen: n } }, null, 2));
+    return 0;
+  }
   io.out(`baseline: ${n} unproven finding${n === 1 ? '' : 's'} frozen at ${baseline.head.slice(0, 12)}${baseline.dirty ? ' (working tree was dirty)' : ''}${evidence.run.provisional ? ' — FROM PROVISIONAL EVIDENCE (--allow-provisional)' : ''} → ${outPath}`);
   io.out('Commit this file; from now on only new findings gate. Ignore the regenerated ones — add to .gitignore:');
   io.out('  .testguard/evidence.json');

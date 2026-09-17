@@ -31,6 +31,7 @@ node cli/testguard.mjs scaffold src/probe/classify.mjs --json   # what the produ
 - `fixtures/known-answer/expected.json` — the oracle. Never edit it to match output.
 - `testguard.claims.json` — claims about this codebase, probed in CI.
 - `src/scaffold/producers.mjs` — the five fault shapes. Deterministic line heuristics; no AST, no LLM. A new shape needs a synthetic-file test and a README row.
+- `src/status/status.mjs` — the state machine every rendering derives from. A new state or action is a spec change (`status.schema.json`) and a skill-template change (`src/init/templates/SKILL.md`) in the same PR.
 
 ## Rules
 

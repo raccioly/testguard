@@ -11,11 +11,15 @@ import { claimsCommand } from './commands/claims.mjs';
 import { baselineCommand } from './commands/baseline.mjs';
 import { briefCommand } from './commands/brief.mjs';
 import { scaffoldCommand } from './commands/scaffold.mjs';
+import { statusCommand } from './commands/status.mjs';
+import { initCommand } from './commands/init.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
 
 const USAGE = `testguard ${VERSION} — proves a test suite defends the claims a project makes
 
+  testguard status [dir]     where the project is and the ONE next action; --json is the machine entry point
+  testguard init [dir]       install the agent layer: skill, session-start hook, AGENTS.md section, .gitignore lines
   testguard claims [dir]     list the claims file and report drift against @claim annotations in code
   testguard probe [dir]      inject each claim's faults, run its defenders, report what survived
   testguard baseline [dir]   freeze today's unproven findings so only new ones gate
@@ -44,6 +48,9 @@ probe
 scaffold   --claim <ID> (put every proposal under this claim; copies it if it exists)  --out <path>  --json
            shapes: if-guard → if (false) · single-line guard/mutation removed · return <check> → return true
                    · security flag/window/cost literal weakened · verify/validate/check call removed
+status     --json (exit 0 clean · 1 unproven/stale · 2 nothing to probe yet)
+init       --force (replace an existing skill file)  --json
+every command accepts --json; probe/baseline emit the status document plus their own result
 claims     --json
 baseline   --evidence <path>  --out <path>  --allow-provisional (freeze unconfirmed evidence; normally refused)
 brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; safe for hooks)
@@ -51,7 +58,7 @@ brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; 
 exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift) · 2 precondition failed · 3 usage
 `;
 
-const COMMANDS = { probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand };
+const COMMANDS = { probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand };
 
 export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') }) {
   let parsed;
@@ -72,6 +79,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         claim: { type: 'string' },
         'include-dirty': { type: 'boolean', default: false },
         'allow-provisional': { type: 'boolean', default: false },
+        force: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'runner-cmd': { type: 'string' },
         'node-modules': { type: 'string' },

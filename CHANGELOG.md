@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-17
+
+The agent operating layer. TestGuard is meant to be run by AI agents; this
+release gives them one source of truth, an installable loop, and makes the
+one cheap way to game it visible.
+
+### Added
+
+- **`testguard status --json`** — the machine entry point. A new spec kind
+  (`status.schema.json`): `state` (no-claims · unprobed · evidence-stale ·
+  provisional-only · unproven · clean) and the one `next` action, computed
+  from claims, evidence, baseline and the working tree. Exit 0 clean, 1
+  unproven/stale, 2 nothing to probe yet.
+- **`testguard init`** — installs `.claude/skills/testguard/SKILL.md`, the
+  `brief --text` SessionStart hook (merged into an existing
+  `.claude/settings.json`), an `AGENTS.md` section and the `.gitignore`
+  lines. Idempotent; `--force` replaces the skill.
+- **Fault edits are visible.** Evidence records `subject.contentHash`;
+  `status` lists `changedFaults` (a fault edited after it was probed, with
+  its previous verdict) and makes `review-fault-change` the next action when
+  the edited fault had survived. Gate rule 8. Self-claim
+  `TG-FAULT-EDIT-VISIBLE`.
+- `--json` on every command; `probe` and `baseline` emit the status document
+  plus their result. `brief` carries `next` and prints it.
+
 ## [0.2.1] - 2026-09-17
 
 ### Added

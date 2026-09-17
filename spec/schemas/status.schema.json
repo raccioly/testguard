@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:guard-spec:v1:status",
+  "title": "Guard spec v1 — status",
+  "description": "The single machine-readable answer to 'where is this project and what should happen next'. Every human rendering (CLI text, agent brief, skill instructions) derives from this document so they cannot disagree. Computed from the claims file, the evidence, the baseline and the current working tree; never from a cached verdict alone.",
+  "type": "object",
+  "required": ["schemaVersion", "tool", "generatedAt", "state", "next", "counts"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "tool": { "$ref": "urn:guard-spec:v1:common#/$defs/tool" },
+    "generatedAt": { "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime" },
+    "state": {
+      "description": "no-claims: no claims file. unprobed: claims but no confirmed evidence. evidence-stale: evidence exists but a claim, fault, target or defender changed since. provisional-only: only sub-N evidence exists. unproven: current evidence has findings not covered by the baseline. clean: every finding is killed or baselined.",
+      "enum": ["no-claims", "unprobed", "evidence-stale", "provisional-only", "unproven", "clean"]
+    },
+    "next": {
+      "description": "The one action that moves the project forward. `command` is a shell line when the action is a tool command, or an instruction when it is not (write-test).",
+      "type": "object",
+      "required": ["action", "command", "why"],
+      "properties": {
+        "action": { "enum": ["scaffold", "probe", "write-test", "baseline", "review-fault-change", "none"] },
+        "command": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "why": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "target": {
+          "description": "For write-test / review-fault-change: the finding the action is about.",
+          "type": "object",
+          "required": ["claimId", "subjectId"],
+          "properties": {
+            "claimId": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+            "subjectId": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+            "file": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" },
+            "verdict": { "$ref": "urn:guard-spec:v1:common#/$defs/verdict" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "provisional": { "type": "boolean" },
+    "counts": {
+      "type": "object",
+      "required": ["claims", "faults"],
+      "properties": {
+        "claims": { "type": "integer", "minimum": 0 },
+        "faults": { "type": "integer", "minimum": 0 },
+        "byVerdict": {
+          "type": "object",
+          "propertyNames": { "enum": ["killed", "survived", "nocover", "unverifiable", "timeout", "fault-invalid", "flaky-defender"] },
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "new": { "type": "integer", "minimum": 0 },
+        "baselined": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "stale": {
+      "description": "Why the evidence no longer describes the working tree. Empty when it does.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+    },
+    "changedFaults": {
+      "description": "Faults whose find/replace content differs from what the evidence probed. A changed fault that previously survived is the cheapest way to make a finding disappear without a test; it is surfaced, never hidden.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claimId", "subjectId", "previousVerdict"],
+        "properties": {
+          "claimId": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+          "subjectId": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+          "previousVerdict": { "$ref": "urn:guard-spec:v1:common#/$defs/verdict" },
+          "file": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "findings": {
+      "description": "Unproven findings from the current evidence, ranked, new first, capped.",
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "required": ["fingerprint", "claimId", "subjectId", "verdict", "severity", "isNew"],
+        "properties": {
+          "fingerprint": { "$ref": "urn:guard-spec:v1:common#/$defs/sha256" },
+          "claimId": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+          "subjectId": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" },
+          "verdict": { "$ref": "urn:guard-spec:v1:common#/$defs/verdict" },
+          "reason": { "type": "string", "maxLength": 256 },
+          "severity": { "$ref": "urn:guard-spec:v1:common#/$defs/severity" },
+          "file": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" },
+          "rank": { "type": "number" },
+          "isNew": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "paths": {
+      "type": "object",
+      "properties": {
+        "claims": { "type": "string" },
+        "evidence": { "type": "string" },
+        "provisionalEvidence": { "type": "string" },
+        "baseline": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

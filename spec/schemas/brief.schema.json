@@ -34,6 +34,17 @@
       },
       "additionalProperties": false
     },
+    "next": {
+      "description": "The one action that moves the project forward, as computed by the status document; the brief carries it so an agent reading its session-start context knows what to do, not only what is wrong.",
+      "type": "object",
+      "required": ["action", "command", "why"],
+      "properties": {
+        "action": { "enum": ["scaffold", "probe", "write-test", "baseline", "review-fault-change", "none"] },
+        "command": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "why": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      },
+      "additionalProperties": false
+    },
     "items": {
       "type": "array",
       "maxItems": 50,

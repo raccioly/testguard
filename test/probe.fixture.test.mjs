@@ -89,6 +89,10 @@ describe('probe reproduces the known-answer fixture', () => {
     }
   });
 
+  it('records every fault\'s content hash so a later edit is visible', () => {
+    for (const r of evidence.records) expect(r.subject.contentHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
   it('discovers defenders by import when none are declared, and records that it did', () => {
     const r = evidence.records.find((x) => x.claim.id === 'DISCOVER-001');
     expect(r.verdict).toBe('killed');
@@ -244,6 +248,27 @@ it('fails closed on a missing scope (uncommitted)', async () => {
       expect(await main(['baseline', scratch, '--evidence', join(scratch, '.testguard', 'evidence-provisional.json'), '--out', join(scratch, '.testguard', 'b-prov.json'), '--allow-provisional'], c.io)).toBe(0);
       expect(c.lines.out[0]).toContain('FROM PROVISIONAL EVIDENCE');
     }, 120_000);
+
+    it('status --json and probe --json emit a conforming status document with a next action; brief carries it', async () => {
+      const a = capture();
+      const code = await main(['status', scratch, '--json'], a.io);
+      const status = JSON.parse(a.lines.out.join('\n'));
+      expect(validate('status', status).errors).toEqual([]);
+      expect(['clean', 'unproven', 'evidence-stale']).toContain(status.state);
+      expect([0, 1]).toContain(code);
+      expect(status.next.action).toBeDefined();
+      const b = capture();
+      await main(['brief', scratch, '--json'], b.io);
+      const brief = JSON.parse(b.lines.out.join('\n'));
+      expect(validate('brief', brief).errors).toEqual([]);
+      expect(brief.next.action).toBe(status.next.action);
+      expect(brief.text).toContain(`NEXT [${status.next.action}]`);
+      const c = capture();
+      const pc = await main(['probe', scratch, '--claim', 'REDACT-001', '--budget', '30000', '--json'], c.io);
+      const out = JSON.parse(c.lines.out.join('\n'));
+      expect(out.run).toMatchObject({ records: 2, exitCode: pc });
+      expect(out.state).toBeDefined();
+    }, 90_000);
 
     it('brief --text on a repo with no evidence exits 0 silently, so a session-start hook never breaks', async () => {
       const { lines, io } = capture();
