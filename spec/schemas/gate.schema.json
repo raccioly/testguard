@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:guard-spec:v1:gate",
+  "title": "Guard spec v1 — change gate",
+  "description": "Claim coverage of one change. `probe` asks whether the tests defend the claims that exist; `gate` asks whether the files a change touched carry any claim at all. Measured per file against the merge-base of a reference and HEAD (or the working tree). A file is covered when a fault anchors to it, when it is a test file that defends a claim, or when an unexpired ignore entry excuses it — and every reliance on an ignore entry is listed, so a reviewer sees why the gate passed.",
+  "type": "object",
+  "required": ["schemaVersion", "tool", "generatedAt", "ref", "base", "head", "includeDirty", "strict", "changed", "evaluated", "excluded", "covered", "uncovered", "reliedOn", "expired", "exitCode"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "tool": { "$ref": "urn:guard-spec:v1:common#/$defs/tool" },
+    "generatedAt": { "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime" },
+    "ref": { "description": "The reference the change was measured against, as given (a branch, a tag, a sha).", "type": "string", "minLength": 1, "maxLength": 256 },
+    "base": { "description": "merge-base(ref, HEAD): the commit the change is relative to.", "$ref": "urn:guard-spec:v1:common#/$defs/gitSha" },
+    "head": { "$ref": "urn:guard-spec:v1:common#/$defs/gitSha" },
+    "includeDirty": { "description": "True when the working tree was compared instead of HEAD.", "type": "boolean" },
+    "strict": { "description": "True when a non-empty change with zero evaluated files fails instead of passing with a note.", "type": "boolean" },
+    "changed": { "description": "Files changed inside the project directory, deletions excluded.", "type": "integer", "minimum": 0 },
+    "evaluated": { "description": "covered + uncovered: the changed files that are source and not excluded.", "type": "integer", "minimum": 0 },
+    "excluded": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "by"],
+        "properties": {
+          "file": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" },
+          "by": { "description": "`non-source`, `default:<glob>` or `exclude:<glob>`.", "type": "string", "minLength": 1, "maxLength": 600 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "covered": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "by"],
+        "properties": {
+          "file": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" },
+          "by": { "enum": ["fault", "defender", "ignore"] },
+          "claimIds": { "type": "array", "minItems": 1, "items": { "$ref": "urn:guard-spec:v1:common#/$defs/identifier" } },
+          "pattern": { "type": "string", "minLength": 1, "maxLength": 512 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "uncovered": { "type": "array", "items": { "$ref": "urn:guard-spec:v1:common#/$defs/uncoveredFile" } },
+    "reliedOn": { "description": "Unexpired ignore entries that excused at least one changed file. The gate passed *because of* these; a reviewer reads them.", "type": "array", "items": { "$ref": "urn:guard-spec:v1:common#/$defs/ignoreReliance" } },
+    "expired": { "description": "Expired ignore entries that would have matched a changed file. They excuse nothing; the files are reported as uncovered.", "type": "array", "items": { "$ref": "urn:guard-spec:v1:common#/$defs/ignoreReliance" } },
+    "exitCode": { "enum": [0, 1] }
+  },
+  "additionalProperties": false
+}

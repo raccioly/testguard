@@ -24,7 +24,7 @@ Node ≥ 20. Python ≥ 3.8 only if you touch `testguard_cli/`.
 | `spec/lib/` | the validator and the one fingerprint implementation |
 | `spec/conformance/` | one valid example per kind; must-reject documents named for their defect |
 | `src/probe/` | worktree isolation, injector, runner adapter, classifier, ranker, orchestrator |
-| `src/claims/`, `src/baseline/`, `src/brief/` | the other three commands |
+| `src/claims/`, `src/baseline/`, `src/brief/`, `src/gate/` | the other commands: claims, baseline, brief, and the change gate |
 | `src/commands/`, `src/cli.mjs`, `cli/` | argument parsing and dispatch |
 | `fixtures/known-answer/` | the oracle: a project with a known verdict for every value in the verdict set |
 | `testguard.claims.json` | TestGuard's claims about itself, probed in CI |

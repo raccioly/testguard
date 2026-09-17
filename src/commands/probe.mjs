@@ -57,7 +57,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
 
   const g = gate(evidence.records, baseline, { severityFloor: values.severity });
   if (values.json) {
-    const status = computeStatus({ projectDir, toolVersion: version });
+    const status = computeStatus({ projectDir, toolVersion: version, changedRef: values.changed, includeDirty: values['include-dirty'] });
     io.out(JSON.stringify({ ...status, run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode: g.new.length > 0 ? 1 : 0 } }, null, 2));
     return g.new.length > 0 ? 1 : 0;
   }

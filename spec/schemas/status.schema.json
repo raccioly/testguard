@@ -11,17 +11,21 @@
     "tool": { "$ref": "urn:guard-spec:v1:common#/$defs/tool" },
     "generatedAt": { "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime" },
     "state": {
-      "description": "no-claims: no claims file. unprobed: claims but no confirmed evidence. evidence-stale: evidence exists but a claim, fault, target or defender changed since. provisional-only: only sub-N evidence exists. unproven: current evidence has findings not covered by the baseline. clean: every finding is killed or baselined.",
-      "enum": ["no-claims", "unprobed", "evidence-stale", "provisional-only", "unproven", "clean"]
+      "description": "no-claims: no claims file. unclaimed-changes: the change measured against a reference touches source files that carry no claim and no excusing ignore entry (only computed when a reference is known; it precedes every evidence state because the claim is written before more code). unprobed: claims but no confirmed evidence. evidence-stale: evidence exists but a claim, fault, target or defender changed since. provisional-only: only sub-N evidence exists. unproven: current evidence has findings not covered by the baseline. clean: every finding is killed or baselined.",
+      "enum": ["no-claims", "unclaimed-changes", "unprobed", "evidence-stale", "provisional-only", "unproven", "clean"]
     },
     "next": {
-      "description": "The one action that moves the project forward. `command` is a shell line when the action is a tool command, or an instruction when it is not (write-test).",
+      "description": "The one action that moves the project forward. `command` is a shell line when the action is a tool command, or an instruction when it is not (write-test, claim for a test file).",
       "type": "object",
       "required": ["action", "command", "why"],
       "properties": {
-        "action": { "enum": ["scaffold", "probe", "write-test", "baseline", "review-fault-change", "none"] },
+        "action": { "enum": ["scaffold", "claim", "probe", "write-test", "baseline", "review-fault-change", "none"] },
         "command": { "type": "string", "minLength": 1, "maxLength": 1024 },
         "why": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "file": {
+          "description": "For claim (and for scaffold when a change is known): the first uncovered changed file the action is about.",
+          "$ref": "urn:guard-spec:v1:common#/$defs/repoPath"
+        },
         "target": {
           "description": "For write-test / review-fault-change: the finding the action is about.",
           "type": "object",
@@ -95,10 +99,28 @@
         "additionalProperties": false
       }
     },
+    "changes": {
+      "description": "Claim coverage of the change since `ref`, present only when a reference was given (--changed) or detected from CI. Uncovered files come first in every rendering: the claim is written before more code. Same per-file shapes as the gate document.",
+      "type": "object",
+      "required": ["ref", "base", "changed", "evaluated", "excluded", "uncovered", "reliedOn", "expired"],
+      "properties": {
+        "ref": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "base": { "$ref": "urn:guard-spec:v1:common#/$defs/gitSha" },
+        "includeDirty": { "type": "boolean" },
+        "changed": { "type": "integer", "minimum": 0 },
+        "evaluated": { "type": "integer", "minimum": 0 },
+        "excluded": { "type": "integer", "minimum": 0 },
+        "uncovered": { "type": "array", "items": { "$ref": "urn:guard-spec:v1:common#/$defs/uncoveredFile" } },
+        "reliedOn": { "type": "array", "items": { "$ref": "urn:guard-spec:v1:common#/$defs/ignoreReliance" } },
+        "expired": { "type": "array", "items": { "$ref": "urn:guard-spec:v1:common#/$defs/ignoreReliance" } }
+      },
+      "additionalProperties": false
+    },
     "paths": {
       "type": "object",
       "properties": {
         "claims": { "type": "string" },
+        "ignore": { "type": "string" },
         "evidence": { "type": "string" },
         "provisionalEvidence": { "type": "string" },
         "baseline": { "type": "string" }

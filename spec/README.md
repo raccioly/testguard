@@ -1,6 +1,6 @@
 # Guard spec — the contract spine
 
-Six formats that tools following the Guard pattern share. They share
+Eight formats that tools following the Guard pattern share. They share
 *formats*, not code: [`docguard-cli`](https://www.npmjs.com/package/docguard-cli)
 is Node ESM, [`websec-validator`](https://pypi.org/project/websec-validator/)
 is Python, and porting one runtime into the other is not worth it. A tool
@@ -21,7 +21,8 @@ The pattern all such tools run:
 | `ignore` | [`schemas/ignore.schema.json`](schemas/ignore.schema.json) | Reviewable scoping. Every entry has a reason. |
 | `calibration` | [`schemas/calibration.schema.json`](schemas/calibration.schema.json) | P(finding is real) per bucket, with a Wilson interval and the sample size behind it. |
 | `brief` | [`schemas/brief.schema.json`](schemas/brief.schema.json) | What to tell an agent before it writes code — ranked, capped, never a single score, and carrying the one next action. |
-| `status` | [`schemas/status.schema.json`](schemas/status.schema.json) | Where the project is and what happens next — the single machine-readable truth every human rendering derives from. Surfaces faults whose content changed since they were probed. |
+| `status` | [`schemas/status.schema.json`](schemas/status.schema.json) | Where the project is and what happens next — the single machine-readable truth every human rendering derives from. Surfaces faults whose content changed since they were probed, and changed files that carry no claim. |
+| `gate` | [`schemas/gate.schema.json`](schemas/gate.schema.json) | Claim coverage of one change: which changed files carry a claim, which are excused (and by which ignore entry), which are unclaimed. The delta gate for code that has no claim yet. |
 
 Shared definitions (verdicts, fault classes, provenance, annotations) live in
 [`schemas/common.schema.json`](schemas/common.schema.json). Gate behaviour —

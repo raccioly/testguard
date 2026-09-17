@@ -13,6 +13,7 @@ import { briefCommand } from './commands/brief.mjs';
 import { scaffoldCommand } from './commands/scaffold.mjs';
 import { statusCommand } from './commands/status.mjs';
 import { initCommand } from './commands/init.mjs';
+import { gateCommand } from './commands/gate.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
 
@@ -24,6 +25,7 @@ const USAGE = `testguard ${VERSION} — proves a test suite defends the claims a
   testguard probe [dir]      inject each claim's faults, run its defenders, report what survived
   testguard baseline [dir]   freeze today's unproven findings so only new ones gate
   testguard brief [dir]      emit the blind-spot block for an agent's session-start context
+  testguard gate [dir]       fail when a changed source file carries no claim and no excusing ignore entry
   testguard scaffold <file>  propose faults mechanically for one source file, as a draft claims document
 
 probe
@@ -48,17 +50,24 @@ probe
 scaffold   --claim <ID> (put every proposal under this claim; copies it if it exists)  --out <path>  --json
            shapes: if-guard → if (false) · single-line guard/mutation removed · return <check> → return true
                    · security flag/window/cost literal weakened · verify/validate/check call removed
-status     --json (exit 0 clean · 1 unproven/stale · 2 nothing to probe yet)
+gate       --changed <ref>   measure the change since merge-base(ref, HEAD); auto-detected in GitHub Actions / GitLab CI
+           --include-dirty   compare the working tree (staged, unstaged and untracked) instead of HEAD — the pre-commit shape
+           --exclude <glob>  (repeatable) more files that never carry claims; --explain lists the defaults
+           --strict          a non-empty change that evaluates nothing is a failure, not a note
+           --ignore <path>   ignore file (default: <dir>/testguard.ignore.json; kind=path entries excuse files, with a reason)
+           exit 0 every changed source file is claimed or excused · 1 unclaimed file · 2 cannot evaluate · 3 no reference
+status     --json (exit 0 clean · 1 unproven/stale/unclaimed · 2 nothing to probe yet)
+           --changed <ref>   also compute claim coverage of the change; unclaimed-changes then precedes every evidence state
 init       --force (replace an existing skill file)  --json
 every command accepts --json; probe/baseline emit the status document plus their own result
 claims     --json
 baseline   --evidence <path>  --out <path>  --allow-provisional (freeze unconfirmed evidence; normally refused)
 brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; safe for hooks)
 
-exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift) · 2 precondition failed · 3 usage
+exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift, or unclaimed changes) · 2 precondition failed · 3 usage
 `;
 
-const COMMANDS = { probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand };
+const COMMANDS = { probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand };
 
 export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') }) {
   let parsed;
@@ -78,6 +87,11 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         ref: { type: 'string', default: 'HEAD' },
         claim: { type: 'string' },
         'include-dirty': { type: 'boolean', default: false },
+        changed: { type: 'string' },
+        exclude: { type: 'string', multiple: true },
+        strict: { type: 'boolean', default: false },
+        explain: { type: 'boolean', default: false },
+        ignore: { type: 'string' },
         'allow-provisional': { type: 'boolean', default: false },
         force: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "tool": { "name": "testguard", "version": "0.4.0" },
+  "generatedAt": "2026-09-17T02:00:00Z",
+  "state": "unclaimed-changes",
+  "next": {
+    "action": "claim",
+    "command": "testguard scaffold src/export.mjs",
+    "why": "src/export.mjs changed since origin/main and carries no claim."
+  },
+  "provisional": false,
+  "counts": { "claims": 2, "faults": 6 },
+  "stale": [],
+  "changedFaults": [],
+  "findings": [],
+  "changes": {
+    "ref": "origin/main",
+    "base": "0f2a4c6e8b1d3f5a7c9e1b3d5f7a9c1e3b5d7f9a",
+    "changed": 1,
+    "evaluated": 1,
+    "excluded": 0,
+    "uncovered": [
+      { "file": "src/export.mjs", "kind": "source", "suggestion": "testguard scaffold src/export.mjs" }
+    ],
+    "reliedOn": [],
+    "expired": []
+  },
+  "paths": { "claims": "testguard.claims.json" }
+}

@@ -6,7 +6,7 @@ import { fingerprint } from './fingerprint.mjs';
 
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 
-export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status']);
+export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate']);
 export const PASSING_VERDICTS = Object.freeze(new Set(['killed']));
 
 const ajv = new Ajv2020({ strict: true, allErrors: true });
@@ -99,8 +99,26 @@ const semantic = {
   status(doc) {
     const errors = [];
     if (['write-test', 'review-fault-change'].includes(doc.next.action) && !doc.next.target) errors.push({ path: '/next/target', message: `${doc.next.action} requires a target` });
+    if (doc.next.action === 'claim' && !doc.next.file) errors.push({ path: '/next/file', message: 'claim requires the file the claim is about' });
     if (doc.state === 'no-claims' && doc.counts.claims !== 0) errors.push({ path: '/counts/claims', message: 'no-claims with a non-zero claim count' });
     if (doc.state === 'clean' && (doc.counts.new ?? 0) > 0) errors.push({ path: '/state', message: 'clean with new findings' });
+    if (doc.state === 'unclaimed-changes' && !(doc.changes && doc.changes.uncovered.length > 0)) errors.push({ path: '/changes/uncovered', message: 'unclaimed-changes requires at least one uncovered changed file' });
+    if (doc.state === 'unclaimed-changes' && doc.next.action !== 'claim') errors.push({ path: '/next/action', message: 'unclaimed-changes requires next.action = claim' });
+    if (doc.changes && doc.changes.uncovered.length > 0 && !['no-claims', 'unclaimed-changes'].includes(doc.state)) errors.push({ path: '/state', message: 'uncovered changed files are hidden behind a later state; unclaimed-changes precedes every evidence state' });
+    return errors;
+  },
+
+  gate(doc) {
+    const errors = [];
+    if (doc.evaluated !== doc.covered.length + doc.uncovered.length) errors.push({ path: '/evaluated', message: `evaluated (${doc.evaluated}) must equal covered (${doc.covered.length}) + uncovered (${doc.uncovered.length})` });
+    if (doc.changed !== doc.evaluated + doc.excluded.length) errors.push({ path: '/changed', message: `changed (${doc.changed}) must equal evaluated (${doc.evaluated}) + excluded (${doc.excluded.length})` });
+    if (doc.uncovered.length > 0 && doc.exitCode !== 1) errors.push({ path: '/exitCode', message: 'an uncovered changed file must exit 1; the gate never passes over unclaimed code' });
+    if (doc.uncovered.length === 0 && doc.exitCode === 1 && !(doc.strict && doc.changed > 0 && doc.evaluated === 0)) errors.push({ path: '/exitCode', message: 'exit 1 without uncovered files is only valid under --strict when a non-empty change evaluated nothing' });
+    doc.covered.forEach((c, i) => {
+      if (c.by === 'ignore' && !c.pattern) errors.push({ path: `/covered/${i}/pattern`, message: 'a file covered by an ignore entry must name the pattern that excused it' });
+      if (c.by !== 'ignore' && !c.claimIds?.length) errors.push({ path: `/covered/${i}/claimIds`, message: `a file covered by a ${c.by} must name the claim(s)` });
+    });
+    for (const e of doc.expired) if (!e.expires) errors.push({ path: '/expired', message: `expired entry "${e.pattern}" has no expires instant` });
     return errors;
   },
 

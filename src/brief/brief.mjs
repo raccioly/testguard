@@ -31,7 +31,7 @@ function orderItems(a, b) {
   return (b.isNew - a.isNew) || (ORDER.indexOf(a.verdict) - ORDER.indexOf(b.verdict)) || ((b.rank ?? 0) - (a.rank ?? 0));
 }
 
-export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Date().toISOString(), next } = {}) {
+export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Date().toISOString(), next, changes } = {}) {
   const g = gate(evidence.records, baseline);
   const toItem = (r, isNew) => ({
     fingerprint: r.fingerprint,
@@ -54,7 +54,8 @@ export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Dat
     new: g.new.length + g.belowFloor.length,
     baselined: g.baselined.length,
   };
-  const doc = { schemaVersion: 1, tool: evidence.tool, generatedAt, head: evidence.run.repo.head, heading: HEADING, summary, ...(next ? { next: { action: next.action, command: next.command, why: next.why } } : {}), items, text: '' };
+  const unclaimed = changes?.uncovered?.length ? { ref: changes.ref, files: changes.uncovered } : undefined;
+  const doc = { schemaVersion: 1, tool: evidence.tool, generatedAt, head: evidence.run.repo.head, heading: HEADING, summary, ...(next ? { next: { action: next.action, command: next.command, why: next.why } } : {}), ...(unclaimed ? { unclaimed } : {}), items, text: '' };
   doc.text = renderBriefText({ ...doc, provisional: Boolean(evidence.run.provisional) }, { hasBaseline: Boolean(baseline), total: evidence.records.length });
   return doc;
 }
@@ -68,6 +69,13 @@ export function renderBriefText(brief, { hasBaseline, total }) {
     `testguard ${brief.tool.version}${brief.head ? ` @ ${brief.head.slice(0, 12)}` : ''} — ${brief.summary.claims} claims, ${total} faults probed, ${unproven} unproven` +
       (unproven === 0 ? '.' : hasBaseline ? ` (${brief.summary.new} new since baseline).` : ' (no baseline; everything is new).'),
   ];
+  // Unclaimed changes come before everything else: the claim is written
+  // before more code, and TestGuard is silent about unclaimed code otherwise.
+  if (brief.unclaimed) {
+    const n = brief.unclaimed.files.length;
+    lines.push('', `UNCLAIMED CHANGES since ${brief.unclaimed.ref}: ${n} changed file${n === 1 ? '' : 's'} carr${n === 1 ? 'ies' : 'y'} no claim. State the claim first; nothing below can see this code.`);
+    for (const u of brief.unclaimed.files) lines.push(`  - ${u.file} (${u.kind}) → ${u.suggestion}`);
+  }
   if (brief.next) lines.push('', `NEXT [${brief.next.action}]: ${brief.next.command}`, `  why: ${brief.next.why}`);
   if (brief.items.length === 0) {
     lines.push('', 'Every probed claim is defended. Keep it that way: new claims need a fault and a test that fails on it.');
@@ -86,4 +94,20 @@ export function renderBriefText(brief, { hasBaseline, total }) {
   });
   if (unproven > brief.items.length) lines.push('', `… and ${unproven - brief.items.length} more in the evidence file.`);
   return lines.join('\n') + '\n';
+}
+
+/**
+ * A brief for a project that has unclaimed changes but no evidence yet. The
+ * session-start hook must still tell the agent to write the claim; an empty
+ * summary is honest, silence is not.
+ */
+export function buildUnclaimedBrief({ tool, next, changes, generatedAt = new Date().toISOString() }) {
+  const summary = { claims: 0, byVerdict: {}, new: 0, baselined: 0 };
+  const doc = { schemaVersion: 1, tool, generatedAt, heading: HEADING, summary, ...(next ? { next: { action: next.action, command: next.command, why: next.why } } : {}), unclaimed: { ref: changes.ref, files: changes.uncovered }, items: [], text: '' };
+  const lines = [HEADING, '', `testguard ${tool.version} — no evidence yet; ${changes.uncovered.length} unclaimed changed file${changes.uncovered.length === 1 ? '' : 's'} since ${changes.ref}.`];
+  lines.push('', `UNCLAIMED CHANGES since ${changes.ref}: state the claim first; nothing can be probed for this code until it has one.`);
+  for (const u of changes.uncovered) lines.push(`  - ${u.file} (${u.kind}) → ${u.suggestion}`);
+  if (next) lines.push('', `NEXT [${next.action}]: ${next.command}`, `  why: ${next.why}`);
+  doc.text = lines.join('\n') + '\n';
+  return doc;
 }

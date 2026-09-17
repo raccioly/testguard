@@ -1,0 +1,34 @@
+{
+  "$schema": "./spec/schemas/ignore.schema.json",
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "kind": "path",
+      "pattern": "src/cli.mjs",
+      "reason": "Argument parsing and dispatch only. Every behaviour it routes to is claimed where it lives (src/gate, src/status, src/probe, src/scaffold). Re-evaluate if logic moves here.",
+      "by": "maintainer",
+      "at": "2026-09-17T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "src/commands/**",
+      "reason": "Thin command wrappers: read flags, call the module, print. The logic is claimed in the modules they call; the fixture CLI tests drive them end to end.",
+      "by": "maintainer",
+      "at": "2026-09-17T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "cli/**",
+      "reason": "The bin shim imports src/cli.mjs and exits with its code; nothing to claim.",
+      "by": "maintainer",
+      "at": "2026-09-17T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "src/render.mjs",
+      "reason": "Text rendering of documents that are themselves validated; rendering carries no verdict logic.",
+      "by": "maintainer",
+      "at": "2026-09-17T00:00:00Z"
+    }
+  ]
+}

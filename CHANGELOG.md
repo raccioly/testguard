@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`testguard gate --changed <ref>`** — the change gate. Every escaped
+  defect in the field reports was a *claim gap*: the feature shipped green
+  with zero claims, and `probe` is silent about unclaimed code by
+  construction. `gate` measures the files changed since
+  `merge-base(ref, HEAD)` (or in the working tree with `--include-dirty`)
+  and exits `1` when any changed source file carries no fault, does not
+  resolve as a defender (test files), and is not excused by an unexpired
+  `path` entry in `testguard.ignore.json`. Every reliance on an ignore entry
+  is printed with its reason; expired entries excuse nothing. Non-source
+  files and documented never-claimed patterns are excluded and listed
+  (`--explain`, `--exclude <glob>`); `--strict` fails a change that
+  evaluated nothing. The base branch is detected in GitHub Actions and
+  GitLab CI (`TESTGUARD_CHANGED_REF` overrides). A new spec kind,
+  `gate.schema.json`, with conformance examples.
+- **`status --changed <ref>`** — a new state `unclaimed-changes` and action
+  `claim` that precede every evidence state; `next.file` names the first
+  unclaimed file. `brief` renders unclaimed files before the findings, and
+  briefs them even when there is no evidence yet.
+- `testguard.ignore.json` at the repository root: TestGuard's own excused
+  paths (dispatch, thin command wrappers, rendering), with reasons.
+- Seven new self-claims for the gate, status and brief invariants, and one
+  for `init` idempotency; the gate runs on this repository's own pull
+  requests.
+- GitHub Action `command: gate` with a `changed-ref` input; pre-commit hook
+  `testguard-gate`.
+
 ## [0.3.1] - 2026-09-17
 
 Dogfooding `init` and `status` on this repository.
