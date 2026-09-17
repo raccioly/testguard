@@ -128,8 +128,18 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    did not look at. Every summary names the commit probed.
 
    A claim with no `defendedBy` has its defenders **discovered**: the test
-   files that import the fault's target, by relative path or resolved alias.
-   `NOCOVER` then means exactly "no test file imports this source".
+   files that import the fault's target, by relative path or resolved alias
+   (tsconfig `paths`, through `extends` and `references`, vite/vitest
+   `resolve.alias`, package.json `imports`) — **minus the files that mock
+   it**. A test that `vi.mock`s / `jest.mock`s the target cannot detect any
+   fault in it; counting it would make `NOCOVER` under-report and waste runs.
+   `NOCOVER` therefore means exactly "no test file imports this source
+   without mocking it". `claims` prints the split (`18 import · 16 mock · 2
+   can detect`), the evidence lists the mocking files, and a mocking file
+   that never `expect(...)`s anything imported from the target carries the
+   static signal `mocked-never-asserted` — the cheapest blind-spot signal
+   there is, and the exact signature of one escaped bug in the field
+   reports. Silence it, visibly, with `// unasserted: <why>` above the mock.
 
    Runners: **vitest** and **jest** (`--runner auto` picks the first that
    resolves; both read the same jest-compatible JSON report). Anything else
