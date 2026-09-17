@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { parseReport, runProcess } from '../src/probe/runners/shared.mjs';
+import { parseReport, runProcess, checkRunner, resolveRunner, runnerArgv, resetRunnerCache } from '../src/probe/runners/shared.mjs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const file = (status, tests, message) => ({ status, message, assertionResults: tests });
 const t = (status, ...failureMessages) => ({ status, failureMessages });
@@ -51,5 +56,52 @@ describe('runVitest budget', () => {
     const { run, loadMessage } = await runProcess({ argv: () => [],  projectDir: process.cwd(), files: [], budgetMs: 5000, command: [process.execPath, '-e', 'console.error("boom"); process.exit(1)'] });
     expect(run.outcome).toBe('error');
     expect(loadMessage).toBe('boom');
+  });
+});
+
+describe('runner resolution: the project package first, PATH second, npx never', () => {
+  it('resolves vitest from this project with its pinned version and its own bin script', async () => {
+    resetRunnerCache();
+    const r = await checkRunner({ projectDir: ROOT, pkg: 'vitest', bin: 'vitest' });
+    const pinned = JSON.parse(readFileSync(join(ROOT, 'node_modules', 'vitest', 'package.json'), 'utf8')).version;
+    expect(r).toEqual({ ok: true, version: pinned, source: 'project' });
+    const argv = runnerArgv(ROOT, 'vitest', 'vitest');
+    expect(argv[0]).toBe(process.execPath);
+    expect(argv[1]).toMatch(/node_modules[\\/]vitest[\\/]vitest\.mjs$/);
+    expect(resolveRunner({ projectDir: ROOT, pkg: 'vitest', bin: 'vitest' }).source).toBe('project');
+  });
+
+  it('a project without the package, and nothing on PATH, is not resolvable — whatever the npx cache holds', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-resolve-'));
+    mkdirSync(join(dir, 'node_modules'));
+    try {
+      resetRunnerCache();
+      const r = await checkRunner({ projectDir: dir, pkg: 'definitely-not-a-runner-xyz', bin: 'definitely-not-a-runner-xyz' });
+      expect(r.ok).toBe(false);
+      expect(r.message).toMatch(/not installed in the project and `definitely-not-a-runner-xyz` is not on PATH/);
+      expect(runnerArgv(dir, 'definitely-not-a-runner-xyz', 'definitely-not-a-runner-xyz')).toEqual(['definitely-not-a-runner-xyz']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      resetRunnerCache();
+    }
+  });
+
+  it('falls back to an executable on PATH and says so (source: path)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-resolve-path-'));
+    const bin = mkdtempSync(join(tmpdir(), 'tg-resolve-bin-'));
+    mkdirSync(join(dir, 'node_modules'));
+    writeFileSync(join(bin, 'fakerunner'), '#!/bin/sh\necho 7.7.7\n', { mode: 0o755 });
+    const saved = process.env.PATH;
+    process.env.PATH = `${bin}:${saved}`;
+    try {
+      resetRunnerCache();
+      const r = await checkRunner({ projectDir: dir, pkg: 'fakerunner', bin: 'fakerunner' });
+      expect(r).toEqual({ ok: true, version: '7.7.7', source: 'path' });
+    } finally {
+      process.env.PATH = saved;
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(bin, { recursive: true, force: true });
+      resetRunnerCache();
+    }
   });
 });

@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -43,27 +45,74 @@ export function parseCommandTemplate(template) {
 /** `{files}` must be a word of its own (one argv entry per file); `{out}` may be embedded, e.g. `--outputFile={out}`. */
 export const expandCommand = (words, files, outFile) => words.flatMap((w) => (w === '{files}' ? files : [w.replaceAll('{out}', outFile)]));
 
+const resolvedRunners = new Map(); // `${projectDir}\0${pkg}` → { argv, version, source }
+
 /**
- * Can `bin` be resolved at all from this directory? Run before any verdict
- * is attempted: an unresolvable runner is a precondition failure, never a
- * statement about the tests.
+ * Where does the runner come from? The PROJECT first: the runner package
+ * resolved from `projectDir` (its version, its `bin` script run with this
+ * node). Only when no package resolves, an executable on PATH — a global
+ * runner is a legitimate setup for some monorepos, and the evidence says so
+ * (`source: "path"`). Never `npx`: the npx cache and a same-named executable
+ * (a Python `playwright` shim, say) both answer `npx --no-install <bin>
+ * --version` from a project that has no such runner at all (#41).
  */
-export function checkBinary({ projectDir, bin, budgetMs = 60_000, env = process.env }) {
+export function resolveRunner({ projectDir, pkg, bin }) {
+  const key = `${projectDir}\0${pkg}`;
+  if (resolvedRunners.has(key)) return resolvedRunners.get(key);
+  let result = null;
+  try {
+    const req = createRequire(join(projectDir, 'noop.js'));
+    const pkgJsonPath = req.resolve(`${pkg}/package.json`);
+    const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));
+    const binField = typeof pkgJson.bin === 'string' ? pkgJson.bin : pkgJson.bin?.[bin];
+    if (binField) result = { argv: [process.execPath, join(dirname(pkgJsonPath), binField)], version: pkgJson.version, source: 'project' };
+  } catch {}
+  resolvedRunners.set(key, result);
+  return result;
+}
+
+/** Forget cached resolutions (tests create and delete projects at the same paths). */
+export const resetRunnerCache = () => resolvedRunners.clear();
+
+/** The argv prefix that runs `pkg`'s `bin` for this project: the resolved local script, else the PATH executable. */
+export function runnerArgv(projectDir, pkg, bin) {
+  return resolveRunner({ projectDir, pkg, bin })?.argv ?? [bin];
+}
+
+/**
+ * Can the runner be resolved at all from this directory? Run before any
+ * verdict is attempted: an unresolvable runner is a precondition failure,
+ * never a statement about the tests. Project package first; PATH second;
+ * npx never.
+ */
+export function checkRunner({ projectDir, pkg, bin, budgetMs = 60_000, env = process.env }) {
+  const local = resolveRunner({ projectDir, pkg, bin });
+  if (local) return Promise.resolve({ ok: true, version: local.version, source: 'project' });
   return new Promise((resolve) => {
-    const child = spawn(npx, ['--no-install', bin, '--version'], { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], env: { ...env, CI: '1' } });
+    let child;
+    try {
+      child = spawn(process.platform === 'win32' ? `${bin}.cmd` : bin, ['--version'], { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], env: { ...env, CI: '1' } });
+    } catch (e) {
+      return resolve({ ok: false, message: e.message });
+    }
     let out = '';
     let err = '';
-    child.on('error', (e) => resolve({ ok: false, message: e.message }));
+    child.on('error', () => resolve({ ok: false, message: `${pkg} is not installed in the project and \`${bin}\` is not on PATH (npm i -D ${pkg})` }));
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (err += d));
     const timer = setTimeout(() => child.kill('SIGKILL'), budgetMs);
     child.on('close', (code) => {
       clearTimeout(timer);
-      const version = out.trim().replace(/^vitest\//, '').split('\n').pop();
-      resolve(code === 0 && version ? { ok: true, version } : { ok: false, message: (err || out).trim().split('\n').filter(Boolean).slice(-1)[0] ?? `exit ${code}` });
+      const version = out.trim().replace(/^vitest\//, '').replace(/^Version\s+/i, '').split('\n').pop();
+      resolve(code === 0 && version
+        ? { ok: true, version, source: 'path' }
+        : { ok: false, message: `${pkg} is not installed in the project; \`${bin}\` on PATH answered: ${(err || out).trim().split('\n').filter(Boolean).slice(-1)[0] ?? `exit ${code}`}` });
     });
   });
 }
+
+/** @deprecated name kept for older callers; resolves the project package first, never npx. */
+export const checkBinary = ({ bin, ...rest }) => checkRunner({ ...rest, pkg: bin, bin });
 
 /** Defender globs → existing files. Empty result is the `nocover` signal. */
 export const resolveDefenders = (projectDir, globs) => matchGlobs(projectDir, globs ?? []);

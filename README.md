@@ -141,9 +141,13 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    reports. Silence it, visibly, with `// unasserted: <why>` above the mock.
 
    Runners: **vitest** and **jest** (`--runner auto` picks the first that
-   resolves; both read the same jest-compatible JSON report). Anything else
-   goes through `--runner-cmd`. Each runner is proven against its own copy
-   of the known-answer fixture.
+   resolves; both read the same jest-compatible JSON report). A runner is
+   resolved from the **project's own package** first — its pinned version,
+   its own bin script — and only then from an executable on PATH, which the
+   evidence records as `runner.source: "path"`; `npx` is never asked,
+   because its cache answers for packages a project does not have. Anything
+   else goes through `--runner-cmd`. Each runner is proven against its own
+   copy of the known-answer fixture.
 
    The two-gate rule, as one verb: `testguard admit <test-file> --claim <ID>`
    runs the claim's faults against your uncommitted test and answers
