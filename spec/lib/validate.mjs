@@ -6,7 +6,7 @@ import { fingerprint } from './fingerprint.mjs';
 
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 
-export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate']);
+export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate', 'replay']);
 export const PASSING_VERDICTS = Object.freeze(new Set(['killed']));
 
 const ajv = new Ajv2020({ strict: true, allErrors: true });
@@ -130,6 +130,37 @@ const semantic = {
     if (doc.state === 'unclaimed-changes' && doc.next.action !== 'claim') errors.push({ path: '/next/action', message: 'unclaimed-changes requires next.action = claim' });
     if (doc.evidenceSource && !doc.evidenceHead) errors.push({ path: '/evidenceHead', message: 'evidence was read, so the commit it describes must be recorded' });
     if (doc.changes && doc.changes.uncovered.length > 0 && !['no-claims', 'unclaimed-changes'].includes(doc.state)) errors.push({ path: '/state', message: 'uncovered changed files are hidden behind a later state; unclaimed-changes precedes every evidence state' });
+    return errors;
+  },
+
+  replay(doc) {
+    const errors = [];
+    const n = doc.run.confirmRuns;
+    const seen = new Set();
+    doc.records.forEach((r, i) => {
+      const p = `/records/${i}`;
+      // One patch, one row: a dual-branch topology carries the same fix under
+      // two or three shas, and counting it twice corrupts the corpus the
+      // calibration is computed from.
+      if (seen.has(r.patchId)) errors.push({ path: `${p}/patchId`, message: `duplicate patch-id ${r.patchId.slice(0, 12)}: the same fix counted twice` });
+      seen.add(r.patchId);
+      if (['caught', 'blind'].includes(r.verdict) && r.runs.length !== n) {
+        errors.push({ path: `${p}/runs`, message: `${r.verdict} requires exactly confirmRuns (${n}) runs, got ${r.runs.length}` });
+      }
+      // Only a test body rejecting the reverted source counts as caught —
+      // the same rule as `killed`, for the same reason.
+      if (r.verdict === 'caught' && !r.runs.every((x) => x.outcome === 'fail' && (x.assertionFailures ?? 0) > 0)) {
+        errors.push({ path: `${p}/runs`, message: 'caught requires every run to fail with at least one assertion failure' });
+      }
+      if (r.verdict === 'blind' && !r.runs.every((x) => x.outcome === 'pass')) {
+        errors.push({ path: `${p}/runs`, message: 'blind requires every run to pass: the suite stayed green on known-broken code' });
+      }
+      if (r.verdict === 'flaky' && !(r.runs.some((x) => x.outcome === 'pass') && r.runs.some((x) => x.outcome === 'fail'))) {
+        errors.push({ path: `${p}/runs`, message: 'flaky requires runs that disagree' });
+      }
+      if (r.verdict === 'nocover' && r.ranTests) errors.push({ path: `${p}/ranTests`, message: 'nocover means no test exercises the reverted files; it cannot have run tests' });
+      if (r.verdict === 'unverifiable' && !r.reason) errors.push({ path: `${p}/reason`, message: 'unverifiable requires a reason (e.g. revert-did-not-apply, suite-failed-to-load)' });
+    });
     return errors;
   },
 

@@ -4,15 +4,23 @@ import { scanAnnotations, reconcile } from '../claims/annotations.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefendersDetailed } from '../probe/discover.mjs';
 import { classifyDefenders } from '../probe/mocks.mjs';
+import { computeRemovedClaims, renderRemoved } from '../claims/removed.mjs';
+import { evidencePath } from './probe.mjs';
 
-export async function claimsCommand({ projectDir, values }, io) {
+export async function claimsCommand({ projectDir, values, version }, io) {
   const path = values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir);
   const claims = loadClaims(path);
   const annotations = scanAnnotations(projectDir);
   const drift = reconcile(claims, annotations);
 
+  // A claim that disappeared is invisible to every other command; compare
+  // identities against a reference when one is given.
+  const removed = values.since
+    ? computeRemovedClaims({ projectDir, ref: values.since, claimsPath: path, current: claims, ignorePath: values.ignore ? resolve(values.ignore) : undefined, evidencePath: evidencePath(projectDir), toolVersion: version })
+    : undefined;
+
   if (values.json) {
-    io.out(JSON.stringify({ path, claims, annotations, drift }, null, 2));
+    io.out(JSON.stringify({ path, claims, annotations, drift, ...(removed ? { removed } : {}) }, null, 2));
   } else {
     const annotated = new Set(drift.annotated);
     io.out(`${claims.claims.length} claims in ${path} — ${annotated.size} carry a @claim annotation in source (test files are not scanned)`);
@@ -42,6 +50,10 @@ export async function claimsCommand({ projectDir, values }, io) {
     if (drift.undeclared.length || drift.stale.length) io.out('');
     for (const a of drift.undeclared) io.out(`UNDECLARED   @claim ${a.id} at ${a.file}:${a.line} has no entry in the claims file — a claim with no fault model`);
     for (const c of drift.stale) io.out(`STALE        ${c.id} is annotation-sourced but no source file carries @claim ${c.id}`);
+    if (removed) {
+      io.out('');
+      io.out(renderRemoved(removed));
+    }
   }
-  return drift.undeclared.length || drift.stale.length ? 1 : 0;
+  return drift.undeclared.length || drift.stale.length || (removed?.removed.length ?? 0) > 0 ? 1 : 0;
 }

@@ -204,6 +204,55 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    brief's first line says which install answered (`local install` or
    `global`), so a stale one is visible.
 
+### Would this suite have caught the bugs that already escaped?
+
+An injected fault is a fault somebody thought of. A bug that actually shipped
+is ground truth: a human already confirmed it was a defect, and there is no
+equivalent-mutant argument to have about it.
+
+```bash
+npx testguard-cli replay --since HEAD~50..HEAD --max 10
+```
+
+For each fix commit in the range — one that changes source **and** a test
+together — `replay` checks it out in a scratch worktree, reverts only its
+source files to the parent, **deletes the test the fix shipped** (that test
+proves nothing about what the suite knew before it existed), and runs the
+tests that import the reverted code:
+
+| Verdict | Meaning |
+|---|---|
+| `caught` | a remaining test failed by assertion, every run. The suite knew. |
+| `blind` | the suite stayed green on known-broken code. |
+| `nocover` | no test imports the reverted files — worse than blind. |
+| `flaky` | the runs disagreed, so nothing can be concluded. A flaky failure reads as detection, which biases this metric *optimistically*; mixed runs are never `caught`. |
+| `unverifiable` | the revert did not apply, or the suite could not load. |
+
+One patch counts once (`git patch-id`), because a dual-branch topology
+carries the same fix under two or three shas. **`replay` reports and never
+gates**: a bug that escaped is history, not a regression in this change.
+
+Each replayed bug is also labelled with the injected-fault class its diff
+most resembles, which is the join key that turns an uninterpretable mutation
+score into a statement with a sample size:
+
+```
+  guard-removed          blind   7/9    p=0.78  ci [0.45, 0.94]
+  field-dropped          blind   4/4    p=1.00  ci [0.51, 1.00]
+```
+
+Read as *"when a fault of this class survives, how often does that
+correspond to a bug that really escaped"*. It is written as a
+`calibration` document beside the replay one. Only `caught` and `blind`
+carry information; the other verdicts are excluded from both sides of the
+ratio.
+
+**The open question this exists to answer.** Does a calibration learned on a
+repository *with* history transfer to a greenfield one that has none? AI
+authored code has no history, so replay cannot help it directly and
+calibration is the only bridge. That transfer is unproven, it is the core
+product bet, and this is the instrument for testing it — not the answer.
+
 ### Read CI's evidence locally
 
 Verdict reuse makes a probe cheap, but the evidence lives where `probe` ran
@@ -314,6 +363,25 @@ talks to the network; only the job posts, and only when told to.
   assertion would notice. `NOCOVER` here means no test even imports the
   file; everything above that is measured by injecting the fault.
 
+A claim that **disappeared** is invisible to all of the above: `probe`
+verifies the claims that exist, `gate` sees the source file covered by some
+other claim, and `status` says clean. Deleting a claim is therefore cheaper
+than weakening its fault — and `changedFaults` exists precisely because
+weakening was the cheap escape. So:
+
+```bash
+npx testguard-cli claims --since origin/main    # what existed there and does not now
+```
+
+`removed-claim` and `removed-fault` gate; a rename that keeps the statement
+verbatim is reported as `renamed-claim` and does not. Where evidence is
+present, the line names the verdict the claim last had, because *"it was
+SURVIVED when it was removed"* is the sentence that matters. The escape hatch
+is the same one as everywhere else: a `claim` entry in
+`testguard.ignore.json` with a reason, expiring if you give it an `expires`.
+Removal is allowed — claims can be wrong, superseded or split — and it is
+never silent.
+
 ### Built for agents to run
 
 TestGuard is meant to be driven by an AI agent, not typed by a person. Three
@@ -409,6 +477,7 @@ through every verdict.
 
 ## Status
 
+**v0.5.** Ten commands (`status`, `init`, `claims`, `probe`, `admit`, `replay`, `baseline`, `brief`, `gate`, `scaffold`), vitest and jest runners, hand-authored faults plus
 **v0.5.** Nine commands (`status`, `init`, `claims`, `probe`, `admit`, `baseline`, `brief`, `gate`, `scaffold`), vitest, jest and Playwright runners, hand-authored faults plus
 a mechanical scaffold, an agent operating layer (`status`, `init`) and a
 change gate (`gate`). The contract
@@ -416,6 +485,9 @@ spine — eight JSON Schemas shared with the other Guard tools — is under
 [`spec/`](spec/). One exact-pinned runtime dependency (`ajv`, for schema validation); Node ≥ 20.
 
 Not yet: test generation (the acceptance half, `admit`, exists; the generating half stays the agent's), runners beyond
+vitest and jest, AST-aware producers, and the transfer of a calibration between repositories — `replay` measures it
+now; whether it carries to a repository with no history is unproven. Each is
+designed for; none is claimed.
 vitest, jest and Playwright, AST-aware producers, and calibration of fault classes
 against real escaped bugs. Each is designed for; none is claimed.
 

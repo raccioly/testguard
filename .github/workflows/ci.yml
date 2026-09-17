@@ -125,6 +125,13 @@ jobs:
       # ── Every change needs a claim: the gate runs on this repository's own
       #    pull requests. A new source file without a claim (or an excusing
       #    ignore entry with a reason) turns the PR red. ──
+      # A claim that disappeared is invisible to every other check: `probe`
+      # verifies what is there, `gate` sees the file covered by another claim.
+      # Removal is allowed; it is never silent.
+      - name: claims — no claim or fault removed without a reason
+        if: github.event_name == 'pull_request'
+        run: node cli/testguard.mjs claims . --since "origin/${{ github.base_ref }}"
+
       - name: gate — every changed source file carries a claim
         if: github.event_name == 'pull_request'
         run: node cli/testguard.mjs gate . --changed "origin/${{ github.base_ref }}"

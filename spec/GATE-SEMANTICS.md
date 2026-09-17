@@ -69,6 +69,35 @@ Rules that follow from the table:
    changed since it was probed, with its previous verdict. The change is
    allowed; it is never invisible.
 
+## Replay reports; it never gates
+
+A replayed bug is history. It escaped, by definition, which means the suite
+missed it; a gate on that is a gate nobody can pass on a first run, and it
+would only teach teams to stop looking. `replay` therefore always exits `0`
+unless it could not run at all.
+
+Its verdicts mirror the probe's, for the same reasons:
+
+| Verdict | Meaning |
+|---|---|
+| `caught` | a remaining test failed **by assertion** on the reverted source, every run. The suite knew. |
+| `blind` | the suite stayed green on known-broken code. |
+| `nocover` | no test imports the reverted files. Worse than `blind`: nothing was even tried. |
+| `unverifiable` | the revert did not apply, the suite failed to load, or it timed out. Carries a `reason`. |
+| `flaky` | the runs disagreed. A flaky failure reads as "the suite caught it", so flakiness biases this metric **optimistically** — mixed runs are never `caught`. |
+
+Two rules that follow:
+
+1. **One patch, one row.** De-duplicate by `git patch-id`; a dual-branch
+   topology carries the same fix under two or three shas, and counting it
+   twice corrupts the corpus a calibration is computed from.
+2. **The fix's own test is removed before the run.** It proves nothing about
+   what the suite knew before the fix existed.
+
+Only `caught` and `blind` carry information. `nocover`, `flaky` and
+`unverifiable` are excluded from both sides of a calibration ratio, because a
+number computed over them would mean nothing.
+
 ## Baseline and delta
 
 A baseline freezes the fingerprints of every non-passing finding at a point

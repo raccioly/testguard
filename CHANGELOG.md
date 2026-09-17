@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 
+
 - **Contention detection and `--serial`** (#26). `probe` looks for other test
   runners before the first run, warns naming their pids, and records them on
   the evidence (`run.contention`) — a contended machine turns a slow suite
@@ -18,6 +19,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file at a time (`--no-file-parallelism`, `--runInBand`, `--workers=1`) and
   is recorded as `run.serial`. Best effort by design: an unreadable process
   list is no detection and never fails a probe.
+
+- **`claims --since <ref>`** — a claim that disappeared was invisible to every
+  other check: `probe` verifies what is there, `gate` sees the file covered by
+  another claim, `status` says clean. Since deleting a claim is cheaper than
+  weakening its fault (which `changedFaults` already surfaces), removal is now
+  reported: `removed-claim` and `removed-fault` gate, a rename that keeps the
+  statement verbatim is `renamed-claim` and does not, and where evidence exists
+  the finding names the verdict the claim last had. Excused by a `claim` entry
+  in `testguard.ignore.json` with a reason, with expiry honoured as everywhere
+  else. This repository's CI runs it on its own pull requests. Found the hard
+  way: a `--theirs` conflict resolution dropped two self-claims during this
+  release and nothing noticed. Self-claim `TG-REMOVED-CLAIM-IS-A-FINDING`. (#57)
+
+- **`testguard replay --since <range>`** — would this suite have caught the
+  bugs that already escaped? For each fix commit in the range (one that
+  changes source *and* a test together), it reverts only the source to the
+  parent in a scratch worktree, removes the test the fix shipped, and runs the
+  tests that import the reverted code: `caught`, `blind`, `nocover`, `flaky`
+  or `unverifiable`. One patch counts once (`git patch-id`). It reports and
+  never gates — a bug that escaped is history, not a regression in this
+  change. An injected fault is one somebody thought of; a bug that shipped is
+  ground truth, with no equivalent-mutant argument to have about it.
+- **Fault-class labelling and the first calibration.** Each replayed bug is
+  labelled with the injected-fault class its diff most resembles — the
+  scaffold producers read in reverse, deterministic, `other` rather than a
+  guess — and a `calibration` document is written beside the replay one:
+  per class, the share of real escaped bugs the suite missed, with a Wilson
+  interval and n. Only `caught` and `blind` carry information; the rest are
+  excluded from both sides. `calibration.schema.json` has had no producer
+  until now. The open question it exists to answer — does a calibration
+  learned on a repository with history transfer to a greenfield one — stays
+  open; this is the instrument, not the answer. (#35)
+- New spec kind **`replay`** (`replay.schema.json`), with semantic rules:
+  `caught` needs every run to fail by assertion, `blind` needs every run to
+  pass, `flaky` needs runs that disagree, `nocover` cannot have run tests,
+  and a duplicate patch-id is rejected. Conformance example plus two
+  must-reject documents. Self-claims
+  `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT`, `TG-REPLAY-DEDUPES-BY-PATCH`,
+  `TG-CALIBRATION-EXCLUDES-UNINFORMATIVE` and `TG-LABEL-NEVER-GUESSES`.
 
 
 
@@ -71,6 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TG-ADMIT-NEEDS-ALL-KILLED`.
 
 ### Changed
+
 
 
 
