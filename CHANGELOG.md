@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
 - **Mock-aware defender discovery** (#20). A test file that `vi.mock`s /
   `jest.mock`s the target cannot detect any fault in it and is no longer a
   discovered defender; `NOCOVER` now means "no test imports this source
@@ -28,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Both known-answer fixtures gain a claim whose only importing test mocks
   the module: expected `NOCOVER`, with the mocking file and the signal
   recorded.
+
+### Changed
+
+
+- CI: TestGuard's self-probe runs on one Node leg instead of three, without
+  escalation, and restores the previous run's evidence from the cache so
+  unchanged claims reuse their verdicts. The verdicts do not depend on the
+  Node minor; the from-scratch probe was ~14 minutes per leg.
 
 ## [0.5.0] - 2026-09-17
 
