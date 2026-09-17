@@ -127,7 +127,7 @@ export const listTestFiles = (projectDir, globs = TEST_GLOBS) => matchGlobs(proj
  * can kill a fault. A suite that fails to load, or a test that times out, is
  * not evidence that the suite defends the claim.
  */
-function firstInformativeLine(message) {
+export function firstInformativeLine(message) {
   const lines = message.split('\n').map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim()).filter(Boolean);
   return lines.find((l) => /error|syntax|unexpected|expected .+ but found|cannot find|failed to parse|transform failed/i.test(l) && !/^●/.test(l)) ?? lines[0] ?? '';
 }
@@ -162,14 +162,16 @@ export function parseReport(report, durationMs) {
  * runner's command line; `command` (tests) or `commandTemplate` (--runner-cmd)
  * override it.
  */
-export function runProcess({ projectDir, files, budgetMs = 120_000, command, commandTemplate, argv }) {
+export function runProcess({ projectDir, files, budgetMs = 120_000, command, commandTemplate, argv, env = {}, parse = parseReport }) {
   const outFile = join(tmpdir(), `testguard-run-${randomBytes(6).toString('hex')}.json`);
   const [cmd, ...args] = command
     ?? (commandTemplate ? expandCommand(commandTemplate, files, outFile) : argv(files, outFile));
+  // A runner that names its report through the environment (Playwright) gets `{out}` substituted there too.
+  const extraEnv = Object.fromEntries(Object.entries(env).map(([k, v]) => [k, String(v).replaceAll('{out}', outFile)]));
   const started = Date.now();
 
   return new Promise((resolve) => {
-    const child = spawn(cmd, args, { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CI: '1', FORCE_COLOR: '0' } });
+    const child = spawn(cmd, args, { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CI: '1', FORCE_COLOR: '0', ...extraEnv } });
     let stderr = '';
     child.stderr.on('data', (d) => (stderr += d));
     child.on('error', (e) => (stderr += e.message));
@@ -189,7 +191,7 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
         result = { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs }, timeouts: 0, loadMessage: stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? 'runner produced no report', failedTests: [] };
       } else {
         try {
-          result = parseReport(JSON.parse(readFileSync(outFile, 'utf8')), durationMs);
+          result = parse(JSON.parse(readFileSync(outFile, 'utf8')), durationMs);
         } catch (e) {
           result = { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs }, timeouts: 0, loadMessage: `unreadable report: ${e.message}`, failedTests: [] };
         }

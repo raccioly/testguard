@@ -47,6 +47,7 @@ const semantic = {
     const n = doc.run.confirmRuns;
     if (n < 3 && doc.run.provisional !== true) errors.push({ path: '/run/provisional', message: `confirmRuns ${n} is below 3; the run must declare provisional: true` });
     if (n >= 3 && doc.run.provisional === true) errors.push({ path: '/run/provisional', message: `confirmRuns ${n} is confirmed; provisional must be absent or false` });
+    if (doc.run.runners && doc.run.runner && !doc.run.runners.some((x) => x.name === doc.run.runner.name)) errors.push({ path: '/run/runners', message: 'runners must include the project runner named in run.runner' });
     if (doc.run.repo.ignoredDirty && doc.run.repo.snapshot) errors.push({ path: '/run/repo/ignoredDirty', message: 'a working-tree snapshot has no ignored dirty files: the tree was probed as it is' });
     doc.records.forEach((r, i) => {
       const p = `/records/${i}`;
@@ -87,6 +88,11 @@ const semantic = {
       }
       if (r.detail.undeclaredKillers && r.detail.reason !== 'killed-by-undeclared-tests') {
         errors.push({ path: `${p}/detail/undeclaredKillers`, message: 'undeclaredKillers is only meaningful with reason killed-by-undeclared-tests' });
+      }
+      if (r.defenders.byRunner) {
+        const resolved = new Set(r.defenders.resolved);
+        for (const [runner, files] of Object.entries(r.defenders.byRunner)) for (const f of files) if (!resolved.has(f)) errors.push({ path: `${p}/defenders/byRunner/${runner}`, message: `${f} ran under ${runner} but is not a resolved defender` });
+        if (Object.keys(r.defenders.byRunner).length < 2) errors.push({ path: `${p}/defenders/byRunner`, message: 'byRunner is only meaningful when more than one runner ran the defenders' });
       }
       if (r.defenders.mocking && r.defenders.discovered) {
         for (const f of r.defenders.mocking) if (r.defenders.resolved.includes(f)) errors.push({ path: `${p}/defenders/mocking`, message: `${f} mocks the subject and was discovered; it cannot also be a resolved defender` });

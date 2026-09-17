@@ -29,6 +29,13 @@
       "reason": "Text rendering of documents that are themselves validated; rendering carries no verdict logic.",
       "by": "maintainer",
       "at": "2026-09-17T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/probe.playwright.test.mjs",
+      "reason": "Acceptance test for the Playwright fixture; it runs only where the fixture's own dependencies are installed (the CI playwright job) and is skipped elsewhere. Naming it as a self-claim defender would make that claim a false survivor in the main job. The fixture's expected.json is its oracle.",
+      "by": "maintainer",
+      "at": "2026-09-17T00:00:00Z"
     }
   ]
 }
