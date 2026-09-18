@@ -70,6 +70,7 @@ What is gated instead:
 | `src/probe/runners/` | `test/runner-vitest.test.mjs`, `test/runner-command.test.mjs`, `test/runner-playwright.test.mjs` |
 | `src/probe/attribution.mjs` | `test/attribution.test.mjs` |
 | `src/probe/cost.mjs` | `test/cost.test.mjs` |
+| `src/probe/progress.mjs` | `test/progress.test.mjs` |
 | `src/probe/contention.mjs` | `test/contention.test.mjs` |
 | `src/gate/changed.mjs` | `test/gate.test.mjs` |
 | `src/baseline/baseline.mjs` | `test/baseline.test.mjs` |

@@ -47,6 +47,7 @@ code were wrong, would anything fail?*
 | Independence | Record, per kill, whether an unrelated test also failed | `src/probe/independence.mjs` |
 | Attribution | Escalation's killer intersection, flake rate, the subject record — pure | `src/probe/attribution.mjs` |
 | Cost | What a probe spent, per claim and per defender file, derived from evidence | `src/probe/cost.mjs` |
+| Progress | How a running probe reports itself, per reader: tty, plain, ndjson | `src/probe/progress.mjs` |
 | Change gate | Claim coverage of a diff | `src/gate/changed.mjs` |
 | Baseline | Freeze debt; gate the delta; re-stamp | `src/baseline/baseline.mjs` |
 | Status | The single state machine every rendering derives from | `src/status/status.mjs` |

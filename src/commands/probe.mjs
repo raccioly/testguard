@@ -8,6 +8,7 @@ import { renderRecord, renderSummary, sortForReport, PROVISIONAL_WARNING } from 
 import { computeStatus } from '../status/status.mjs';
 import { resolveChangedRef, withChangedRef } from '../gate/changed.mjs';
 import { costReport, renderCost } from '../probe/cost.mjs';
+import { progressMode, stageReporter, clearStageLine, recordEvent, isProgressMode, progressStream } from '../probe/progress.mjs';
 export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
@@ -20,6 +21,14 @@ export async function probeCommand({ projectDir, values, version }, io) {
     io.err('--confirm must be a positive integer and --budget at least 1000');
     return 3;
   }
+  if (values.progress && !isProgressMode(values.progress)) {
+    io.err(`--progress must be one of auto, tty, plain, ndjson, none (got ${values.progress})`);
+    return 3;
+  }
+  // Progress always goes to stderr, so --json keeps stdout parseable.
+  const progress = progressMode({ explicit: values.progress, isTTY: process.stderr.isTTY, quiet: values.quiet, json: values.json });
+  const progressTo = progressStream(process);
+  const stageOut = stageReporter(progress, (s) => progressTo.write(s));
   const claims = loadClaims(values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir));
   if (claims.claims.length === 0) {
     io.err('claims file declares no claims; nothing to verify');
@@ -55,9 +64,13 @@ export async function probeCommand({ projectDir, values, version }, io) {
     escalate: !values['no-escalate'],
     toolVersion: version,
     includeDirty: values['include-dirty'],
-    onStage: !values.quiet && !values.json && process.stderr.isTTY ? ({ claimId, faultId, stage, i, n }) => process.stderr.write(`\r\x1b[K  … ${claimId}/${faultId} ${stage} ${i}/${n}`) : undefined,
-    onProgress: values.quiet || values.json ? undefined : (r) => {
-      if (process.stderr.isTTY) process.stderr.write('\r\x1b[K');
+    onStage: stageOut,
+    onProgress: (r) => {
+      // ndjson streams verdicts as they land; a watcher sees them without
+      // waiting for the document at the end.
+      if (progress === 'ndjson') progressTo.write(recordEvent(r));
+      if (values.quiet || values.json) return;
+      progressTo.write(clearStageLine(progress));
       // The discovery note is a property of the claim, not of each fault: say it once.
       const firstOfClaim = !discoveryNoted.has(r.claim.id);
       if (r.defenders.discovered) discoveryNoted.add(r.claim.id);

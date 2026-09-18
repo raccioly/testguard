@@ -475,6 +475,40 @@ things make that safe:
   previous verdict, and makes reviewing that edit the next action. Editing a
   claim is allowed — claims can be wrong — but it is never invisible.
 
+### Watching a probe that is still running
+
+A probe runs the defenders N times clean and N times per fault, which takes
+minutes. It used to print its stage line only when `stderr` was a terminal —
+so CI, a redirected log and an agent harness saw **nothing at all** for the
+whole run, which is indistinguishable from a hang. A gate you cannot tell
+from a hang is a gate people start killing.
+
+The rewriting is a rendering choice, not a reason to withhold the
+information:
+
+| `--progress` | What you get |
+|---|---|
+| `auto` (default) | `tty` at a terminal, `plain` everywhere else |
+| `tty` | one line, rewritten in place — for a human watching |
+| `plain` | one append-only line per stage — a log file, CI, an agent |
+| `ndjson` | one JSON object per line, stages **and** verdicts as they land |
+| `none` | silence |
+
+```bash
+npx testguard-cli probe . > probe.log 2>&1          # now reports; used to be silent
+npx testguard-cli probe . --progress ndjson 2>events.ndjson
+```
+
+```
+{"event":"stage","claim":"TG-COST-NAMES-SHARED-DEFENDERS","fault":"F1","stage":"baseline","run":1,"of":3,"at":"…"}
+{"event":"verdict","claim":"TG-COST-NAMES-SHARED-DEFENDERS","fault":"F1","verdict":"killed","severity":"medium","file":"src/probe/cost.mjs","at":"…"}
+```
+
+**Progress always goes to stderr**, so `--json` leaves stdout as one document
+and nothing else. `--quiet` and `--json` imply `none`, and an explicit
+`--progress` overrides both: an operator who asks for a stream of events has
+said what they want.
+
 ### What the probe costs, and why a gate gets slow
 
 A probe's wall clock is not a function of how many claims you have. Per claim

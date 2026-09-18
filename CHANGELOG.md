@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`--progress auto|tty|plain|ndjson|none` on `probe`** (#68). A probe used
+  to print its stage line only when `stderr` was a terminal, so CI, a
+  redirected log and an agent harness saw nothing at all for the whole run —
+  indistinguishable from a hang, and a gate you cannot tell from a hang is a
+  gate people start killing.
+  The carriage-return rewriting is a *rendering* choice, not a reason to
+  withhold the information. `auto` (the default) keeps the rewritten line at a
+  terminal and prints append-only lines everywhere else. `ndjson` emits one
+  JSON object per line for stages **and** for verdicts as they land, so a
+  machine can watch a probe without waiting for the document at the end.
+  Progress always goes to **stderr**, so `--json` leaves stdout as one
+  parseable document. `--quiet` and `--json` imply `none`; an explicit
+  `--progress` overrides both, because an operator who asks for a stream of
+  events has said what they want.
+  Self-claims `TG-PROGRESS-NOT-ONLY-FOR-A-TTY`, `TG-PROGRESS-NEVER-ON-STDOUT`
+  and `TG-PROGRESS-EXPLICIT-WINS`, all probed and killed.
+
+### Added
+
 - **`--cost`, on `probe` and `claims`** — what the defenders actually cost,
   per claim and per defender file, read back out of the `durationMs` the
   probe already records. It re-measures nothing and spawns nothing.
