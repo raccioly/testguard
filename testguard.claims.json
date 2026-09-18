@@ -1721,7 +1721,7 @@
         "at": "2026-09-18T00:00:00Z"
       },
       "defendedBy": [
-        "test/replay.test.mjs"
+        "test/calibration.test.mjs"
       ],
       "faults": [
         {
@@ -3103,6 +3103,38 @@
       ]
     },
     {
+      "id": "TG-COST-BUDGET-NAMES-THE-CLAIM",
+      "statement": "A cost-budget failure names the claims that cost the most, by id, from the report as claimCosts actually shapes it; a budget that fails with \"undefined\" five times has told the reader nothing about where to look.",
+      "source": {
+        "kind": "spec",
+        "ref": "docs-canonical/TEST-SPEC.md#how-the-gate-duration-is-measured"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/cost.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The worst-claims list reads a field the report does not carry, so every name is undefined.",
+          "faultClass": "variable-swap",
+          "file": "src/probe/cost.mjs",
+          "find": "    worst: (report.claims ?? []).slice(0, worst).map((c) => ({ id: c.claimId, ms: c.ms, runs: c.runs })),",
+          "replace": "    worst: (report.claims ?? []).slice(0, worst).map((c) => ({ id: c.id, ms: c.ms, runs: c.runs })),",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-CALIBRATION-BACKOFF-TIERS-ARE-CHECKED",
       "statement": "Every backoff tier of a calibration is held to the same rules as the primary buckets — arithmetic, ordering, arity. A coarser tier a consumer falls back to is exactly where a wrong number would go unnoticed.",
       "source": {
@@ -3180,7 +3212,7 @@
         "at": "2026-09-18T00:00:00Z"
       },
       "defendedBy": [
-        "test/replay.test.mjs"
+        "test/calibration.test.mjs"
       ],
       "faults": [
         {

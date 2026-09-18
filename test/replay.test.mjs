@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { replay, calibrationFrom, wilson, findFixCommits, dedupeByPatch, classifyReplay } from '../src/replay/replay.mjs';
+import { replay, calibrationFrom, findFixCommits, dedupeByPatch, classifyReplay } from '../src/replay/replay.mjs';
 import { labelDiff } from '../src/replay/label.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 
@@ -34,29 +34,6 @@ describe('labelDiff — the join key between real bugs and the fault model', () 
   });
   it('ignores the diff header so a filename never becomes the signal', () => {
     expect(labelDiff('+++ b/src/timeout.js\n--- a/src/timeout.js\n+  // nothing\n').faultClass).toBe('other');
-  });
-});
-
-describe('wilson — a label carries its sample size', () => {
-  it('is 0..1 with a wide interval at small n and a narrower one as n grows', () => {
-    // No trials, no proportion: 0 would be a fabricated point estimate. The interval is maximal ignorance.
-    expect(wilson(0, 0)).toEqual({ p: null, ci: [0, 1] });
-    const small = wilson(1, 2);
-    const large = wilson(50, 100);
-    expect(small.p).toBe(0.5);
-    expect(large.p).toBe(0.5);
-    expect(small.ci[1] - small.ci[0]).toBeGreaterThan(large.ci[1] - large.ci[0]);
-    for (const w of [small, large]) {
-      expect(w.ci[0]).toBeLessThanOrEqual(w.p);
-      expect(w.ci[1]).toBeGreaterThanOrEqual(w.p);
-    }
-  });
-  it('never leaves the unit interval, even at the extremes', () => {
-    for (const [k, n] of [[0, 1], [1, 1], [0, 3], [3, 3]]) {
-      const w = wilson(k, n);
-      expect(w.ci[0]).toBeGreaterThanOrEqual(0);
-      expect(w.ci[1]).toBeLessThanOrEqual(1);
-    }
   });
 });
 
@@ -195,42 +172,6 @@ describe('replay on a scripted corpus', () => {
     const positives = Object.values(cal.buckets).reduce((n, b) => n + b.positives, 0);
     expect(total).toBe(2);      // both were measurable
     expect(positives).toBe(1);  // one was blind
-  });
-
-  it('nocover is a miss and counts as one: it enters both the numerator and the denominator', () => {
-    const cal = calibrationFrom({
-      tool: { name: 'testguard', version: 't' },
-      run: { range: 'x' },
-      records: [
-        { verdict: 'caught', faultClass: 'guard-removed' },
-        { verdict: 'nocover', faultClass: 'guard-removed' },
-        { verdict: 'blind', faultClass: 'guard-removed' },
-      ],
-    });
-    // 2 of 3 missed. Excluding nocover would report 1 of 2; counting it only in
-    // the denominator would report 1 of 3. Both err in the optimistic direction,
-    // and the first rewards having no tests at all.
-    expect(cal.buckets['guard-removed']).toMatchObject({ n: 3, positives: 2, breakdown: { caught: 1, blind: 1, nocover: 1 } });
-  });
-
-  it('a project with no tests for a subsystem never scores better than one with weak tests', () => {
-    const doc = (verdicts) => ({ tool: { name: 'testguard', version: 't' }, run: { range: 'x' }, records: verdicts.map((verdict) => ({ verdict, faultClass: 'guard-removed' })) });
-    const weak = calibrationFrom(doc(['caught', 'caught', 'caught', 'blind', 'blind', 'blind', 'blind', 'blind', 'blind', 'blind']));
-    const none = calibrationFrom(doc(['caught', 'caught', 'caught', 'nocover', 'nocover', 'nocover', 'nocover', 'nocover', 'nocover', 'nocover']));
-    expect(none.buckets['guard-removed'].p).toBeGreaterThanOrEqual(weak.buckets['guard-removed'].p);
-  });
-
-  it('flaky and unverifiable are failed measurements and enter neither side', () => {
-    const cal = calibrationFrom({
-      tool: { name: 'testguard', version: 't' },
-      run: { range: 'x' },
-      records: [
-        { verdict: 'flaky', faultClass: 'guard-removed' },
-        { verdict: 'unverifiable', faultClass: 'guard-removed' },
-        { verdict: 'blind', faultClass: 'guard-removed' },
-      ],
-    });
-    expect(cal.buckets['guard-removed']).toMatchObject({ n: 1, positives: 1 });
   });
 });
 

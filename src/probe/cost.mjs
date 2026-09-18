@@ -177,7 +177,9 @@ export function checkCostBudget(report, { budgetSeconds, previousMs, worst = 5 }
     headroomMs: Math.max(0, budgetMs - totalMs),
     ...(typeof previousMs === 'number' ? { previousMs, deltaMs: totalMs - previousMs } : {}),
     // Named so a failure opens with which claims to look at, not just a number.
-    worst: (report.claims ?? []).slice(0, worst).map((c) => ({ id: c.id, ms: c.ms, runs: c.runs })),
+    // claimCosts emits `claimId`; reading `id` here printed "undefined" for every
+    // claim the first time the budget fired, and the test had fed the wished-for shape.
+    worst: (report.claims ?? []).slice(0, worst).map((c) => ({ id: c.claimId, ms: c.ms, runs: c.runs })),
   };
 }
 

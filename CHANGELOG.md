@@ -50,6 +50,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+- **Calibration's pure tests moved off the replay fixture** (the #73 pattern).
+  Three calibration claims were defended by `test/replay.test.mjs`, which
+  builds a scripted git corpus on every run; their kills come from pure
+  `calibrationFrom` tests that need none of it. The cost budget fired on the
+  first full run — 1022 s against 950 s, the top rows being exactly those
+  claims — so the tests now live in `test/calibration.test.mjs`, the claims
+  point there, and every fault was re-probed after the move, not assumed.
+- **A cost-budget failure names its claims.** `checkCostBudget` read `id`
+  from a report whose claims carry `claimId`, so the one line meant to say
+  *which* claims to look at printed `undefined` five times — and its unit test
+  fed the shape the code wished for, so it passed. Found the first time the
+  budget actually fired. The test now goes through `costReport`, and
+  `TG-COST-BUDGET-NAMES-THE-CLAIM` guards it.
 - **A calibration counts `nocover` as a miss** (#82). `nocover` — no test
   even imports the broken file — is the worst replay outcome, and the ratio
   excluded it: a project with no tests at all for a subsystem scored *better*
