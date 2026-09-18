@@ -7,6 +7,54 @@ import { initProject, hookCommand } from '../src/init/init.mjs';
 
 const gitInit = (dir) => { const g = (...a) => spawnSync('git', ['-c', 'user.email=i@example.invalid', '-c', 'user.name=i', ...a], { cwd: dir }); g('init', '-q'); };
 
+describe('the session-start hook never reaches the network', () => {
+  const run = (cwd, env, cmd) => spawnSync('/bin/sh', ['-c', cmd], { cwd, encoding: 'utf8', env: { ...process.env, ...env } });
+
+  it('contains no form of npx — `--no-install` is quiet, not offline', () => {
+    for (const dir of ['.', 'backend']) {
+      const cmd = hookCommand(dir);
+      expect(cmd).not.toMatch(/npx/);
+      expect(cmd).not.toMatch(/curl|wget|fetch/);
+    }
+  });
+
+  it('runs a project-local install, and runs it exactly once', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-hook-local-'));
+    mkdirSync(join(dir, 'node_modules', '.bin'), { recursive: true });
+    writeFileSync(join(dir, 'node_modules', '.bin', 'testguard'), '#!/bin/sh\necho ran\n', { mode: 0o755 });
+    const r = run(dir, {}, hookCommand('.'));
+    expect(r.status).toBe(0);
+    // `a || b && c` binds as `(a || b) && c` in sh: unbraced, this printed twice
+    expect(r.stdout.trim().split('\n')).toEqual(['ran']);
+  });
+
+  it('falls back to a testguard on PATH when the project has none', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-hook-path-'));
+    const bin = mkdtempSync(join(tmpdir(), 'tg-hook-bin-'));
+    writeFileSync(join(bin, 'testguard'), '#!/bin/sh\necho global\n', { mode: 0o755 });
+    const r = run(dir, { PATH: `${bin}:/usr/bin:/bin` }, hookCommand('.'));
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('global');
+  });
+
+  it('with nothing installed it exits 0 and prints nothing, so a session is never broken', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-hook-none-'));
+    const r = run(dir, { PATH: '/usr/bin:/bin' }, hookCommand('.'));
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('init replaces an earlier npx hook, `--no-install` included', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-hook-legacy-'));
+    mkdirSync(join(dir, '.claude'), { recursive: true });
+    writeFileSync(join(dir, '.claude', 'settings.json'), JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: 'command', command: 'npx --no-install testguard brief --text 2>/dev/null || true' }] }] } }));
+    initProject({ projectDir: dir });
+    const cmds = JSON.parse(readFileSync(join(dir, '.claude', 'settings.json'), 'utf8')).hooks.SessionStart.flatMap((g) => g.hooks.map((h) => h.command));
+    expect(cmds.join(' ')).not.toMatch(/npx/);
+    expect(cmds).toContain(hookCommand('.'));
+  });
+});
+
 describe('init', () => {
   it('installs skill, hook, AGENTS.md section and gitignore lines; is idempotent; --force replaces only the skill', () => {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-')));
@@ -24,8 +72,8 @@ describe('init', () => {
     const cmd = settings.hooks.SessionStart[0].hooks[0].command;
     expect(cmd).toBe(hookCommand('.'));
     expect(cmd).toContain('node_modules/.bin/testguard brief --text');
-    expect(cmd).toContain('npx --no-install testguard brief --text');
-    expect(cmd).not.toMatch(/npx -y|npx testguard-cli/); // never a network fetch from a hook
+    expect(cmd).toContain('command -v testguard'); // a PATH lookup, not a package manager
+    expect(cmd).not.toMatch(/npx/); // no form of npx: --no-install still resolves from the registry
     expect(cmd.endsWith('|| true')).toBe(true);           // never breaks a session
     const agents = readFileSync(join(dir, 'AGENTS.md'), 'utf8');
     expect(agents.startsWith('# My project')).toBe(true);
@@ -50,7 +98,7 @@ describe('init', () => {
     expect(readFileSync(join(dir, '.claude', 'skills', 'testguard', 'SKILL.md'), 'utf8')).toContain('testguard status --json');
   });
 
-  it('replaces a pre-0.6 `npx -y` hook with the local-first one instead of adding a second hook', () => {
+  it('replaces a pre-0.6 npx hook with the local-then-PATH one instead of adding a second hook', () => {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-legacy-')));
     mkdirSync(join(dir, '.claude'));
     writeFileSync(join(dir, '.claude', 'settings.json'), JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: 'command', command: 'npx -y testguard-cli brief --text' }] }] } }));
@@ -58,7 +106,7 @@ describe('init', () => {
     const hooks = JSON.parse(readFileSync(join(dir, '.claude', 'settings.json'), 'utf8')).hooks.SessionStart;
     expect(hooks).toHaveLength(1);
     expect(hooks[0].hooks[0].command).toBe(hookCommand('.'));
-    expect(r.done.some((d) => /replaced the network-fetching/.test(d))).toBe(true);
+    expect(r.done.some((d) => /replaced the network-reaching npx hook/.test(d))).toBe(true);
   });
 
   it('for a project in a subdirectory, puts the agent layer at the git root and the project layer in the subdirectory; a second project adds, never duplicates', () => {
@@ -76,7 +124,7 @@ describe('init', () => {
     const cmd = JSON.parse(readFileSync(join(root, '.claude', 'settings.json'), 'utf8')).hooks.SessionStart[0].hooks[0].command;
     expect(cmd).toBe(hookCommand('backend'));
     expect(cmd).toContain('backend/node_modules/.bin/testguard brief --text backend');
-    expect(cmd).toContain('npx --no-install testguard brief --text backend');
+    expect(cmd).toContain('command -v testguard >/dev/null 2>&1 && testguard brief --text backend');
     const agents = readFileSync(join(root, 'AGENTS.md'), 'utf8');
     expect(agents).toContain('- `backend/`: claims in `backend/testguard.claims.json`; run `testguard status --json backend`');
     expect(existsSync(join(root, 'backend', 'AGENTS.md'))).toBe(false);

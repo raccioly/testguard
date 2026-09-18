@@ -11,16 +11,28 @@ const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provis
 /**
  * The session-start hook command. It runs from the git root (where the agent
  * session lives) and must never fetch from the network: a local install of
- * the project (or of the root) is preferred, then `npx --no-install`, then
- * nothing — the hook exits 0 with no output rather than break a session.
- * `npx -y` is deliberately absent: it would fetch the published package on
- * every session start, behind the checkout and against any supply-chain
- * posture.
+ * the project (or of the root) is preferred, then a `testguard` already on
+ * PATH, then nothing — the hook exits 0 with no output rather than break a
+ * session.
+ *
+ * No form of `npx` appears here, and `--no-install` is not an exception.
+ * Measured: in a project with nothing installed,
+ * `npx --no-install --loglevel=http testguard-cli --version` logs
+ * `npm http fetch GET 200 https://registry.npmjs.org/testguard-cli`, and
+ * against an unreachable registry it exits non-zero. npm resolves the
+ * packument before it decides not to install, so `--no-install` is quiet, not
+ * offline. A `command -v` lookup covers the global-install case with no
+ * network at all, which is the whole point in a repository that pins and
+ * audits its dependencies.
  */
 export function hookCommand(dir) {
   const arg = dir === '.' ? '' : ` ${dir}`;
   const candidates = dir === '.' ? ['node_modules/.bin/testguard'] : [`${dir}/node_modules/.bin/testguard`, 'node_modules/.bin/testguard'];
-  return [...candidates.map((c) => `${c} brief --text${arg} 2>/dev/null`), `npx --no-install testguard brief --text${arg} 2>/dev/null`, 'true'].join(' || ');
+  // The PATH branch is braced: `a || b && c` binds as `(a || b) && c` in sh,
+  // so an unbraced `&&` would run the brief a second time whenever the local
+  // binary succeeded.
+  const onPath = `{ command -v testguard >/dev/null 2>&1 && testguard brief --text${arg} 2>/dev/null; }`;
+  return [...candidates.map((c) => `${c} brief --text${arg} 2>/dev/null`), onPath, 'true'].join(' || ');
 }
 
 function agentsBlock(entries) {
@@ -133,14 +145,27 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
   settings.hooks.SessionStart ??= [];
   const cmd = hookCommand(dir);
   const hasCmd = settings.hooks.SessionStart.some((e) => JSON.stringify(e).includes(cmd));
-  // The pre-0.6 hook fetched the published package with `npx -y` on every session start; replace it.
-  const legacy = settings.hooks.SessionStart.findIndex((e) => /npx -y testguard-cli brief --text/.test(JSON.stringify(e)) && (dir === '.' ? !/brief --text \S/.test(JSON.stringify(e)) : JSON.stringify(e).includes(`brief --text ${dir}`)));
+  // Any earlier hook that reached for npx — `-y` fetched outright, and
+  // `--no-install` still resolves the packument from the registry — is replaced.
+  // Which project a hook is for is the token right after `brief --text`, if
+  // that token is an argument rather than a redirect or a shell operator.
+  // Testing for any non-space there mistook `brief --text 2>/dev/null` for a
+  // hook belonging to a directory, so a legacy root hook was never replaced.
+  const hookDir = (text) => {
+    const m = /brief --text(?:\s+([^\s"|;&]+))?/.exec(text);
+    const token = m?.[1];
+    return !token || token.startsWith('2>') || token.startsWith('>') ? '.' : token;
+  };
+  const legacy = settings.hooks.SessionStart.findIndex((e) => {
+    const text = JSON.stringify(e);
+    return /npx\s+(-y|--no-install)[^"]*brief --text/.test(text) && hookDir(text) === dir;
+  });
   if (hasCmd) {
     skipped.push(`SessionStart hook for ${dir === '.' ? 'this project' : dir} already present in ${rel(settingsPath)}`);
   } else {
     if (legacy !== -1) {
       settings.hooks.SessionStart.splice(legacy, 1);
-      done.push(`${rel(settingsPath)}: replaced the network-fetching \`npx -y\` hook with a local-first one`);
+      done.push(`${rel(settingsPath)}: replaced the network-reaching npx hook with a local-then-PATH one`);
     }
     settings.hooks.SessionStart.push({ hooks: [{ type: 'command', command: cmd }] });
     mkdirSync(dirname(settingsPath), { recursive: true });

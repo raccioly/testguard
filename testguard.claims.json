@@ -1018,7 +1018,7 @@
     },
     {
       "id": "TG-INIT-HOOK-NO-NETWORK",
-      "statement": "The session-start hook init installs never fetches from the network: it prefers a local install, falls back to npx --no-install, and ends in `true` so it can never break a session; `npx -y` never appears.",
+      "statement": "The session-start hook resolves an already-installed testguard \u2014 the project's, the git root's, or one on PATH \u2014 and contains no form of npx, because even `npx --no-install` resolves the package from the registry before declining to install it.",
       "source": {
         "kind": "spec",
         "ref": "README.md#built-for-agents-to-run"
@@ -1035,11 +1035,11 @@
       "faults": [
         {
           "id": "F1",
-          "description": "The fallback fetches the published package with npx -y on every session start.",
+          "description": "The PATH lookup is swapped back for `npx --no-install`, which still fetches the packument from the registry when nothing is installed.",
           "faultClass": "literal-changed",
           "file": "src/init/init.mjs",
-          "find": "`npx --no-install testguard brief --text${arg} 2>/dev/null`",
-          "replace": "`npx -y testguard-cli brief --text${arg} 2>/dev/null`",
+          "find": "  const onPath = `{ command -v testguard >/dev/null 2>&1 && testguard brief --text${arg} 2>/dev/null; }`;",
+          "replace": "  const onPath = `npx --no-install testguard brief --text${arg} 2>/dev/null`;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -1855,6 +1855,70 @@
           "file": "src/mcp/server.mjs",
           "find": "        return ok(id, { content: [{ type: 'text', text: `${tool.name} failed: ${e.message}` }], isError: true });",
           "replace": "        return err(id, ERROR.internal, `${tool.name} failed: ${e.message}`);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-REPLAY-SCOPES-TO-THE-PROJECT",
+      "statement": "Only files under the project directory are considered when finding and reverting a fix commit; in a monorepo a fix that also touches another package is replayed on this project's part of it, never abandoned.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#replay-reports-it-never-gates"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/replay.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Files outside the project are kept in the fix's source list, so the revert targets paths that do not exist here and every cross-package fix reports revert-did-not-apply.",
+          "faultClass": "condition-forced",
+          "file": "src/replay/replay.mjs",
+          "find": "  const inScope = (f) => !scope || f === scope || f.startsWith(`${scope}/`);",
+          "replace": "  const inScope = () => true;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-REPLAY-ADDED-FILE-IS-REMOVED-NOT-CHECKED-OUT",
+      "statement": "A source file the fix added is reverted by removing it, and a commit whose source is entirely new is no-prior-version rather than a failed revert; an addition is not a bug the suite could have caught.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/replay.schema.json"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-17T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/replay.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every source file is checked out of the parent, so a file the fix added fails the revert and the whole commit reports revert-did-not-apply.",
+          "faultClass": "condition-forced",
+          "file": "src/replay/replay.mjs",
+          "find": "  if (existedBefore.length === 0) {",
+          "replace": "  if (false) {",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",

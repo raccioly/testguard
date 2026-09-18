@@ -1,4 +1,4 @@
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { replay, calibrationFrom, renderReplay } from '../replay/replay.mjs';
 import { writeSpecDoc } from '../evidence/writer.mjs';
 
@@ -38,7 +38,10 @@ export async function replayCommand({ projectDir, values, version }, io) {
   const outPath = values.out ? resolve(values.out) : replayPath(projectDir);
   writeSpecDoc('replay', outPath, doc);
   const calibration = calibrationFrom(doc, { toolVersion: version });
-  const calPath = values.baseline ? resolve(values.baseline) : calibrationPath(projectDir);
+  // Beside the replay document, whatever --out says: the two are one result,
+  // and splitting them across directories loses the pairing — and leaves a
+  // file behind in a repository the run is only meant to read.
+  const calPath = values.baseline ? resolve(values.baseline) : values.out ? join(dirname(outPath), 'calibration.json') : calibrationPath(projectDir);
   writeSpecDoc('calibration', calPath, calibration);
 
   if (values.json) {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { cpSync, mkdtempSync, rmSync, symlinkSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -240,6 +240,27 @@ describe('classifyReplay — the verdict, pure, every branch', () => {
   });
 });
 
+describe('replay output paths', () => {
+  it('--out places the calibration beside the replay document, never in the project being read', async () => {
+    const { replayCommand } = await import('../src/commands/replay.mjs');
+    const dir = mkdtempSync(join(tmpdir(), 'tg-replay-out-'));
+    const out = mkdtempSync(join(tmpdir(), 'tg-replay-dest-'));
+    const g = (...args) => spawnSync('git', ['-c', 'user.email=r@x', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
+    g('init', '-q');
+    writeFileSync(join(dir, 'a.mjs'), 'export const a = 1;\n');
+    g('add', '-A');
+    g('commit', '-q', '-m', 'no test here');
+    const lines = [];
+    const io = { out: (s) => lines.push(s), err: (s) => lines.push(s) };
+    // the run itself has nothing to replay; the paths are what this pins
+    await replayCommand({ projectDir: dir, values: { since: 'HEAD~0..HEAD', confirm: '1', budget: '5000', out: join(out, 'replay.json') }, version: 't' }, io).catch(() => {});
+    const { calibrationPath } = await import('../src/commands/replay.mjs');
+    expect(existsSync(calibrationPath(dir))).toBe(false); // nothing written into the project
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(out, { recursive: true, force: true });
+  });
+});
+
 describe('replay preconditions', () => {
   it('de-duplicates by patch-id: the same fix under two shas is one row', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-replay-dup-'));
@@ -272,6 +293,90 @@ describe('replay preconditions', () => {
     expect(duplicates).toBe(1);
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it('scopes to the project directory: a monorepo fix that also touches another package is replayed on this part of it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-replay-mono-'));
+    const g = (...args) => {
+      const r = spawnSync('git', ['-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
+      if (r.status !== 0) throw new Error(r.stderr);
+      return r.stdout;
+    };
+    mkdirSync(join(dir, 'backend', 'src'), { recursive: true });
+    mkdirSync(join(dir, 'backend', 'test'), { recursive: true });
+    mkdirSync(join(dir, 'frontend', 'src'), { recursive: true });
+    g('init', '-q');
+    writeFileSync(join(dir, 'backend', 'src', 'a.mjs'), 'export const a = 1;\n');
+    writeFileSync(join(dir, 'backend', 'test', 'a.test.mjs'), "import { a } from '../src/a.mjs';\n");
+    writeFileSync(join(dir, 'frontend', 'src', 'b.mjs'), 'export const b = 1;\n');
+    g('add', '-A');
+    g('commit', '-q', '-m', 'base');
+    // one fix, two packages — the shape a monorepo produces constantly
+    writeFileSync(join(dir, 'backend', 'src', 'a.mjs'), 'export const a = 2;\n');
+    writeFileSync(join(dir, 'backend', 'test', 'a.test.mjs'), "import { a } from '../src/a.mjs';\n// asserted\n");
+    writeFileSync(join(dir, 'frontend', 'src', 'b.mjs'), 'export const b = 2;\n');
+    g('add', '-A');
+    g('commit', '-q', '-m', 'fix: both packages');
+
+    const scoped = findFixCommits({ dir, range: 'HEAD~1..HEAD', projectDir: join(dir, 'backend') });
+    expect(scoped).toHaveLength(1);
+    expect(scoped[0].source).toEqual(['backend/src/a.mjs']);   // the frontend file is not this project's to revert
+    expect(scoped[0].tests).toEqual(['backend/test/a.test.mjs']);
+
+    // unscoped, the same commit drags in a file that does not exist under the
+    // project, which is what made every cross-package fix unverifiable
+    expect(findFixCommits({ dir, range: 'HEAD~1..HEAD' })[0].source).toContain('frontend/src/b.mjs');
+
+    // a commit with no source-and-test pair inside the project is not a candidate
+    expect(findFixCommits({ dir, range: 'HEAD~1..HEAD', projectDir: join(dir, 'frontend') })).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reverts a file the fix ADDED by removing it, and calls an addition-only commit no-prior-version', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-replay-added-'));
+    cpSync(FIXTURE, dir, { recursive: true, filter: (s) => !/node_modules|\.flake-counter|\.testguard/.test(s) });
+    symlinkSync(join(ROOT, 'node_modules'), join(dir, 'node_modules'), 'dir');
+    const g = (...args) => {
+      const r = spawnSync('git', ['-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
+      if (r.status !== 0) throw new Error(r.stderr);
+      return r.stdout;
+    };
+    g('init', '-q');
+    g('add', '-A');
+    g('commit', '-q', '-m', 'base');
+
+    // (1) a fix that CHANGES one file and ADDS another — the shape that made
+    //     nineteen of forty real commits unverifiable before this was handled
+    writeFileSync(join(dir, 'src', 'helper.mjs'), 'export const normalise = (s) => String(s).trim();\n');
+    const src = readFileSync(join(dir, 'src', 'redact.mjs'), 'utf8');
+    writeFileSync(join(dir, 'src', 'redact.mjs'), src.replace('export function mask', 'export function mask'));
+    writeFileSync(join(dir, 'src', 'redact.mjs'), readFileSync(join(dir, 'src', 'redact.mjs'), 'utf8') + '\n// touched by the fix\n');
+    writeFileSync(join(dir, 'test', 'helper.test.mjs'), `import { describe, it, expect } from 'vitest';
+import { normalise } from '../src/helper.mjs';
+describe('helper', () => { it('trims', () => { expect(normalise(' a ')).toBe('a'); }); });
+`);
+    g('add', '-A');
+    g('commit', '-q', '-m', 'fix(redact): normalise input, with a new helper');
+
+    // (2) a commit whose source is ENTIRELY new: an addition, not a fix
+    writeFileSync(join(dir, 'src', 'brandnew.mjs'), 'export const fresh = () => 1;\n');
+    writeFileSync(join(dir, 'test', 'brandnew.test.mjs'), `import { describe, it, expect } from 'vitest';
+import { fresh } from '../src/brandnew.mjs';
+describe('fresh', () => { it('is one', () => { expect(fresh()).toBe(1); }); });
+`);
+    g('add', '-A');
+    g('commit', '-q', '-m', 'feat: a brand new module');
+
+    const doc = await replay({ projectDir: dir, range: 'HEAD~2..HEAD', confirmRuns: 1, budgetMs: 30_000, toolVersion: 'test' });
+    const addition = doc.records.find((r) => (r.subject ?? '').startsWith('feat: a brand new'));
+    expect(addition).toMatchObject({ verdict: 'unverifiable', reason: 'no-prior-version' });
+
+    const mixed = doc.records.find((r) => (r.subject ?? '').startsWith('fix(redact)'));
+    // the added helper was removed rather than checked out, so the revert ran
+    expect(mixed.reason).not.toBe('revert-did-not-apply');
+    expect(['caught', 'blind', 'nocover', 'flaky', 'unverifiable']).toContain(mixed.verdict);
+    expect(validate('replay', doc).errors).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
+  }, 180_000);
 
   it('a range with no fix commit is a precondition failure, not an empty pass', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-replay-none-'));
