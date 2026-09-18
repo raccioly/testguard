@@ -73,6 +73,26 @@ Projects that set `min-release-age` in `.npmrc` cannot see a version published
 less than that many days ago (`ENOVERSIONS`); install that one with
 `npm i -D testguard-cli --min-release-age=0`.
 
+## Usage
+
+```bash
+npx testguard-cli init                      # install the agent layer at the git root
+npx testguard-cli status --json             # where the project is, and the ONE next action
+npx testguard-cli claims                    # what does this project claim, and is each claim probeable?
+npx testguard-cli scaffold src/auth.ts      # propose faults for a file, as a draft to keep or drop
+npx testguard-cli probe                     # try to falsify each claim; report what the tests missed
+npx testguard-cli admit test/auth.test.ts --claim AUTH-ADMIN   # does this test satisfy the two-gate rule?
+npx testguard-cli baseline                  # freeze today's unproven findings; only new ones gate
+npx testguard-cli gate --changed origin/main # fail when a changed source file carries no claim
+npx testguard-cli brief --text              # tell the agent where the suite is blind, before it writes
+npx testguard-cli replay --since v1.0..HEAD # would this suite have caught the bugs that escaped?
+npx testguard-cli mcp                       # serve the read-only loop over MCP, on stdio
+```
+
+Exit codes are the contract: `0` nothing new to prove, `1` unproven claims or
+unclaimed changes, `2` a precondition failed and nothing was probed, `3` usage.
+Every command accepts `--json`.
+
 ## How it works
 
 ```bash

@@ -1,3 +1,5 @@
+// @req FR-06
+// Requirements live in docs-canonical/REQUIREMENTS.md; the matrix there must agree with these.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { buildBaseline, gate, restampBaseline, sameFingerprints } from '../src/baseline/baseline.mjs';
