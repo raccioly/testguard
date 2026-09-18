@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-18
+
+A calibration you can quote.
+
+A calibration document now says what its number means and where its labels
+came from, and it reproduces: `p` and every interval are recomputed by the
+validator from `n`, `positives`, `method` and `confidence`, at the document's
+own precision — the spec's own example had carried a truncated bound since
+the day it was written, and nothing could notice. `nocover` counts as the
+miss it is, so a project with no tests at all for a subsystem no longer
+outscores one with weak tests. The format also carries what
+websec-validator's shipped table already said — corpus, caveat, a producer
+floor, backoff tiers, a labelled prior — so a second tool's honesty survives
+translation; that table is now a conformance example, and "adoptable" means
+the file validates rather than a sentence saying so. Underneath: the
+self-probe gate is held to a cost budget (#89), and a reserved method has
+somewhere to put its data (#91).
+
 ### Added
 - **A calibration can now say what it measures and where it came from** (#82).
   websec-validator's shipped `calibration.json` already carried `corpus`,
