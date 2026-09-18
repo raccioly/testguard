@@ -81,6 +81,16 @@ describe('no surface describes a hook mechanism the code does not use', () => {
   it('the README does not', () => {
     expect(offenders(readFileSync(new URL('../README.md', import.meta.url), 'utf8'))).toEqual([]);
   });
+
+  it('the canonical security document does not', () => {
+    // A fourth surface, found by DocGuard while this very claim was being
+    // widened from one artifact to three. It is currently correct, which is
+    // the point: the property is checked where the sentence lives, not only
+    // where a defect has already been found. NFR-01 is stated here.
+    const security = readFileSync(new URL('../docs-canonical/SECURITY.md', import.meta.url), 'utf8');
+    expect(security).toMatch(/session-start hook/); // the surface is actually present
+    expect(offenders(security)).toEqual([]);
+  });
 });
 
 describe('the session-start hook never reaches the network', () => {

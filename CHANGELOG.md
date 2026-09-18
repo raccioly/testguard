@@ -42,7 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   emitting — the sentence the user reads at the moment the hook is installed
   described the network-reaching mechanism that was removed for reaching the
   network. `TG-README-HOOK-MATCHES-THE-CODE` is now a claim about the
-  property, over all three surfaces.
+  property, over all four surfaces. The fourth, `docs-canonical/SECURITY.md`,
+  was found by DocGuard while this claim was being widened from one to
+  three; it is correct today, and is checked because that is where the
+  sentence lives, not because a defect had been found there.
 - **A test runner that has already exited is not reported as contention.**
   `ps` is a snapshot, and a suite that finished between the snapshot and the
   warning produced "1 test runner is already running (pid 65751)" for a process
