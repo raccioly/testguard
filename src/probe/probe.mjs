@@ -213,7 +213,11 @@ export async function probe({
       ...(serial ? { serial: true } : {}),
       ...(contention.detected ? { contention } : {}),
       ...(confirmRuns < 3 ? { provisional: true } : {}),
-      mode,
+      // The isolation that was actually created, not the mode that was asked
+      // for. A record saying `worktree` while the probe edited the project in
+      // place would be a false statement about where the evidence came from,
+      // and nothing downstream could detect it.
+      mode: iso.mode,
     },
     records,
   };

@@ -1,0 +1,40 @@
+# Local hooks for contributors. Opt in once per clone:
+#
+#     pre-commit install                      # doc + claim checks on commit
+#     pre-commit install --hook-type pre-push # the probe, before you push
+#
+# These are the same checks CI runs. CI is authoritative; this is the fast
+# feedback loop. Nothing here reaches the network.
+repos:
+  - repo: local
+    hooks:
+      - id: docguard-guard
+        name: DocGuard — docs match code
+        description: Validates this repository against docs-canonical/. Fails on errors, passes on warnings (exit 2). Needs docguard on PATH.
+        entry: bash -c 'code=0; docguard guard || code=$?; if [ "$code" -eq 2 ]; then exit 0; fi; exit "$code"'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: testguard-claims
+        name: TestGuard — claims file valid, no annotation drift
+        entry: node cli/testguard.mjs claims .
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: testguard-gate
+        name: TestGuard — every changed source file carries a claim
+        entry: node cli/testguard.mjs gate . --changed HEAD --include-dirty --quiet
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: testguard-probe
+        name: TestGuard — probe the claims (pre-push)
+        description: Slow by design. Runs the faults and fails on any the tests miss.
+        entry: node cli/testguard.mjs probe . --quiet
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

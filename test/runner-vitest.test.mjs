@@ -1,3 +1,6 @@
+// @req FR-10
+// @req NFR-02
+// Requirements live in docs-canonical/REQUIREMENTS.md; the matrix there must agree with these.
 import { describe, it, expect } from 'vitest';
 import { parseReport, runProcess, checkRunner, resolveRunner, runnerArgv, resetRunnerCache } from '../src/probe/runners/shared.mjs';
 import { argvFor as vitestArgv } from '../src/probe/runners/vitest.mjs';

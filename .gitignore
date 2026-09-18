@@ -14,6 +14,7 @@ coverage/
 # Local agent tooling — not part of the public project
 .wolf/
 .claude/
+.agent/
 CLAUDE.local.md
 graphify-out/
 .vitest/
@@ -22,3 +23,8 @@ dist/
 build/
 *.egg-info/
 __pycache__/
+
+# Never commit secrets
+.env
+.env.*
+!.env.example

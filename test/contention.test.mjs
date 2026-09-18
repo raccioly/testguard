@@ -1,3 +1,5 @@
+// @req NFR-06
+// Requirements live in docs-canonical/REQUIREMENTS.md; the matrix there must agree with these.
 import { describe, it, expect } from 'vitest';
 import { processList, detectContention, contentionWarning } from '../src/probe/contention.mjs';
 

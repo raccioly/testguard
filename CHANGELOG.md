@@ -41,6 +41,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which file. They overlap by construction and do not sum to the total, which
   the report says on its own face. Only `totalMs` is additive.
 
+- **DocGuard governs this repository's documentation.** Six canonical
+  documents under `docs-canonical/` — architecture, data model, security,
+  test spec, environment and requirements — written against v0.6.0 rather
+  than generated as templates, plus `DRIFT-LOG.md` for deliberate,
+  recorded deviations. Every validator passes: structure, doc sections,
+  changelog, test spec, environment, security, freshness, traceability,
+  docs-coverage, document lifecycle and TODO tracking. Structural maturity
+  99/100.
+- **Requirements are traceable to tests.** Fourteen functional and eight
+  non-functional requirements, each carrying an `@req` annotation in the
+  test that verifies it, and a traceability matrix that must agree with
+  those annotations. 27/27 traceability checks pass.
+- **Doc drift is caught automatically, not reviewed by hand.** `ci.yml`
+  runs `docguard guard` on every pull request — authoritative, unbypassable
+  and visible in review — and reports the maturity score without gating on
+  it. `.pre-commit-config.yaml` gives contributors the same checks locally,
+  opt-in per clone, alongside the claims check, the change gate and the
+  probe on pre-push.
+- Every configuration file in the repository is now documented in
+  `ARCHITECTURE.md`, including the distinction between
+  `.pre-commit-hooks.yaml` (what we publish for consumers) and
+  `.pre-commit-config.yaml` (what contributors to this repository use).
+  README gains the `Usage` section the Standard README spec expects.
+
 ### Changed
 
 - **The self-probe gate no longer runs a fifty-second acceptance test thirty
@@ -61,6 +85,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Measured on the same machine, serially, from scratch: 24.1 min → 9.6 min**
   (68 faults, 68 killed, 0 unproven). `--cost` names what is left: the jest
   and replay suites now dominate, at 207s and 148s of defender time.
+
+- Style exceptions in the canonical documents are declared with a reason
+  (`docguard:quality ... off — why`) rather than satisfied by rewording.
+  This tool is defined by what must not happen — no network, no telemetry,
+  never optimistic under uncertainty — and stating those positively would
+  misdescribe them. A declared, reasoned exception is auditable; contorted
+  prose is not.
 
 ## [0.6.0] - 2026-09-17
 

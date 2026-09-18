@@ -147,6 +147,30 @@ jobs:
             console.log('mcp:', list.result.tools.map((t) => t.name).join(', '), '→ state', call.result.structuredContent.state);
           "
 
+      # ── Documentation is canon: DocGuard validates this repository against
+      #    docs-canonical/. This is the authoritative check — a machine-local
+      #    .git/hooks file is neither shared with contributors nor reviewable,
+      #    so CI is where doc drift is actually caught. `guard` exits 2 for
+      #    warnings, which we surface without failing; errors fail the build. ──
+      - name: DocGuard — documentation matches the code
+        run: |
+          # Capture the exit code explicitly. A pipeline under the default
+          # `bash -e` aborts the step before any branch on its status can run,
+          # and `|| code=$?` is the one form errexit does not trip on.
+          code=0
+          npx -y docguard-cli@0.41.5 guard > "$RUNNER_TEMP/docguard-guard.txt" 2>&1 || code=$?
+          cat "$RUNNER_TEMP/docguard-guard.txt"
+          if [ "$code" -eq 2 ]; then
+            echo "::warning::DocGuard reported warnings (exit 2); see the output above."
+          elif [ "$code" -ne 0 ]; then
+            echo "::error::DocGuard guard failed (exit $code) — documentation contradicts the code."
+            exit 1
+          fi
+
+      - name: DocGuard — maturity score (reported, not gated)
+        if: always()
+        run: npx -y docguard-cli@0.41.5 score || true
+
       # ── Every change needs a claim: the gate runs on this repository's own
       #    pull requests. A new source file without a claim (or an excusing
       #    ignore entry with a reason) turns the PR red. ──
