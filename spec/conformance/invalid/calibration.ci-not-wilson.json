@@ -16,10 +16,10 @@
     "guard-removed": {
       "n": 41,
       "positives": 32,
-      "p": 0.95,
+      "p": 0.78,
       "ci": [
-        0.63,
-        0.88
+        0.6,
+        0.9
       ]
     },
     "variable-swap": {

@@ -27,6 +27,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+- **A calibration counts `nocover` as a miss** (#82). `nocover` — no test
+  even imports the broken file — is the worst replay outcome, and the ratio
+  excluded it: a project with no tests at all for a subsystem scored *better*
+  than one with weak tests, because its worst outcomes left the denominator
+  before the ratio was taken. It now enters both sides, as it does in Stryker
+  and PIT, and the replay summary says how many misses were blind and how many
+  had no test at all. The schema description, the emitter's docstring and
+  `GATE-SEMANTICS.md` had also disagreed about what `p` was — "P(finding is
+  real)" in one place, the miss rate in another, and the docstring's two
+  sentences conditioning on different denominators — and now say one thing:
+  for testguard, the share of real escaped bugs the suite failed to catch.
+- **A calibration's arithmetic is checked, not trusted.** The validator
+  recomputed nothing: it checked that `p` sat inside `ci` and would pass a
+  document with every number invented. It now recomputes `p` from
+  `positives / n` and `ci` from `n`, `positives`, `method` and `confidence`
+  with `spec/lib/wilson.mjs` — one implementation, shared with the emitter —
+  at the document's own precision, accepting either the exact quantile or the
+  textbook 1.96. The spec's own example had carried a truncated lower bound
+  (6/30 → `0.09`; Wilson gives 0.0950 → `0.10`) since the day it was written,
+  and websec-validator's shipped table reproduces exactly.
 - **A reserved method can now say something.** #81 reserved `assertion` and
   `scan` without required fields, and `fault` / `detail` are both
   `additionalProperties: false` — so a probe using a reserved method could

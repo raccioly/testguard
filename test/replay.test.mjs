@@ -183,7 +183,7 @@ describe('replay on a scripted corpus', () => {
     expect(c.g('rev-parse', 'HEAD').trim()).toBe(c.blindSha);
   });
 
-  it('derives a conforming calibration: blind over measurable, per fault class, with n', () => {
+  it('derives a conforming calibration: misses over measurable, per fault class, with n', () => {
     const cal = calibrationFrom(doc, { toolVersion: 'test' });
     expect(validate('calibration', cal).errors).toEqual([]);
     expect(cal.bucketBy).toBe('faultClass');
@@ -194,12 +194,34 @@ describe('replay on a scripted corpus', () => {
     expect(positives).toBe(1);  // one was blind
   });
 
-  it('a verdict that is neither caught nor blind carries no information and is excluded', () => {
+  it('nocover is a miss and counts as one: it enters both the numerator and the denominator', () => {
     const cal = calibrationFrom({
       tool: { name: 'testguard', version: 't' },
       run: { range: 'x' },
       records: [
+        { verdict: 'caught', faultClass: 'guard-removed' },
         { verdict: 'nocover', faultClass: 'guard-removed' },
+        { verdict: 'blind', faultClass: 'guard-removed' },
+      ],
+    });
+    // 2 of 3 missed. Excluding nocover would report 1 of 2; counting it only in
+    // the denominator would report 1 of 3. Both err in the optimistic direction,
+    // and the first rewards having no tests at all.
+    expect(cal.buckets['guard-removed']).toMatchObject({ n: 3, positives: 2 });
+  });
+
+  it('a project with no tests for a subsystem never scores better than one with weak tests', () => {
+    const doc = (verdicts) => ({ tool: { name: 'testguard', version: 't' }, run: { range: 'x' }, records: verdicts.map((verdict) => ({ verdict, faultClass: 'guard-removed' })) });
+    const weak = calibrationFrom(doc(['caught', 'caught', 'caught', 'blind', 'blind', 'blind', 'blind', 'blind', 'blind', 'blind']));
+    const none = calibrationFrom(doc(['caught', 'caught', 'caught', 'nocover', 'nocover', 'nocover', 'nocover', 'nocover', 'nocover', 'nocover']));
+    expect(none.buckets['guard-removed'].p).toBeGreaterThanOrEqual(weak.buckets['guard-removed'].p);
+  });
+
+  it('flaky and unverifiable are failed measurements and enter neither side', () => {
+    const cal = calibrationFrom({
+      tool: { name: 'testguard', version: 't' },
+      run: { range: 'x' },
+      records: [
         { verdict: 'flaky', faultClass: 'guard-removed' },
         { verdict: 'unverifiable', faultClass: 'guard-removed' },
         { verdict: 'blind', faultClass: 'guard-removed' },

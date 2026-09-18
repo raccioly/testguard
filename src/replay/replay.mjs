@@ -8,6 +8,7 @@ import { parseCommandTemplate } from '../probe/runners/shared.mjs';
 import { fileImports } from '../probe/rank.mjs';
 import { IS_PY_TEST, pyFileImports } from '../probe/pyimports.mjs';
 import { labelDiff } from './label.mjs';
+import { wilsonInterval, roundTo } from '../../spec/lib/wilson.mjs';
 
 const TEST_RE = /(^|\/)(__tests__|tests?)\//;
 const IS_TEST = (f) => /\.(test|spec)\.[cm]?[jt]sx?$/.test(f) || IS_PY_TEST.test(f) || TEST_RE.test(f);
@@ -247,35 +248,49 @@ export function classifyReplay(runs) {
   return { verdict: 'flaky', reason: 'runs-disagreed' };
 }
 
-/** Wilson score interval: the reason a label carries n rather than a vibe. */
+/**
+ * Wilson score interval at 4 dp — the reason a label carries n rather than a
+ * vibe. Computed by the spec's single implementation, which the validator
+ * recomputes with: an emitter and a validator with separate arithmetic can
+ * drift, and did (see `spec/lib/wilson.mjs`).
+ */
 export function wilson(positives, n, z = 1.96) {
   if (n === 0) return { p: 0, ci: [0, 1] };
-  const p = positives / n;
-  const d = 1 + (z * z) / n;
-  const centre = (p + (z * z) / (2 * n)) / d;
-  const half = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / d;
-  const round = (x) => Number(Math.min(1, Math.max(0, x)).toFixed(4));
-  return { p: Number(p.toFixed(4)), ci: [round(centre - half), round(centre + half)] };
+  const [lo, hi] = wilsonInterval(positives, n, z);
+  return { p: roundTo(positives / n, 4), ci: [roundTo(lo, 4), roundTo(hi, 4)] };
 }
 
 /**
+ * Replay verdicts that are measurements of the suite. `caught` is a hit.
+ * `blind` is a miss. `nocover` is also a miss — the worst kind, no test even
+ * imported the broken file — and it counts as one: excluding it would score a
+ * project with no tests for a subsystem BETTER than one with weak tests,
+ * because its worst outcomes would leave the denominator before the ratio is
+ * taken. Stryker and PIT count no-coverage mutants against the headline score
+ * for the same reason. `flaky` and `unverifiable` are failed measurements
+ * and enter neither side.
+ */
+export const MEASURED_VERDICTS = Object.freeze(['caught', 'blind', 'nocover']);
+
+/**
  * Calibration from a replay document: per fault class, the share of real
- * escaped bugs of that shape the suite did NOT catch.
+ * escaped bugs of that shape the suite failed to catch.
  *
- * Read it as "when a fault of this class survives, how often does that
- * correspond to a bug that really escaped" — the number that turns an
- * uninterpretable mutation score into a statement with a sample size.
- * `caught` and `blind` are the only outcomes that carry information;
- * `nocover`, `flaky` and `unverifiable` are excluded from both sides.
+ * `p` is P(the suite misses it | a bug of this class escapes) — a miss rate,
+ * so a HIGH number is bad. It is the number that turns an uninterpretable
+ * mutation score into a statement with a sample size. `positives` counts the
+ * misses; see MEASURED_VERDICTS for which verdicts are measurements at all
+ * and why `nocover` is a miss rather than an exclusion.
  */
 export function calibrationFrom(replayDoc, { confidence = 0.95, computedAt = new Date().toISOString(), toolVersion } = {}) {
   const buckets = {};
   for (const r of replayDoc.records) {
-    if (!['caught', 'blind'].includes(r.verdict)) continue;
+    if (!MEASURED_VERDICTS.includes(r.verdict)) continue;
     const key = r.faultClass ?? 'other';
     buckets[key] ??= { n: 0, positives: 0 };
     buckets[key].n += 1;
-    if (r.verdict === 'blind') buckets[key].positives += 1;
+    // Anything measured that was not caught is a miss — blind and nocover alike.
+    if (r.verdict !== 'caught') buckets[key].positives += 1;
   }
   for (const [k, b] of Object.entries(buckets)) buckets[k] = { ...b, ...wilson(b.positives, b.n) };
   return {
@@ -303,8 +318,9 @@ export function renderReplay(doc) {
   lines.push(`${doc.records.length} fix commit${doc.records.length === 1 ? '' : 's'} replayed from ${doc.run.candidates} candidate${doc.run.candidates === 1 ? '' : 's'}` +
     (doc.run.duplicates ? ` (${doc.run.duplicates} dropped as the same patch)` : '') + ': ' +
     order.filter((v) => by[v]).map((v) => `${by[v]} ${v}`).join(', ') + '.');
-  const measurable = (by.caught ?? 0) + (by.blind ?? 0);
-  if (measurable) lines.push(`${by.blind ?? 0} of ${measurable} measurable bugs were invisible to the suite — the escaped-bug replay rate is ${(((by.blind ?? 0) / measurable) * 100).toFixed(0)}%.`);
+  const measurable = MEASURED_VERDICTS.reduce((s, v) => s + (by[v] ?? 0), 0);
+  const missed = measurable - (by.caught ?? 0);
+  if (measurable) lines.push(`${missed} of ${measurable} measurable bugs were invisible to the suite (${by.blind ?? 0} blind, ${by.nocover ?? 0} with no test at all) — the escaped-bug miss rate is ${((missed / measurable) * 100).toFixed(0)}%.`);
   lines.push('A bug that reached production is by construction one the suite missed, so a high rate is expected on a first run. The number to move is this one, over time.');
   return lines.join('\n');
 }
