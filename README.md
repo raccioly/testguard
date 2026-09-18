@@ -80,8 +80,9 @@ risk. TestGuard binds every fault to a **stated claim**, so the output is not
 a score but a finding: *"Your project says a missing scope fails closed.
 Nothing checks that."* That is the difference between a metric and an audit.
 
-📄 **[Read the three-page technical brief (PDF)](docs/testguard-explained.pdf)**
-— the idea on page one, mechanics and prior art after it.
+📄 **[Read the six-page technical brief (PDF)](docs/testguard-explained.pdf)**
+— the idea on page one, then the field evidence, the anatomy of a run, the
+verdicts, the loop and its calibration, and the prior art.
 
 ## Why
 
