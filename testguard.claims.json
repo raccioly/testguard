@@ -2075,6 +2075,115 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-PROGRESS-NOT-ONLY-FOR-A-TTY",
+      "statement": "A probe reports progress whether or not stderr is a terminal. The rewriting line is a rendering choice for a human; CI, a redirected log and an agent harness get append-only lines. Twenty silent minutes is indistinguishable from a hang.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#progress"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/progress.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Progress is silent again whenever stderr is not a terminal, which is every automated context.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/progress.mjs",
+          "find": "  return isTTY ? 'tty' : 'plain';",
+          "replace": "  return isTTY ? 'tty' : 'none';",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Non-terminal readers get the carriage-return rendering, so a log file becomes one unreadable line.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/progress.mjs",
+          "find": "  return isTTY ? 'tty' : 'plain';",
+          "replace": "  return 'tty';",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PROGRESS-NEVER-ON-STDOUT",
+      "statement": "Progress is written to stderr, never stdout. stdout carries the result \u2014 with --json it is one document and nothing else \u2014 so a progress line there does not degrade the output, it destroys it for every consumer that parses it.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#progress"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/progress.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Progress is written to stdout, so any consumer piping --json into a parser gets progress lines mixed into the document.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/progress.mjs",
+          "find": "export const progressStream = (streams) => streams.stderr;",
+          "replace": "export const progressStream = (streams) => streams.stdout;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PROGRESS-EXPLICIT-WINS",
+      "statement": "An explicit --progress overrides every inference, including --quiet and --json. An operator who asks for a stream of events has said what they want; nothing else may silence it.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#progress"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/progress.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "--quiet and --json silence an explicitly requested progress mode, so `--json --progress ndjson` reports nothing.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/progress.mjs",
+          "find": "  if (explicit && explicit !== 'auto') return explicit;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

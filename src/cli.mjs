@@ -49,6 +49,9 @@ probe
                        (without it, a dirty defender/target with the implicit HEAD is refused: the silent-mismatch trap)
   --verbose            also print each killed fault (default: only unproven ones, plus a count)
   --cost               (probe, claims) report what the defenders cost, per claim and per defender file
+  --progress <mode>    auto|tty|plain|ndjson|none. auto rewrites one line at a terminal and prints
+                       append-only lines everywhere else, so a redirected log and CI see progress
+                       instead of twenty silent minutes. Always on stderr; ndjson also streams verdicts
                        --confirm below 3 is PROVISIONAL: verdicts print with "?", evidence goes to .testguard/evidence-provisional.json
   --runner <name>      vitest | jest | playwright | auto (default: auto — first of vitest, jest that resolves; a defender under
                        playwright's testDir always runs under playwright, whatever the project runner)
@@ -151,6 +154,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         text: { type: 'boolean', default: false },
         markdown: { type: 'boolean', default: false },
         cost: { type: 'boolean', default: false },
+        progress: { type: 'string' },
         help: { type: 'boolean', short: 'h', default: false },
         version: { type: 'boolean', short: 'v', default: false },
       },
