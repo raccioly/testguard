@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The session-start hook now contains no form of `npx`.** It fell back to
+  `npx --no-install`, and `--no-install` is quiet rather than offline:
+  measured, `npx --no-install --loglevel=http testguard-cli --version` in a
+  project with nothing installed logs
+  `npm http fetch GET 200 https://registry.npmjs.org/testguard-cli`, and
+  against an unreachable registry it exits non-zero. npm resolves the
+  packument before deciding not to install. The fallback is now a
+  `command -v` lookup, which covers a global install with no network at all.
+  `TG-INIT-HOOK-NO-NETWORK` was defended while its statement over-promised;
+  the statement and its fault are corrected together.
+- The PATH branch is braced. `a || b && c` binds as `(a || b) && c` in sh, so
+  the unbraced form printed the brief **twice** whenever the local binary
+  succeeded. The tests now execute the hook in all three cases (local, PATH,
+  neither) rather than matching its text.
+- `init` recognises an earlier `npx --no-install` hook as well as `npx -y`,
+  and its which-project check no longer mistakes `brief --text 2>/dev/null`
+  for a hook belonging to a directory — that misfire meant a legacy root hook
+  was never replaced.
+
 ### Added
 
 - **`testguard mcp`** — the operating loop, served over the Model Context
