@@ -1,5 +1,7 @@
 # AI Agent Instructions — TestGuard
 
+<!-- docguard:last-reviewed 2026-09-18 -->
+
 Read this before changing anything. It is short on purpose.
 
 ## What this is

@@ -1,3 +1,5 @@
+// @req FR-12
+// Requirements live in docs-canonical/REQUIREMENTS.md; the matrix there must agree with these.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { cpSync, mkdtempSync, rmSync, symlinkSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';

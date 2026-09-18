@@ -1,3 +1,7 @@
+// @req FR-03
+// @req FR-04
+// @req FR-05
+// Requirements live in docs-canonical/REQUIREMENTS.md; the matrix there must agree with these.
 import { describe, it, expect } from 'vitest';
 import { classify, shouldStopEarly } from '../src/probe/classify.mjs';
 

@@ -1,3 +1,5 @@
+// @req FR-07
+// Requirements live in docs-canonical/REQUIREMENTS.md; the matrix there must agree with these.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { renderBriefMarkdown, renderUnclaimedMarkdown, MARKDOWN_MARKER, buildBrief, buildUnclaimedBrief, HEADING, hintFor } from '../src/brief/brief.mjs';

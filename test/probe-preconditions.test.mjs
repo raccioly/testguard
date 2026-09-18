@@ -1,3 +1,5 @@
+// @req NFR-03
+// Requirements live in docs-canonical/REQUIREMENTS.md; the matrix there must agree with these.
 import { describe, it, expect } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from 'node:fs';
 import { dirname } from 'node:path';
