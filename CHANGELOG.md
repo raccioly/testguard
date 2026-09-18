@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The weekly release starts its own CI, so no human step is left.** A pull
+  request opened by `GITHUB_TOKEN` raises no `pull_request` event, so the three
+  required Node legs never started and auto-merge sat on checks that would
+  never run — the workflow simply printed `gh workflow run ci.yml --ref
+  release/vX.Y.Z` and waited for someone to read it. It now dispatches that
+  run itself, as `release.yml`'s `homebrew-sha` job already did, guarded so a
+  re-run does not queue a second identical run. With
+  "Allow GitHub Actions to create and approve pull requests" enabled, a
+  release now needs no manual step at all.
+
 ### Fixed
 - **A release can tag itself even when `main` moves underneath it.** A GitHub
   App may not *push* a ref whose `.github/workflows` differ from the current
