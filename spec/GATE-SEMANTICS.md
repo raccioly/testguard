@@ -209,9 +209,38 @@ Two rules that follow:
 2. **The fix's own test is removed before the run.** It proves nothing about
    what the suite knew before the fix existed.
 
-Only `caught` and `blind` carry information. `nocover`, `flaky` and
-`unverifiable` are excluded from both sides of a calibration ratio, because a
-number computed over them would mean nothing.
+`caught`, `blind` and `nocover` are measurements and enter the calibration
+ratio: `caught` as a hit, the other two as misses. `nocover` counts as a miss
+because it is one — the worst kind. Leaving it out would let a project with
+**no tests at all** for a subsystem score better than one with weak tests,
+since its worst outcomes would leave the denominator before the ratio is
+taken; Stryker and PIT count no-coverage mutants against the headline score
+for the same reason. `flaky` and `unverifiable` are failed measurements and
+enter neither side.
+
+### Calibration arithmetic is reproducible
+
+A calibration cell declares `n` and `positives`, and with them has declared
+`p`; a document declares `method: wilson` at `confidence`, and with them has
+declared every `ci`. The validator recomputes both with `lib/wilson.mjs` —
+the single implementation, as `lib/fingerprint.mjs` is for fingerprints — and
+a cell that does not reproduce does not conform. Before this rule the
+validator checked only that `p` lay inside `ci`, which a document with every
+number invented satisfies, and the spec's own example shipped a truncated
+lower bound (6/30 → `0.09`, where Wilson gives 0.0950 → `0.10`) that nothing
+could notice.
+
+- **Precision is the document's own**: the most decimal places any `p` or
+  `ci` value shows, capped at 6. Values are compared after rounding to that
+  precision, so a producer at 3 dp and one at 4 dp both reproduce and a
+  truncated bound does not.
+- **z may be the exact quantile or the textbook rounding** (1.96, 2.576,
+  1.645). The two differ by up to 9.2e-6 in the interval — enough to flip a
+  rounding boundary at 4 dp — so either reproduces, and a document never fails
+  for having used the number in the textbook.
+- **`p` is `positives / n`.** A smoothed or shrunk point estimate is a
+  different method and must say so; under `wilson` the point estimate is the
+  observed proportion.
 
 ## Baseline and delta
 

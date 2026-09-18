@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { fingerprint } from './fingerprint.mjs';
+import { reproduces, decimals, MAX_PLACES } from './wilson.mjs';
 
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 
@@ -189,12 +190,27 @@ const semantic = {
 
   calibration(doc) {
     const errors = [];
+    // The precision the document wrote at: the most places any value shows.
+    // Parsing drops trailing zeros (0.10 → 0.1), so a single value can
+    // under-report; the maximum cannot unless every value ended in zero.
+    const places = Object.values(doc.buckets).reduce((m, b) => Math.max(m, decimals(b.p ?? 0), decimals(b.ci[0]), decimals(b.ci[1])), 0);
     for (const [key, b] of Object.entries(doc.buckets)) {
       const p = `/buckets/${key}`;
       if (b.positives > b.n) errors.push({ path: `${p}/positives`, message: `positives (${b.positives}) exceed n (${b.n})` });
       const [lo, hi] = b.ci;
       if (lo > hi) errors.push({ path: `${p}/ci`, message: `ci lower bound ${lo} exceeds upper bound ${hi}` });
-      if (b.p < lo || b.p > hi) errors.push({ path: `${p}/p`, message: `p (${b.p}) lies outside ci [${lo}, ${hi}]` });
+      if (b.p !== null && (b.p < lo || b.p > hi)) errors.push({ path: `${p}/p`, message: `p (${b.p}) lies outside ci [${lo}, ${hi}]` });
+      // A cell that declares n and positives has declared p; a document that
+      // declares `wilson` at `confidence` has declared every ci. Recompute
+      // both with the spec's own implementation: "conforms" means
+      // "reproducible", not "internally plausible". Before this the validator
+      // would pass a document with every number invented, and the spec's own
+      // example carried a truncated bound nothing could notice.
+      // A cell with more positives than trials has no proportion to reproduce.
+      if (b.positives > b.n) continue;
+      const r = reproduces(b, { confidence: doc.confidence, places });
+      if (!r.p) errors.push({ path: `${p}/p`, message: `p (${b.p}) is not positives/n: ${b.positives}/${b.n} = ${r.expected.p} at ${Math.min(places, MAX_PLACES)} dp` });
+      if (!r.ci) errors.push({ path: `${p}/ci`, message: `ci [${lo}, ${hi}] does not reproduce: ${doc.method} at ${doc.confidence} for ${b.positives}/${b.n} is [${r.expected.ci[0]}, ${r.expected.ci[1]}]` });
     }
     return errors;
   },

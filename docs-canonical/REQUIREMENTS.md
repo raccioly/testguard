@@ -97,7 +97,7 @@ fails the pull request naming the unclaimed file, and `status` reports
 | FR-10 | `src/probe/runners/` | fixture acceptance per runner, `TG-RUNNER-FROM-PROJECT-FIRST` |
 | FR-11 | `src/scaffold/producers.mjs` | `test/scaffold.test.mjs`, `TG-SCAFFOLD-ANCHORS-HIT` |
 | FR-12 | `src/admit/admit.mjs` | `test/admit.test.mjs`, `TG-ADMIT-NEEDS-ALL-KILLED` |
-| FR-13 | `src/replay/` | `test/replay.test.mjs`, `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT` |
+| FR-13 | `src/replay/` | `test/replay.test.mjs`, `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT`, `TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS` |
 | FR-14 | `src/mcp/` | `test/mcp.test.mjs` |
 | NFR-01 | `src/init/init.mjs`, runner resolution | `TG-INIT-HOOK-NO-NETWORK`, `TG-README-HOOK-MATCHES-THE-CODE` |
 | NFR-02 | `package.json` | `npm run test:install` in CI |
@@ -106,7 +106,7 @@ fails the pull request naming the unclaimed file, and `status` reports
 | NFR-05 | `src/probe/probe.mjs` | `TG-FINGERPRINT-VERDICT`, `TG-FAULT-EDIT-VISIBLE` |
 | NFR-06 | `src/probe/contention.mjs`, `classify.mjs` | `TG-CONTENTION-NEVER-FAILS-A-PROBE`, `TG-ESCALATION-N-RUNS`, `TG-ONE-BAD-FAULT-KEEPS-THE-EVIDENCE`, `TG-A-PRECONDITION-STILL-REFUSES-THE-RUN`, `TG-A-PROBE-ERROR-IS-NEVER-REUSED`, `TG-SURVIVOR-PROVES-THE-SUBJECT-RUNS`, `TG-CONTROL-READS-ANY-RED-AS-REACHED`, `TG-FATAL-EDIT-CANNOT-COMPILE` |
 | NFR-07 | verdict reuse, `src/probe/rank.mjs`, `src/probe/cost.mjs` | `test/probe.fixture.test.mjs` reuse case, `test/cost.test.mjs`, `TG-COST-BUDGET-ACTUALLY-GATES` |
-| NFR-08 | `spec/` | `spec/conformance/schemas.test.mjs` |
+| NFR-08 | `spec/` | `spec/conformance/schemas.test.mjs`, `TG-WILSON-REPRODUCES-AT-THE-DOCUMENTS-PRECISION` |
 
 ## Revision History
 

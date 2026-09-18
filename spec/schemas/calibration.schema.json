@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:claimspec:v1:calibration",
   "title": "claimspec v1 — calibration",
-  "description": "P(finding is real) per bucket, with a confidence interval and the sample size behind it. A label without n is a vibe; this is the format that stops it being one.",
+  "description": "The observed rate of a bucket's outcome — for testguard, the share of real escaped bugs of a fault class that the suite failed to catch, so a high p is bad — with a confidence interval and the sample size behind it. A label without n is a vibe; this is the format that stops it being one. p and ci are recomputable from n, positives, method and confidence, and the validator recomputes them.",
   "type": "object",
   "required": ["schemaVersion", "tool", "computedAt", "method", "confidence", "bucketBy", "source", "buckets"],
   "properties": {

@@ -1708,17 +1708,17 @@
       ]
     },
     {
-      "id": "TG-CALIBRATION-EXCLUDES-UNINFORMATIVE",
-      "statement": "Only caught and blind outcomes enter a calibration bucket; nocover, flaky and unverifiable carry no information about detection and are excluded from both the numerator and the denominator.",
+      "id": "TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS",
+      "statement": "A calibration counts caught, blind and nocover as measurements and nocover as a miss: it enters both the numerator and the denominator, so a project with no tests for a subsystem never scores better than one with weak tests. flaky and unverifiable are failed measurements and enter neither side.",
       "source": {
         "kind": "spec",
-        "ref": "spec/schemas/calibration.schema.json"
+        "ref": "spec/GATE-SEMANTICS.md#replay-reports-it-never-gates"
       },
       "severity": "high",
       "producedBy": {
         "producer": "human",
         "by": "maintainer",
-        "at": "2026-09-17T00:00:00Z"
+        "at": "2026-09-18T00:00:00Z"
       },
       "defendedBy": [
         "test/replay.test.mjs"
@@ -1726,15 +1726,150 @@
       "faults": [
         {
           "id": "F1",
-          "description": "Every verdict enters the denominator, so a corpus full of nocover rows reports a low blind rate that means nothing.",
-          "faultClass": "condition-forced",
+          "description": "nocover is excluded from both sides again, so a corpus of untested bugs reports a low miss rate — the optimistic bias this claim exists to forbid.",
+          "faultClass": "literal-changed",
           "file": "src/replay/replay.mjs",
-          "find": "    if (!['caught', 'blind'].includes(r.verdict)) continue;",
-          "replace": "    if (false) continue;",
+          "find": "    if (!MEASURED_VERDICTS.includes(r.verdict)) continue;",
+          "replace": "    if (!['caught', 'blind'].includes(r.verdict)) continue;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
-            "at": "2026-09-17T00:00:00Z"
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "nocover enters the denominator but not the numerator, so untested bugs dilute the miss rate downward.",
+          "faultClass": "condition-forced",
+          "file": "src/replay/replay.mjs",
+          "find": "    if (r.verdict !== 'caught') buckets[key].positives += 1;",
+          "replace": "    if (r.verdict === 'blind') buckets[key].positives += 1;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-WILSON-REPRODUCES-AT-THE-DOCUMENTS-PRECISION",
+      "statement": "The spec's single Wilson implementation reproduces a cell at the precision the document wrote — rounding, not truncating, to the document's own decimal places — and accepts either the exact quantile or the textbook z, so an honest producer at 3 or 4 dp is never rejected and a truncated bound never passes.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#calibration-arithmetic-is-reproducible"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "spec/conformance/schemas.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Precision is forced to the 6 dp cap regardless of what the document wrote, so a 3 dp producer (websec-validator) no longer reproduces.",
+          "faultClass": "call-removed",
+          "file": "spec/lib/wilson.mjs",
+          "find": "  const pl = Math.min(places, MAX_PLACES);",
+          "replace": "  const pl = MAX_PLACES;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "roundTo truncates instead of rounding, so the spec example's corrected 0.10 no longer reproduces and the truncated 0.09 is accepted.",
+          "faultClass": "return-altered",
+          "file": "spec/lib/wilson.mjs",
+          "find": "export const roundTo = (x, places) => Number(x.toFixed(places));",
+          "replace": "export const roundTo = (x, places) => Math.trunc(x * 10 ** places) / 10 ** places;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Only the exact quantile is accepted; a producer using the textbook 1.96 (testguard, docguard) is rejected on the 93 cells at n <= 60 where the two round differently at 4 dp.",
+          "faultClass": "return-altered",
+          "file": "spec/lib/wilson.mjs",
+          "find": "  return conventional === undefined ? [exact] : [exact, conventional];",
+          "replace": "  return [exact];",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CALIBRATION-P-IS-REPRODUCIBLE",
+      "statement": "A calibration cell whose p is not positives/n at the document's precision does not conform; the validator recomputes it rather than trusting it.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#calibration-arithmetic-is-reproducible"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "spec/conformance/schemas.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The p-reproduction rule is removed from the validator; a document may declare any p inside its interval.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (!r.p) errors.push(",
+          "replace": "      if (false) errors.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CALIBRATION-CI-IS-REPRODUCIBLE",
+      "statement": "A calibration cell whose ci is not the Wilson interval for its n and positives at the stated confidence, at the document's precision, does not conform; the spec's own example carried a truncated bound until this rule existed.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#calibration-arithmetic-is-reproducible"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "spec/conformance/schemas.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The ci-reproduction rule is removed from the validator; any well-ordered interval containing p passes.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (!r.ci) errors.push(",
+          "replace": "      if (false) errors.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
           }
         }
       ]
