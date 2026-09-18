@@ -4,6 +4,8 @@
 <!-- docguard:status approved -->
 <!-- docguard:last-reviewed 2026-09-18 -->
 <!-- docguard:owner @raccioly -->
+<!-- docguard:quality negation-load off — a security posture is a list of things that must not happen: no network, no secrets, no tokens, no telemetry. Stating them positively would weaken them. -->
+<!-- docguard:quality passive-voice off — threat and control statements name what is protected, not who protects it; the actor is the system throughout. -->
 
 > Canonical. Code that contradicts this document is drift.
 

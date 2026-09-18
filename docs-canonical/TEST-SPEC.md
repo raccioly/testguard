@@ -4,6 +4,7 @@
 <!-- docguard:status approved -->
 <!-- docguard:last-reviewed 2026-09-18 -->
 <!-- docguard:owner @raccioly -->
+<!-- docguard:quality negation-load off — the governing rule is a prohibition (a test that would pass with the behaviour broken is not a test), and the verdict rules are defined by what does not count as detection. -->
 
 > Canonical. Code that contradicts this document is drift.
 
@@ -19,9 +20,18 @@ the test that defends it, and CI fails if any injected fault survives.
 | Unit | `test/*.test.mjs` | One pure function's branches, without a runner | milliseconds |
 | Conformance | `spec/conformance/` | Every valid example validates; every must-reject document is rejected for the defect its filename names | ~1 s |
 | Fixture acceptance | `test/probe.fixture.test.mjs`, `test/probe.jest.test.mjs`, `test/probe.playwright.test.mjs` | The whole pipeline reproduces a known-answer oracle, one per runner | 10–50 s each |
-| Self-verification | `testguard.claims.json`, run by `npm run self:probe` | The tool's own invariants survive fault injection | ~25 min cold, seconds when verdicts are reused |
+| Self-verification | `testguard.claims.json`, run by `npm run self:probe` | The tool's own invariants survive fault injection | **24 min** cold (measured 2026-09-18: 59 faults, `--serial`, idle machine; 1002 s baseline + 888 s probe); seconds when verdicts are reused, which is why CI restores the previous evidence from cache |
 | Install smoke | `.github/scripts/install-smoke.mjs` | The **packed tarball** runs with production dependencies only | ~20 s |
 | Runtime budget | `ci.yml` | The suite has not silently started walking the wrong tree | gate, not a test |
+
+### How the gate duration is measured
+
+Sum `detail.baselineRuns[].durationMs` and `detail.probeRuns[].durationMs`
+across every record of an evidence document, and compare with
+`run.finishedAt − run.startedAt`. The gap between the two is the work the
+baseline cache avoided. One defender dominates the total: a single 49.5 s
+acceptance test defends five claims and accounts for roughly 15 of the 24
+minutes, which is tracked as issue #67.
 
 ## Coverage Rules
 
