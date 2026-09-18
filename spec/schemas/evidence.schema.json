@@ -25,9 +25,7 @@
       "required": [
         "id",
         "startedAt",
-        "repo",
-        "confirmRuns",
-        "mode"
+        "repo"
       ],
       "properties": {
         "id": {
@@ -97,18 +95,33 @@
         "contention": {
           "description": "Other test runners that were already running when this probe started. Best effort, never a verdict: it exists so a reader of a TIMEOUT or FLAKY-DEFENDER can tell the machine was loaded.",
           "type": "object",
-          "required": ["detected", "runners"],
+          "required": [
+            "detected",
+            "runners"
+          ],
           "properties": {
-            "detected": { "const": true },
+            "detected": {
+              "const": true
+            },
             "runners": {
               "type": "array",
               "minItems": 1,
               "items": {
                 "type": "object",
-                "required": ["pid", "command"],
+                "required": [
+                  "pid",
+                  "command"
+                ],
                 "properties": {
-                  "pid": { "type": "integer", "minimum": 1 },
-                  "command": { "type": "string", "minLength": 1, "maxLength": 200 }
+                  "pid": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "command": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
                 },
                 "additionalProperties": false
               }
@@ -152,9 +165,48 @@
             },
             "additionalProperties": false
           }
+        },
+        "method": {
+          "$ref": "urn:claimspec:v1:common#/$defs/method"
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "properties": {
+                  "method": {
+                    "const": "fault-injection"
+                  }
+                },
+                "required": [
+                  "method"
+                ]
+              },
+              {
+                "not": {
+                  "required": [
+                    "method"
+                  ]
+                }
+              }
+            ]
+          },
+          "then": {
+            "$comment": "Absent `method` means fault-injection, so every evidence file written before the field existed is held to exactly the same requirements as before. `confirmRuns` and `mode` are what injection means by a confirmed run and by where the mutation happened; a method that mutates nothing has neither.",
+            "properties": {
+              "confirmRuns": true,
+              "mode": true
+            },
+            "required": [
+              "confirmRuns",
+              "mode"
+            ]
+          }
+        }
+      ]
     },
     "records": {
       "type": "array",
@@ -223,9 +275,7 @@
         "claim",
         "subject",
         "verdict",
-        "detail",
-        "defenders",
-        "inputs"
+        "detail"
       ],
       "properties": {
         "fingerprint": {
@@ -319,10 +369,7 @@
         },
         "detail": {
           "type": "object",
-          "required": [
-            "baselineRuns",
-            "probeRuns"
-          ],
+          "required": [],
           "properties": {
             "reason": {
               "description": "Machine-readable qualifier, e.g. `anchor-missing`, `anchor-ambiguous`, `defenders-not-green`, `replacement-does-not-compile`.",
@@ -349,7 +396,9 @@
             },
             "escalationStoppedEarly": {
               "description": "Why the escalation loop ran fewer than N times. `no-common-failure`: no test failed in every run so far, so no further run could name an undeclared killer. Stopping can only fail to NAME a killer, never upgrade a verdict.",
-              "enum": ["no-common-failure"]
+              "enum": [
+                "no-common-failure"
+              ]
             },
             "escalationRuns": {
               "type": "array",
@@ -368,50 +417,73 @@
               }
             },
             "flakeRate": {
-          "description": "Observed instability of the defenders on UNMODIFIED source: `failures` of `runs` baseline runs failed with the source untouched. Only runs that actually ran are counted (`pass`/`fail`); a load error or a timeout measures nothing about stability and is excluded from both numbers. `failures > 0` means the verdict is `flaky-defender`; the degree is for whoever fixes the defender, and it is the first input to calibration.",
-          "type": "object",
-          "required": ["runs", "failures"],
-          "properties": {
-            "runs": { "type": "integer", "minimum": 1 },
-            "failures": { "type": "integer", "minimum": 0 }
-          },
-          "additionalProperties": false
-        },
-        "independence": {
-          "description": "L3 signal, on `killed` records only: was the killing defender last touched by the same change (or the same author) as the fault's target? A signal for ranking and reporting; it never changes a verdict.",
-          "type": "object",
-          "required": ["class"],
-          "properties": {
-            "class": { "enum": ["co-authored", "separate-change", "unknown"] },
-            "defenderCommit": { "$ref": "urn:claimspec:v1:common#/$defs/gitSha" },
-            "targetCommit": { "$ref": "urn:claimspec:v1:common#/$defs/gitSha" },
-            "sameAuthor": { "type": "boolean" }
-          },
-          "additionalProperties": false
-        },
-        "negativeControl": {
-          "description": "The result of replacing the subject with content its loader cannot parse, and running the defenders once. `reached`: they went red, so they do execute this file and a `survived` verdict is about their assertions. `not-reached`: they stayed green, so they never execute it and the verdict becomes `unverifiable` with reason `subject-not-executed`. Charged only where a false answer is expensive \u2014 on a would-be survivor \u2014 because a kill already proves the defenders reached the code. Absent when the control was not run or the runner cannot say what \"cannot compile\" means for its language.",
-          "enum": [
-            "reached",
-            "not-reached"
-          ]
-        },
-        "targetNotImported": {
+              "description": "Observed instability of the defenders on UNMODIFIED source: `failures` of `runs` baseline runs failed with the source untouched. Only runs that actually ran are counted (`pass`/`fail`); a load error or a timeout measures nothing about stability and is excluded from both numbers. `failures > 0` means the verdict is `flaky-defender`; the degree is for whoever fixes the defender, and it is the first input to calibration.",
+              "type": "object",
+              "required": [
+                "runs",
+                "failures"
+              ],
+              "properties": {
+                "runs": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "failures": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            },
+            "independence": {
+              "description": "L3 signal, on `killed` records only: was the killing defender last touched by the same change (or the same author) as the fault's target? A signal for ranking and reporting; it never changes a verdict.",
+              "type": "object",
+              "required": [
+                "class"
+              ],
+              "properties": {
+                "class": {
+                  "enum": [
+                    "co-authored",
+                    "separate-change",
+                    "unknown"
+                  ]
+                },
+                "defenderCommit": {
+                  "$ref": "urn:claimspec:v1:common#/$defs/gitSha"
+                },
+                "targetCommit": {
+                  "$ref": "urn:claimspec:v1:common#/$defs/gitSha"
+                },
+                "sameAuthor": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "negativeControl": {
+              "description": "The result of replacing the subject with content its loader cannot parse, and running the defenders once. `reached`: they went red, so they do execute this file and a `survived` verdict is about their assertions. `not-reached`: they stayed green, so they never execute it and the verdict becomes `unverifiable` with reason `subject-not-executed`. Charged only where a false answer is expensive \u2014 on a would-be survivor \u2014 because a kill already proves the defenders reached the code. Absent when the control was not run or the runner cannot say what \"cannot compile\" means for its language.",
+              "enum": [
+                "reached",
+                "not-reached"
+              ]
+            },
+            "targetNotImported": {
               "description": "True when, with the fault applied, no defender caused the subject's module to be imported at all. Reported by runners that can tell (Python), never inferred. It does not change the verdict, and it is the one thing that makes a `survived` unreadable: the tests were not blind to the fault, they never reached it. A module imported from OUTSIDE the tree being probed is not recorded here \u2014 that run is refused outright, because every verdict in it would be false.",
               "const": true
-        },
-        "message": {
-          "description": "Human-readable detail for a reason that carries one \u2014 today `probe-error`, whose first line names what threw. Never parsed; a reader should not have to reproduce the run to learn what happened.",
-          "type": "string",
-          "maxLength": 1024
-        },
-        "restoreSkipped": {
-          "description": "The fault was applied but the restore found nothing to put back: the target file no longer existed. In worktree mode that is a disturbed run rather than a failed one \u2014 the mutation only ever existed inside a scratch worktree, and something outside the process deleted it \u2014 but the verdicts in that run were measured against a tree that was being removed underneath them, and a reader has to be able to see that. In `--in-place` mode it never appears: there a missing target is the user's own file gone, and the restore throws.",
-          "enum": [
-            "target-missing"
-          ]
-        },
-        "anchor": {
+            },
+            "message": {
+              "description": "Human-readable detail for a reason that carries one \u2014 today `probe-error`, whose first line names what threw. Never parsed; a reader should not have to reproduce the run to learn what happened.",
+              "type": "string",
+              "maxLength": 1024
+            },
+            "restoreSkipped": {
+              "description": "The fault was applied but the restore found nothing to put back: the target file no longer existed. In worktree mode that is a disturbed run rather than a failed one \u2014 the mutation only ever existed inside a scratch worktree, and something outside the process deleted it \u2014 but the verdicts in that run were measured against a tree that was being removed underneath them, and a reader has to be able to see that. In `--in-place` mode it never appears: there a missing target is the user's own file gone, and the restore throws.",
+              "enum": [
+                "target-missing"
+              ]
+            },
+            "anchor": {
               "description": "With an anchor-related reason: how many times `find` occurred versus how many were expected.",
               "type": "object",
               "required": [
@@ -431,7 +503,8 @@
               "additionalProperties": false
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "Everything behind the verdict. Under `fault-injection` the runs are mandatory and the validator enforces them; a method that runs no tests carries whatever its own evidence is."
         },
         "defenders": {
           "type": "object",

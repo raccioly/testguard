@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "websec-validator",
+    "version": "0.15.3"
+  },
+  "run": {
+    "id": "run-20260918-090000",
+    "startedAt": "2026-09-18T09:00:00Z",
+    "finishedAt": "2026-09-18T09:00:12Z",
+    "repo": {
+      "head": "cccccccccccccccccccccccccccccccccccccccc",
+      "dirty": false
+    },
+    "method": "scan"
+  },
+  "records": [
+    {
+      "fingerprint": "7b86a358f37adcf78bcc51ef2f7dbfe74dbffcb31918752ef4fc65b98eabc440",
+      "claim": {
+        "id": "SEC-001",
+        "statement": "No unauthenticated route reads from the user store.",
+        "severity": "critical",
+        "source": {
+          "kind": "spec",
+          "ref": "docs/THREAT-MODEL.md"
+        },
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-09-18T00:00:00Z"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "P1",
+        "description": "An unauthenticated route reaches the user store.",
+        "file": "src/routes/user.mjs",
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-09-18T00:00:00Z"
+        },
+        "contentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "verdict": "killed",
+      "detail": {
+        "reason": "rule-matched-nothing"
+      }
+    }
+  ]
+}

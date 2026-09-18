@@ -35,6 +35,14 @@ in review, and replayable by anyone holding the repository.
 ## Schema Definitions
 
 Every kind is JSON Schema 2020-12, identified as `urn:claimspec:v1:<kind>`.
+
+A probe carries a `method`, and a run says which method produced it. It
+defaults to `fault-injection`, whose required fields — `file`, `find`,
+`replace` on a probe; `confirmRuns`, `mode`, `defenders`, `inputs` and the
+baseline and probe runs on evidence — are unchanged and are enforced by the
+validator rather than merely by the schema. `assertion` and `scan` are
+reserved names for tools that verify by reading or scanning; their fields are
+defined by their first consumer, not in advance.
 `spec/lib/validate.mjs` applies the schema **and** the semantic rules a schema
 cannot express. `spec/lib/fingerprint.mjs` is the single fingerprint
 implementation every tool must use.

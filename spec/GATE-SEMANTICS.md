@@ -151,6 +151,31 @@ Rules that follow from the table:
    can name the file the interpreter loaded) answers the same question more
    precisely for one language; where both are present they must agree.
 
+13. **Fault injection is one method, not the definition.** A claim declares
+   what must be true; a probe declares how a tool would try to make it false,
+   and `method` says which way. `fault-injection` — mutate the source, run the
+   claim's defenders, confirm over N runs — is the only method specified in
+   v1, and it is the default when the field is absent, so every document
+   written before the field existed is held to exactly the rules it was
+   written against.
+   Everything in this document above this rule is `fault-injection`'s
+   semantics. `confirmRuns`, `mode`, `defenders`, `inputs` and the baseline
+   and probe runs are what *it* means by showing its work; a tool that reads
+   code or scans a surface has none of them, and requiring them would force it
+   to emit empty arrays to conform — which is lying, and the one thing this
+   format exists to make impossible. The schema therefore requires them only
+   under `fault-injection`, and the validator enforces them there in full: the
+   relaxation is for a tool that injects nothing, never a licence for an
+   injecting tool to stop showing its work.
+   `assertion` and `scan` are **reserved**. Their required fields are
+   deliberately unspecified and will be defined by their first real consumer,
+   with its own conformance examples written from the shape that tool actually
+   has. Designing them for an absent tool is precisely the mistake that made
+   this rule necessary: the spec was drafted against a single consumer and
+   hard-coded its assumptions as requirements.
+   The verdict set stays closed and shared. What each method may legitimately
+   report is part of defining it.
+
 ## Replay reports; it never gates
 
 A replayed bug is history. It escaped, by definition, which means the suite
