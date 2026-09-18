@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-18
+
+Python, and a fault that cannot hide.
+
+TestGuard now probes Python projects with nothing installed into them, and it
+no longer takes a green suite at its word: a fault applied to code the tests
+never execute used to be reported as SURVIVED — an audit finding that reads as
+devastating and is entirely false — and is now `unverifiable`, because the
+defenders are made to prove they can fail because of that file before a
+survival about it is allowed to stand.
+
+Alongside: the shared spec is named `claimspec` and no longer assumes fault
+injection is the only way to falsify a claim, one bad fault can no longer cost
+the evidence for the whole run, and the self-probe gate was measured rather
+than guessed at.
+
+### Upgrading
+
+**Some claims that were `survived` will become `unverifiable`, and your frozen
+baseline will not suppress them.** This is the intended consequence of the
+negative control, and it is worth reading before you re-freeze anything.
+
+A fingerprint is derived from the claim, the subject, the file and **the
+verdict**. A claim whose subject the defenders never execute was reported
+`survived`; it is now `unverifiable` with reason `subject-not-executed`. That
+is a different fingerprint, so a baseline frozen before this release does not
+contain it, and it gates as new.
+
+**The finding is real.** It says the defenders do not execute that file at all,
+so every earlier verdict about it was a statement about their reach rather than
+their assertions — including the `survived` your baseline was suppressing. A
+`survived` you had accepted as known debt was, in these cases, not a measurement
+of anything.
+
+What to do, in order:
+
+1. `testguard probe` and read the records carrying
+   `detail.negativeControl: "not-reached"`. Each names a file no defender
+   loads.
+2. **Prefer fixing the defenders.** A claim whose subject is never imported is
+   the cheapest blind spot you will ever find — cheaper than a survivor,
+   because nothing was even tried.
+3. If you are accepting it as existing debt for now, `testguard baseline`
+   re-freezes today's findings so only newer ones gate. Do this **after**
+   looking at them, not instead of.
+
+`baseline --restamp` is **not** the command for this: it moves a baseline's
+`head` onto a clean identical probe, and it requires the same fingerprints.
+
+Nothing else in this release requires migration. The `claimspec` rename changes
+no emitted document, the `method` field defaults to `fault-injection` so every
+existing claims and evidence file stays valid, and the gate work changed which
+tests defend which claims, never a verdict.
+
+### Added
+
+- **A five-page technical brief**, [`docs/testguard-explained.pdf`](docs/testguard-explained.pdf):
+  the whole idea on page one, the field measurements on page two, then
+  mechanics, architecture and prior art. Six diagrams, including a dot matrix
+  of the 39 injected faults from the second field report — 21 survived a fully
+  green suite, 39/39 killed after tests were written against the survivors. Built from
+  `docs/testguard-explained.html` with `node .github/scripts/build-one-pager.mjs`
+  (headless Chrome, so the one pinned runtime dependency stays one).
+
 ### Changed
 - **A probe says which method produced it, and fault injection is no longer
   assumed** (#81). `claims` required `file`, `find` and `replace` on every
@@ -30,15 +94,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Designing them for an absent tool is exactly the mistake that made this
   change necessary — the spec was drafted against a single consumer and
   hard-coded its assumptions as requirements.
-- **A five-page technical brief**, [`docs/testguard-explained.pdf`](docs/testguard-explained.pdf):
-  the whole idea on page one, the field measurements on page two, then
-  mechanics, architecture and prior art. Six diagrams, including a dot matrix
-  of the 39 injected faults from the second field report — 21 survived a fully
-  green suite, 39/39 killed after tests were written against the survivors. Built from
-  `docs/testguard-explained.html` with `node .github/scripts/build-one-pager.mjs`
-  (headless Chrome, so the one pinned runtime dependency stays one).
-
-### Changed
 - **The self-probe gate, re-measured and cut** (#73). `--cost` at `ffaaa81`
   reported **1414 s across 546 defender runs for 91 faults** — back where #67
   started, because #77 took the corpus from 59 faults to 91. The gate did not
