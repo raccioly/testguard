@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ClaimsError } from './claims/load.mjs';
 import { PreconditionError } from './probe/worktree.mjs';
+import { RUNNER_NAMES } from './probe/runners/index.mjs';
 import { GitError } from './git.mjs';
 import { SpecDocError } from './evidence/writer.mjs';
 import { probeCommand } from './commands/probe.mjs';
@@ -53,11 +54,17 @@ probe
                        append-only lines everywhere else, so a redirected log and CI see progress
                        instead of twenty silent minutes. Always on stderr; ndjson also streams verdicts
                        --confirm below 3 is PROVISIONAL: verdicts print with "?", evidence goes to .testguard/evidence-provisional.json
-  --runner <name>      vitest | jest | playwright | auto (default: auto — first of vitest, jest that resolves; a defender under
-                       playwright's testDir always runs under playwright, whatever the project runner)
+  --runner <name>      vitest | jest | playwright | python | pytest | unittest | auto
+                       (default: auto — first of vitest, jest, python that resolves. A defender under playwright's testDir
+                       always runs under playwright, and a .py defender always under python, whatever the project runner.
+                       python picks pytest when the interpreter can import it and stdlib unittest otherwise; pytest and
+                       unittest pin that choice and fail rather than fall back. The engine that ran is what the evidence records.)
   --runner-cmd "<cmd>" custom runner; must contain {files} and {out}, e.g. "pnpm vitest run {files} --reporter=json --outputFile={out}"
   --node-modules <dir> node_modules to link into the scratch worktree (or TESTGUARD_NODE_MODULES)
-  --serial             run one test file at a time (vitest --no-file-parallelism, jest --runInBand, playwright --workers=1);
+  --python <path>      Python interpreter for .py defenders (or TESTGUARD_PYTHON; default: $VIRTUAL_ENV, then the project's
+                       .venv/venv, then python3 on PATH). Resolved against your working tree, never the scratch worktree.
+  --serial             run one test file at a time (vitest --no-file-parallelism, jest --runInBand, playwright --workers=1,
+                       pytest -p no:xdist);
                        use it when another test runner is already running — probe warns and records the contention either way
   --in-place           mutate the working tree instead of a scratch worktree
   --no-escalate        do not re-run survivors against the whole suite
@@ -144,6 +151,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         here: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'runner-cmd': { type: 'string' },
+        python: { type: 'string' },
         runner: { type: 'string', default: 'auto' },
         'node-modules': { type: 'string' },
         'in-place': { type: 'boolean', default: false },
@@ -180,8 +188,8 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
     io.err(USAGE);
     return 3;
   }
-  if (!['vitest', 'jest', 'playwright', 'auto'].includes(values.runner)) {
-    io.err('--runner must be vitest, jest, playwright or auto');
+  if (![...RUNNER_NAMES, 'auto'].includes(values.runner)) {
+    io.err(`--runner must be one of ${RUNNER_NAMES.join(', ')} or auto`);
     return 3;
   }
   if (!['critical', 'high', 'medium', 'low'].includes(values.severity)) {

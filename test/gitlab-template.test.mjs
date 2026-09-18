@@ -22,7 +22,7 @@ describe('packaging/gitlab/testguard.gitlab-ci.yml — the GitLab component-shap
   const [spec, body] = parseYaml(FILE);
   it('is two YAML documents: a spec with inputs, then the jobs', () => {
     expect(Object.keys(spec)).toEqual(['spec']);
-    expect(Object.keys(spec.spec.inputs)).toEqual(['version', 'dir', 'image', 'severity', 'confirm', 'budget', 'no_escalate', 'strict', 'post_note', 'stage']);
+    expect(Object.keys(spec.spec.inputs)).toEqual(['version', 'dir', 'image', 'severity', 'confirm', 'budget', 'no_escalate', 'runner', 'python', 'strict', 'post_note', 'stage']);
     expect(Object.keys(body)).toEqual(['variables', '.testguard', 'testguard:gate', 'testguard:probe']);
   });
   it('pins the version input default to package.json (the release sync keeps it there)', () => {

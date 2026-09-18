@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { specifierResolvesTo } from './rank.mjs';
+import { classifyPythonDefenders } from './pyimports.mjs';
 
 /**
  * Mock-awareness for defenders (issues #20, #21).
@@ -104,6 +105,7 @@ function matchesTargetAnyImport(source, matchesTarget) {
  * the annotation is recorded (`unasserted-annotated`) — silenced, never hidden.
  */
 export function classifyDefenders(projectDir, targetRel, candidates) {
+  if (targetRel.endsWith('.py')) return classifyPythonDefenders(projectDir, targetRel, candidates);
   const canDetect = [];
   const mocking = [];
   const signals = [];

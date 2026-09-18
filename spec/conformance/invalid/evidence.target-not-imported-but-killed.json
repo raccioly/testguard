@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.1.0"
+  },
+  "run": {
+    "id": "run-20260917-020000",
+    "startedAt": "2026-09-17T02:00:00Z",
+    "finishedAt": "2026-09-17T02:00:41Z",
+    "repo": {
+      "head": "deadbeefcafe",
+      "dirty": false,
+      "snapshot": "c0ffeeaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "runner": {
+      "name": "pytest",
+      "version": "9.1.1",
+      "source": "project"
+    },
+    "confirmRuns": 3,
+    "mode": "worktree",
+    "serial": true,
+    "contention": {
+      "detected": true,
+      "runners": [
+        {
+          "pid": 4321,
+          "command": "node /repo/node_modules/vitest/vitest.mjs run"
+        }
+      ]
+    }
+  },
+  "records": [
+    {
+      "fingerprint": "5f85d06b8430d65b8699fbe0c61424462cc6d20087e86dc531ed7e5ce4717b93",
+      "claim": {
+        "id": "REDACT-001",
+        "statement": "The audit record written for a redacted message never contains the original secret.",
+        "severity": "critical",
+        "source": {
+          "kind": "spec",
+          "ref": "docs/spec.md#audit-records"
+        },
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-09-17T02:00:00Z"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "Audit row is written with the raw input.",
+        "file": "src/demo/redact.py",
+        "faultClass": "variable-swap",
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-09-17T02:00:00Z"
+        },
+        "contentHash": "f232f31d9e6eecc8e952f0da1fb0878c5060e1a4dc19724874b041a4ab265aaf"
+      },
+      "verdict": "killed",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 310
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 4,
+              "passed": 3,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 310
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 4,
+              "passed": 3,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 310
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 4,
+              "passed": 3,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 310
+          }
+        ],
+        "targetNotImported": true
+      },
+      "defenders": {
+        "requested": [
+          "tests/test_redact.py"
+        ],
+        "resolved": [
+          "tests/test_redact.py"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "defenderHashes": {
+          "test/redact.test.mjs": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "rank": {
+        "score": 9.5,
+        "blastRadius": 7,
+        "tier": "critical"
+      },
+      "annotations": [
+        {
+          "kind": "tracked",
+          "text": "Assertion uses objectContaining without the content key.",
+          "by": "maintainer",
+          "at": "2026-09-17T02:00:00Z",
+          "ref": "issue#12"
+        }
+      ]
+    }
+  ]
+}

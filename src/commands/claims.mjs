@@ -55,7 +55,12 @@ export async function claimsCommand({ projectDir, values, version }, io) {
     }
     if (signalLines.length) io.out('');
     for (const s of signalLines) {
-      if (s.signal === 'mocked-never-asserted') io.out(`MOCKED-NEVER-ASSERTED  ${s.file} mocks ${s.target} and never asserts on it (${s.claim}) — assert on the mocked call, drive the real module, or annotate the mock \`// unasserted: <why>\``);
+      // The annotation's comment marker is the probed file's, not JavaScript's.
+      const marker = s.file.endsWith('.py') ? '#' : '//';
+      if (s.signal === 'mocked-never-asserted') io.out(`MOCKED-NEVER-ASSERTED  ${s.file} mocks ${s.target} and never asserts on it (${s.claim}) — assert on the mocked call, drive the real module, or annotate the mock \`${marker} unasserted: <why>\``);
+      // An attribute patch does not remove a defender; saying it "mocks" the
+      // module would tell the author the opposite of what happened.
+      else if (s.signal === 'target-attribute-patched') io.out(`attribute-patched  ${s.file} defends ${s.target} but replaces ${s.reason} (${s.claim}) — a fault in those attributes is where it is least likely to notice`);
       else io.out(`unasserted (annotated)  ${s.file} mocks ${s.target}: ${s.reason} (${s.claim})`);
     }
     if (drift.undeclared.length || drift.stale.length) io.out('');

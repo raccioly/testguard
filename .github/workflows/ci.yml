@@ -229,6 +229,80 @@ jobs:
           path: .testguard/ci-self-evidence.json
           if-no-files-found: warn
 
+  # ── Python: two engines, one oracle. The stdlib leg runs FIRST and with no
+  #    pip install of any kind, because "a project with no test dependencies
+  #    still probes" is a claim about the tool and the only way to keep it true
+  #    is to prove it in an environment that has none. The pytest leg then
+  #    installs pytest into a venv and must reach the SAME sixteen verdicts
+  #    through a different report shape. ──
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install (tool only)
+        run: npm ci
+
+      # A bare virtualenv, not the system interpreter: the claim under test is
+      # "a project whose test dependencies are the standard library still
+      # probes", and asserting that the runner image happens to lack pytest
+      # would make this job fail for a reason that has nothing to do with the
+      # product the day that image changes. Guarantee the condition instead.
+      - name: The stdlib engine must need nothing installed
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 -m venv "$RUNNER_TEMP/bare"
+          if "$RUNNER_TEMP/bare/bin/python" -c 'import pytest' 2>/dev/null; then
+            echo "::error::the bare venv can import pytest; it is not bare and this leg proves nothing"
+            exit 1
+          fi
+          TESTGUARD_PYTHON="$RUNNER_TEMP/bare/bin/python" \
+            npx vitest run test/runner-python.test.mjs test/pyimports.test.mjs test/scaffold.python.test.mjs test/probe.python.test.mjs
+
+      - name: probe the Python fixture through the bin, stdlib engine
+        shell: bash
+        run: |
+          set -o pipefail
+          S=$(mktemp -d)
+          cp -R fixtures/known-answer-python/. "$S/"
+          rm -rf "$S/.flake-counter" "$S/.testguard" "$S/.pytest_cache"
+          find "$S" -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
+          git -C "$S" init -q
+          git -C "$S" -c user.email=ci@example.invalid -c user.name=ci add -A
+          git -C "$S" -c user.email=ci@example.invalid -c user.name=ci commit -qm fixture
+          status=0; node cli/testguard.mjs probe "$S" --budget 20000 --quiet --no-escalate --python "$RUNNER_TEMP/bare/bin/python" || status=$?
+          [ "$status" -eq 1 ] || { echo "::error::expected exit 1, got $status"; exit 1; }
+          node .github/scripts/check-python-fixture.mjs "$S/.testguard/evidence.json" unittest
+
+      - name: install pytest into a venv, and reach the same verdicts through it
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 -m venv "$RUNNER_TEMP/pyenv"
+          "$RUNNER_TEMP/pyenv/bin/pip" install -q pytest
+          S=$(mktemp -d)
+          cp -R fixtures/known-answer-python/. "$S/"
+          rm -rf "$S/.flake-counter" "$S/.testguard" "$S/.pytest_cache"
+          find "$S" -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
+          git -C "$S" init -q
+          git -C "$S" -c user.email=ci@example.invalid -c user.name=ci add -A
+          git -C "$S" -c user.email=ci@example.invalid -c user.name=ci commit -qm fixture
+          status=0; node cli/testguard.mjs probe "$S" --budget 20000 --quiet --no-escalate \
+            --runner pytest --python "$RUNNER_TEMP/pyenv/bin/python" || status=$?
+          [ "$status" -eq 1 ] || { echo "::error::expected exit 1, got $status"; exit 1; }
+          node .github/scripts/check-python-fixture.mjs "$S/.testguard/evidence.json" pytest
+
+      - name: the acceptance suite again, now against an interpreter that HAS pytest
+        shell: bash
+        run: |
+          TESTGUARD_PYTHON="$RUNNER_TEMP/pyenv/bin/python" npx vitest run test/probe.python.test.mjs
+
   # ── Playwright: the per-file runner is proven against its own browserless
   #    fixture, whose dependencies live in the fixture (never in the tool's
   #    package.json). Installed and run here only. ──

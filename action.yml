@@ -51,6 +51,14 @@ inputs:
     description: 'Node.js version (20+)'
     required: false
     default: '22'
+  runner:
+    description: 'probe only: vitest | jest | playwright | python | pytest | unittest | auto. `python` picks pytest when the interpreter can import it and stdlib unittest otherwise; `pytest`/`unittest` pin that choice and fail rather than fall back.'
+    required: false
+    default: 'auto'
+  python:
+    description: 'probe only: Python interpreter for .py defenders (default: $VIRTUAL_ENV, then the project .venv/venv, then python3 on PATH). Set it when your dependencies live in a venv this workflow created.'
+    required: false
+    default: ''
 
 outputs:
   evidence:
@@ -74,6 +82,8 @@ runs:
         if [ "${{ inputs.command }}" = "probe" ]; then
           ARGS+=(--severity "${{ inputs.severity }}" --confirm "${{ inputs.confirm }}" --budget "${{ inputs.budget }}")
           [ "${{ inputs.no-escalate }}" = "true" ] && ARGS+=(--no-escalate)
+          [ "${{ inputs.runner }}" != "auto" ] && ARGS+=(--runner "${{ inputs.runner }}")
+          [ -n "${{ inputs.python }}" ] && ARGS+=(--python "${{ inputs.python }}")
         fi
         [ "${{ inputs.command }}" = "brief" ] && ARGS+=(--text)
         if [ "${{ inputs.command }}" = "gate" ]; then

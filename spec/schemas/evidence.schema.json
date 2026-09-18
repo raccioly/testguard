@@ -389,6 +389,10 @@
           },
           "additionalProperties": false
         },
+        "targetNotImported": {
+              "description": "True when, with the fault applied, no defender caused the subject's module to be imported at all. Reported by runners that can tell (Python), never inferred. It does not change the verdict, and it is the one thing that makes a `survived` unreadable: the tests were not blind to the fault, they never reached it. A module imported from OUTSIDE the tree being probed is not recorded here \u2014 that run is refused outright, because every verdict in it would be false.",
+              "const": true
+        },
         "anchor": {
               "description": "With an anchor-related reason: how many times `find` occurred versus how many were expected.",
               "type": "object",
@@ -446,7 +450,7 @@
               }
             },
             "signals": {
-              "description": "Static, annotation-grade signals about the defenders. They never change a verdict. `mocked-never-asserted`: the file mocks the subject and never asserts on anything imported from it. `unasserted-annotated`: the same, but the author annotated the mock with a reason (`// unasserted: <why>`), recorded here \u2014 silenced, never hidden.",
+              "description": "Static, annotation-grade signals about the defenders. They never change a verdict. `mocked-never-asserted`: the file mocks the subject and never asserts on anything imported from it. `unasserted-annotated`: the same, but the author annotated the mock with a reason (`// unasserted: <why>`), recorded here \u2014 silenced, never hidden. `target-attribute-patched`: a Python defender that patches individual attributes of the subject (`patch(\"pkg.mod.fn\")`) rather than the module. Unlike a JavaScript module mock it does NOT disqualify the file \u2014 a fault anywhere else in the module is still detectable \u2014 so the file stays in `resolved`; `reason` names the patched attributes, which are where that test is least likely to notice anything.",
               "type": "array",
               "items": {
                 "type": "object",
@@ -461,7 +465,8 @@
                   "signal": {
                     "enum": [
                       "mocked-never-asserted",
-                      "unasserted-annotated"
+                      "unasserted-annotated",
+                      "target-attribute-patched"
                     ]
                   },
                   "reason": {

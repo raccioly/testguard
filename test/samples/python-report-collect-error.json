@@ -1,0 +1,10 @@
+{
+  "testguard": 1,
+  "runner": "unittest",
+  "rootdir": "/tmp/project",
+  "collectionErrors": [
+    { "file": "tests/test_redact.py", "message": "Traceback (most recent call last):\n  File \"demo/redact.py\", line 33\n    out = rule.sub(lambda m: \"*\" * len(m.group(0)\n                             ^\nSyntaxError: '(' was never closed" }
+  ],
+  "tests": [],
+  "provenance": {}
+}

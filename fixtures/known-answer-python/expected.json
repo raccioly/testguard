@@ -1,0 +1,75 @@
+{
+  "confirmRuns": 3,
+  "budgetMs": 20000,
+  "expected": {
+    "REDACT-001/F1": {
+      "verdict": "survived",
+      "why": "The audit-row test checks action, scope and rule_count and never checks `content`; a row carrying the raw input passes. The exhibit."
+    },
+    "REDACT-001/F2": {
+      "verdict": "killed",
+      "why": "Verified by hand 2026-09-17 with `python -m unittest`, reading its exit code, not TestGuard's reporter: with masking skipped, two of four tests fail (the secret is present, and no audit row is written)."
+    },
+    "REDACT-001/F3": {
+      "verdict": "survived",
+      "why": "Verified by hand 2026-09-17 with `python -m unittest`, reading its exit code, not TestGuard's reporter: with the content key removed, all four tests pass. The assertions name three keys and a row with no content at all is indistinguishable from a correct one."
+    },
+    "REDACT-002/F1": {
+      "verdict": "killed",
+      "why": "Verified by hand 2026-09-17 with `python -m unittest`, reading its exit code, not TestGuard's reporter: re-raising re.error makes compile_rules propagate; the invalid-pattern test errors (1 of 4). An exception raised in the test body is the suite rejecting the behaviour, exactly as it is under jest."
+    },
+    "REDACT-003/F1": {
+      "verdict": "survived",
+      "why": "No test exercises a missing scope; the fail-closed guard is undefended."
+    },
+    "REDACT-004/F1": {
+      "verdict": "timeout",
+      "why": "Verified by hand 2026-09-17 with `python -m unittest`, reading its exit code, not TestGuard's reporter: the process does not finish. Python has no per-test timeout without a plugin, so the run ends at TestGuard's wall-clock budget. A timeout is not an assertion failure and is not a kill."
+    },
+    "REDACT-005/F1": {
+      "verdict": "unverifiable",
+      "reason": "anchor-missing",
+      "why": "The find string is not present in the source (0 hits)."
+    },
+    "REDACT-005/F2": {
+      "verdict": "unverifiable",
+      "reason": "anchor-ambiguous",
+      "why": "`return None` occurs in find_rule and in scope_of (2 hits); expectHits is 1."
+    },
+    "REDACT-006/F1": {
+      "verdict": "fault-invalid",
+      "reason": "replacement-does-not-compile",
+      "why": "Verified by hand 2026-09-17 with `python -m unittest`, reading its exit code, not TestGuard's reporter: the unbalanced parenthesis makes demo/redact.py unimportable, so the test module fails to collect. A SyntaxError reaches TestGuard as a collection error, never as a kill."
+    },
+    "REDACT-007/F1": {
+      "verdict": "killed",
+      "why": "Verified by hand 2026-09-17 with `python -m unittest`, reading its exit code, not TestGuard's reporter: mask(text, []) masks nothing, so no audit row is written and the output still contains the secret: two of four tests fail."
+    },
+    "EXPORT-001/F1": {
+      "verdict": "nocover",
+      "why": "tests/test_export.py does not exist; no defender resolves."
+    },
+    "EXPORT-002/F1": {
+      "verdict": "nocover",
+      "why": "The only test that imports demo.export patches the module itself and never asserts on it. A patch of the whole module cannot detect a fault in it, so discovery excludes the file: no defender, and the evidence lists it under defenders.mocking with a mocked-never-asserted signal."
+    },
+    "FLAKY-001/F1": {
+      "verdict": "flaky-defender",
+      "reason": "defenders-not-green",
+      "why": "tests/test_flaky.py fails on every odd run; the baseline is not green N/N, so no verdict about the fault is possible."
+    },
+    "DISCOVER-001/F1": {
+      "verdict": "killed",
+      "why": "No defendedBy. Defenders are discovered by Python module name: tests/test_redact.py and tests/test_patched.py both import demo.redact, and verified by hand 2026-09-17 with `python -m unittest`, reading its exit code, not testguard's reporter: removing the substitution fails every test in both."
+    },
+    "PATCHED-001/F1": {
+      "verdict": "killed",
+      "why": "The defender patches demo.redact.compile_rules but exercises mask for real, so it is a defender and it notices: verified by hand 2026-09-17 with `python -m unittest`, reading its exit code, not testguard's reporter: collapsing each match to one asterisk fails its assertion. The JavaScript rule \u2014 drop any file that mocks the target \u2014 would have reported this claim as nocover. The evidence records target-attribute-patched instead."
+    },
+    "UNREACHED-001/F1": {
+      "verdict": "survived",
+      "targetNotImported": true,
+      "why": "The declared defender never imports demo.orphan, so nothing it asserts could detect this fault. The tests are not blind to the fault; they never reach it. Recorded as detail.targetNotImported, which is what distinguishes this from a real survivor."
+    }
+  }
+}

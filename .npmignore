@@ -20,3 +20,7 @@ CLAUDE.md
 CLAUDE.local.md
 AGENTS.md
 .DS_Store
+# Python bytecode: version-specific, never shipped. The runner sets
+# PYTHONDONTWRITEBYTECODE so none is produced, but a stray one must not pack.
+__pycache__/
+*.pyc

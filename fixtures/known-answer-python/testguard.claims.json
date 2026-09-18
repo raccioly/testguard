@@ -1,0 +1,425 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "REDACT-001",
+      "statement": "The audit row written for a masked message never contains the original input.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "tests/test_redact.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Audit row carries the raw input instead of the redacted text.",
+          "faultClass": "variable-swap",
+          "file": "demo/redact.py",
+          "find": "\"content\": redacted,",
+          "replace": "\"content\": text,",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Masking is skipped entirely; the input passes through unchanged.",
+          "faultClass": "statement-deleted",
+          "file": "demo/redact.py",
+          "find": "    redacted = mask(text, rules)",
+          "replace": "    redacted = text",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The content key is dropped from the audit row entirely.",
+          "faultClass": "field-dropped",
+          "file": "demo/redact.py",
+          "find": "            \"content\": redacted,\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "REDACT-002",
+      "statement": "A pattern that will not compile is skipped; it never aborts the scan.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "tests/test_redact.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An invalid pattern is re-raised instead of skipped.",
+          "faultClass": "exception-swallowed",
+          "file": "demo/redact.py",
+          "find": "        except re.error:\n            continue",
+          "replace": "        except re.error:\n            raise",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "REDACT-003",
+      "statement": "A missing scope is an error; the engine never performs an unscoped scan.",
+      "source": {
+        "kind": "annotation",
+        "ref": "demo/redact.py @claim REDACT-003"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "tests/test_redact.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Fail-closed guard removed; a missing scope proceeds unscoped.",
+          "faultClass": "guard-removed",
+          "file": "demo/redact.py",
+          "find": "if not ctx or not ctx.get(\"scope\"):",
+          "replace": "if False:",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "REDACT-004",
+      "statement": "redact() returns for every input.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "tests/test_redact.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "redact() never returns.",
+          "faultClass": "return-altered",
+          "file": "demo/redact.py",
+          "find": "    return redacted\n",
+          "replace": "    while True:\n        pass\n",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "REDACT-005",
+      "statement": "find_rule() returns None for an unknown id.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "tests/test_redact.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An anchor that no longer exists in the source (rotted).",
+          "faultClass": "return-altered",
+          "file": "demo/redact.py",
+          "find": "return None  # unknown rule",
+          "replace": "return rules[0]",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An anchor that matches more than once: `return None` occurs in two functions.",
+          "faultClass": "return-altered",
+          "file": "demo/redact.py",
+          "find": "return None",
+          "replace": "return rules[0]",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          },
+          "expectHits": 1
+        }
+      ]
+    },
+    {
+      "id": "REDACT-006",
+      "statement": "mask() replaces each match with asterisks of equal length.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "tests/test_redact.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A replacement that does not parse (a bad fault, not a detection).",
+          "faultClass": "literal-changed",
+          "file": "demo/redact.py",
+          "find": "lambda m: \"*\" * len(m.group(0))",
+          "replace": "lambda m: \"*\" * len(m.group(0)",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "REDACT-007",
+      "statement": "redact() masks with the configured rules, not with an empty rule set.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "tests/test_redact.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The call is kept, its rules argument swapped for an empty list; nothing is ever masked.",
+          "faultClass": "argument-swapped",
+          "file": "demo/redact.py",
+          "find": "    redacted = mask(text, rules)",
+          "replace": "    redacted = mask(text, [])",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "EXPORT-001",
+      "statement": "Exported rows never include the content field.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "tests/test_export.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Export keeps the content field.",
+          "faultClass": "statement-deleted",
+          "file": "demo/export.py",
+          "find": "return [{k: v for k, v in row.items() if k != \"content\"} for row in rows]",
+          "replace": "return [dict(row) for row in rows]",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "EXPORT-002",
+      "statement": "export_rows() strips the content field (a claim whose only importing test replaces the module).",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Export keeps the content field. No defendedBy: the only test that imports the module patches it wholesale and never asserts on it, so discovery must find NO defender.",
+          "faultClass": "statement-deleted",
+          "file": "demo/export.py",
+          "find": "return [{k: v for k, v in row.items() if k != \"content\"} for row in rows]",
+          "replace": "return [dict(row) for row in rows]",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "FLAKY-001",
+      "statement": "A claim whose defender is not reliably green cannot be verified.",
+      "source": {
+        "kind": "manual"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "tests/test_flaky.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Any fault at all; the defender's flakiness pre-empts the verdict.",
+          "faultClass": "literal-changed",
+          "file": "demo/redact.py",
+          "find": "\"action\": \"MASK\",",
+          "replace": "\"action\": \"mask\",",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "DISCOVER-001",
+      "statement": "Every rule match is replaced in the returned text.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The replacement loop body is removed. No defendedBy: defenders must be discovered as the tests that import demo.redact by module name.",
+          "faultClass": "statement-deleted",
+          "file": "demo/redact.py",
+          "find": "        out = rule.sub(lambda m: \"*\" * len(m.group(0)), out)",
+          "replace": "        pass  # fault: replacement removed",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PATCHED-001",
+      "statement": "mask() replaces a match with asterisks of the same length (defended by a test that patches one attribute of the target).",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "tests/test_patched.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Each match collapses to a single asterisk. The defender patches demo.redact.compile_rules but exercises mask for real, so it is a defender and carries the target-attribute-patched signal.",
+          "faultClass": "literal-changed",
+          "file": "demo/redact.py",
+          "find": "\"*\" * len(m.group(0))",
+          "replace": "\"*\"",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "UNREACHED-001",
+      "statement": "Only an administrator is allowed (a claim whose declared defender never imports the module).",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "tests/test_redact.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The role check always allows. The declared defender never imports demo.orphan, so nothing it asserts could detect this.",
+          "faultClass": "guard-removed",
+          "file": "demo/orphan.py",
+          "find": "return role == \"admin\"",
+          "replace": "return True",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    }
+  ]
+}

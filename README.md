@@ -227,14 +227,39 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    there is, and the exact signature of one escaped bug in the field
    reports. Silence it, visibly, with `// unasserted: <why>` above the mock.
 
-   Runners: **vitest** and **jest** (`--runner auto` picks the first that
-   resolves; both read the same jest-compatible JSON report). A runner is
-   resolved from the **project's own package** first — its pinned version,
-   its own bin script — and only then from an executable on PATH, which the
-   evidence records as `runner.source: "path"`; `npx` is never asked,
-   because its cache answers for packages a project does not have. Anything
-   else goes through `--runner-cmd`. Each runner is proven against its own
-   copy of the known-answer fixture.
+   Runners: **vitest**, **jest**, **Playwright** and **Python** (`--runner
+   auto` picks the first of vitest, jest, python that resolves). A JavaScript
+   runner is resolved from the **project's own package** first — its pinned
+   version, its own bin script — and only then from an executable on PATH,
+   which the evidence records as `runner.source: "path"`; `npx` is never
+   asked, because its cache answers for packages a project does not have.
+   Anything else goes through `--runner-cmd`. Each runner is proven against
+   its own copy of the known-answer fixture.
+
+   **Python** runs under `pytest` when the project's interpreter can import
+   it and stdlib `unittest` when it cannot, and the evidence records the
+   engine that actually ran — `--runner pytest` or `--runner unittest` pins
+   the choice and fails rather than falling back. Nothing is installed into
+   the project: the reporters ship inside TestGuard and reach the interpreter
+   through `PYTHONPATH`, so a codebase whose test dependencies are the
+   standard library stays that way. The interpreter is the project's
+   `.venv`/`venv`, the active `VIRTUAL_ENV`, or `--python <path>`. A `.py`
+   defender runs under Python whatever the project runner is, so one claim
+   can be defended by a vitest test and a pytest test at once.
+
+   Two things Python forces that JavaScript does not. **`patch("pkg.mod.fn")`
+   is not `vi.mock`**: it replaces one attribute, so the file is still a
+   defender of every other fault in that module — it keeps its place and
+   carries a `target-attribute-patched` signal naming the attributes. And
+   **the fault must be the code that ran**: a strict editable install puts an
+   import hook ahead of `sys.path`, so Python can load the original file while
+   TestGuard faults the copy — a green baseline, every claim `SURVIVED`, and a
+   report that reads as a devastating finding while being entirely false. With
+   the fault applied, TestGuard asks which file was actually imported and
+   refuses the run when it is outside the tree being probed. When no defender
+   imported the subject at all, the run continues and the record says so
+   (`detail.targetNotImported`), because that is a fact about the defenders'
+   reach and not about their assertions.
 
    The two-gate rule, as one verb: `testguard admit <test-file> --claim <ID>`
    runs the claim's faults against your uncommitted test and answers
@@ -465,6 +490,45 @@ is the same one as everywhere else: a `claim` entry in
 Removal is allowed — claims can be wrong, superseded or split — and it is
 never silent.
 
+### Probing a Python project
+
+Nothing is installed into your project. TestGuard carries its own reporters and
+puts them on the interpreter's `PYTHONPATH`, so a codebase whose test
+dependencies are the standard library keeps none.
+
+```bash
+npx testguard-cli probe .                        # auto: pytest if importable, else stdlib unittest
+npx testguard-cli probe . --runner unittest      # pin the stdlib engine
+npx testguard-cli probe . --python .venv/bin/python
+```
+
+The evidence records the engine that actually ran, and `--runner pytest` fails
+rather than quietly using `unittest` — which engine ran changes what the
+evidence means.
+
+Three things behave differently from JavaScript, and each one is a place a
+naive port would have produced a confident wrong answer:
+
+- **Defenders are matched by module name**, the way Python itself matches, so
+  a test that reaches your package through `sys.path`, a `conftest.py` or an
+  installed distribution is found either way.
+- **`patch("pkg.mod.fn")` is not `vi.mock`.** It replaces one attribute, so the
+  file still detects a fault anywhere else in that module: it stays a defender
+  and carries a `target-attribute-patched` signal naming the attributes. Only a
+  patch of the module *itself* removes a defender.
+- **The fault has to be the code that ran.** A strict editable install puts an
+  import hook ahead of `sys.path`, so Python can load your original file while
+  TestGuard faults its copy — green baseline, every claim `SURVIVED`, and a
+  report that reads as a catastrophe while being entirely false. With the fault
+  applied TestGuard asks which file was really imported and **refuses the run**
+  if it came from outside the tree being probed. If no defender imported the
+  subject at all, the run continues and the record says so
+  (`detail.targetNotImported`): that is a fact about the tests' reach, not
+  about their assertions, and the two must not read alike.
+
+`testguard scaffold path/to/module.py` proposes Python faults the same way it
+does for JavaScript.
+
 ### Run it from any harness
 
 The operating loop above lives in a Claude Code skill and a session-start
@@ -642,6 +706,18 @@ npx testguard-cli scaffold src/auth.ts --claim AUTH-ADMIN   # every proposal und
 | `element-removed` | a one-line JSX element — self-closing (`<Toggle … />`) or paired (`<button …>Save</button>`) — removed; the UI shape behind "the toggle is invisible", killable by a browser-layer defender |
 | `handler-dropped` | an `on<Event>={…}` prop removed, whether it is its own line or inline in the tag; the control renders and does nothing |
 
+The table above is JavaScript. `scaffold` reads Python too, and proposes the
+same fault classes in Python syntax: `if <guard>:` → `if False:`,
+`return <check>` → `return True`, `verify=True` → `verify=False`, a
+parameter-derived argument swapped for `None`, a key dropped from a payload
+`dict` or an allow-list. Two differences are deliberate. A statement is
+removed by replacing it with `pass`, never by deleting the line, because a
+block whose only statement is gone is an `IndentationError`; and a line that
+leaves a bracket open (`COLOURS = {`) is never removed at all. Both exist
+because a fault that cannot compile is a `fault-invalid` verdict — a probe run
+spent saying nothing about the tests. The two JSX shapes (`element-removed`,
+`handler-dropped`) have no Python meaning and are absent rather than faked.
+
 Every proposal's `find` is the exact line with `expectHits`/`occurrence`
 computed from the file, so it is verifiable by construction; provenance is
 `producer: derived`; `defendedBy` is prefilled from the tests that import
@@ -674,21 +750,28 @@ redacted text for the raw input and the test stays green. `probe` reports it
 as `SURVIVED`; the fixture's [README](fixtures/known-answer/README.md) walks
 through every verdict.
 
+The same blind spot, in Python, is
+[`fixtures/known-answer-python/`](fixtures/known-answer-python/README.md) —
+run under **both** stdlib `unittest` and `pytest`, which have different report
+shapes and different notions of failure and must still agree on all sixteen
+verdicts.
+
 ## Status
 
-**v0.5.** Eleven commands (`status`, `init`, `claims`, `probe`, `admit`, `replay`, `baseline`, `brief`, `gate`, `scaffold`, `mcp`), vitest and jest runners, hand-authored faults plus
-**v0.5.** Nine commands (`status`, `init`, `claims`, `probe`, `admit`, `baseline`, `brief`, `gate`, `scaffold`), vitest, jest and Playwright runners, hand-authored faults plus
-a mechanical scaffold, an agent operating layer (`status`, `init`) and a
-change gate (`gate`). The contract
-spine — eight JSON Schemas shared with the other Guard tools — is under
-[`spec/`](spec/). One exact-pinned runtime dependency (`ajv`, for schema validation); Node ≥ 20.
+**v0.5.** Eleven commands (`status`, `init`, `claims`, `probe`, `admit`,
+`replay`, `baseline`, `brief`, `gate`, `scaffold`, `mcp`), vitest, jest,
+Playwright and Python (pytest / stdlib unittest) runners, hand-authored faults
+plus a mechanical scaffold for JavaScript and Python, an agent operating layer
+(`status`, `init`) and a change gate (`gate`). The contract spine — eight JSON
+Schemas shared with the other Guard tools — is under [`spec/`](spec/). One
+exact-pinned runtime dependency (`ajv`, for schema validation); Node ≥ 20, and
+Python ≥ 3.8 only when probing Python.
 
-Not yet: test generation (the acceptance half, `admit`, exists; the generating half stays the agent's), runners beyond
-vitest and jest, AST-aware producers, and the transfer of a calibration between repositories — `replay` measures it
-now; whether it carries to a repository with no history is unproven. Each is
+Not yet: test generation (the acceptance half, `admit`, exists; the generating
+half stays the agent's), runners beyond those four, AST-aware producers, and
+the transfer of a calibration between repositories — `replay` measures it now;
+whether it carries to a repository with no history is unproven. Each is
 designed for; none is claimed.
-vitest, jest and Playwright, AST-aware producers, and calibration of fault classes
-against real escaped bugs. Each is designed for; none is claimed.
 
 ## Licence
 

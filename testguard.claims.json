@@ -286,8 +286,8 @@
           "description": "Every test file counts as an importer of the target; discovery no longer depends on the import.",
           "faultClass": "statement-deleted",
           "file": "src/probe/discover.mjs",
-          "find": "  const importing = listTestFiles(projectDir).filter((t) => fileImports(projectDir, join(projectDir, t), targetRel));",
-          "replace": "  const importing = listTestFiles(projectDir);",
+          "find": "    : listTestFiles(projectDir).filter((t) => fileImports(projectDir, join(projectDir, t), targetRel));",
+          "replace": "    : listTestFiles(projectDir);",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -1250,7 +1250,7 @@
           "description": "An unknown runner name silently falls back to the first candidate instead of erroring.",
           "faultClass": "return-altered",
           "file": "src/probe/runners/index.mjs",
-          "find": "  if (!candidates[0]) return { error: `unknown runner \"${name}\"; use vitest, jest, playwright or auto` };",
+          "find": "  if (!candidates[0]) return { error: `unknown runner \"${name}\"; use ${RUNNER_NAMES.join(', ')} or auto` };",
           "replace": "  if (!candidates[0]) candidates = [vitest];",
           "producedBy": {
             "producer": "human",
@@ -2268,6 +2268,270 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PYTHON-ENGINE-IS-RECORDED",
+      "statement": "The evidence records the Python engine that actually ran, and a pinned engine fails rather than silently falling back to the other.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/runner-python.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "--runner pytest falls back to unittest when pytest is missing, so the evidence names an engine that never ran.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/python.mjs",
+          "find": "  if (engine === 'pytest' && !found.pytest) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An explicit --python is only a preference: resolution falls through to another interpreter, changing which dependencies the tests ran against.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/python.mjs",
+          "find": "  if (explicit) return [{ path: explicit, source: 'project', explicit: true }];",
+          "replace": "  if (explicit) out.push({ path: explicit, source: 'project' });",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PYTHON-COLLECTION-ERROR-NEVER-KILLS",
+      "statement": "A Python module that will not import is a load failure, never a detection; a test the suite expected to fail that passed makes the run non-green without ever being an assertion failure.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/runner-python.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A collection error is reported as an ordinary failure, so a fault whose replacement does not parse would count as a kill.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/python.mjs",
+          "find": "  if (collectionErrors.length > 0 || total === 0) outcome = 'error';",
+          "replace": "  if (false) outcome = 'error';",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A timed-out test counts toward assertion failures, so a hang becomes a kill.",
+          "faultClass": "variable-swap",
+          "file": "src/probe/runners/python.mjs",
+          "find": "    run: { outcome, tests: summary, assertionFailures: failed.length - timedOut.length, durationMs },",
+          "replace": "    run: { outcome, tests: summary, assertionFailures: failed.length, durationMs },",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PYTHON-BYTECODE-NEVER-STALE",
+      "statement": "Every Python run reads and writes bytecode outside the tree under probe, so a length-preserving fault applied within the same second can never be served from a cached .pyc.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/runner-python.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The cache prefix is dropped, so Python consults the tree's existing __pycache__ and a same-second, same-length fault never executes.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/runners/python.mjs",
+          "find": "    PYTHONPYCACHEPREFIX: '{out}.pycache',\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PYTHON-PROVENANCE-REFUSES-A-FOREIGN-IMPORT",
+      "statement": "When the interpreter loaded the subject from outside the tree being probed, the run is refused; no verdict is emitted from a run in which the fault could not have executed.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/probe.python.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A subject imported from outside the probed tree is accepted, so every claim in that run is reported SURVIVED however good the tests are.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/probe.mjs",
+          "find": "  if (isoReal && !isInside(isoReal, loaded)) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PYTHON-ATTRIBUTE-PATCH-IS-STILL-A-DEFENDER",
+      "statement": "A Python test that patches one attribute of the subject remains a defender; only a patch of the module itself removes one.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/pyimports.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An attribute patch is treated as a module mock, so files that defend the claim are dropped and it is reported nocover.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/pyimports.mjs",
+          "find": "    if (path === target.dotted) whole.push(path);",
+          "replace": "    if (path.startsWith(target.dotted)) whole.push(path);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PYTHON-DISCOVERY-BY-MODULE-NAME",
+      "statement": "Python defenders are discovered by module name, the way Python itself resolves an import, so a test that reaches the subject through sys.path or an installed distribution is still found.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/pyimports.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Only an exact module match counts, so importing a package's __init__ by a submodule path no longer finds it.",
+          "faultClass": "return-altered",
+          "file": "src/probe/pyimports.mjs",
+          "find": "  return dotted === target.dotted || (target.isPackage && dotted.startsWith(target.dotted + '.'));",
+          "replace": "  return dotted === target.dotted;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PYTHON-PRODUCERS-ALWAYS-COMPILE",
+      "statement": "A proposed Python fault always parses: a statement is removed by replacing it with pass, and a line that leaves a bracket open is never removed at all.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#authoring-faults-mechanically"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/scaffold.python.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A line that opens a multi-line literal is proposed for removal, orphaning the lines below it and producing a fault that cannot compile.",
+          "faultClass": "condition-forced",
+          "file": "src/scaffold/producers.python.mjs",
+          "find": "  const complete = !isIncomplete(line);",
+          "replace": "  const complete = true;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RUNNER-CMD-SHAPE-IS-NAMED",
+      "statement": "A runner report that carries no recognisable test results is an error that names the mismatch, never a run of zero tests reported without explanation.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/runner-command.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An unrecognised report shape produces no message, so the verdict is unverifiable with nothing said about why.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "  const unknownShape = report == null || typeof report !== 'object' || !Array.isArray(report.testResults);",
+          "replace": "  const unknownShape = false;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
           }
         }
       ]

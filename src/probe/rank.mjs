@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join, resolve, extname } from 'node:path';
 import { walk } from '../util/glob.mjs';
+import { pyBlastRadius } from './pyimports.mjs';
 
 const aliasCache = new Map();
 
@@ -168,6 +169,7 @@ export function fileImports(projectDir, absFile, targetRel) {
  * bare package specifiers are not. Direct imports only.
  */
 export function blastRadius(projectDir, targetRel) {
+  if (targetRel.endsWith('.py')) return pyBlastRadius(projectDir, targetRel);
   const targetAbs = resolve(projectDir, targetRel);
   const aliases = loadAliases(projectDir);
   let count = 0;

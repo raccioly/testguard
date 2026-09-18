@@ -6,9 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- **A five-page technical brief**, [`docs/testguard-explained.pdf`](docs/testguard-explained.pdf):
+  the whole idea on page one, the field measurements on page two, then
+  mechanics, architecture and prior art. Six diagrams, including a dot matrix
+  of the 39 injected faults from the second field report — 21 survived a fully
+  green suite, 39/39 killed after tests were written against the survivors. Built from
+  `docs/testguard-explained.html` with `node .github/scripts/build-one-pager.mjs`
+  (headless Chrome, so the one pinned runtime dependency stays one).
+
+### Changed
+- **The README leads with the plain explanation.** The research evidence is
+  still there and still matters, but it is not the first thing a newcomer
+  meets: an "In one minute" section now opens with what coverage cannot tell
+  you, the `objectContaining` exhibit, killed vs SURVIVED, the seven verdicts,
+  and — stated plainly — that mutation testing is from the 1970s and the novel
+  part is binding every fault to a claim.
+- The one-line descriptions on npm, PyPI and the GitHub Action now say what the
+  tool does rather than what category it belongs to.
 
 ### Fixed
-
 - **A prior verdict is no longer reused across a fault edit.** `probe` decided
   reuse from the source hash, the defender hashes and the defender set — never
   from the fault itself. So editing a fault's `find` or `replace` kept the
@@ -23,29 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the cost of the other direction is a verdict nobody took.
   Found by using the tool on itself: repairing two rotted anchors left both
   claims reporting `UNVERIFIABLE (reused)` on the next probe.
-
-
-### Added
-
-- **A five-page technical brief**, [`docs/testguard-explained.pdf`](docs/testguard-explained.pdf):
-  the whole idea on page one, the field measurements on page two, then
-  mechanics, architecture and prior art. Six diagrams, including a dot matrix
-  of the 39 injected faults from the second field report — 21 survived a fully
-  green suite, 39/39 killed after tests were written against the survivors. Built from
-  `docs/testguard-explained.html` with `node .github/scripts/build-one-pager.mjs`
-  (headless Chrome, so the one pinned runtime dependency stays one).
-
-### Changed
-
-- **The README leads with the plain explanation.** The research evidence is
-  still there and still matters, but it is not the first thing a newcomer
-  meets: an "In one minute" section now opens with what coverage cannot tell
-  you, the `objectContaining` exhibit, killed vs SURVIVED, the seven verdicts,
-  and — stated plainly — that mutation testing is from the 1970s and the novel
-  part is binding every fault to a claim.
-- The one-line descriptions on npm, PyPI and the GitHub Action now say what the
-  tool does rather than what category it belongs to.
-
 
 ### Added
 
@@ -66,7 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Self-claims `TG-PROGRESS-NOT-ONLY-FOR-A-TTY`, `TG-PROGRESS-NEVER-ON-STDOUT`
   and `TG-PROGRESS-EXPLICIT-WINS`, all probed and killed.
 
-### Added
 
 - **`--cost`, on `probe` and `claims`** — what the defenders actually cost,
   per claim and per defender file, read back out of the `durationMs` the
@@ -104,6 +96,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.pre-commit-hooks.yaml` (what we publish for consumers) and
   `.pre-commit-config.yaml` (what contributors to this repository use).
   README gains the `Usage` section the Standard README spec expects.
+- **A Python runner** (`--runner python|pytest|unittest`, and `auto` when no
+  JavaScript runner resolves). `pytest` when the project's interpreter can
+  import it, stdlib `unittest` when it cannot; the engine that actually ran is
+  what `run.runner.name` records, and `--runner pytest` / `--runner unittest`
+  pin the choice and fail rather than fall back. **Nothing is installed into
+  the project under test**: the reporters ship inside TestGuard and reach the
+  interpreter through `PYTHONPATH`, so a codebase whose test dependencies are
+  the standard library stays one. A `.py` defender runs under Python whatever
+  the project runner is, so one claim can be defended by a vitest test and a
+  pytest test at once.
+- `--python <path>` (or `TESTGUARD_PYTHON`) names the interpreter. Otherwise:
+  the active `VIRTUAL_ENV`, then the project's `.venv`/`venv`/`.env`, then
+  `python3` on PATH. An interpreter you name is the only one tried — TestGuard
+  never quietly substitutes another, which would change what the tests ran
+  against without changing anything the evidence says.
+- **An import-provenance precondition, and `detail.targetNotImported`.** A
+  green baseline proves the harness is not reporting everything as broken. It
+  proves nothing about the opposite direction, and Python can reach it: a
+  strict editable install puts an import hook ahead of `sys.path`, so the
+  interpreter loads the original file while TestGuard faults the copy. The
+  baseline stays green, every claim is reported `SURVIVED`, and the result
+  reads as a devastating finding while being entirely false. With the fault
+  applied, TestGuard now asks which file was actually imported: loaded from
+  outside the tree being probed **refuses the run**; never imported at all is
+  recorded as `detail.targetNotImported` and warned about, because an import
+  in a branch the fault does not reach is legitimate.
+- **`target-attribute-patched`**, a new defender signal. `patch("pkg.mod.fn")`
+  is not `vi.mock("./mod")`: it replaces one attribute, so the file still
+  detects a fault anywhere else in that module. Applying the JavaScript rule
+  would have dropped such files and reported `nocover` for well-defended
+  claims. Only a patch of the module itself removes a defender; an attribute
+  patch keeps it and names the attributes.
+- Python fault producers for `testguard scaffold`: `condition-forced`,
+  `statement-deleted`, `return-altered`, `literal-changed`, `call-removed`,
+  `field-dropped` and `argument-swapped`, in Python syntax. A statement is
+  removed by replacing it with `pass` rather than deleting the line, and a line
+  that leaves a bracket open is never removed — both because a fault that
+  cannot compile is a probe run that says nothing about the tests.
+- Python defender discovery, mock-awareness and blast radius: matched by module
+  name, the way Python itself matches, so `import`, `from … import`, aliases,
+  relative imports and `importlib.import_module` all resolve.
+- `fixtures/known-answer-python/`: sixteen faults covering every verdict, each
+  verified by hand before it became the oracle, and reproduced under **both**
+  engines.
 
 ### Changed
 
@@ -132,6 +168,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never optimistic under uncertainty — and stating those positively would
   misdescribe them. A declared, reasoned exception is auditable; contorted
   prose is not.
+- `--runner` accepts `python`, `pytest` and `unittest`; `--runner auto` tries
+  vitest, then jest, then python. A JavaScript project with neither vitest nor
+  jest installed now also reports why Python did not resolve.
+- The GitHub Action and the GitLab template take `runner` and `python` inputs.
+
+### Fixed
+
+- `gate --changed` treated a changed `.py` file as `non-source` and excluded it,
+  so it could never be reported as uncovered. Python is source; Python test
+  files (`test_*.py`, `*_test.py`) are tests.
+- `walk()` descended into `.venv`, `venv`, `site-packages`, `__pycache__`,
+  `.tox`, `.nox` and the pytest/mypy/ruff caches. Every `test_*.py` of every
+  installed package was collected as a test file of the project under probe.
+- `testguard claims` printed a JavaScript comment marker (`// unasserted:`)
+  when suggesting how to annotate a mock in a Python file.
+- A `--runner-cmd` whose reporter emits something other than the jest-compatible
+  JSON shape produced `unverifiable / defenders-failed-to-load` with no message
+  at all. The verdict was already safe — a report with no recognised tests is a
+  non-green baseline, never a pass — but nothing said why. It now names the
+  mismatch.
 
 ## [0.6.0] - 2026-09-17
 

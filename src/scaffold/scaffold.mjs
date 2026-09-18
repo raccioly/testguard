@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { proposalsForLine, functionHead, functionParams } from './producers.mjs';
+import * as py from './producers.python.mjs';
 import { locate } from '../probe/inject.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { validate } from '../../spec/lib/validate.mjs';
@@ -9,8 +10,90 @@ const ANNOTATION = /@claim\s+([A-Za-z0-9]+(?:[._]?[A-Za-z0-9]+)*-[A-Za-z0-9._-]*
 // field-dropped is never proposed inside tests, fixtures or migrations: an
 // object literal there is data, not a payload the product writes.
 const NO_FIELD_DROPS = /\.(test|spec)\.[cm]?[jt]sx?$|(^|\/)(__tests__|__fixtures__|__mocks__|fixtures|migrations)\//;
+// Python names its tests by file rather than by a dotted suffix, so the JS
+// rule would not recognise one. Kept separate so adding Python cannot quietly
+// change which proposals a JavaScript file gets.
+const NO_FIELD_DROPS_PY = /(^|\/)(test[^/]*\.py|[^/]*_test\.py|conftest\.py)$|(^|\/)(tests?|__fixtures__|fixtures|migrations)\//;
 
 const idPart = (s) => s.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').toUpperCase();
+
+const isPython = (file) => file.endsWith('.py');
+
+/**
+ * JavaScript line scan: enclosing function tracked by brace depth, `@claim`
+ * annotations read from `//` and `/* *\u002f` comments.
+ */
+function scanJs({ source, lines, fieldDrops, keep, anchor }) {
+  const proposals = [];
+  let offset = 0;
+  let fn = null;
+  let fnDepth = 0;
+  let params = new Set();
+  let depth = 0;
+  let pendingAnnotation = null;
+  lines.forEach((line, i) => {
+    const ann = ANNOTATION.exec(line);
+    if (ann && /^\s*(\/\/|\*|\/\*)/.test(line)) pendingAnnotation = ann[1];
+
+    const head = functionHead(line);
+    if (head) {
+      fn = head;
+      fnDepth = depth;
+      params = new Set(functionParams(line));
+    }
+
+    for (const p of proposalsForLine(lines, i, { params, fieldDrops })) {
+      const { hits, occurrence } = anchor(line, offset);
+      const fault = { ...p, find: line, replace: p.replace, expectHits: hits, occurrence, line: i + 1, fn, annotation: pendingAnnotation };
+      if (keep(fault)) proposals.push(fault); // never propose an anchor that would be unverifiable
+    }
+
+    depth += (line.match(/\{/g) ?? []).length - (line.match(/\}/g) ?? []).length;
+    if (fn && depth <= fnDepth && !head) { fn = null; params = new Set(); }
+    if (pendingAnnotation && !ann && !head && line.trim() && !/^\s*(\/\/|\*|\/\*)/.test(line)) pendingAnnotation = null;
+    offset += line.length + 1;
+  });
+  return proposals;
+}
+
+/**
+ * Python line scan. Scope is indentation, not braces, and it must be read
+ * BEFORE the line is attributed: a line dedented out of a function belongs to
+ * whatever follows, not to the function that just ended. `@claim` annotations
+ * are read from `#` comments.
+ */
+function scanPython({ source, lines, fieldDrops, keep, anchor }) {
+  const proposals = [];
+  let offset = 0;
+  let fn = null;
+  let fnIndent = 0;
+  let params = new Set();
+  let pendingAnnotation = null;
+  lines.forEach((line, i) => {
+    const indent = py.indentOf(line);
+    if (fn !== null && indent !== null && indent <= fnIndent) { fn = null; params = new Set(); }
+
+    const ann = ANNOTATION.exec(line);
+    if (ann && py.isComment(line)) pendingAnnotation = ann[1];
+
+    const head = py.functionHead(line);
+    if (head) {
+      fn = head;
+      fnIndent = indent ?? 0;
+      params = new Set(py.functionParams(line));
+    }
+
+    for (const p of py.proposalsForLine(lines, i, { params, fieldDrops })) {
+      const { hits, occurrence } = anchor(line, offset);
+      const fault = { ...p, find: line, replace: p.replace, expectHits: hits, occurrence, line: i + 1, fn, annotation: pendingAnnotation };
+      if (keep(fault)) proposals.push(fault);
+    }
+
+    if (pendingAnnotation && !ann && !head && line.trim() && !py.isComment(line)) pendingAnnotation = null;
+    offset += line.length + 1;
+  });
+  return proposals;
+}
 
 /** How many times `find` occurs, and which occurrence the line at `offset` is. */
 function anchorFor(source, find, offset) {
@@ -43,38 +126,9 @@ export function scaffoldFile({ projectDir, file, claimId, existingClaims, toolVe
     return groups.get(key);
   };
 
-  let offset = 0;
-  let fn = null;
-  let fnDepth = 0;
-  let params = new Set();
-  const fieldDrops = !NO_FIELD_DROPS.test(file);
-  let depth = 0;
-  let pendingAnnotation = null;
-  const proposals = [];
-  lines.forEach((line, i) => {
-    const ann = ANNOTATION.exec(line);
-    if (ann && /^\s*(\/\/|\*|\/\*)/.test(line)) pendingAnnotation = ann[1];
-
-    const head = functionHead(line);
-    if (head) {
-      fn = head;
-      fnDepth = depth;
-      params = new Set(functionParams(line));
-    }
-
-    for (const p of proposalsForLine(lines, i, { params, fieldDrops })) {
-      const find = line;
-      const { hits, occurrence } = anchorFor(source, find, offset);
-      const fault = { ...p, find, replace: p.replace, expectHits: hits, occurrence, line: i + 1, fn, annotation: pendingAnnotation };
-      if (locate(source, fault).status !== 'ok') continue; // never propose an anchor that would be unverifiable
-      proposals.push(fault);
-    }
-
-    depth += (line.match(/\{/g) ?? []).length - (line.match(/\}/g) ?? []).length;
-    if (fn && depth <= fnDepth && !head) { fn = null; params = new Set(); }
-    if (pendingAnnotation && !ann && !head && line.trim() && !/^\s*(\/\/|\*|\/\*)/.test(line)) pendingAnnotation = null;
-    offset += line.length + 1;
-  });
+  const fieldDrops = !(isPython(file) ? NO_FIELD_DROPS_PY : NO_FIELD_DROPS).test(file);
+  const scan = isPython(file) ? scanPython : scanJs;
+  const proposals = scan({ source, lines, fieldDrops, keep: (fault) => locate(source, fault).status === 'ok', anchor: (find, offset) => anchorFor(source, find, offset) });
 
   const existing = new Map((existingClaims?.claims ?? []).map((c) => [c.id, c]));
   const usedIds = new Set();

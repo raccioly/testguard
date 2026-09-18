@@ -1,7 +1,13 @@
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'coverage', '.testguard']);
+// Dependency and tool directories. The Python entries are not cosmetic: a
+// virtualenv inside the project holds thousands of `test_*.py` files belonging
+// to installed packages, and without skipping it every one of them would be
+// collected as a test file of the project under probe.
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'coverage', '.testguard',
+  '__pycache__', '.venv', 'venv', 'site-packages', '.tox', '.nox',
+  '.pytest_cache', '.mypy_cache', '.ruff_cache', '.eggs']);
 
 /** Translate a minimal glob (`**`, `*`, `?`) into an anchored RegExp over posix paths. */
 export function globToRegExp(glob) {
