@@ -15,6 +15,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (headless Chrome, so the one pinned runtime dependency stays one).
 
 ### Changed
+- **The self-probe gate, re-measured and cut** (#73). `--cost` at `ffaaa81`
+  reported **1414 s across 546 defender runs for 91 faults** — back where #67
+  started, because #77 took the corpus from 59 faults to 91. The gate did not
+  decay; the workload grew, and nothing gated on that.
+  The issue's original table pointed at `test/replay.test.mjs`. Measurement
+  disagreed: that file is 138 s across *six* claims, about 23 s each, the
+  cheapest per-claim cost in the top ten — the table had read a cumulative
+  column as a per-claim one. The real cost was four claims paying an
+  end-to-end fixture probe, 33 to 37 s a run, to falsify decisions that are
+  pure functions.
+  Each was re-pointed at a test that does not need the expensive setup, and
+  **each was then re-probed rather than assumed**: 7 faults, 7 killed, 92 s
+  where they had cost about 860 s.
+  - `checkProvenance` is now exported and unit-tested. It was already a
+    standalone function, and only a 33 s Python fixture probe could falsify it.
+  - `argvFor` is pure, and its own comment says it is "exported so it is
+    falsifiable without spawning anything" — while the claim still paid two
+    fixture probes. `test/runner-argv.test.mjs` asserts the argv directly in
+    126 ms, and covers `selectRunner`'s unknown-name guard too.
+  - The isolation fault needed new work before it could move: forcing
+    isolation to in-place left every fast test green, because they all probe
+    in place anyway, so only the 37 s fixture noticed. Caught by injecting the
+    fault by hand before trusting the re-point — the same trap that made two
+    of five claims survive in #67.
+- **`TG-PIPELINE-REPRODUCES-THE-ORACLE` is restated as
+  `TG-PROBE-NEVER-EDITS-THE-TREE-IT-MEASURES`**, both faults carried over
+  unchanged, the old id retired through the ignore file with a reason.
+  The old statement promised that a probe "reproduces the known-answer
+  fixture's verdicts exactly", and **no fault in it ever falsified that
+  half**: one removes the restore, the other forces in-place isolation, and
+  both are about tree safety. A claim that is defended and still over-promises
+  is the one thing a probe cannot catch, so the statement was narrowed to what
+  its faults actually prove — swapping the defender alone would have kept the
+  over-promise and merely made it cheaper. The fixture oracle still runs on
+  every `npm test` and in CI; it is no longer the defender of a claim whose
+  cost it dominated.
 - **The shared spec is named `claimspec`.** Schemas are now identified as
   `urn:claimspec:v1:<kind>` rather than `urn:guard-spec:v1:<kind>`.
   **No emitted document changes**: the identifier lives only in the schemas'

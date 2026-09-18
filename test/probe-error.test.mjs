@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { probe, errorRecord } from '../src/probe/probe.mjs';
+import { probe, errorRecord, checkProvenance } from '../src/probe/probe.mjs';
 import { PreconditionError } from '../src/probe/worktree.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 
@@ -131,4 +131,52 @@ describe('one bad fault does not cost the evidence for the rest', () => {
       .rejects.toThrow(PreconditionError);
     rmSync(dir, { recursive: true, force: true });
   }, 120_000);
+});
+
+/**
+ * Import provenance, without a probe.
+ *
+ * The decision is one comparison — is the file the interpreter actually loaded
+ * inside the tree being faulted? — and it was falsifiable only through the
+ * Python known-answer fixture, at 33 seconds a run and 199 seconds of the
+ * gate. It is a pure function over what the reporter said; the fixture proves
+ * the reporter says it, which is a different claim.
+ */
+describe('checkProvenance — the fault must be the code that ran', () => {
+  const claim = { id: 'C-1' };
+  const fault = { id: 'F1', file: 'demo/redact.py' };
+  const call = (provenance, isoReal, detail = {}) => {
+    const warnings = [];
+    checkProvenance({ claim, fault, provenance, isoReal, detail, onWarn: (m) => warnings.push(m) });
+    return { detail, warnings };
+  };
+
+  it('refuses the whole run when the interpreter loaded the module from outside the probed tree', () => {
+    // Not a verdict about one claim: every verdict in the run would be false,
+    // because nothing TestGuard changed could ever have executed.
+    expect(() => call({ 'demo/redact.py': '/usr/lib/python3/site-packages/demo/redact.py' }, '/scratch/probe'))
+      .toThrow(PreconditionError);
+    expect(() => call({ 'demo/redact.py': '/usr/lib/python3/site-packages/demo/redact.py' }, '/scratch/probe'))
+      .toThrow(/imported .* instead|strict editable|--in-place/s);
+  });
+
+  it('accepts a module loaded from inside the probed tree', () => {
+    const { detail, warnings } = call({ 'demo/redact.py': '/scratch/probe/demo/redact.py' }, '/scratch/probe');
+    expect(detail.targetNotImported).toBeUndefined();
+    expect(warnings).toEqual([]);
+  });
+
+  it('records and warns, but does not refuse, when nothing imported the subject', () => {
+    // A lazy import inside a branch the fault does not reach is legitimate;
+    // refusing would substitute the tool's judgement for the author's.
+    const { detail, warnings } = call({ 'demo/redact.py': null }, '/scratch/probe');
+    expect(detail.targetNotImported).toBe(true);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/never imported/);
+  });
+
+  it('says nothing when the runner cannot report provenance at all', () => {
+    expect(call(undefined, '/scratch/probe').detail).toEqual({});
+    expect(call({}, '/scratch/probe').detail).toEqual({});
+  });
 });

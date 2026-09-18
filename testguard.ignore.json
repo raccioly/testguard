@@ -40,7 +40,7 @@
     {
       "kind": "path",
       "pattern": "src/probe/runners/python/**",
-      "reason": "The injected Python reporters. They are not JavaScript, so a claim here could only be probed by running TestGuard's Python runner against TestGuard itself \u2014 circular, and it would prove the runner with the runner. They are instead held to fixtures/known-answer-python, whose sixteen verdicts were verified by hand against `python -m unittest`'s own exit code and must reproduce under BOTH engines: any behaviour change in a reporter moves a verdict there, in CI, on every push. Re-evaluate if they gain logic the fixture cannot reach.",
+      "reason": "The injected Python reporters. They are not JavaScript, so a claim here could only be probed by running TestGuard's Python runner against TestGuard itself — circular, and it would prove the runner with the runner. They are instead held to fixtures/known-answer-python, whose sixteen verdicts were verified by hand against `python -m unittest`'s own exit code and must reproduce under BOTH engines: any behaviour change in a reporter moves a verdict there, in CI, on every push. Re-evaluate if they gain logic the fixture cannot reach.",
       "by": "maintainer",
       "at": "2026-09-18T00:00:00Z"
     },
@@ -50,6 +50,13 @@
       "reason": "Build and release scripts that run only in CI and are proven by CI failing: the install smoke, the version sync (claimed as TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT where its logic lives), the fixture verdict check and the PDF build. None ships in the package.",
       "by": "maintainer",
       "at": "2026-09-18T00:00:00Z"
+    },
+    {
+      "kind": "claim",
+      "pattern": "TG-PIPELINE-REPRODUCES-THE-ORACLE",
+      "reason": "Restated as TG-PROBE-NEVER-EDITS-THE-TREE-IT-MEASURES, with both faults carried over unchanged. The old statement promised that a probe \"reproduces the known-answer fixture's verdicts exactly\", and no fault in it ever falsified that half: F1 removes the restore and F2 forces in-place isolation, which are both about tree safety. A claim that is defended and still over-promises is the one thing a probe cannot catch, so the statement was narrowed to what its faults actually prove. The fixture oracle is still run on every `npm test` and in CI; it is no longer the defender of a claim whose cost it dominated (444 s, 31% of the gate) for two faults a 4 s test set kills.",
+      "by": "maintainer",
+      "at": "2026-09-18T07:41:17Z"
     }
   ]
 }

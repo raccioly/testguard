@@ -5,7 +5,11 @@ import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, symlin
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createScratch, findNodeModules, PreconditionError } from '../src/probe/worktree.mjs';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function repo() {
   const dir = mkdtempSync(join(tmpdir(), 'tg-wt-'));
@@ -74,4 +78,49 @@ describe('createScratch', () => {
     const { dir } = repo();
     expect(() => createScratch({ repoRoot: dir, projectDir: dir, ref: 'no-such-ref' })).toThrow(PreconditionError);
   });
+});
+
+/**
+ * The isolation a probe actually created, asserted through a real run.
+ *
+ * `createScratch` is unit-tested above, but nothing cheap checked that `probe`
+ * CHOOSES it: forcing the isolation to in-place left every fast test green,
+ * because they all probe in place anyway. The only assertion that noticed was
+ * in the 37-second known-answer fixture, so the claim about never touching the
+ * user's tree was paying an end-to-end oracle to falsify a one-line ternary.
+ *
+ * `run.mode` is recorded from the isolation object rather than from the `mode`
+ * argument, so it is a fact about the run and not an echo of its input.
+ */
+describe('probe chooses its isolation, and says which one it used', () => {
+  it('worktree mode probes a scratch copy and leaves the project tree untouched', async () => {
+    const { probe } = await import('../src/probe/probe.mjs');
+    const dir = mkdtempSync(join(tmpdir(), 'tg-iso-'));
+    const g = (...a) => spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8' });
+    g('init', '-q');
+    mkdirSync(join(dir, 'src'));
+    mkdirSync(join(dir, 'test'));
+    writeFileSync(join(dir, 'src', 'a.mjs'), 'export const a = () => 1;\n');
+    writeFileSync(join(dir, 'test', 'a.test.mjs'), "import { expect, it } from 'vitest';\nimport { a } from '../src/a.mjs';\nit('is one', () => expect(a()).toBe(1));\n");
+    writeFileSync(join(dir, '.gitignore'), 'node_modules\n');
+    g('add', '-A');
+    g('commit', '-qm', 'one');
+    symlinkSync(join(ROOT, 'node_modules'), join(dir, 'node_modules'), 'dir');
+    const before = readFileSync(join(dir, 'src', 'a.mjs'), 'utf8');
+    const claims = {
+      schemaVersion: 1,
+      claims: [{
+        id: 'C-1', statement: 'a() returns one.', severity: 'low', source: { kind: 'manual' },
+        producedBy: { producer: 'human' }, defendedBy: ['test/a.test.mjs'],
+        faults: [{ id: 'F1', description: 'd', faultClass: 'other', file: 'src/a.mjs', find: '1', replace: '2', producedBy: { producer: 'human' } }],
+      }],
+    };
+    const ev = await probe({ projectDir: dir, claims, mode: 'worktree', confirmRuns: 1, budgetMs: 60_000, escalate: false, toolVersion: 't' });
+    // A record saying `worktree` while the probe edited the project in place
+    // would be a false statement about where the evidence came from, and
+    // nothing downstream could detect it.
+    expect(ev.run.mode).toBe('worktree');
+    expect(ev.records[0].verdict).toBe('killed');
+    expect(readFileSync(join(dir, 'src', 'a.mjs'), 'utf8')).toBe(before);
+  }, 120_000);
 });
