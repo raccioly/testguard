@@ -34,7 +34,7 @@ in review, and replayable by anyone holding the repository.
 
 ## Schema Definitions
 
-Every kind is JSON Schema 2020-12, identified as `urn:guard-spec:v1:<kind>`.
+Every kind is JSON Schema 2020-12, identified as `urn:claimspec:v1:<kind>`.
 `spec/lib/validate.mjs` applies the schema **and** the semantic rules a schema
 cannot express. `spec/lib/fingerprint.mjs` is the single fingerprint
 implementation every tool must use.
@@ -90,7 +90,7 @@ target file to importing tests for defender discovery.
 ## Migration Strategy
 
 The contract is versioned by `schemaVersion` inside every document and by the
-`urn:guard-spec:v1:` identifier on every schema.
+`urn:claimspec:v1:` identifier on every schema.
 
 - **Additive change** (a new optional field): no migration; older readers
   ignore it, and `additionalProperties: false` means the field must be added to
@@ -99,7 +99,7 @@ The contract is versioned by `schemaVersion` inside every document and by the
   spec change. The schema, `GATE-SEMANTICS.md`, the validator's semantic rules,
   a conformance example, a must-reject document and the known-answer fixture
   all change together, in the same pull request.
-- **Breaking change**: a new `urn:guard-spec:v2:` identifier. None has been
+- **Breaking change**: a new `urn:claimspec:v2:` identifier. None has been
   needed.
 - **Regenerated artifacts** (evidence, brief, gate) need no migration: delete
   and re-probe. **Committed artifacts** (claims, ignore, baseline) do, and the

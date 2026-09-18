@@ -15,7 +15,7 @@ for (const f of readdirSync(schemaDir).filter((n) => n.endsWith('.schema.json'))
 }
 
 const schemaFor = (kind) => {
-  const v = ajv.getSchema(`urn:guard-spec:v1:${kind}`);
+  const v = ajv.getSchema(`urn:claimspec:v1:${kind}`);
   if (!v) throw new RangeError(`unknown Guard-spec kind: ${kind}`);
   return v;
 };

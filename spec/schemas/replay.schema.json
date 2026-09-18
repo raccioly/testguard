@@ -1,21 +1,21 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:guard-spec:v1:replay",
-  "title": "Guard spec v1 — bug replay",
+  "$id": "urn:claimspec:v1:replay",
+  "title": "claimspec v1 — bug replay",
   "description": "Would this suite have caught the bugs that actually escaped? For each fix commit in a range: revert only the source to its parent, remove the test the fix shipped, run what remains. `blind` means the suite was blind to a bug that really shipped. Unlike an injected fault, a replayed bug is ground truth — a human already confirmed it was a defect — which is what makes this the oracle a fault model is calibrated against.",
   "type": "object",
   "required": ["schemaVersion", "tool", "run", "records"],
   "properties": {
     "$schema": { "type": "string" },
     "schemaVersion": { "const": 1 },
-    "tool": { "$ref": "urn:guard-spec:v1:common#/$defs/tool" },
+    "tool": { "$ref": "urn:claimspec:v1:common#/$defs/tool" },
     "run": {
       "type": "object",
       "required": ["id", "startedAt", "range", "confirmRuns"],
       "properties": {
         "id": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "startedAt": { "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime" },
-        "finishedAt": { "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime" },
+        "startedAt": { "$ref": "urn:claimspec:v1:common#/$defs/isoDateTime" },
+        "finishedAt": { "$ref": "urn:claimspec:v1:common#/$defs/isoDateTime" },
         "range": {
           "description": "The commit range searched for fix commits, as given.",
           "type": "string",
@@ -43,7 +43,7 @@
         "type": "object",
         "required": ["commit", "patchId", "verdict", "source", "removedTests", "runs"],
         "properties": {
-          "commit": { "$ref": "urn:guard-spec:v1:common#/$defs/gitSha" },
+          "commit": { "$ref": "urn:claimspec:v1:common#/$defs/gitSha" },
           "patchId": {
             "description": "`git patch-id --stable` of the fix: the identity of the CHANGE rather than of the commit. A dual-branch topology carries the same fix under several shas, and counting it twice corrupts the corpus. Hex, 40 characters for a SHA-1 repository and 64 for a SHA-256 one; the commit sha when git could not compute one.",
             "type": "string",
@@ -59,22 +59,22 @@
             "description": "Source files reverted to the fix's parent.",
             "type": "array",
             "minItems": 1,
-            "items": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" }
+            "items": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" }
           },
           "removedTests": {
             "description": "Test files the fix shipped, removed before the run: the fix's own test proves nothing about what the suite knew before it.",
             "type": "array",
-            "items": { "$ref": "urn:guard-spec:v1:common#/$defs/repoPath" }
+            "items": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" }
           },
           "ranTests": { "type": "integer", "minimum": 0 },
           "faultClass": {
             "description": "The injected-fault class this real diff most resembles, derived mechanically from the diff shape. This is the join key between ground truth and a fault model: it is what lets P(this fault class is a real bug) be computed.",
-            "$ref": "urn:guard-spec:v1:common#/$defs/faultClass"
+            "$ref": "urn:claimspec:v1:common#/$defs/faultClass"
           },
           "runs": {
             "type": "array",
             "minItems": 1,
-            "items": { "$ref": "urn:guard-spec:v1:evidence#/$defs/testRun" }
+            "items": { "$ref": "urn:claimspec:v1:evidence#/$defs/testRun" }
           }
         },
         "additionalProperties": false
