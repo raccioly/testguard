@@ -114,6 +114,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was 962 s at 96 faults.
 
 ### Performance
+- **The self-probe cost budget is 1350 s, from 1100.** Six new claims and 14
+  new faults took the gate from 115 to 129 faults and 690 to 774 runs, and CI
+  measured 1123 s against the 1100 ceiling. The budget exists to make exactly
+  this visible rather than let it pass, so the raise is recorded with its
+  measurement and its reason in `testguard.cost-budget.json`. Two caveats are
+  written down there: the 1123 s run restored a cache under the fallback key
+  and so reused some verdicts, which makes it a floor rather than the
+  from-scratch figure this budget is defined against; and the number is
+  expected to come back down, because 44% of the gate is two shared defender
+  files re-run once per claim that names them.
 - **The new calibration claim costs 4.9 s instead of 51 s.** Its tests are
   pure — no git, no fixture corpus, no scratch worktree — but they were added
   to `replay.test.mjs`, whose scripted-corpus setup costs tens of seconds a
