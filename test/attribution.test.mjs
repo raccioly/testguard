@@ -181,6 +181,17 @@ describe('reuse — a prior verdict may only stand for the fault that produced i
     expect(isReusable(prior({ defenders: { requested: ['a.test.mjs'], resolved: ['a.test.mjs', 'b.test.mjs'] } }), current())).toBe(false);
   });
 
+  it('never reuses a record that exists because the probe threw', () => {
+    // `probe-error` is a statement about the run, not about the code: the tree
+    // was being deleted underneath it, a runner vanished, something threw. Its
+    // inputs can match perfectly and it still has to be measured again, or one
+    // disturbed run becomes a permanent verdict nobody took.
+    const thrown = prior({ verdict: 'unverifiable', detail: { baselineRuns: [], probeRuns: [], reason: 'probe-error', message: 'ENOENT' } });
+    expect(isReusable(thrown, current())).toBe(false);
+    // Every other unverifiable reason is a property of the fault and reuses normally.
+    expect(isReusable(prior({ verdict: 'unverifiable', detail: { baselineRuns: [], probeRuns: [], reason: 'anchor-missing' } }), current())).toBe(true);
+  });
+
   it('has nothing to reuse without a prior', () => {
     expect(isReusable(undefined, current())).toBe(false);
   });

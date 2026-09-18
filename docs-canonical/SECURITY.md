@@ -42,6 +42,11 @@ guarantees are about **what the tool is allowed to touch**:
   changes, so a restore cannot destroy unsaved work.
 - Every mutation registers a restore handler that also runs on `SIGINT`,
   `SIGTERM`, `SIGHUP`, `uncaughtException` and process exit.
+- A restore that cannot write the original back is raised, with one exception:
+  in worktree mode a target that no longer exists is already restored — the
+  mutation only ever lived inside a scratch worktree — and is recorded on the
+  record as `detail.restoreSkipped`. A permission failure is still raised in
+  both modes, because it can mean a mutated file left on disk.
 - The tool never writes to a path outside the project directory except its own
   temporary files, and `repoPath` in the schema rejects absolute paths and
   parent traversal.

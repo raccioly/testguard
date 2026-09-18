@@ -13,7 +13,7 @@
 | ID | Requirement | Priority |
 |---|---|---|
 | FR-01 | Accept a claims file declaring statements, provenance, defenders and deterministic faults, and reject any file that does not conform | P1 |
-| FR-02 | Apply each fault in isolation from the user's working tree, run the claim's defenders, and restore unconditionally | P1 |
+| FR-02 | Apply each fault in isolation from the user's working tree, run the claim's defenders, and restore — unconditionally in-place, and in a scratch worktree except where the target itself no longer exists, which is recorded rather than raised | P1 |
 | FR-03 | Emit a verdict from a closed set of seven, where only `killed` is a pass | P1 |
 | FR-04 | Confirm `killed` and `survived` over N runs (default 3), on a baseline that was green N/N | P1 |
 | FR-05 | Never count a timeout, a load failure or a mixed result as detection | P1 |
@@ -33,7 +33,7 @@
 |---|---|---|
 | NFR-01 | No network access at run time, no telemetry | the CLI opens no socket; the session-start hook contains no form of `npx` |
 | NFR-02 | Exactly one runtime dependency, exact-pinned | `ajv` 8.20.0; proven by the install smoke gate |
-| NFR-03 | The user's working tree is never damaged | scratch worktree by default; restore on signal, exception and exit; refusal to run in place over a dirty target |
+| NFR-03 | The user's working tree is never damaged | scratch worktree by default; restore on signal, exception and exit; refusal to run in place over a dirty target; a restore failure is raised in every case but a scratch target that has already been deleted |
 | NFR-04 | Every emitted document conforms to the published schema before it is written | `writeSpecDoc` refuses non-conforming output |
 | NFR-05 | Verdicts are reproducible and attributable to a commit | evidence records `repo.head`, the snapshot when the working tree was probed, and the runner and its source |
 | NFR-06 | A verdict is never optimistic under uncertainty | contention recorded; flaky and timeout verdicts gate; escalation cannot upgrade a verdict |
@@ -86,7 +86,7 @@ fails the pull request naming the unclaimed file, and `status` reports
 | Requirement | Implementation | Verified by |
 |---|---|---|
 | FR-01 | `src/claims/load.mjs`, `spec/schemas/claims.schema.json` | `spec/conformance/`, `TG-WRITER-REFUSES` |
-| FR-02 | `src/probe/worktree.mjs`, `src/probe/inject.mjs` | `test/worktree.test.mjs`, `TG-RESTORE-ALWAYS`, `TG-SYMLINK-NODE-MODULES` |
+| FR-02 | `src/probe/worktree.mjs`, `src/probe/inject.mjs` | `test/worktree.test.mjs`, `test/inject.test.mjs`, `TG-RESTORE-ALWAYS`, `TG-RESTORE-SURVIVES-A-VANISHED-TARGET`, `TG-IN-PLACE-STILL-RAISES-A-MISSING-TARGET`, `TG-SYMLINK-NODE-MODULES` |
 | FR-03 | `src/probe/classify.mjs` | `test/classify.test.mjs`, the known-answer fixtures |
 | FR-04 | `src/probe/probe.mjs` | `TG-KILL-NEEDS-N` |
 | FR-05 | `src/probe/classify.mjs` | `TG-TIMEOUT-NEVER-KILLS`, `TG-PW-TIMEOUT-NEVER-KILLS` |
@@ -101,10 +101,10 @@ fails the pull request naming the unclaimed file, and `status` reports
 | FR-14 | `src/mcp/` | `test/mcp.test.mjs` |
 | NFR-01 | `src/init/init.mjs`, runner resolution | `TG-INIT-HOOK-NO-NETWORK`, `TG-README-HOOK-MATCHES-THE-CODE` |
 | NFR-02 | `package.json` | `npm run test:install` in CI |
-| NFR-03 | `src/probe/inject.mjs`, `src/probe/probe.mjs` | `TG-DIRTY-DEFENDERS-REFUSED`, `TG-IGNORED-DIRTY-RECORDED` |
+| NFR-03 | `src/probe/inject.mjs`, `src/probe/probe.mjs` | `TG-DIRTY-DEFENDERS-REFUSED`, `TG-IGNORED-DIRTY-RECORDED`, `TG-IN-PLACE-STILL-RAISES-A-MISSING-TARGET` |
 | NFR-04 | `src/evidence/writer.mjs` | `test/writer.test.mjs` |
 | NFR-05 | `src/probe/probe.mjs` | `TG-FINGERPRINT-VERDICT`, `TG-FAULT-EDIT-VISIBLE` |
-| NFR-06 | `src/probe/contention.mjs`, `classify.mjs` | `TG-CONTENTION-NEVER-FAILS-A-PROBE`, `TG-ESCALATION-N-RUNS` |
+| NFR-06 | `src/probe/contention.mjs`, `classify.mjs` | `TG-CONTENTION-NEVER-FAILS-A-PROBE`, `TG-ESCALATION-N-RUNS`, `TG-ONE-BAD-FAULT-KEEPS-THE-EVIDENCE`, `TG-A-PRECONDITION-STILL-REFUSES-THE-RUN`, `TG-A-PROBE-ERROR-IS-NEVER-REUSED` |
 | NFR-07 | verdict reuse, `src/probe/rank.mjs` | `test/probe.fixture.test.mjs` reuse case |
 | NFR-08 | `spec/` | `spec/conformance/schemas.test.mjs` |
 
