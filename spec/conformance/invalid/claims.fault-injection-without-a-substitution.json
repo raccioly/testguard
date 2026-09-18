@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "MIX-001",
+      "statement": "A claim may be falsified more than one way, and each probe says how.",
+      "source": {
+        "kind": "manual"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "faults": [
+        {
+          "id": "P1",
+          "method": "fault-injection",
+          "description": "d",
+          "faultClass": "guard-removed",
+          "file": "src/auth.mjs",
+          "replace": "x",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    }
+  ]
+}

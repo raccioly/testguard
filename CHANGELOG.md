@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed
+- **A probe says which method produced it, and fault injection is no longer
+  assumed** (#81). `claims` required `file`, `find` and `replace` on every
+  fault; `evidence` required `confirmRuns`, `mode`, `defenders`, `inputs` and
+  the baseline and probe runs on every record. All of those are what *fault
+  injection* means by showing its work — and DocGuard verifies claims by
+  reading code while websec-validator scans a surface, so neither could
+  conform without emitting empty arrays, which is lying, and the one thing
+  this format exists to make impossible.
+  A probe now carries `method`, and a run says which method produced it.
+  **It defaults to `fault-injection`, so every document written before the
+  field existed validates unchanged** — verified against this repository's own
+  88-claim file and every conformance example, none of which carries the field.
+  The injection requirements did not disappear, they moved: the schema asks
+  for them only under `fault-injection`, and the validator enforces them there
+  in full. Relaxing the schema so a scanning tool can conform is not a licence
+  for an injecting tool to stop showing its work, and a self-claim now says so.
+  `assertion` and `scan` are **reserved**: their required fields are
+  deliberately unspecified, to be defined by their first real consumer with
+  conformance examples written from the shape that tool actually has.
+  Designing them for an absent tool is exactly the mistake that made this
+  change necessary — the spec was drafted against a single consumer and
+  hard-coded its assumptions as requirements.
 - **A five-page technical brief**, [`docs/testguard-explained.pdf`](docs/testguard-explained.pdf):
   the whole idea on page one, the field measurements on page two, then
   mechanics, architecture and prior art. Six diagrams, including a dot matrix

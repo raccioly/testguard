@@ -7,6 +7,13 @@ import { fingerprint } from './fingerprint.mjs';
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 
 export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate', 'replay']);
+/**
+ * How a document says it tried to falsify its claims. Absent means
+ * `fault-injection`, so every document written before the field existed is
+ * held to exactly the rules it was written against.
+ */
+export const methodOf = (x) => x?.method ?? 'fault-injection';
+const isInjection = (x) => methodOf(x) === 'fault-injection';
 export const PASSING_VERDICTS = Object.freeze(new Set(['killed']));
 
 const ajv = new Ajv2020({ strict: true, allErrors: true });
@@ -33,10 +40,15 @@ const semantic = {
         const p = `/claims/${ci}/faults/${fi}`;
         if (seenFault.has(f.id)) errors.push({ path: `${p}/id`, message: `duplicate fault id "${f.id}" in claim "${c.id}"` });
         seenFault.add(f.id);
-        const occ = f.occurrence ?? 1;
-        const hits = f.expectHits ?? 1;
-        if (occ > hits) errors.push({ path: `${p}/occurrence`, message: `occurrence ${occ} exceeds expectHits ${hits}` });
-        if (f.find === f.replace) errors.push({ path: `${p}/replace`, message: 'replace is identical to find; the fault is a no-op' });
+        // Anchor arithmetic is a property of fault injection. A probe that does
+        // not substitute text has no `find` to compare, and `undefined ===
+        // undefined` would report every one of them as a no-op.
+        if (isInjection(f)) {
+          const occ = f.occurrence ?? 1;
+          const hits = f.expectHits ?? 1;
+          if (occ > hits) errors.push({ path: `${p}/occurrence`, message: `occurrence ${occ} exceeds expectHits ${hits}` });
+          if (f.find === f.replace) errors.push({ path: `${p}/replace`, message: 'replace is identical to find; the fault is a no-op' });
+        }
       });
     });
     return errors;
@@ -44,15 +56,38 @@ const semantic = {
 
   evidence(doc) {
     const errors = [];
+    const injection = isInjection(doc.run);
     const n = doc.run.confirmRuns;
-    if (n < 3 && doc.run.provisional !== true) errors.push({ path: '/run/provisional', message: `confirmRuns ${n} is below 3; the run must declare provisional: true` });
-    if (n >= 3 && doc.run.provisional === true) errors.push({ path: '/run/provisional', message: `confirmRuns ${n} is confirmed; provisional must be absent or false` });
+    // N-run agreement is what fault injection means by "confirmed". A method
+    // that does not re-run anything has no N, and a rule about one would be a
+    // rule about a number that is not there.
+    if (injection) {
+      if (n < 3 && doc.run.provisional !== true) errors.push({ path: '/run/provisional', message: `confirmRuns ${n} is below 3; the run must declare provisional: true` });
+      if (n >= 3 && doc.run.provisional === true) errors.push({ path: '/run/provisional', message: `confirmRuns ${n} is confirmed; provisional must be absent or false` });
+    }
     if (doc.run.runners && doc.run.runner && !doc.run.runners.some((x) => x.name === doc.run.runner.name)) errors.push({ path: '/run/runners', message: 'runners must include the project runner named in run.runner' });
     if (doc.run.repo.ignoredDirty && doc.run.repo.snapshot) errors.push({ path: '/run/repo/ignoredDirty', message: 'a working-tree snapshot has no ignored dirty files: the tree was probed as it is' });
     doc.records.forEach((r, i) => {
       const p = `/records/${i}`;
       const expected = fingerprint({ claimId: r.claim.id, subjectId: r.subject.id, file: r.subject.file ?? '', verdict: r.verdict });
       if (r.fingerprint !== expected) errors.push({ path: `${p}/fingerprint`, message: `fingerprint does not match spec derivation (expected ${expected})` });
+
+      // What the schema no longer requires, the validator still does — for the
+      // one method that means it. Fault injection without defenders, inputs or
+      // runs is not a leaner document, it is a verdict with nothing behind it;
+      // relaxing the schema was to let a scanner conform, never to let an
+      // injecting tool stop showing its work.
+      if (injection) {
+        for (const k of ['defenders', 'inputs']) {
+          if (!r[k]) errors.push({ path: `${p}/${k}`, message: `fault-injection requires ${k} on every record` });
+        }
+        for (const k of ['baselineRuns', 'probeRuns']) {
+          if (!Array.isArray(r.detail[k])) errors.push({ path: `${p}/detail/${k}`, message: `fault-injection requires detail.${k} on every record` });
+        }
+      }
+      // Every rule below reads those fields, so a record that is already
+      // malformed must not also throw on the way to being reported.
+      if (!injection || !r.defenders || !r.inputs || !Array.isArray(r.detail.baselineRuns) || !Array.isArray(r.detail.probeRuns)) return;
 
       const { baselineRuns, probeRuns } = r.detail;
       if (r.verdict === 'killed' || r.verdict === 'survived') {
