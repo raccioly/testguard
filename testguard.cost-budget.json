@@ -70,15 +70,17 @@
     ],
     "expected": "250-350 s, which would put the gate near 800 s with all 129 faults. Lower BOTH ceilings when it lands."
   },
-  "perClaimSeconds": 75,
+  "perClaimSeconds": 100,
   "perClaim": {
-    "seconds": 75,
+    "seconds": 100,
     "why": "A SECOND ceiling, because neither unit works alone. The total can only ever be raised - claims should grow forever - so a number that always goes up stops being read. A per-fault average is worse: the regression that prompted this budget raised the fault count 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine. The measured pathology is per-CLAIM, and specifically a claim naming an expensive SHARED defender file, because a claim pays for every test in the file it names. TG-ADMIT-NEEDS-ALL-KILLED costs 67 s for ONE fault; a new calibration claim landed at 51 s for two purely by being written into replay.test.mjs rather than calibration.test.mjs, and re-pointing it took it to 4.9 s. The total absorbed that silently; this does not.",
     "rule": "No new claim may be worse than the worst we already have. 75 s sits just above today's worst, so the ceiling stays meaningful as claims are added and should be tightened as the shared-defender cut lands.",
     "todayWorst": {
       "id": "TG-ADMIT-NEEDS-ALL-KILLED",
-      "seconds": 67,
-      "faults": 1
-    }
+      "seconds": 87,
+      "faults": 1,
+      "where": "CI (ci.yml test 22); the same claim measures 66.5 s locally"
+    },
+    "calibratedAgainst": "CI, never local. 75 s was set from a local 66.5 s and tripped on the very first CI run, where the same claim costs 87 s — a CI runner is materially slower, and this file already says so for the total: 950 s was 18% over local 804 s but only 4.6% over CI's 906 s, and the first PR adding any claim tripped it. The same error, one level down. 100 s is ~15% over the CI worst."
   }
 }
