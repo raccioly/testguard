@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (headless Chrome, so the one pinned runtime dependency stays one).
 
 ### Changed
+- **The shared spec is named `claimspec`.** Schemas are now identified as
+  `urn:claimspec:v1:<kind>` rather than `urn:guard-spec:v1:<kind>`.
+  **No emitted document changes**: the identifier lives only in the schemas'
+  own `$id`/`$ref`, the validator's registry and the documentation, so every
+  evidence file, baseline, brief and status already written stays valid and
+  keeps validating. Nothing needs migrating.
+  The old name said which family of tools the formats came from. The name that
+  matters is what they are *for* — claims, the evidence that tried to falsify
+  them, and gating only the delta — and most of the tools that could adopt
+  them (a scanner with an existing-violations problem, a mutation tester, an
+  agent harness that needs `brief` and `status`) do no fault injection at all.
+  `spec/README.md` now says so, and says plainly which kinds a second tool can
+  adopt today and which cannot (#81).
 - **The README leads with the plain explanation.** The research evidence is
   still there and still matters, but it is not the first thing a newcomer
   meets: an "In one minute" section now opens with what coverage cannot tell

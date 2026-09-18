@@ -1,15 +1,24 @@
-# Guard spec — the contract spine
+# claimspec — the contract spine
 
-Eight formats that tools following the Guard pattern share. They share
-*formats*, not code: [`docguard-cli`](https://www.npmjs.com/package/docguard-cli)
-is Node ESM, [`websec-validator`](https://pypi.org/project/websec-validator/)
-is Python, and porting one runtime into the other is not worth it. A tool
-conforms by emitting these shapes; it keeps its own language, CLI and UX.
+Nine formats for declaring what must be true about a codebase, recording the
+evidence that tried to falsify it, and gating only what is new.
 
-The pattern all such tools run:
+They are shared as *formats*, not as code. The first tools to adopt them are
+[`docguard-cli`](https://www.npmjs.com/package/docguard-cli) (Node ESM) and
+[`websec-validator`](https://pypi.org/project/websec-validator/) (Python) —
+porting one runtime into the other was never worth it, and never the point. A
+tool conforms by emitting these shapes; it keeps its own language, CLI and UX.
+
+The method they have in common:
 
 > declare what must be true → try mechanically to falsify it → freeze a
 > baseline → gate only the delta → brief the agent before it writes code.
+
+**Falsifying by fault injection is one method, not the definition.** A tool
+that verifies a claim by reading code, by scanning a surface, or by replaying
+history is as much a consumer as one that mutates source. The formats that
+carry *how* a claim was tested say which method produced them; the formats
+that carry claims, baselines, scoping and briefs do not care.
 
 ## Formats
 
@@ -30,7 +39,7 @@ Shared definitions (verdicts, fault classes, provenance, annotations) live in
 which verdicts turn CI red, baseline and delta rules, exit codes — is in
 [`GATE-SEMANTICS.md`](GATE-SEMANTICS.md).
 
-Schemas are JSON Schema 2020-12 and identified as `urn:guard-spec:v1:<kind>`.
+Schemas are JSON Schema 2020-12 and identified as `urn:claimspec:v1:<kind>`.
 
 ## Conformance
 
@@ -53,5 +62,14 @@ npm run test:spec
 
 The spec is drafted here and validated against `testguard` as its first
 consumer. It moves to its own repository only when a second tool adopts it.
-Adoption by an existing tool is one additive output writer — no rewrite, no
-behaviour change, and optional until that tool wants it.
+
+Adoption is additive and optional: an existing tool gains an output writer, and
+nothing it already detects or already writes changes. That holds today for
+`baseline`, `ignore`, `brief` and `status`. It does **not** yet hold for
+`claims` and `evidence`, whose required fields assume fault injection
+(`find`/`replace` anchors, `confirmRuns`, `baselineRuns`/`probeRuns`,
+`defenders`) — a tool that scans or reads would have to emit empty arrays to
+satisfy the schema, which is conforming by lying. Making those two kinds
+method-agnostic is tracked as
+[#81](https://github.com/raccioly/testguard/issues/81) and blocks adoption of
+either.

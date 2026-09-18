@@ -1,27 +1,27 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:guard-spec:v1:baseline",
-  "title": "Guard spec v1 — baseline",
+  "$id": "urn:claimspec:v1:baseline",
+  "title": "claimspec v1 — baseline",
   "description": "Frozen fingerprints of findings that existed when the baseline was taken. A finding whose fingerprint appears here is suppressed up to `count` occurrences; everything else is new and gates. Only non-passing verdicts are ever fingerprinted.",
   "type": "object",
   "required": ["schemaVersion", "tool", "createdAt", "fingerprints"],
   "properties": {
     "$schema": { "type": "string" },
     "schemaVersion": { "const": 1 },
-    "tool": { "$ref": "urn:guard-spec:v1:common#/$defs/tool" },
-    "createdAt": { "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime" },
-    "head": { "$ref": "urn:guard-spec:v1:common#/$defs/gitSha" },
+    "tool": { "$ref": "urn:claimspec:v1:common#/$defs/tool" },
+    "createdAt": { "$ref": "urn:claimspec:v1:common#/$defs/isoDateTime" },
+    "head": { "$ref": "urn:claimspec:v1:common#/$defs/gitSha" },
     "dirty": {
       "description": "Whether the working tree had uncommitted changes when the evidence behind this baseline was taken.",
       "type": "boolean"
     },
     "snapshot": {
       "description": "When the evidence behind this baseline was a working-tree snapshot: that throwaway commit. `head` is then the parent of the commit that will carry the tests; `baseline --restamp` moves `head` once a clean probe reproduces the same fingerprints.",
-      "$ref": "urn:guard-spec:v1:common#/$defs/gitSha"
+      "$ref": "urn:claimspec:v1:common#/$defs/gitSha"
     },
     "restampedAt": {
       "description": "Set when `head` was moved by `baseline --restamp` (same fingerprints, clean tree). `createdAt` keeps the original freeze time.",
-      "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime"
+      "$ref": "urn:claimspec:v1:common#/$defs/isoDateTime"
     },
     "fingerprints": {
       "type": "object",

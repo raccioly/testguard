@@ -11,7 +11,7 @@ import { fingerprint } from '../lib/fingerprint.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const load = (dir, f) => JSON.parse(readFileSync(join(here, dir, f), 'utf8'));
 
-describe('Guard spec v1 — conformance', () => {
+describe('claimspec v1 — conformance', () => {
   describe('every valid example passes', () => {
     for (const f of readdirSync(join(here, 'examples')).filter((f) => f.endsWith('.json'))) {
       const kind = KINDS.find((k) => f.startsWith(k));

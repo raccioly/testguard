@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:guard-spec:v1:common",
-  "title": "Guard spec v1 — shared definitions",
-  "description": "Definitions shared by every Guard-spec format. Referenced as urn:guard-spec:v1:common#/$defs/<name>.",
+  "$id": "urn:claimspec:v1:common",
+  "title": "claimspec v1 — shared definitions",
+  "description": "Definitions shared by every Guard-spec format. Referenced as urn:claimspec:v1:common#/$defs/<name>.",
   "$defs": {
     "sha256": {
       "type": "string",

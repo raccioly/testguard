@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:guard-spec:v1:evidence",
-  "title": "Guard spec v1 \u2014 evidence file",
+  "$id": "urn:claimspec:v1:evidence",
+  "title": "claimspec v1 \u2014 evidence file",
   "description": "One run's findings, on disk, in a shape an auditor can read without the tool. Each record binds a claim to a subject (for TestGuard, an injected fault) and a verdict, with every run that produced the verdict.",
   "type": "object",
   "required": [
@@ -18,7 +18,7 @@
       "const": 1
     },
     "tool": {
-      "$ref": "urn:guard-spec:v1:common#/$defs/tool"
+      "$ref": "urn:claimspec:v1:common#/$defs/tool"
     },
     "run": {
       "type": "object",
@@ -31,13 +31,13 @@
       ],
       "properties": {
         "id": {
-          "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+          "$ref": "urn:claimspec:v1:common#/$defs/identifier"
         },
         "startedAt": {
-          "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime"
+          "$ref": "urn:claimspec:v1:common#/$defs/isoDateTime"
         },
         "finishedAt": {
-          "$ref": "urn:guard-spec:v1:common#/$defs/isoDateTime"
+          "$ref": "urn:claimspec:v1:common#/$defs/isoDateTime"
         },
         "repo": {
           "type": "object",
@@ -47,21 +47,21 @@
           ],
           "properties": {
             "head": {
-              "$ref": "urn:guard-spec:v1:common#/$defs/gitSha"
+              "$ref": "urn:claimspec:v1:common#/$defs/gitSha"
             },
             "dirty": {
               "type": "boolean"
             },
             "snapshot": {
               "description": "When the working tree was probed instead of `head`: the dangling commit that captured it. Not a ref; may be garbage-collected.",
-              "$ref": "urn:guard-spec:v1:common#/$defs/gitSha"
+              "$ref": "urn:claimspec:v1:common#/$defs/gitSha"
             },
             "ignoredDirty": {
               "description": "Defender/target files that had uncommitted changes when `head` was probed as committed (an explicit --ref, or --ignore-dirty). The working-tree versions of these files are NOT what the verdicts describe.",
               "type": "array",
               "minItems": 1,
               "items": {
-                "$ref": "urn:guard-spec:v1:common#/$defs/repoPath"
+                "$ref": "urn:claimspec:v1:common#/$defs/repoPath"
               }
             }
           },
@@ -74,7 +74,7 @@
           ],
           "properties": {
             "name": {
-              "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+              "$ref": "urn:claimspec:v1:common#/$defs/identifier"
             },
             "version": {
               "type": "string",
@@ -143,7 +143,7 @@
             ],
             "properties": {
               "name": {
-                "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+                "$ref": "urn:claimspec:v1:common#/$defs/identifier"
               },
               "version": {
                 "type": "string",
@@ -230,7 +230,7 @@
       "properties": {
         "fingerprint": {
           "description": "sha256 of `<claim.id>\\n<subject.id>\\n<subject.file>\\n<verdict>`. Derived from identities and outcome, never from `find`/`replace`, so repairing a rotted anchor does not churn the baseline.",
-          "$ref": "urn:guard-spec:v1:common#/$defs/sha256"
+          "$ref": "urn:claimspec:v1:common#/$defs/sha256"
         },
         "claim": {
           "type": "object",
@@ -242,7 +242,7 @@
           ],
           "properties": {
             "id": {
-              "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+              "$ref": "urn:claimspec:v1:common#/$defs/identifier"
             },
             "statement": {
               "type": "string",
@@ -250,7 +250,7 @@
               "maxLength": 2000
             },
             "severity": {
-              "$ref": "urn:guard-spec:v1:common#/$defs/severity"
+              "$ref": "urn:claimspec:v1:common#/$defs/severity"
             },
             "source": {
               "type": "object",
@@ -275,7 +275,7 @@
               "additionalProperties": false
             },
             "producedBy": {
-              "$ref": "urn:guard-spec:v1:common#/$defs/provenance"
+              "$ref": "urn:claimspec:v1:common#/$defs/provenance"
             }
           },
           "additionalProperties": false
@@ -289,33 +289,33 @@
           ],
           "properties": {
             "kind": {
-              "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+              "$ref": "urn:claimspec:v1:common#/$defs/identifier"
             },
             "id": {
-              "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+              "$ref": "urn:claimspec:v1:common#/$defs/identifier"
             },
             "description": {
               "type": "string",
               "maxLength": 2000
             },
             "file": {
-              "$ref": "urn:guard-spec:v1:common#/$defs/repoPath"
+              "$ref": "urn:claimspec:v1:common#/$defs/repoPath"
             },
             "faultClass": {
-              "$ref": "urn:guard-spec:v1:common#/$defs/faultClass"
+              "$ref": "urn:claimspec:v1:common#/$defs/faultClass"
             },
             "producedBy": {
-              "$ref": "urn:guard-spec:v1:common#/$defs/provenance"
+              "$ref": "urn:claimspec:v1:common#/$defs/provenance"
             },
             "contentHash": {
               "description": "sha256 of the subject's content (for a fault: find + newline + replace). Excluded from the fingerprint on purpose, so repairing an anchor does not churn a baseline \u2014 and recorded here on purpose, so weakening a fault to make a finding disappear is visible.",
-              "$ref": "urn:guard-spec:v1:common#/$defs/sha256"
+              "$ref": "urn:claimspec:v1:common#/$defs/sha256"
             }
           },
           "additionalProperties": true
         },
         "verdict": {
-          "$ref": "urn:guard-spec:v1:common#/$defs/verdict"
+          "$ref": "urn:claimspec:v1:common#/$defs/verdict"
         },
         "detail": {
           "type": "object",
@@ -383,8 +383,8 @@
           "required": ["class"],
           "properties": {
             "class": { "enum": ["co-authored", "separate-change", "unknown"] },
-            "defenderCommit": { "$ref": "urn:guard-spec:v1:common#/$defs/gitSha" },
-            "targetCommit": { "$ref": "urn:guard-spec:v1:common#/$defs/gitSha" },
+            "defenderCommit": { "$ref": "urn:claimspec:v1:common#/$defs/gitSha" },
+            "targetCommit": { "$ref": "urn:claimspec:v1:common#/$defs/gitSha" },
             "sameAuthor": { "type": "boolean" }
           },
           "additionalProperties": false
@@ -443,7 +443,7 @@
             "resolved": {
               "type": "array",
               "items": {
-                "$ref": "urn:guard-spec:v1:common#/$defs/repoPath"
+                "$ref": "urn:claimspec:v1:common#/$defs/repoPath"
               }
             },
             "nocover": {
@@ -457,7 +457,7 @@
               "description": "Candidate test files that import the subject's file but mock it (`vi.mock`/`jest.mock`). Discovered candidates that mock are excluded from `resolved`; a declared defender that mocks stays in `resolved` and is listed here, because a declared defender that mocks the subject is a broken evidence chain.",
               "type": "array",
               "items": {
-                "$ref": "urn:guard-spec:v1:common#/$defs/repoPath"
+                "$ref": "urn:claimspec:v1:common#/$defs/repoPath"
               }
             },
             "signals": {
@@ -471,7 +471,7 @@
                 ],
                 "properties": {
                   "file": {
-                    "$ref": "urn:guard-spec:v1:common#/$defs/repoPath"
+                    "$ref": "urn:claimspec:v1:common#/$defs/repoPath"
                   },
                   "signal": {
                     "enum": [
@@ -493,13 +493,13 @@
               "description": "When the resolved defenders ran under more than one runner: runner name \u2192 the files it ran. Every file appears in `resolved`. Absent when the project runner ran them all.",
               "type": "object",
               "propertyNames": {
-                "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+                "$ref": "urn:claimspec:v1:common#/$defs/identifier"
               },
               "additionalProperties": {
                 "type": "array",
                 "minItems": 1,
                 "items": {
-                  "$ref": "urn:guard-spec:v1:common#/$defs/repoPath"
+                  "$ref": "urn:claimspec:v1:common#/$defs/repoPath"
                 }
               }
             }
@@ -515,12 +515,12 @@
           ],
           "properties": {
             "targetHash": {
-              "$ref": "urn:guard-spec:v1:common#/$defs/sha256"
+              "$ref": "urn:claimspec:v1:common#/$defs/sha256"
             },
             "defenderHashes": {
               "type": "object",
               "additionalProperties": {
-                "$ref": "urn:guard-spec:v1:common#/$defs/sha256"
+                "$ref": "urn:claimspec:v1:common#/$defs/sha256"
               }
             }
           },
@@ -528,7 +528,7 @@
         },
         "reusedFrom": {
           "description": "Run id whose verdict was reused because `inputs` were unchanged.",
-          "$ref": "urn:guard-spec:v1:common#/$defs/identifier"
+          "$ref": "urn:claimspec:v1:common#/$defs/identifier"
         },
         "rank": {
           "description": "Additive ordering signal. Never alters `verdict`.",
@@ -555,7 +555,7 @@
         "annotations": {
           "type": "array",
           "items": {
-            "$ref": "urn:guard-spec:v1:common#/$defs/annotation"
+            "$ref": "urn:claimspec:v1:common#/$defs/annotation"
           }
         }
       },
