@@ -65,3 +65,38 @@ describe('shouldStopEarly', () => {
     expect(shouldStopEarly([pass])).toBe(false);
   });
 });
+
+describe('a survivor is unverifiable until the control shows the subject runs', () => {
+  // TG-SURVIVOR-PROVES-THE-SUBJECT-RUNS, proved here rather than through a full
+  // probe. The claim is about classify(), which is pure — it was defended by
+  // negative-control.test.mjs, which spawns real runners against fixture repos
+  // and costs ~54 s a claim. The negative control still earns its place as an
+  // end-to-end check; this is the same invariant at unit cost.
+  //
+  // Why it matters: "the defenders never execute this code" is a devastating
+  // audit finding, and reporting it when the control was never run would make
+  // it a false one. So `false` means proven-unreached and downgrades the
+  // verdict, while `undefined` means we did not look and changes nothing.
+  const survives = (subjectReached) => classify({
+    defenders: D,
+    anchor: ok,
+    baselineRuns: [pass, pass, pass],
+    probeRuns: [pass, pass, pass],
+    confirmRuns: N,
+    subjectReached,
+  });
+
+  it('downgrades a survivor to unverifiable when the subject is proven unreached', () => {
+    expect(survives(false)).toEqual({ verdict: 'unverifiable', reason: 'subject-not-executed' });
+  });
+
+  it('still reports survived when the control proved the subject IS reached', () => {
+    expect(survives(true)).toEqual({ verdict: 'survived' });
+  });
+
+  it('leaves the verdict alone when the control was never run', () => {
+    // `undefined` is not evidence either way. Treating it as unreached would
+    // turn every un-escalated survivor into a false audit finding.
+    expect(survives(undefined)).toEqual({ verdict: 'survived' });
+  });
+});
