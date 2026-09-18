@@ -36,6 +36,7 @@ jobs:
       tag_missing: ${{ steps.check.outputs.tag_missing }}
       npm_missing: ${{ steps.check.outputs.npm_missing }}
       pypi_missing: ${{ steps.check.outputs.pypi_missing }}
+      brew_missing: ${{ steps.check.outputs.brew_missing }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,6 +46,13 @@ jobs:
         # Each surface is gated on ITS OWN registry, not on the tag. A tag
         # whose npm or PyPI publish failed (e.g. Trusted Publishing not yet
         # configured) is retried by simply re-running this workflow.
+        #
+        # The Homebrew formula's sha256 is a surface too, gated on the registry
+        # tarball it names: `--check --online` downloads it and compares. It is
+        # owed (brew_missing=true) until npm serves the tarball AND the formula
+        # on main carries its hash — so a failed sha job is retried by the
+        # hourly sweep exactly like a failed publish. It does not set `changed`:
+        # only tag/npm/PyPI need the test job and the publish jobs.
         run: |
           CURRENT=$(node -p "require('./package.json').version")
           TAG="v${CURRENT}"
@@ -53,12 +61,17 @@ jobs:
           if npm view "testguard-cli@${CURRENT}" version >/dev/null 2>&1; then NPMM=false; else NPMM=true; fi
           CODE=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/testguard-cli/${CURRENT}/json")
           if [ "$CODE" = "200" ]; then PYPIM=false; else PYPIM=true; fi
+          if node .github/scripts/sync-release-version.mjs --check --online; then BREWM=false; else BREWM=true; fi
           echo "tag_missing=$TAGM" >> "$GITHUB_OUTPUT"
           echo "npm_missing=$NPMM" >> "$GITHUB_OUTPUT"
           echo "pypi_missing=$PYPIM" >> "$GITHUB_OUTPUT"
+          echo "brew_missing=$BREWM" >> "$GITHUB_OUTPUT"
           if [ "$TAGM" = true ] || [ "$NPMM" = true ] || [ "$PYPIM" = true ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "✅ $TAG — tag missing: $TAGM · npm missing: $NPMM · PyPI missing: $PYPIM"
+            echo "✅ $TAG — tag missing: $TAGM · npm missing: $NPMM · PyPI missing: $PYPIM · Homebrew sha256 owed: $BREWM"
+          elif [ "$BREWM" = true ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "✅ $TAG is published everywhere; only the Homebrew sha256 is owed"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "⏭️ $TAG is fully released everywhere — nothing to do"
@@ -82,6 +95,12 @@ jobs:
       - name: Self-probe must be fully defended before anything ships
         run: node cli/testguard.mjs probe . --budget 180000 --out "$RUNNER_TEMP/self-evidence.json" --quiet --cost
       - name: Version surfaces are in sync
+        # Offline on purpose. Before the tag the tarball for this version
+        # cannot exist, so `--online` would say nothing in the normal path and
+        # would DEADLOCK the recovery path: npm published, the sha job failed,
+        # the formula still stale — an online check here fails and the job
+        # that fixes the formula never runs. The online comparison lives in
+        # detect-version (is it owed?) and in homebrew-sha (did it take?).
         run: node .github/scripts/sync-release-version.mjs --check
 
   create-release:
@@ -177,3 +196,104 @@ jobs:
       - name: Assert OIDC token is available
         run: '[ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] || { echo "::error::no OIDC token endpoint"; exit 1; }'
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+
+  homebrew-sha:
+    # The formula's sha256 is set from the PUBLISHED tarball — what Homebrew
+    # will download, which a provenance-signed publish can make differ byte
+    # for byte from `npm pack` — after npm serves it (a publish is `PUT 202`;
+    # the file can take minutes to appear, so the script polls, bounded).
+    #
+    # It cannot commit to main: branch protection requires the three CI legs
+    # on every commit and github-actions[bot] is no admin. So the one-line
+    # change lands as a bot PR with native auto-merge armed, and this job
+    # dispatches ci.yml on the branch itself — a PR opened with GITHUB_TOKEN
+    # gets no pull_request run, but workflow_dispatch is the documented
+    # exception. That also means the merge triggers nothing here; the hourly
+    # sweep observes the merged formula and finds brew_missing=false.
+    #
+    # Idempotent: an existing branch is reused, an existing open PR is left
+    # alone (CI re-dispatched only if its head has no check runs), a closed
+    # PR is respected as a human decision, and a formula that already carries
+    # the published hash lands nothing.
+    needs: [detect-version, test, create-release, publish-npm]
+    if: >-
+      !cancelled()
+      && needs.detect-version.outputs.brew_missing == 'true'
+      && needs.test.result != 'failure'
+      && needs.create-release.result != 'failure'
+      && (needs.publish-npm.result == 'success' || (needs.publish-npm.result == 'skipped' && needs.detect-version.outputs.npm_missing == 'false'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # pushes the chore/homebrew-sha-v* branch
+      pull-requests: write # opens the PR and arms auto-merge
+      actions: write # dispatches ci.yml on that branch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Set sha256 from the published tarball; land it as an auto-merging PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.detect-version.outputs.version }}"
+          ON_MAIN=$(node -p "require('./package.json').version")
+          if [ "$ON_MAIN" != "$VERSION" ]; then
+            echo "⏭️ main is already at v${ON_MAIN}, not v${VERSION}; that release sets its own sha256"; exit 0
+          fi
+          BRANCH="chore/homebrew-sha-v${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$BRANCH"
+            git checkout -B "$BRANCH" "origin/$BRANCH"
+          else
+            git checkout -b "$BRANCH"
+          fi
+
+          node .github/scripts/sync-release-version.mjs --sha256 --wait 900
+          # Post-condition: the file now on disk matches the tarball, and no
+          # other surface drifted. Nothing is pushed unless this passes.
+          node .github/scripts/sync-release-version.mjs --check --online
+
+          if git diff --quiet -- packaging/homebrew/testguard.rb; then
+            echo "✅ $BRANCH already carries the published sha256"
+          else
+            git add packaging/homebrew/testguard.rb
+            git commit -m "chore(homebrew): sha256 for v${VERSION}, from the published tarball"
+            git push origin "$BRANCH"
+          fi
+          if [ -z "$(git log --oneline origin/main..HEAD)" ]; then
+            echo "✅ main already matches the published tarball; nothing to land"; exit 0
+          fi
+
+          CLOSED=$(gh pr list --head "$BRANCH" --base main --state closed --json url,mergedAt --jq '[.[] | select(.mergedAt == null)][0].url')
+          if [ -n "$CLOSED" ]; then
+            echo "::warning::$CLOSED was closed without merging; leaving that decision alone. Delete branch $BRANCH to let the sweep retry."; exit 0
+          fi
+          PR=$(gh pr list --head "$BRANCH" --base main --state open --json url --jq '.[0].url')
+          if [ -z "$PR" ]; then
+            {
+              printf 'Automated: `sha256` of `packaging/homebrew/testguard.rb` set from the published tarball\n\n'
+              printf '    https://registry.npmjs.org/testguard-cli/-/testguard-cli-%s.tgz\n\n' "$VERSION"
+              printf 'Computed by `.github/scripts/sync-release-version.mjs --sha256` in release.yml after `npm publish`, from the registry — never from a local `npm pack`. `--check --online` confirmed the value before this PR was opened.\n\n'
+              printf 'Auto-merge is armed; CI was dispatched on this branch by the release workflow. If the checks never appear: `gh workflow run ci.yml --ref %s`.\n' "$BRANCH"
+            } > /tmp/pr-body.md
+            PR=$(gh pr create --base main --head "$BRANCH" --title "chore(homebrew): sha256 for v${VERSION}" --body-file /tmp/pr-body.md)
+            gh pr merge --auto --squash "$PR"
+            echo "Opened $PR"
+          else
+            echo "✅ PR already open: $PR"
+          fi
+          HEAD_SHA=$(git rev-parse HEAD)
+          RUNS=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" --jq '.total_count')
+          if [ "${RUNS:-0}" = "0" ]; then
+            gh workflow run ci.yml --ref "$BRANCH"
+            echo "Dispatched ci.yml on $BRANCH ($HEAD_SHA)"
+          else
+            echo "✅ $HEAD_SHA already has $RUNS check run(s)"
+          fi

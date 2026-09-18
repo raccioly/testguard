@@ -81,6 +81,14 @@ on the fault.
 opens a release PR; merging it tags and publishes to npm and PyPI via OIDC
 Trusted Publishing. There are no tokens to rotate.
 
+The Homebrew formula's `sha256` is the one surface that cannot be known before
+publishing: `release.yml` sets it after `npm publish`, from the registry
+tarball (`sync-release-version.mjs --sha256`), and lands it as a bot PR with
+auto-merge armed — `main` is protected, so no job commits to it directly.
+`--check` (offline) refuses a placeholder hash; `--check --online` compares
+against the tarball and is what decides, on every hourly sweep, whether the
+formula is still owed.
+
 ## Licence
 
 MIT. By contributing you agree your contribution is licensed the same way.

@@ -703,7 +703,7 @@
     },
     {
       "id": "TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT",
-      "statement": "The release version check exits non-zero when any version surface is out of step with package.json; a release can never ship with drifting version strings.",
+      "statement": "The release version check exits non-zero when any version surface is out of step with package.json — including a Homebrew formula whose sha256 is the known-stale placeholder or, checked online, does not match the published tarball — and the sha256 mode writes the hash of the registry tarball into the formula; a release can never ship with drifting version strings or an unverifiable formula.",
       "source": {
         "kind": "spec",
         "ref": "CONTRIBUTING.md#releases"
@@ -729,6 +729,45 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "--check accepts the known-stale Homebrew sha256 placeholder; the formula that shipped wrong across three releases passes the release check again.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/sync-release-version.mjs",
+          "find": "else if (sha === KNOWN_STALE_SHA256) { drift++;",
+          "replace": "else if (false) { drift++;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "--check --online accepts a formula sha256 that does not match the published tarball; detect-version would report the formula as up to date and the sha job would open a PR for a hash Homebrew cannot verify.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/sync-release-version.mjs",
+          "find": "else if (result.sha256 !== sha) { drift++;",
+          "replace": "else if (false) { drift++;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "--sha256 reports the formula unchanged without writing the computed hash; release.yml sees no diff and never opens the PR, so the formula stays stale exactly as before.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/sync-release-version.mjs",
+          "find": "if (current === sha256) {",
+          "replace": "if (true) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
           }
         }
       ]
