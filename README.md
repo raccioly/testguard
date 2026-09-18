@@ -65,7 +65,7 @@ raises coverage. TestGuard admits it because it fails when the claim is false.
 | npm | `npm i -D testguard-cli` then `npx testguard probe` |
 | pip | `pip install testguard-cli` then `testguard probe` (needs Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.5.0` — see [`action.yml`](./action.yml) |
+| GitHub Action | `uses: raccioly/testguard@v0.6.0` — see [`action.yml`](./action.yml) |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
 | GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.5.0/packaging/gitlab/testguard.gitlab-ci.yml` with `inputs:` — see [`packaging/gitlab/`](./packaging/gitlab/testguard.gitlab-ci.yml) |
 
@@ -194,15 +194,17 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
 
    ```json
    { "hooks": { "SessionStart": [ { "hooks": [
-     { "type": "command", "command": "node_modules/.bin/testguard brief --text 2>/dev/null || npx --no-install testguard brief --text 2>/dev/null || true" }
+     { "type": "command", "command": "node_modules/.bin/testguard brief --text 2>/dev/null || { command -v testguard >/dev/null 2>&1 && testguard brief --text 2>/dev/null; } || true" }
    ] } ] } }
    ```
 
    `--text` prints only, and exits 0 silently when there is no evidence yet;
-   the command prefers the project's own install, never fetches from the
-   network, and ends in `true` — so the hook can never break a session. The
-   brief's first line says which install answered (`local install` or
-   `global`), so a stale one is visible.
+   the command resolves the project's own install, then a `testguard` on
+   `PATH`, and ends in `true` — so the hook can never break a session. There
+   is no `npx` in it, in any form: `--no-install` resolves the package from
+   the registry before declining to install it, so it is quiet rather than
+   offline. The brief's first line says which install answered
+   (`local install` or `global`), so a stale one is visible.
 
 ### Would this suite have caught the bugs that already escaped?
 
@@ -316,7 +318,7 @@ detected base that does not resolve is a warning for `status` and `brief`
 # GitHub Actions
 - uses: actions/checkout@v4
   with: { fetch-depth: 0 }
-- uses: raccioly/testguard@v0.5.0
+- uses: raccioly/testguard@v0.6.0
   with: { command: gate }
 
 # GitLab CI — the component-shaped template: gate + probe, brief as an artifact and, opted in, as a merge-request note
@@ -427,9 +429,11 @@ things make that safe:
   `brief --text` session-start hook, an `AGENTS.md` section — and the
   **project layer** (`.gitignore` lines) beside the claims file. A second
   project in the same repository adds a hook line and an `AGENTS.md`
-  bullet; `--here` keeps everything in the subdirectory. The hook prefers a
-  local install, falls back to `npx --no-install`, and **never fetches from
-  the network**; a pre-0.6 `npx -y` hook is replaced. A written file that
+  bullet; `--here` keeps everything in the subdirectory. The hook
+  resolves the project's `node_modules/.bin/testguard`, then the git root's,
+  then a `testguard` on `PATH` via `command -v`, then does nothing — **no
+  `npx` in any form, so no path to the network**; a pre-0.6 `npx -y` or
+  `npx --no-install` hook is replaced. A written file that
   `.gitignore` swallows is reported, not offered for commit. Idempotent.
 - **Independence is recorded (L3).** `probe` measures *power* — would this
   test notice if the code were wrong. It also records, on every kill, whether

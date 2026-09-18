@@ -7,6 +7,35 @@ import { initProject, hookCommand } from '../src/init/init.mjs';
 
 const gitInit = (dir) => { const g = (...a) => spawnSync('git', ['-c', 'user.email=i@example.invalid', '-c', 'user.name=i', ...a], { cwd: dir }); g('init', '-q'); };
 
+describe('the README documents the hook the code actually emits', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+
+  it('the copy-pasteable snippet is exactly what hookCommand() produces', () => {
+    // A doc-vs-code contradiction shipped past two reviewers inside a release
+    // about detection power. A probe cannot catch prose; this can.
+    expect(readme).toContain(JSON.stringify(hookCommand('.')));
+  });
+
+  it('every hook command it shows equals the one the code emits', () => {
+    // Mechanical, not prose: pull every `||`-chained `brief --text` command
+    // out of the README and require it to be a hookCommand() output. The
+    // shipped defect was exactly such a chain, ending in `npx --no-install`.
+    const chains = [...readme.matchAll(/"((?:[^"\\]|\\.)*brief --text(?:[^"\\]|\\.)*\|\|(?:[^"\\]|\\.)*)"/g)].map((m) => JSON.parse(`"${m[1]}"`));
+    expect(chains.length).toBeGreaterThan(0);
+    const valid = new Set([hookCommand('.'), hookCommand('backend')]);
+    for (const c of chains) {
+      expect(valid.has(c), `README shows a hook command the code does not emit:\n  ${c}`).toBe(true);
+    }
+  });
+
+  it('never says the hook "falls back to npx" — the phrase that shipped', () => {
+    // `npx testguard-cli probe` in the install table is fine: that is how to
+    // RUN the tool. This is the one phrasing that asserted npx *inside the
+    // hook*, and it survived review twice.
+    expect(readme).not.toMatch(/falls back to `?npx/i);
+  });
+});
+
 describe('the session-start hook never reaches the network', () => {
   const run = (cwd, env, cmd) => spawnSync('/bin/sh', ['-c', cmd], { cwd, encoding: 'utf8', env: { ...process.env, ...env } });
 

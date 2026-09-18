@@ -7,26 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+## [0.6.0] - 2026-09-17
 
-- **The session-start hook now contains no form of `npx`.** It fell back to
-  `npx --no-install`, and `--no-install` is quiet rather than offline:
-  measured, `npx --no-install --loglevel=http testguard-cli --version` in a
-  project with nothing installed logs
-  `npm http fetch GET 200 https://registry.npmjs.org/testguard-cli`, and
-  against an unreachable registry it exits non-zero. npm resolves the
-  packument before deciding not to install. The fallback is now a
-  `command -v` lookup, which covers a global install with no network at all.
-  `TG-INIT-HOOK-NO-NETWORK` was defended while its statement over-promised;
-  the statement and its fault are corrected together.
-- The PATH branch is braced. `a || b && c` binds as `(a || b) && c` in sh, so
-  the unbraced form printed the brief **twice** whenever the local binary
-  succeeded. The tests now execute the hook in all three cases (local, PATH,
-  neither) rather than matching its text.
-- `init` recognises an earlier `npx --no-install` hook as well as `npx -y`,
-  and its which-project check no longer mistakes `brief --text 2>/dev/null`
-  for a hook belonging to a directory — that misfire meant a legacy root hook
-  was never replaced.
+Everything the field asked for. Two independent field reports on private
+AI-authored codebases drove eleven issues; this release closes all of them,
+alongside the roadmap work that landed beside it.
+
+**Read this before upgrading.** Defender discovery is now mock-aware: a test
+that `vi.mock`s or `jest.mock`s the subject can detect no fault in it and is
+no longer counted. Claims defended only by such tests therefore move to
+`NOCOVER`, which is the truth those verdicts always should have told. Expect
+new findings on the first probe after upgrading, and re-freeze your baseline
+once you have read them — they are not regressions in your code, they are
+blind spots that were previously invisible.
 
 ### Added
 
@@ -52,32 +45,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never written, because a harness config is the person's file. Self-claims
   `TG-MCP-IS-READ-ONLY` and
   `TG-MCP-TOOL-FAILURE-IS-NOT-A-PROTOCOL-ERROR`. (#30)
-
-### Fixed
-
-- **`replay` scopes to the project directory.** In a monorepo a fix commit
-  routinely touches several packages; the harness kept the out-of-project
-  files in the revert, so every cross-package fix came back
-  `revert-did-not-apply` — a tooling failure wearing the costume of a
-  verdict. Found on a real corpus, where it was two of the first three
-  commits. A commit with no source-and-test pair inside the project is no
-  longer a candidate at all. Self-claim `TG-REPLAY-SCOPES-TO-THE-PROJECT`.
-- **`replay` reverts a file the fix ADDED by removing it**, and calls a commit
-  whose source is entirely new `no-prior-version` rather than a failed revert.
-  A fix routinely adds a helper as well as changing a module, and a file that
-  did not exist at the parent cannot be checked out of it: on a real corpus
-  this turned **nineteen of forty** commits into `revert-did-not-apply` — a
-  tooling failure reading as a verdict and hiding every real result behind it.
-  An addition is not a bug the suite could have caught, so it never enters a
-  calibration. Self-claim
-  `TG-REPLAY-ADDED-FILE-IS-REMOVED-NOT-CHECKED-OUT`.
-- `replay --out <path>` now writes the calibration beside it rather than into
-  the project's `.testguard/`: the two documents are one result and splitting
-  them loses the pairing.
-
-### Added
-
-
 
 - **Contention detection and `--serial`** (#26). `probe` looks for other test
   runners before the first run, warns naming their pids, and records them on
@@ -127,12 +94,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT`, `TG-REPLAY-DEDUPES-BY-PATCH`,
   `TG-CALIBRATION-EXCLUDES-UNINFORMATIVE` and `TG-LABEL-NEVER-GUESSES`.
 
-
-
-
-
-
-
 - **`baseline --restamp`** (#25). A baseline frozen from `--include-dirty`
   evidence now records the snapshot commit and, once you commit, a clean
   `probe` plus `--restamp` moves its `head` to that commit — only when the
@@ -180,11 +141,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-
-
-
-
-
 - **`init` installs the agent layer at the git root** (#23): the skill,
   the session-start hook and the `AGENTS.md` section go where agent
   sessions run; the `.gitignore` lines stay beside the claims file. A
@@ -192,17 +148,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `AGENTS.md` bullet; `--here` keeps the old placement. A written file
   that `.gitignore` swallows is reported (exit 1), never offered for
   commit.
-- **The session-start hook never fetches from the network** (#24):
-  `node_modules/.bin/testguard … || npx --no-install testguard … || true`
-  instead of `npx -y testguard-cli …`; a pre-0.6 hook is replaced on the
-  next `init`. The brief's first line names the install that answered.
+- **The session-start hook resolves an installed `testguard` and contains no
+  form of `npx`** (#24): the project's `node_modules/.bin`, then the git
+  root's, then `command -v testguard`, then nothing — it exits 0 with no
+  output rather than break a session. Any earlier npx hook, `-y` or
+  `--no-install`, is replaced on the next `init`. The brief's first line
+  names the install that answered.
 
-
-
-
-
-
-
+  `--no-install` is **quiet, not offline**, which is why it is gone too:
+  measured, `npx --no-install --loglevel=http testguard-cli --version` in a
+  project with nothing installed logs
+  `npm http fetch GET 200 https://registry.npmjs.org/testguard-cli`, and
+  against an unreachable registry it exits non-zero. npm resolves the
+  packument before deciding not to install.
 
 - `probe` honours an explicit `--ref` (even `--ref HEAD`) when defender or
   target files are dirty, and gains `--ignore-dirty` for the implicit HEAD
@@ -215,6 +173,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   escalation, and restores the previous run's evidence from the cache so
   unchanged claims reuse their verdicts. The verdicts do not depend on the
   Node minor; the from-scratch probe was ~14 minutes per leg.
+
+### Fixed
+
+- **The README described a hook the code no longer writes.** Three passages
+  still documented the `npx --no-install` fallback that this release removes,
+  one of them repeating the "never fetches from the network" wording the
+  measurement above disproves — in the security-relevant paragraph, in a
+  release about detection power. Corrected, and now checked mechanically:
+  every `||`-chained `brief --text` command in the README must be one
+  `hookCommand()` actually emits, and the phrase "falls back to npx" is
+  banned outright. Both regressions were verified to fail the check before it
+  was accepted. Self-claim `TG-README-HOOK-MATCHES-THE-CODE`.
+- **A claim can be defended and still over-promise, and no probe can catch
+  that.** `TG-INIT-HOOK-NO-NETWORK` was killed 3/3 on every run while the
+  code it guarded could still reach the registry: the fault matched the
+  code, the code matched the test, and the *statement* was the thing that
+  was wrong. Fault injection measures whether a test would notice the code
+  changing; it cannot measure whether the sentence a human wrote is true of
+  the world. That is the standing limit of this method, and the only remedy
+  is reading claims against reality — which is what happened here. The
+  statement and its fault were corrected together.
+- **The session-start hook now contains no form of `npx`.** It fell back to
+  `npx --no-install`, and `--no-install` is quiet rather than offline:
+  measured, `npx --no-install --loglevel=http testguard-cli --version` in a
+  project with nothing installed logs
+  `npm http fetch GET 200 https://registry.npmjs.org/testguard-cli`, and
+  against an unreachable registry it exits non-zero. npm resolves the
+  packument before deciding not to install. The fallback is now a
+  `command -v` lookup, which covers a global install with no network at all.
+  `TG-INIT-HOOK-NO-NETWORK` was defended while its statement over-promised;
+  the statement and its fault are corrected together.
+- The PATH branch is braced. `a || b && c` binds as `(a || b) && c` in sh, so
+  the unbraced form printed the brief **twice** whenever the local binary
+  succeeded. The tests now execute the hook in all three cases (local, PATH,
+  neither) rather than matching its text.
+- `init` recognises an earlier `npx --no-install` hook as well as `npx -y`,
+  and its which-project check no longer mistakes `brief --text 2>/dev/null`
+  for a hook belonging to a directory — that misfire meant a legacy root hook
+  was never replaced.
+
+
+- **`replay` scopes to the project directory.** In a monorepo a fix commit
+  routinely touches several packages; the harness kept the out-of-project
+  files in the revert, so every cross-package fix came back
+  `revert-did-not-apply` — a tooling failure wearing the costume of a
+  verdict. Found on a real corpus, where it was two of the first three
+  commits. A commit with no source-and-test pair inside the project is no
+  longer a candidate at all. Self-claim `TG-REPLAY-SCOPES-TO-THE-PROJECT`.
+- **`replay` reverts a file the fix ADDED by removing it**, and calls a commit
+  whose source is entirely new `no-prior-version` rather than a failed revert.
+  A fix routinely adds a helper as well as changing a module, and a file that
+  did not exist at the parent cannot be checked out of it: on a real corpus
+  this turned **nineteen of forty** commits into `revert-did-not-apply` — a
+  tooling failure reading as a verdict and hiding every real result behind it.
+  An addition is not a bug the suite could have caught, so it never enters a
+  calibration. Self-claim
+  `TG-REPLAY-ADDED-FILE-IS-REMOVED-NOT-CHECKED-OUT`.
+- `replay --out <path>` now writes the calibration beside it rather than into
+  the project's `.testguard/`: the two documents are one result and splitting
+  them loses the pairing.
 
 ## [0.5.0] - 2026-09-17
 

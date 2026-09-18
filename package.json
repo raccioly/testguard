@@ -1,6 +1,6 @@
 {
   "name": "testguard-cli",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Proves a test suite defends the claims a project makes: injects the faults those claims forbid and reports every one the tests fail to detect.",
   "type": "module",
   "license": "MIT",
