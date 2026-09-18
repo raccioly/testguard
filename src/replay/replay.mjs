@@ -255,7 +255,7 @@ export function classifyReplay(runs) {
  * drift, and did (see `spec/lib/wilson.mjs`).
  */
 export function wilson(positives, n, z = 1.96) {
-  if (n === 0) return { p: 0, ci: [0, 1] };
+  if (n === 0) return { p: null, ci: [0, 1] };
   const [lo, hi] = wilsonInterval(positives, n, z);
   return { p: roundTo(positives / n, 4), ci: [roundTo(lo, 4), roundTo(hi, 4)] };
 }
@@ -287,8 +287,9 @@ export function calibrationFrom(replayDoc, { confidence = 0.95, computedAt = new
   for (const r of replayDoc.records) {
     if (!MEASURED_VERDICTS.includes(r.verdict)) continue;
     const key = r.faultClass ?? 'other';
-    buckets[key] ??= { n: 0, positives: 0 };
+    buckets[key] ??= { n: 0, positives: 0, breakdown: {} };
     buckets[key].n += 1;
+    buckets[key].breakdown[r.verdict] = (buckets[key].breakdown[r.verdict] ?? 0) + 1;
     // Anything measured that was not caught is a miss — blind and nocover alike.
     if (r.verdict !== 'caught') buckets[key].positives += 1;
   }
@@ -299,8 +300,18 @@ export function calibrationFrom(replayDoc, { confidence = 0.95, computedAt = new
     computedAt,
     method: 'wilson',
     confidence,
+    // What p is the probability of. Without it the document is unattributed
+    // and a consumer may quote nothing from it — see GATE-SEMANTICS.
+    measures: 'escape-missed',
     bucketBy: 'faultClass',
-    source: { kind: 'bug-replay', ref: replayDoc.run.range },
+    source: {
+      kind: 'bug-replay',
+      ref: replayDoc.run.range,
+      // The ground truth is this repository's own history, which `ref` names,
+      // so there is no external corpus to list. The caveat is the sentence a
+      // consumer shows beside any number it quotes from here.
+      caveat: 'measured on this repository\'s own fix history: every replayed bug is one that escaped, so a first run is expected to be high — the number to move is this one, over time',
+    },
     buckets,
   };
 }

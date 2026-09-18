@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A calibration can now say what it measures and where it came from** (#82).
+  websec-validator's shipped `calibration.json` already carried `corpus`,
+  `min_n`, `caveat`, `evidence_status` and `limitation` — the fields that say
+  "indicative, do not quote this number" — and claimspec had nowhere to put
+  them, so adopting it would have stripped that honesty in translation. It
+  also had nowhere to say what `p` *was*: testguard's is a miss rate where
+  high is bad, websec's is P(real) where high is good, and both validated
+  identically. The schema gains `measures` (a registry: `escape-missed`,
+  `finding-real`), provenance in `source` (`corpus`, `caveat`, `limitation`,
+  `evidenceStatus`, a `tool-oracle` kind, and an unconstrained `detail` on the
+  `methodDetail` pattern), a producer floor `minN` that consumers may raise
+  and never lower, ordered `backoff` tiers so a class→label→prior cascade is
+  expressible, a `fallback` whose shape says it is a guess, a per-cell
+  `breakdown` that sums to `n`, `p: null` at `n = 0`, and `|`-compound bucket
+  keys whose arity the validator checks. Every field is optional and absence
+  means *unattributed* — readable, not quotable — so no existing document
+  breaks; testguard's emitter always writes them and a self-claim guards it.
+  The proof of adoption is a file, not a sentence: websec-validator's table,
+  translated field for field, is now `spec/conformance/examples/calibration-websec.json`
+  and validates with every number reproducing. `GATE-SEMANTICS.md` records
+  the merge rule (sum counts, recompute, never average; only when `measures`
+  and `bucketBy` agree) that websec's shipped-plus-local overlay already
+  depends on.
 - **The gate is now gated on its own cost** (#89). `--cost` has printed the
   self-probe's wall clock into every CI log since #67, and the gate still went
   from 9.6 to 23.6 minutes across one merged change without anything saying a

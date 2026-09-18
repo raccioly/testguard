@@ -39,7 +39,8 @@ describe('labelDiff — the join key between real bugs and the fault model', () 
 
 describe('wilson — a label carries its sample size', () => {
   it('is 0..1 with a wide interval at small n and a narrower one as n grows', () => {
-    expect(wilson(0, 0)).toEqual({ p: 0, ci: [0, 1] });
+    // No trials, no proportion: 0 would be a fabricated point estimate. The interval is maximal ignorance.
+    expect(wilson(0, 0)).toEqual({ p: null, ci: [0, 1] });
     const small = wilson(1, 2);
     const large = wilson(50, 100);
     expect(small.p).toBe(0.5);
@@ -187,7 +188,9 @@ describe('replay on a scripted corpus', () => {
     const cal = calibrationFrom(doc, { toolVersion: 'test' });
     expect(validate('calibration', cal).errors).toEqual([]);
     expect(cal.bucketBy).toBe('faultClass');
-    expect(cal.source).toEqual({ kind: 'bug-replay', ref: 'HEAD~3..HEAD' });
+    expect(cal.source).toMatchObject({ kind: 'bug-replay', ref: 'HEAD~3..HEAD' });
+    expect(cal.measures).toBe('escape-missed');
+    expect(cal.source.caveat).toMatch(/own fix history/);
     const total = Object.values(cal.buckets).reduce((n, b) => n + b.n, 0);
     const positives = Object.values(cal.buckets).reduce((n, b) => n + b.positives, 0);
     expect(total).toBe(2);      // both were measurable
@@ -207,7 +210,7 @@ describe('replay on a scripted corpus', () => {
     // 2 of 3 missed. Excluding nocover would report 1 of 2; counting it only in
     // the denominator would report 1 of 3. Both err in the optimistic direction,
     // and the first rewards having no tests at all.
-    expect(cal.buckets['guard-removed']).toMatchObject({ n: 3, positives: 2 });
+    expect(cal.buckets['guard-removed']).toMatchObject({ n: 3, positives: 2, breakdown: { caught: 1, blind: 1, nocover: 1 } });
   });
 
   it('a project with no tests for a subsystem never scores better than one with weak tests', () => {

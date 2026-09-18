@@ -100,6 +100,32 @@ describe('claimspec v1 — conformance', () => {
     });
   });
 
+  describe('adoption: websec-validator\'s shipped calibration table, translated field for field', () => {
+    const doc = load('examples', 'calibration-websec.json');
+    it('conforms with its honesty intact — corpus, caveat, limitation, floor, backoff tier and labelled fallback all survive', () => {
+      expect(validate('calibration', doc).errors).toEqual([]);
+      expect(doc.source.corpus).toEqual(['VAmPI', 'NodeGoat', 'DVGA']);
+      expect(doc.source.caveat).toMatch(/deliberately-vulnerable/);
+      expect(doc.minN).toBe(5);
+      expect(doc.backoff.map((t) => t.bucketBy)).toEqual(['confidence']);
+      expect(doc.fallback).toEqual({ basis: 'uncalibrated-prior', values: { HIGH: 0.85, MEDIUM: 0.5, LOW: 0.25 } });
+    });
+    it('measures a different event from testguard\'s, so the two can never be merged', () => {
+      expect(doc.measures).toBe('finding-real');
+      expect(load('examples', 'calibration.json').measures).toBe('escape-missed');
+    });
+    it('a backoff tier is held to the same arithmetic as the primary', () => {
+      const bad = structuredClone(doc);
+      bad.backoff[0].buckets.LOW.ci = [0.02, 0.5];
+      expect(validate('calibration', bad).errors.map((e) => e.path)).toEqual(['/backoff/0/buckets/LOW/ci']);
+    });
+    it('a compound bucketBy demands compound keys', () => {
+      const bad = structuredClone(doc);
+      bad.buckets.sqli = bad.buckets['missing-auth|MEDIUM'];
+      expect(validate('calibration', bad).errors.map((e) => e.path)).toEqual(['/buckets/sqli']);
+    });
+  });
+
   it('rejects an unknown kind', () => {
     expect(() => validate('scores', {})).toThrow(RangeError);
   });
