@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.7.0] - 2026-09-18
+
+Python, and a fault that cannot hide.
+
+TestGuard now probes Python projects with nothing installed into them, and it
+no longer takes a green suite at its word: a fault applied to code the tests
+never execute used to be reported as SURVIVED — an audit finding that reads as
+devastating and is entirely false — and is now `unverifiable`, because the
+defenders are made to prove they can fail because of that file before a
+survival about it is allowed to stand.
+
+Alongside: the shared spec is named `claimspec`, one bad fault can no longer
+cost the evidence for the whole run, and the self-probe gate was measured
+rather than guessed at.
+
+### Added
+
 - **A five-page technical brief**, [`docs/testguard-explained.pdf`](docs/testguard-explained.pdf):
   the whole idea on page one, the field measurements on page two, then
   mechanics, architecture and prior art. Six diagrams, including a dot matrix
