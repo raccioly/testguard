@@ -1,0 +1,16 @@
+{
+  "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine.",
+  "seconds": 950,
+  "measured": {
+    "seconds": 804,
+    "at": "2026-09-18",
+    "commit": "cf5a083",
+    "faults": 96,
+    "runs": 576,
+    "how": "probe . --serial --no-escalate --cost, idle machine, from scratch"
+  },
+  "headroom": "A CI runner is slower than the machine above, and reuse is cold on a release. 950 leaves ~18% over the measured figure — enough that an ordinary run never flaps, tight enough that another 59-to-91 style jump fails.",
+  "history": [
+    { "seconds": 950, "at": "2026-09-18", "why": "First budget. Set from the 804 s measurement after #73 cut the gate from 1414 s." }
+  ]
+}

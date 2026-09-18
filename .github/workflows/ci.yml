@@ -210,6 +210,14 @@ jobs:
         if: matrix.node-version == 22
         run: node cli/testguard.mjs probe . --budget 180000 --no-escalate --cost --out .testguard/ci-self-evidence.json
 
+      # The gate went 9.6 -> 23.6 min across one merged PR and nothing said a
+      # word, because --cost only ever printed into a log. `always()` so the
+      # cost is reported even when the probe itself failed: a run that got
+      # slower AND found a survivor should say both, not just the second.
+      - name: The gate must stay inside its cost budget
+        if: always() && matrix.node-version == 22
+        run: node .github/scripts/check-cost-budget.mjs .testguard/ci-self-evidence.json
+
       # A stable, branch-named artifact so a developer can fetch the evidence
       # CI produced without knowing a run id (README: read CI's evidence
       # locally). One Node leg is enough; the verdicts are identical.

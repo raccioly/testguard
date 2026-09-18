@@ -1,7 +1,7 @@
 // @req NFR-05
 // @req NFR-06
 import { describe, it, expect } from 'vitest';
-import { runsOf, recordCost, claimCosts, defenderCosts, costReport, renderCost } from '../src/probe/cost.mjs';
+import { runsOf, recordCost, claimCosts, defenderCosts, costReport, renderCost, checkCostBudget, renderCostBudget } from '../src/probe/cost.mjs';
 
 const run = (durationMs) => ({ outcome: 'pass', durationMs });
 /** An evidence record, reduced to the parts cost is derived from. */
@@ -123,5 +123,54 @@ describe('renderCost', () => {
     const text = renderCost(costReport(many), { limit: 3 });
     expect(text).toContain('12 fault records cost 12s');
     expect(text).toContain('… 9 more');
+  });
+});
+
+describe('checkCostBudget — the gate has to gate on its own cost', () => {
+  const report = (totalMs, claims = []) => ({ totalMs, totalRuns: 100, records: 50, claims, defenders: [] });
+
+  it('passes inside the budget and reports the headroom', () => {
+    const d = checkCostBudget(report(804_000), { budgetSeconds: 950 });
+    expect(d).toMatchObject({ ok: true, totalMs: 804_000, budgetMs: 950_000, overByMs: 0, headroomMs: 146_000 });
+  });
+
+  it('fails over the budget and says by how much', () => {
+    const d = checkCostBudget(report(804_000), { budgetSeconds: 700 });
+    expect(d).toMatchObject({ ok: false, overByMs: 104_000, headroomMs: 0 });
+  });
+
+  it('is inclusive at the boundary — exactly on budget is inside it', () => {
+    expect(checkCostBudget(report(900_000), { budgetSeconds: 900 }).ok).toBe(true);
+    expect(checkCostBudget(report(900_001), { budgetSeconds: 900 }).ok).toBe(false);
+  });
+
+  it('names the worst claims, so a failure opens with where to look', () => {
+    const d = checkCostBudget(report(999_000, [
+      { id: 'A', ms: 71_000, runs: 12 }, { id: 'B', ms: 64_000, runs: 6 }, { id: 'C', ms: 30_000, runs: 6 },
+    ]), { budgetSeconds: 100, worst: 2 });
+    expect(d.worst).toEqual([{ id: 'A', ms: 71_000, runs: 12 }, { id: 'B', ms: 64_000, runs: 6 }]);
+    expect(renderCostBudget(d)).toMatch(/most expensive claims[\s\S]*A/);
+  });
+
+  it('reports a delta when a previous run is given, and works without one', () => {
+    expect(checkCostBudget(report(804_000), { budgetSeconds: 950, previousMs: 780_000 }).deltaMs).toBe(24_000);
+    const none = checkCostBudget(report(804_000), { budgetSeconds: 950 });
+    expect(none.deltaMs).toBeUndefined();
+    expect(none.ok).toBe(true); // a missing baseline never fails the check
+  });
+
+  // The regression this exists to catch: 59 -> 91 faults, per-fault cost flat.
+  // An average would have reported everything fine while the gate tripled.
+  it('catches growth that a per-fault average would hide', () => {
+    const before = checkCostBudget(report(9.6 * 60_000), { budgetSeconds: 950 });
+    const after = checkCostBudget(report(23.6 * 60_000), { budgetSeconds: 950 });
+    expect(before.ok).toBe(true);
+    expect(after.ok).toBe(false);
+  });
+
+  it('refuses a budget that is not a positive number, rather than passing everything', () => {
+    for (const bad of [undefined, 0, -1, NaN, '900']) {
+      expect(() => checkCostBudget(report(1), { budgetSeconds: bad })).toThrow(TypeError);
+    }
   });
 });

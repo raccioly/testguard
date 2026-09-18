@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **The gate is now gated on its own cost** (#89). `--cost` has printed the
+  self-probe's wall clock into every CI log since #67, and the gate still went
+  from 9.6 to 23.6 minutes across one merged change without anything saying a
+  word. A measurement nothing gates on is not a check — which is the premise
+  this tool rests on, applied to itself.
+  `testguard.cost-budget.json` carries the ceiling, its measurement and why it
+  is set where it is. CI fails when the probe exceeds it and opens with the
+  most expensive claims, so the first thing a failure shows is where to look.
+  Raising it is a committed diff with a reason: growth is allowed, going
+  unnoticed is not.
+  The budget is on the **total**, never a per-fault average. The regression
+  that prompted this took the corpus from 59 faults to 91 while per-fault cost
+  barely moved — an average would have reported everything fine while the gate
+  tripled, and a test says so. A budget that is missing or not a positive
+  number is refused rather than treated as unlimited, so a typo cannot quietly
+  disable the gate.
+
+
 ### Fixed
 - **A reserved method can now say something.** #81 reserved `assertion` and
   `scan` without required fields, and `fault` / `detail` are both

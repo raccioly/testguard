@@ -37,7 +37,7 @@
 | NFR-04 | Every emitted document conforms to the published schema before it is written | `writeSpecDoc` refuses non-conforming output |
 | NFR-05 | Verdicts are reproducible and attributable to a commit | evidence records `repo.head`, the snapshot when the working tree was probed, and the runner and its source |
 | NFR-06 | A verdict is never optimistic under uncertainty | contention recorded; flaky and timeout verdicts gate; escalation cannot upgrade a verdict; a survivor is unverifiable until the defenders are shown to fail because of the subject |
-| NFR-07 | Cost grows with what changed, not with the size of the project | verdict reuse on unchanged inputs; blast-radius-targeted escalation |
+| NFR-07 | Cost grows with what changed, not with the size of the project | verdict reuse on unchanged inputs; blast-radius-targeted escalation; a committed cost budget gated in CI, so growth is signed for rather than discovered |
 | NFR-08 | Portable contract | schemas are JSON Schema 2020-12, readable and implementable without this codebase |
 
 ## Success Criteria
@@ -105,7 +105,7 @@ fails the pull request naming the unclaimed file, and `status` reports
 | NFR-04 | `src/evidence/writer.mjs` | `test/writer.test.mjs` |
 | NFR-05 | `src/probe/probe.mjs` | `TG-FINGERPRINT-VERDICT`, `TG-FAULT-EDIT-VISIBLE` |
 | NFR-06 | `src/probe/contention.mjs`, `classify.mjs` | `TG-CONTENTION-NEVER-FAILS-A-PROBE`, `TG-ESCALATION-N-RUNS`, `TG-ONE-BAD-FAULT-KEEPS-THE-EVIDENCE`, `TG-A-PRECONDITION-STILL-REFUSES-THE-RUN`, `TG-A-PROBE-ERROR-IS-NEVER-REUSED`, `TG-SURVIVOR-PROVES-THE-SUBJECT-RUNS`, `TG-CONTROL-READS-ANY-RED-AS-REACHED`, `TG-FATAL-EDIT-CANNOT-COMPILE` |
-| NFR-07 | verdict reuse, `src/probe/rank.mjs` | `test/probe.fixture.test.mjs` reuse case |
+| NFR-07 | verdict reuse, `src/probe/rank.mjs`, `src/probe/cost.mjs` | `test/probe.fixture.test.mjs` reuse case, `test/cost.test.mjs`, `TG-COST-BUDGET-ACTUALLY-GATES` |
 | NFR-08 | `spec/` | `spec/conformance/schemas.test.mjs` |
 
 ## Revision History

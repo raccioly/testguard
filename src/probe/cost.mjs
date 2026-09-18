@@ -143,3 +143,61 @@ export function renderCost(report, { limit = 10 } = {}) {
   }
   return out.join('\n');
 }
+
+/**
+ * Is this probe within its cost budget?
+ *
+ * The gate went from 9.6 minutes to 23.6 across one merged pull request, and
+ * nothing said a word — `--cost` had been printing the number into every CI log
+ * since the previous optimisation. A measurement nothing gates on is not a
+ * check, which is the premise this whole tool rests on, applied to itself.
+ *
+ * Budget the TOTAL, never the per-fault average. The regression that prompted
+ * this raised the fault count from 59 to 91 while per-fault cost barely moved,
+ * so an average would have reported everything fine while the gate tripled.
+ * Growth is legitimate; the point is that someone signs for it in a diff.
+ *
+ * `previousMs` is optional and only ever informational: "804s, budget 900s" is
+ * a much weaker signal than "804s, was 780s", and the prior total is already in
+ * the evidence CI restores for verdict reuse.
+ *
+ * Pure. Reads a report, returns a decision; the caller owns exit codes and I/O.
+ */
+export function checkCostBudget(report, { budgetSeconds, previousMs, worst = 5 } = {}) {
+  if (typeof budgetSeconds !== 'number' || !Number.isFinite(budgetSeconds) || budgetSeconds <= 0) {
+    throw new TypeError('checkCostBudget: budgetSeconds must be a positive number');
+  }
+  const budgetMs = budgetSeconds * 1000;
+  const totalMs = report.totalMs ?? 0;
+  return {
+    ok: totalMs <= budgetMs,
+    totalMs,
+    budgetMs,
+    overByMs: Math.max(0, totalMs - budgetMs),
+    headroomMs: Math.max(0, budgetMs - totalMs),
+    ...(typeof previousMs === 'number' ? { previousMs, deltaMs: totalMs - previousMs } : {}),
+    // Named so a failure opens with which claims to look at, not just a number.
+    worst: (report.claims ?? []).slice(0, worst).map((c) => ({ id: c.id, ms: c.ms, runs: c.runs })),
+  };
+}
+
+/** The budget decision as text, for a CI log that someone reads only when it fails. */
+export function renderCostBudget(d) {
+  const out = [];
+  const delta = typeof d.deltaMs === 'number'
+    ? ` (${d.deltaMs >= 0 ? '+' : ''}${secs(Math.abs(d.deltaMs))} against the previous run's ${secs(d.previousMs)})`
+    : '';
+  out.push(d.ok
+    ? `cost ${secs(d.totalMs)} of a ${secs(d.budgetMs)} budget — ${secs(d.headroomMs)} to spare${delta}.`
+    : `COST BUDGET EXCEEDED: ${secs(d.totalMs)} against a ${secs(d.budgetMs)} budget, over by ${secs(d.overByMs)}${delta}.`);
+  if (!d.ok && d.worst.length) {
+    out.push('');
+    out.push('most expensive claims');
+    for (const c of d.worst) out.push(`  ${secs(c.ms).padStart(7)}  ${c.id}  (${c.runs} runs)`);
+    out.push('');
+    out.push('Either move a claim onto a defender that does not need the expensive setup —');
+    out.push('re-probing afterwards, never assuming — or raise the budget in a commit that');
+    out.push('says why. Growth is allowed; going unnoticed is not.');
+  }
+  return out.join('\n');
+}
