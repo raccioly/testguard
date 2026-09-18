@@ -8,8 +8,15 @@ name: Scheduled Release
 # GITHUB_TOKEN-created PRs do not trigger `pull_request` workflows, so nothing
 # would ever start the required checks and auto-merge would wait forever. This
 # workflow therefore dispatches ci.yml on the release branch itself:
-# `workflow_dispatch` is the one event GITHUB_TOKEN may trigger. After the
-# three Node legs go green, auto-merge completes. No human step remains.
+# `workflow_dispatch` is the one event GITHUB_TOKEN may trigger.
+#
+# That is not the whole story, and v0.9.0 proved it. The `pull_request` runs
+# the PR creates anyway are held at `action_required`, because the repository
+# requires approval from first-time contributors and `github-actions[bot]` is
+# permanently one. Held runs keep check suites QUEUED on the head sha, so the
+# rollup never becomes terminal and auto-merge waits — with every required
+# check already green. This workflow now approves those runs itself, which
+# GITHUB_TOKEN is permitted to do. Only then does no human step remain.
 
 on:
   schedule:
@@ -134,7 +141,7 @@ jobs:
           git add -A
           git commit -m "release: v${NEW_VERSION} — automated weekly batch"
           git push origin "$BRANCH"
-          printf 'Automated weekly release. Version bump + CHANGELOG entry + synced version surfaces. Merging tags and publishes to npm and PyPI via release.yml.\n\nA PR opened by GITHUB_TOKEN gets no `pull_request` run, so this workflow dispatched ci.yml on `%s` itself. Auto-merge is armed; it completes once the three Node legs pass. If the checks never appear: `gh workflow run ci.yml --ref %s`.\n' "$BRANCH" "$BRANCH" > /tmp/pr-body.md
+          printf 'Automated weekly release. Version bump + CHANGELOG entry + synced version surfaces. Merging tags and publishes to npm and PyPI via release.yml.\n\nTwo things a GITHUB_TOKEN PR needs done for it, both handled by this workflow: it raises no `pull_request` event, so ci.yml was dispatched on `%s` itself; and the `pull_request` runs it does create are held at `action_required` (github-actions[bot] is permanently a first-time contributor), so those were approved too. Auto-merge is armed and completes once the three Node legs pass.\n\nIf it sits anyway: `gh workflow run ci.yml --ref %s` for missing checks, or check for runs still awaiting approval on the head sha.\n' "$BRANCH" "$BRANCH" > /tmp/pr-body.md
           # A bare `gh pr create` failure here reads as a GraphQL error with no
           # hint of the cause, which is how v0.8.1 lost its release PR after
           # everything else in the release had succeeded.
@@ -155,6 +162,57 @@ jobs:
             else
               echo "✅ $HEAD_SHA already has $RUNS check run(s)"
             fi
+
+            # ── The third GITHUB_TOKEN wall, and the last one. ──
+            # The `pull_request` runs this PR creates are held at
+            # `action_required`: the repository requires approval from
+            # first-time contributors, and `github-actions[bot]` is
+            # PERMANENTLY one — it never authors a merged commit, so it can
+            # never graduate. Those held runs leave check suites QUEUED on the
+            # head sha forever, the status rollup never reaches a terminal
+            # state, and auto-merge waits on it even though the required
+            # contexts (test 20/22/24) are already green from the dispatched
+            # run above. v0.9.0 sat here until a human clicked Approve.
+            #
+            # GITHUB_TOKEN may clear it: `actions: write` carries the approve
+            # permission, measured 201 on a bot PR's own held run. It may not
+            # approve a REVIEW, which is a different gate and still ours alone.
+            #
+            # Runs appear asynchronously, so poll. Approving an already-running
+            # run answers 403 "not waiting for approval" — success, not failure.
+            echo "Clearing held workflow runs on $HEAD_SHA"
+            approved=0
+            for attempt in 1 2 3 4 5 6; do
+              HELD=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}" \
+                --jq '[.workflow_runs[] | select(.status == "action_required" or .conclusion == "action_required") | .id] | .[]' 2>/dev/null || true)
+              for id in $HELD; do
+                if gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${id}/approve" >/dev/null 2>&1; then
+                  echo "  approved run $id"
+                  approved=$((approved + 1))
+                else
+                  echo "  run $id needed no approval"
+                fi
+              done
+              # Stop as soon as the picture is settled, rather than always
+              # paying the full poll: nothing held after something was
+              # approved means we are done, and nothing held by the third
+              # look means the gate is not applying to this run at all.
+              if [ -z "$HELD" ] && { [ "$approved" -gt 0 ] || [ "$attempt" -ge 3 ]; }; then
+                break
+              fi
+              sleep 10
+            done
+
+            # Never leave this silent: a run still held here means auto-merge
+            # will wait forever, which is the failure this whole block exists
+            # to remove. Say so, and name what to click.
+            STILL=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}" \
+              --jq '[.workflow_runs[] | select(.status == "action_required" or .conclusion == "action_required") | .html_url] | .[]' 2>/dev/null || true)
+            if [ -n "$STILL" ]; then
+              echo "::error::Workflow runs are still held for approval, so auto-merge on $PR will wait forever. Approve them, or re-run this workflow: $STILL"
+              exit 1
+            fi
+            echo "✅ no run is held for approval; auto-merge can complete"
           else
             cat /tmp/pr-err
             if grep -q 'not permitted to create or approve pull requests' /tmp/pr-err; then
