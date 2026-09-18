@@ -10,8 +10,8 @@ repos:
     hooks:
       - id: docguard-guard
         name: DocGuard — docs match code
-        description: Validates this repository against docs-canonical/. Fails on errors, passes on warnings.
-        entry: docguard guard
+        description: Validates this repository against docs-canonical/. Fails on errors, passes on warnings (exit 2). Needs docguard on PATH.
+        entry: bash -c 'code=0; docguard guard || code=$?; if [ "$code" -eq 2 ]; then exit 0; fi; exit "$code"'
         language: system
         pass_filenames: false
         always_run: true
