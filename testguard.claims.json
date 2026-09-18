@@ -1721,7 +1721,7 @@
         "at": "2026-09-18T00:00:00Z"
       },
       "defendedBy": [
-        "test/replay.test.mjs"
+        "test/calibration.test.mjs"
       ],
       "faults": [
         {
@@ -1832,8 +1832,8 @@
           "description": "The p-reproduction rule is removed from the validator; a document may declare any p inside its interval.",
           "faultClass": "guard-removed",
           "file": "spec/lib/validate.mjs",
-          "find": "      if (!r.p) errors.push(",
-          "replace": "      if (false) errors.push(",
+          "find": "        if (!r.p) errors.push(",
+          "replace": "        if (false) errors.push(",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -1864,8 +1864,8 @@
           "description": "The ci-reproduction rule is removed from the validator; any well-ordered interval containing p passes.",
           "faultClass": "guard-removed",
           "file": "spec/lib/validate.mjs",
-          "find": "      if (!r.ci) errors.push(",
-          "replace": "      if (false) errors.push(",
+          "find": "        if (!r.ci) errors.push(",
+          "replace": "        if (false) errors.push(",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -3098,6 +3098,134 @@
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COST-BUDGET-NAMES-THE-CLAIM",
+      "statement": "A cost-budget failure names the claims that cost the most, by id, from the report as claimCosts actually shapes it; a budget that fails with \"undefined\" five times has told the reader nothing about where to look.",
+      "source": {
+        "kind": "spec",
+        "ref": "docs-canonical/TEST-SPEC.md#how-the-gate-duration-is-measured"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/cost.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The worst-claims list reads a field the report does not carry, so every name is undefined.",
+          "faultClass": "variable-swap",
+          "file": "src/probe/cost.mjs",
+          "find": "    worst: (report.claims ?? []).slice(0, worst).map((c) => ({ id: c.claimId, ms: c.ms, runs: c.runs })),",
+          "replace": "    worst: (report.claims ?? []).slice(0, worst).map((c) => ({ id: c.id, ms: c.ms, runs: c.runs })),",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CALIBRATION-BACKOFF-TIERS-ARE-CHECKED",
+      "statement": "Every backoff tier of a calibration is held to the same rules as the primary buckets — arithmetic, ordering, arity. A coarser tier a consumer falls back to is exactly where a wrong number would go unnoticed.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#calibration-provenance-backoff-and-merging"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "spec/conformance/schemas.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Backoff tiers are dropped from the tier list, so only the primary buckets are validated and a wrong interval in a tier passes.",
+          "faultClass": "call-removed",
+          "file": "spec/lib/validate.mjs",
+          "find": "...(doc.backoff ?? []).map((t, i) => ({ ...t, path: `/backoff/${i}` }))",
+          "replace": "...[]",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CALIBRATION-BREAKDOWN-SUMS-TO-N",
+      "statement": "A calibration cell that carries a breakdown of its n by outcome must have that breakdown sum to n; otherwise the narrower rate a consumer recovers from it is wrong.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#calibration-provenance-backoff-and-merging"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "spec/conformance/schemas.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The sum check is removed; any breakdown passes.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/validate.mjs",
+          "find": "          if (sum !== b.n) errors.push(",
+          "replace": "          if (false) errors.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CALIBRATION-EMITS-ITS-PROVENANCE",
+      "statement": "The calibration testguard writes says what p measures (escape-missed) and carries the caveat a consumer must show beside any quoted number. Without measures the document is unattributed and nothing may be quoted from it.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#calibration-provenance-backoff-and-merging"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/calibration.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The emitter stops saying what p measures; the document validates but is unattributed.",
+          "faultClass": "field-dropped",
+          "file": "src/replay/replay.mjs",
+          "find": "    measures: 'escape-missed',\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
           }
         }
       ]

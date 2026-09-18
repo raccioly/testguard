@@ -45,7 +45,12 @@
       "ci": [
         0.1,
         0.37
-      ]
+      ],
+      "breakdown": {
+        "caught": 5,
+        "blind": 20,
+        "nocover": 4
+      }
     }
   }
 }

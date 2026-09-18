@@ -145,11 +145,23 @@ describe('checkCostBudget — the gate has to gate on its own cost', () => {
   });
 
   it('names the worst claims, so a failure opens with where to look', () => {
+    // claimCosts emits `claimId`, not `id`. This test once fed the shape the code
+    // wished for and passed while CI printed "undefined" for every claim.
     const d = checkCostBudget(report(999_000, [
-      { id: 'A', ms: 71_000, runs: 12 }, { id: 'B', ms: 64_000, runs: 6 }, { id: 'C', ms: 30_000, runs: 6 },
+      { claimId: 'A', ms: 71_000, runs: 12 }, { claimId: 'B', ms: 64_000, runs: 6 }, { claimId: 'C', ms: 30_000, runs: 6 },
     ]), { budgetSeconds: 100, worst: 2 });
     expect(d.worst).toEqual([{ id: 'A', ms: 71_000, runs: 12 }, { id: 'B', ms: 64_000, runs: 6 }]);
-    expect(renderCostBudget(d)).toMatch(/most expensive claims[\s\S]*A/);
+    expect(renderCostBudget(d)).toMatch(/most expensive claims[\s\S]*\sA\s+\(12 runs\)/);
+  });
+
+  it('names them from a real report, never a hand-built one', () => {
+    const d = checkCostBudget(costReport([
+      rec('DEAR', 'F1', ['slow.test.mjs'], { probe: [run(1000)] }),
+      rec('CHEAP', 'F1', ['fast.test.mjs'], { probe: [run(10)] }),
+    ]), { budgetSeconds: 0.5 });
+    expect(d.ok).toBe(false);
+    expect(d.worst.map((c) => c.id)).toEqual(['DEAR', 'CHEAP']);
+    expect(renderCostBudget(d)).not.toMatch(/undefined/);
   });
 
   it('reports a delta when a previous run is given, and works without one', () => {

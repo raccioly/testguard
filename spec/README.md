@@ -28,7 +28,7 @@ that carry claims, baselines, scoping and briefs do not care.
 | `evidence` | [`schemas/evidence.schema.json`](schemas/evidence.schema.json) | One run's findings on disk, readable without the tool. Every verdict carries every run that produced it. |
 | `baseline` | [`schemas/baseline.schema.json`](schemas/baseline.schema.json) | Frozen fingerprints of existing debt. Gate only what is new. |
 | `ignore` | [`schemas/ignore.schema.json`](schemas/ignore.schema.json) | Reviewable scoping. Every entry has a reason. |
-| `calibration` | [`schemas/calibration.schema.json`](schemas/calibration.schema.json) | P(finding is real) per bucket, with a Wilson interval and the sample size behind it. |
+| `calibration` | [`schemas/calibration.schema.json`](schemas/calibration.schema.json) | The observed rate of a bucket's outcome — what it measures is in the document — with a Wilson interval and the sample size behind it. Every number is recomputable and the validator recomputes it; provenance, a producer floor, backoff tiers and a labelled fallback ride along so a second tool's honesty survives translation. |
 | `brief` | [`schemas/brief.schema.json`](schemas/brief.schema.json) | What to tell an agent before it writes code — ranked, capped, never a single score, and carrying the one next action. |
 | `status` | [`schemas/status.schema.json`](schemas/status.schema.json) | Where the project is and what happens next — the single machine-readable truth every human rendering derives from. Surfaces faults whose content changed since they were probed, and changed files that carry no claim. |
 | `replay` | [`schemas/replay.schema.json`](schemas/replay.schema.json) | Would this suite have caught the bugs that already escaped? Replays real fix commits: revert the source, remove the test the fix shipped, run what remains. A replayed bug is ground truth — a human already confirmed it was a defect — which is what a fault model is calibrated against. |
@@ -65,7 +65,10 @@ consumer. It moves to its own repository only when a second tool adopts it.
 
 Adoption is additive and optional: an existing tool gains an output writer, and
 nothing it already detects or already writes changes. That holds today for
-`baseline`, `ignore`, `brief` and `status`. It does **not** yet hold for
+`baseline`, `ignore`, `brief`, `status` and `calibration` — websec-validator's
+shipped calibration table is `conformance/examples/calibration-websec.json`,
+translated field for field with its corpus, caveat, floor, backoff and
+fallback intact. It does **not** yet hold for
 `claims` and `evidence`, whose required fields assume fault injection
 (`find`/`replace` anchors, `confirmRuns`, `baselineRuns`/`probeRuns`,
 `defenders`) — a tool that scans or reads would have to emit empty arrays to

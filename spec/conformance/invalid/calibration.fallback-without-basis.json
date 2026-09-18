@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "websec-validator",
+    "version": "0.15.3"
+  },
+  "computedAt": "2026-09-18T00:00:00Z",
+  "method": "wilson",
+  "confidence": 0.95,
+  "measures": "finding-real",
+  "bucketBy": "attackClass|confidence",
+  "minN": 5,
+  "source": {
+    "kind": "human-label",
+    "ref": "src/websec_validator/calibration.json, shipped in the package",
+    "corpus": [
+      "VAmPI",
+      "NodeGoat",
+      "DVGA"
+    ],
+    "caveat": "indicative — calibrated on a deliberately-vulnerable app corpus; skews optimistic on clean production code",
+    "limitation": "Historical unpinned corpus labels treated unmatched findings as false positives. Counts retained for audit only; runtime excludes these cells pending reviewed relabeling.",
+    "evidenceStatus": "unverified",
+    "detail": {
+      "n_total": 59,
+      "unmatched_rule": "unmatched finding = false positive",
+      "researched_classes": [
+        "command-injection",
+        "graphql",
+        "missing-auth",
+        "sqli",
+        "ssti"
+      ]
+    }
+  },
+  "buckets": {
+    "command-injection|LOW": {
+      "n": 1,
+      "positives": 1,
+      "p": 1,
+      "ci": [
+        0.207,
+        1
+      ]
+    },
+    "graphql|MEDIUM": {
+      "n": 2,
+      "positives": 2,
+      "p": 1,
+      "ci": [
+        0.342,
+        1
+      ]
+    },
+    "missing-auth|MEDIUM": {
+      "n": 41,
+      "positives": 27,
+      "p": 0.659,
+      "ci": [
+        0.505,
+        0.784
+      ]
+    }
+  },
+  "backoff": [
+    {
+      "bucketBy": "confidence",
+      "buckets": {
+        "LOW": {
+          "n": 8,
+          "positives": 1,
+          "p": 0.125,
+          "ci": [
+            0.022,
+            0.471
+          ]
+        },
+        "MEDIUM": {
+          "n": 51,
+          "positives": 29,
+          "p": 0.569,
+          "ci": [
+            0.433,
+            0.695
+          ]
+        }
+      }
+    }
+  ],
+  "fallback": {
+    "values": {
+      "HIGH": 0.85,
+      "MEDIUM": 0.5,
+      "LOW": 0.25
+    }
+  }
+}

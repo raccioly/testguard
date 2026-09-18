@@ -190,27 +190,43 @@ const semantic = {
 
   calibration(doc) {
     const errors = [];
+    // The primary buckets and every backoff tier are held to the same rules:
+    // a coarser tier a consumer falls back to is exactly where a wrong number
+    // would go unnoticed.
+    const tiers = [{ bucketBy: doc.bucketBy, buckets: doc.buckets, path: '' }, ...(doc.backoff ?? []).map((t, i) => ({ ...t, path: `/backoff/${i}` }))];
     // The precision the document wrote at: the most places any value shows.
     // Parsing drops trailing zeros (0.10 → 0.1), so a single value can
     // under-report; the maximum cannot unless every value ended in zero.
-    const places = Object.values(doc.buckets).reduce((m, b) => Math.max(m, decimals(b.p ?? 0), decimals(b.ci[0]), decimals(b.ci[1])), 0);
-    for (const [key, b] of Object.entries(doc.buckets)) {
-      const p = `/buckets/${key}`;
-      if (b.positives > b.n) errors.push({ path: `${p}/positives`, message: `positives (${b.positives}) exceed n (${b.n})` });
-      const [lo, hi] = b.ci;
-      if (lo > hi) errors.push({ path: `${p}/ci`, message: `ci lower bound ${lo} exceeds upper bound ${hi}` });
-      if (b.p !== null && (b.p < lo || b.p > hi)) errors.push({ path: `${p}/p`, message: `p (${b.p}) lies outside ci [${lo}, ${hi}]` });
-      // A cell that declares n and positives has declared p; a document that
-      // declares `wilson` at `confidence` has declared every ci. Recompute
-      // both with the spec's own implementation: "conforms" means
-      // "reproducible", not "internally plausible". Before this the validator
-      // would pass a document with every number invented, and the spec's own
-      // example carried a truncated bound nothing could notice.
-      // A cell with more positives than trials has no proportion to reproduce.
-      if (b.positives > b.n) continue;
-      const r = reproduces(b, { confidence: doc.confidence, places });
-      if (!r.p) errors.push({ path: `${p}/p`, message: `p (${b.p}) is not positives/n: ${b.positives}/${b.n} = ${r.expected.p} at ${Math.min(places, MAX_PLACES)} dp` });
-      if (!r.ci) errors.push({ path: `${p}/ci`, message: `ci [${lo}, ${hi}] does not reproduce: ${doc.method} at ${doc.confidence} for ${b.positives}/${b.n} is [${r.expected.ci[0]}, ${r.expected.ci[1]}]` });
+    const places = tiers.flatMap((t) => Object.values(t.buckets)).reduce((m, b) => Math.max(m, decimals(b.p ?? 0), decimals(b.ci[0]), decimals(b.ci[1])), 0);
+    for (const t of tiers) {
+      // A compound bucketBy (`attackClass|confidence`) means compound keys,
+      // each with the same number of parts — a key with fewer was translated
+      // from another tool's table and lost a dimension on the way.
+      const arity = t.bucketBy.split('|').length;
+      for (const [key, b] of Object.entries(t.buckets)) {
+        const p = `${t.path}/buckets/${key}`;
+        const parts = key.split('|').length;
+        if (parts !== arity) errors.push({ path: p, message: `bucket key "${key}" has ${parts} part(s); bucketBy "${t.bucketBy}" has ${arity}` });
+        if (b.positives > b.n) errors.push({ path: `${p}/positives`, message: `positives (${b.positives}) exceed n (${b.n})` });
+        const [lo, hi] = b.ci;
+        if (lo > hi) errors.push({ path: `${p}/ci`, message: `ci lower bound ${lo} exceeds upper bound ${hi}` });
+        if (b.p !== null && (b.p < lo || b.p > hi)) errors.push({ path: `${p}/p`, message: `p (${b.p}) lies outside ci [${lo}, ${hi}]` });
+        if (b.breakdown) {
+          const sum = Object.values(b.breakdown).reduce((s, v) => s + v, 0);
+          if (sum !== b.n) errors.push({ path: `${p}/breakdown`, message: `breakdown sums to ${sum}; n is ${b.n}` });
+        }
+        // A cell that declares n and positives has declared p; a document that
+        // declares `wilson` at `confidence` has declared every ci. Recompute
+        // both with the spec's own implementation: "conforms" means
+        // "reproducible", not "internally plausible". Before this the validator
+        // would pass a document with every number invented, and the spec's own
+        // example carried a truncated bound nothing could notice.
+        // A cell with more positives than trials has no proportion to reproduce.
+        if (b.positives > b.n) continue;
+        const r = reproduces(b, { confidence: doc.confidence, places });
+        if (!r.p) errors.push({ path: `${p}/p`, message: `p (${b.p}) is not positives/n: ${b.positives}/${b.n} = ${r.expected.p} at ${Math.min(places, MAX_PLACES)} dp` });
+        if (!r.ci) errors.push({ path: `${p}/ci`, message: `ci [${lo}, ${hi}] does not reproduce: ${doc.method} at ${doc.confidence} for ${b.positives}/${b.n} is [${r.expected.ci[0]}, ${r.expected.ci[1]}]` });
+      }
     }
     return errors;
   },

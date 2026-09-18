@@ -242,6 +242,64 @@ could notice.
   different method and must say so; under `wilson` the point estimate is the
   observed proportion.
 
+### Calibration provenance, backoff and merging
+
+Everything beyond a document's primary buckets is optional and additive, in
+the way `method` is on claims and evidence: absence has a defined meaning, and
+no document written before a field existed becomes invalid. The meaning of
+absence is **unattributed** — readable, auditable, and not a source of
+numbers. A tool that emits calibrations always emits these fields; a
+self-claim guards that it does.
+
+- **`measures`** says what `p` is the probability of. It is the one field
+  that lets two calibrations be told apart: testguard's `escape-missed` is
+  P(a real escaped bug of this class was not caught), and high is bad;
+  websec-validator's `finding-real` is P(a reported finding of this class is a
+  real vulnerability), and high is good. A document without it cannot be
+  quoted and cannot be merged. Registry: `escape-missed`, `finding-real`. A
+  new value is added here by the tool that first emits it.
+- **`source`** carries provenance. `corpus` names external ground-truth
+  sources (a bug-replay's is the repository's own history, which `ref` already
+  names); `caveat` is the one sentence a consumer shows beside any quoted
+  number; `limitation` is the longer story; `evidenceStatus` says whether the
+  labels were reviewed; `kind: tool-oracle` is a tool confirming its own
+  findings, as websec-validator's dynamic probes do. `detail` is the tool's
+  own provenance, unconstrained, on the `methodDetail` pattern. A number
+  quoted without its `caveat` is a misquote.
+- **`minN`** is the producer's floor. A cell below it is not quoted on its
+  own; the consumer backs off a tier. A consumer may raise it — a gate that
+  blocks a merge wants more certainty than a report — and may never lower
+  it: lowering it resurrects a cell the producer suppressed. Absent, the
+  producer sets no floor and the consumer applies its own. A spec-level
+  constant would be wrong in both directions: websec-validator's 5 would
+  suppress every cell of a corpus the size of DocGuard's benchmark.
+- **`backoff`** is the ordered list of coarser tiers consulted below `minN`.
+  Each tier is held to the same arithmetic as the primary. Keys may be
+  compound (`attackClass|confidence` backs off to `confidence`), and every key
+  in a tier has as many `|`-parts as its `bucketBy` — a key with fewer was
+  translated from another table and lost a dimension on the way.
+- **`fallback`** is what remains when no tier has a cell above `minN`: a
+  labelled guess, not a measurement, and anything quoted from it carries
+  `n = 0`, `ci = [0, 1]` and its `basis`. It lives in the document so that
+  "what did it assume when it had no data?" has one auditable answer instead
+  of one per consumer, each unlabelled.
+- **`breakdown`** splits a cell's `n` by outcome when the producer can say
+  (testguard: `caught` / `blind` / `nocover`), and sums to `n`. It lets a
+  consumer recover a narrower rate — misses among covered code, say —
+  without the producer publishing a second, misleading headline.
+
+**Merging.** Two calibrations merge by summing `n` and `positives` per cell
+and recomputing `p` and `ci` from the sums — never by averaging `p` or `ci`,
+which have no meaning combined. They merge only when `measures`, `bucketBy`
+and `confidence` agree, and the merged document's `source.kind` is `mixed`.
+This is how websec-validator folds an operator's own confirmed samples over
+its shipped table, and it works only because cells carry raw counts.
+
+**The second producer is a conformance example.** websec-validator's shipped
+table, translated field for field, is `conformance/examples/calibration-websec.json`
+— corpus, caveat, limitation, floor, backoff tier and labelled fallback all
+present. That file, not a sentence in a README, is what "adoptable" means.
+
 ## Baseline and delta
 
 A baseline freezes the fingerprints of every non-passing finding at a point

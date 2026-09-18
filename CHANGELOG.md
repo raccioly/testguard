@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **A calibration can now say what it measures and where it came from** (#82).
+  websec-validator's shipped `calibration.json` already carried `corpus`,
+  `min_n`, `caveat`, `evidence_status` and `limitation` — the fields that say
+  "indicative, do not quote this number" — and claimspec had nowhere to put
+  them, so adopting it would have stripped that honesty in translation. It
+  also had nowhere to say what `p` *was*: testguard's is a miss rate where
+  high is bad, websec's is P(real) where high is good, and both validated
+  identically. The schema gains `measures` (a registry: `escape-missed`,
+  `finding-real`), provenance in `source` (`corpus`, `caveat`, `limitation`,
+  `evidenceStatus`, a `tool-oracle` kind, and an unconstrained `detail` on the
+  `methodDetail` pattern), a producer floor `minN` that consumers may raise
+  and never lower, ordered `backoff` tiers so a class→label→prior cascade is
+  expressible, a `fallback` whose shape says it is a guess, a per-cell
+  `breakdown` that sums to `n`, `p: null` at `n = 0`, and `|`-compound bucket
+  keys whose arity the validator checks. Every field is optional and absence
+  means *unattributed* — readable, not quotable — so no existing document
+  breaks; testguard's emitter always writes them and a self-claim guards it.
+  The proof of adoption is a file, not a sentence: websec-validator's table,
+  translated field for field, is now `spec/conformance/examples/calibration-websec.json`
+  and validates with every number reproducing. `GATE-SEMANTICS.md` records
+  the merge rule (sum counts, recompute, never average; only when `measures`
+  and `bucketBy` agree) that websec's shipped-plus-local overlay already
+  depends on.
 - **The gate is now gated on its own cost** (#89). `--cost` has printed the
   self-probe's wall clock into every CI log since #67, and the gate still went
   from 9.6 to 23.6 minutes across one merged change without anything saying a
@@ -27,6 +50,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+- **The cost budget is set against what CI measures.** 950 s was 18% over
+  the local 804 s figure and only 4.6% over the 906 s CI already measured on
+  `main`, so the first pull request to add any claim tripped it — #94 passed
+  its own leg only because the cache reused verdicts, and `main` went red at
+  981 s from scratch the moment it merged. Raised to 1100 s (~14% over the
+  962 s CI measures with #82's re-pointed defenders), with the CI figures
+  recorded beside the local one so the next person budgets against the
+  number the check actually sees. The heavy claims the failure now names are
+  the next #73-style cut.
+- **Calibration's pure tests moved off the replay fixture** (the #73 pattern).
+  Three calibration claims were defended by `test/replay.test.mjs`, which
+  builds a scripted git corpus on every run; their kills come from pure
+  `calibrationFrom` tests that need none of it. The cost budget fired on the
+  first full run — 1022 s against 950 s, the top rows being exactly those
+  claims — so the tests now live in `test/calibration.test.mjs`, the claims
+  point there, and every fault was re-probed after the move, not assumed.
+- **A cost-budget failure names its claims.** `checkCostBudget` read `id`
+  from a report whose claims carry `claimId`, so the one line meant to say
+  *which* claims to look at printed `undefined` five times — and its unit test
+  fed the shape the code wished for, so it passed. Found the first time the
+  budget actually fired. The test now goes through `costReport`, and
+  `TG-COST-BUDGET-NAMES-THE-CLAIM` guards it.
 - **A calibration counts `nocover` as a miss** (#82). `nocover` — no test
   even imports the broken file — is the worst replay outcome, and the ratio
   excluded it: a project with no tests at all for a subsystem scored *better*

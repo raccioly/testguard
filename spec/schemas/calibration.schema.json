@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:claimspec:v1:calibration",
   "title": "claimspec v1 — calibration",
-  "description": "The observed rate of a bucket's outcome — for testguard, the share of real escaped bugs of a fault class that the suite failed to catch, so a high p is bad — with a confidence interval and the sample size behind it. A label without n is a vibe; this is the format that stops it being one. p and ci are recomputable from n, positives, method and confidence, and the validator recomputes them.",
+  "description": "The observed rate of a bucket's outcome — for testguard, the share of real escaped bugs of a fault class that the suite failed to catch, so a high p is bad — with a confidence interval and the sample size behind it. A label without n is a vibe; this is the format that stops it being one. p and ci are recomputable from n, positives, method and confidence, and the validator recomputes them. Everything beyond the primary buckets is optional and additive, as `method` is on claims and evidence: a document that omits `measures` or `source.caveat` stays valid and is UNATTRIBUTED — a consumer may read it and audit it, merge nothing into it, and quote no number from it.",
   "type": "object",
   "required": ["schemaVersion", "tool", "computedAt", "method", "confidence", "bucketBy", "source", "buckets"],
   "properties": {
@@ -11,44 +11,114 @@
     "tool": { "$ref": "urn:claimspec:v1:common#/$defs/tool" },
     "computedAt": { "$ref": "urn:claimspec:v1:common#/$defs/isoDateTime" },
     "method": {
-      "description": "Interval method. `wilson` is the only method defined in v1.",
+      "description": "Interval method. `wilson` is the only method defined in v1; under it the point estimate is the observed proportion positives / n, and a smoothed or shrunk estimate is a different method.",
       "enum": ["wilson"]
     },
     "confidence": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
+    "measures": {
+      "description": "What `p` is the probability of — the one field that lets two calibrations be told apart. Registry in GATE-SEMANTICS.md: `escape-missed` (testguard: a real escaped bug of this class was not caught; high is bad) and `finding-real` (websec-validator: a reported finding of this class is a real vulnerability; high is good). Two documents merge only when this, `bucketBy` and `confidence` agree. Absent = unattributed: nothing may be quoted from the document.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "maxLength": 64
+    },
     "bucketBy": {
-      "description": "The field findings are bucketed on, e.g. `faultClass` or `severity`.",
-      "$ref": "urn:claimspec:v1:common#/$defs/identifier"
+      "description": "The field findings are bucketed on, e.g. `faultClass` or `severity`. A compound key joins fields with `|` (`attackClass|confidence`), and every bucket key then has the same number of parts.",
+      "$ref": "#/$defs/bucketKey"
+    },
+    "minN": {
+      "description": "The producer's floor. A cell with fewer samples is not quoted on its own; the consumer backs off a tier, then to `fallback`, then to nothing. A consumer may raise this — a gate that blocks a merge wants more certainty than a report — and may never lower it: lowering it resurrects a cell the producer suppressed. Absent = the producer sets no floor and the consumer applies its own.",
+      "type": "integer",
+      "minimum": 0
     },
     "source": {
-      "description": "Where the ground-truth labels came from.",
+      "description": "Where the ground-truth labels came from. `kind` is the mechanism (`tool-oracle`: a tool confirming its own findings, as websec-validator's dynamic probes do). `corpus` names external ground-truth sources — a bug-replay's ground truth is the repository's own history, already named by `ref`, so it is usually absent there. `caveat` is the one sentence a consumer must show beside any quoted number; `limitation` is the longer story; `evidenceStatus` says whether the labels were reviewed. `detail` is the tool's own provenance, deliberately unconstrained, on the `methodDetail` pattern: what the first consumers put there is the evidence for what should become specified.",
       "type": "object",
       "required": ["kind"],
       "properties": {
-        "kind": { "enum": ["bug-replay", "human-label", "mixed"] },
-        "ref": { "type": "string", "maxLength": 512 }
+        "kind": { "enum": ["bug-replay", "human-label", "tool-oracle", "mixed"] },
+        "ref": { "type": "string", "maxLength": 512 },
+        "corpus": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+        },
+        "caveat": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "limitation": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "evidenceStatus": { "enum": ["verified", "unverified", "quarantined"] },
+        "detail": { "type": "object", "minProperties": 1, "additionalProperties": true }
+      },
+      "additionalProperties": false
+    },
+    "buckets": { "$ref": "#/$defs/buckets" },
+    "backoff": {
+      "description": "Ordered coarser tiers consulted when a primary cell is below `minN`: websec-validator's `attackClass|confidence` backs off to `confidence`. Each tier is held to the same arithmetic as the primary. Absent = no backoff.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["bucketBy", "buckets"],
+        "properties": {
+          "bucketBy": { "$ref": "#/$defs/bucketKey" },
+          "buckets": { "$ref": "#/$defs/buckets" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "fallback": {
+      "description": "What remains when no tier has a cell above `minN`: a labelled guess, not a measurement, and the shape says so — it has a `basis` and no `n`, and anything quoted from it carries n = 0, ci = [0, 1] and the basis. It lives in the document so that \"what did it assume when it had no data?\" has one auditable answer instead of one per consumer.",
+      "type": "object",
+      "required": ["basis", "values"],
+      "properties": {
+        "basis": { "const": "uncalibrated-prior" },
+        "values": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(\\|[A-Za-z0-9][A-Za-z0-9._-]*)*$" },
+          "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "bucketKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(\\|[A-Za-z0-9][A-Za-z0-9._-]*)*$",
+      "maxLength": 128
+    },
+    "cell": {
+      "type": "object",
+      "required": ["n", "positives", "p", "ci"],
+      "properties": {
+        "n": { "type": "integer", "minimum": 0 },
+        "positives": { "type": "integer", "minimum": 0 },
+        "p": {
+          "description": "positives / n at the document's precision, or null when n = 0: a cell with no trials has no proportion, and 0 would be a fabricated one.",
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ci": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "number", "minimum": 0, "maximum": 1 }
+        },
+        "breakdown": {
+          "description": "How n splits by outcome, when the producer can say (testguard: caught / blind / nocover). Values sum to n. Lets a consumer recover a narrower rate — misses among covered code, say — without the producer publishing a second, misleading headline.",
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
       },
       "additionalProperties": false
     },
     "buckets": {
       "type": "object",
-      "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
-      "additionalProperties": {
-        "type": "object",
-        "required": ["n", "positives", "p", "ci"],
-        "properties": {
-          "n": { "type": "integer", "minimum": 0 },
-          "positives": { "type": "integer", "minimum": 0 },
-          "p": { "type": "number", "minimum": 0, "maximum": 1 },
-          "ci": {
-            "type": "array",
-            "minItems": 2,
-            "maxItems": 2,
-            "items": { "type": "number", "minimum": 0, "maximum": 1 }
-          }
-        },
-        "additionalProperties": false
-      }
+      "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(\\|[A-Za-z0-9][A-Za-z0-9._-]*)*$" },
+      "additionalProperties": { "$ref": "#/$defs/cell" }
     }
-  },
-  "additionalProperties": false
+  }
 }

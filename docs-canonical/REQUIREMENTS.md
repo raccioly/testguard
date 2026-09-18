@@ -97,7 +97,7 @@ fails the pull request naming the unclaimed file, and `status` reports
 | FR-10 | `src/probe/runners/` | fixture acceptance per runner, `TG-RUNNER-FROM-PROJECT-FIRST` |
 | FR-11 | `src/scaffold/producers.mjs` | `test/scaffold.test.mjs`, `TG-SCAFFOLD-ANCHORS-HIT` |
 | FR-12 | `src/admit/admit.mjs` | `test/admit.test.mjs`, `TG-ADMIT-NEEDS-ALL-KILLED` |
-| FR-13 | `src/replay/` | `test/replay.test.mjs`, `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT`, `TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS` |
+| FR-13 | `src/replay/` | `test/replay.test.mjs`, `test/calibration.test.mjs`, `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT`, `TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS` |
 | FR-14 | `src/mcp/` | `test/mcp.test.mjs` |
 | NFR-01 | `src/init/init.mjs`, runner resolution | `TG-INIT-HOOK-NO-NETWORK`, `TG-README-HOOK-MATCHES-THE-CODE` |
 | NFR-02 | `package.json` | `npm run test:install` in CI |
