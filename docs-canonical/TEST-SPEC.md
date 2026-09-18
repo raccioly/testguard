@@ -77,7 +77,7 @@ What is gated instead:
 | `src/status/status.mjs` | `test/status.test.mjs` |
 | `src/brief/brief.mjs` | `test/brief.test.mjs` |
 | `src/init/init.mjs` | `test/init.test.mjs` |
-| `src/replay/` | `test/replay.test.mjs` |
+| `src/replay/` | `test/replay.test.mjs`, `test/calibration.test.mjs` (the pure half: `calibrationFrom`, `wilson`) |
 | `src/mcp/` | `test/mcp.test.mjs` |
 | `spec/lib/` | `spec/conformance/schemas.test.mjs` |
 
