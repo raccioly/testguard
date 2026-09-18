@@ -123,7 +123,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and so reused some verdicts, which makes it a floor rather than the
   from-scratch figure this budget is defined against; and the number is
   expected to come back down, because 44% of the gate is two shared defender
-  files re-run once per claim that names them.
+  files re-run once per claim that names them. A third is recorded too: the
+  reported total is modelled rather than wall clock, because a reused record
+  contributes what it cost when it was last probed, so the same commit
+  measured 1123 s and then 1025 s depending on what the cache restored.
 - **The new calibration claim costs 4.9 s instead of 51 s.** Its tests are
   pure — no git, no fixture corpus, no scratch worktree — but they were added
   to `replay.test.mjs`, whose scripted-corpus setup costs tens of seconds a

@@ -45,6 +45,22 @@
       "seconds": 1168,
       "runs": 774,
       "note": "probe . --include-dirty --budget 180000 --cost on a contended developer machine, before the calibration re-point that removed 46 s"
+    },
+    "variance": {
+      "observed": [
+        {
+          "seconds": 1123,
+          "run": "35395439072",
+          "note": "first run on the branch"
+        },
+        {
+          "seconds": 1025,
+          "run": "35397969312",
+          "reused": 92,
+          "note": "second run, same 129 faults and 774 runs, after the budget commit"
+        }
+      ],
+      "why": "The reported total is modelled, not wall clock: a reused record contributes what it cost when it was last probed, on another run and another runner. So the same commit reports differently depending on what the `self-evidence-` fallback key happened to restore — about 10% here. Both figures are reuse-affected and both are floors. The from-scratch figure this budget is defined against comes from the release job, which never reuses; record it there when it runs."
     }
   },
   "nextCut": {
