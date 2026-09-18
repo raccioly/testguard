@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseReport, argvFor, owns, testGlobs, tests, makeCheck, environment, resetInterpreterCache, PYTHON_DIR } from '../src/probe/runners/python.mjs';
+import { parseReport, argvFor, owns, testGlobs, tests, makeCheck, chooseEngine, environment, resetInterpreterCache, PYTHON_DIR } from '../src/probe/runners/python.mjs';
 import { RUNNERS, OWNED_RUNNERS, partitionByRunner, runnerFor, mergeRuns, selectRunner } from '../src/probe/runners/index.mjs';
 import * as vitest from '../src/probe/runners/vitest.mjs';
 
@@ -117,7 +117,25 @@ describe('the interpreter is a precondition, never a verdict', () => {
     expect(c.version).toMatch(/^CPython \d+\.\d+/);
   }, 40_000);
 
-  it('a pinned engine that is unavailable is a precondition failure, never a silent fall back', async () => {
+  it('a pinned pytest on an interpreter that cannot import it is a precondition failure, never unittest', () => {
+    // The branch that matters: the interpreter RESOLVES, and still has no
+    // pytest. Falling back would put an engine in the evidence that never ran.
+    const bare = { path: '/v/bin/python', python: '3.12.0', pytest: null };
+    const withPytest = { path: '/v/bin/python', python: '3.12.0', pytest: '9.1.1' };
+    expect(chooseEngine('pytest', bare)).toMatchObject({ ok: false });
+    expect(chooseEngine('pytest', bare).message).toMatch(/pytest is not importable/);
+    expect(chooseEngine('pytest', withPytest)).toMatchObject({ ok: true, engine: 'pytest', version: '9.1.1' });
+  });
+
+  it('auto picks pytest when it is importable and the stdlib runner when it is not', () => {
+    expect(chooseEngine(null, { path: 'p', python: '3.12.0', pytest: '9.1.1' })).toMatchObject({ engine: 'pytest' });
+    expect(chooseEngine(null, { path: 'p', python: '3.12.0', pytest: null }))
+      .toMatchObject({ ok: true, engine: 'unittest', version: 'CPython 3.12.0' });
+    // unittest is never refused for lacking pytest — it is the stdlib.
+    expect(chooseEngine('unittest', { path: 'p', python: '3.12.0', pytest: null })).toMatchObject({ ok: true });
+  });
+
+  it('an interpreter that does not resolve at all is a precondition failure', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-pypin-'));
     const c = await makeCheck('pytest')({ projectDir: dir, python: join(dir, 'no-such-python') });
     expect(c.ok).toBe(false);

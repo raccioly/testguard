@@ -39,8 +39,15 @@
     },
     {
       "kind": "path",
+      "pattern": "src/probe/runners/python/**",
+      "reason": "The injected Python reporters. They are not JavaScript, so a claim here could only be probed by running TestGuard's Python runner against TestGuard itself \u2014 circular, and it would prove the runner with the runner. They are instead held to fixtures/known-answer-python, whose sixteen verdicts were verified by hand against `python -m unittest`'s own exit code and must reproduce under BOTH engines: any behaviour change in a reporter moves a verdict there, in CI, on every push. Re-evaluate if they gain logic the fixture cannot reach.",
+      "by": "maintainer",
+      "at": "2026-09-18T00:00:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": ".github/scripts/**",
-      "reason": "Build and release scripts that run only in CI and are proven by CI failing: the install smoke, the version sync (claimed as TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT where its logic lives), and the PDF build for the technical brief. None ships in the package.",
+      "reason": "Build and release scripts that run only in CI and are proven by CI failing: the install smoke, the version sync (claimed as TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT where its logic lives), the fixture verdict check and the PDF build. None ships in the package.",
       "by": "maintainer",
       "at": "2026-09-18T00:00:00Z"
     }

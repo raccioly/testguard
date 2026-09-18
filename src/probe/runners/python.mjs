@@ -171,23 +171,32 @@ export function resolveInterpreter({ projectDir, python, budgetMs = 30_000 }) {
  * precondition failure, never a silent fall back to unittest: which engine ran
  * changes what the evidence means.
  */
+/**
+ * Which engine runs, given what the interpreter answered.
+ *
+ * Pure, and separate from the spawn, because the interesting branch is the one
+ * that is hard to stage: an interpreter that resolves but cannot import
+ * pytest. Testing that through `check()` would mean building a bare virtualenv
+ * inside a unit test, so the decision is lifted out and the spawn is left with
+ * nothing to decide.
+ */
+export function chooseEngine(pinned, found) {
+  const engine = pinned ?? (found.pytest ? 'pytest' : 'unittest');
+  if (engine === 'pytest' && !found.pytest) {
+    return { ok: false, message: `pytest is not importable from ${found.path} (pip install pytest, or use --runner unittest for the stdlib runner)` };
+  }
+  return { ok: true, engine, version: engine === 'pytest' ? found.pytest : `CPython ${found.python}` };
+}
+
 export function makeCheck(pinned) {
   return async ({ projectDir, sourceDir, python, budgetMs = 30_000 }) => {
     // Always the ORIGINAL project directory when there is one: a virtualenv is
     // gitignored, so the scratch worktree does not contain it.
     const found = await resolveInterpreter({ projectDir: sourceDir ?? projectDir, python, budgetMs });
     if (found.error) return { ok: false, message: found.error };
-    const engine = pinned ?? (found.pytest ? 'pytest' : 'unittest');
-    if (engine === 'pytest' && !found.pytest) {
-      return { ok: false, message: `pytest is not importable from ${found.path} (pip install pytest, or use --runner unittest for the stdlib runner)` };
-    }
-    return {
-      ok: true,
-      engine,
-      interpreter: found.path,
-      version: engine === 'pytest' ? found.pytest : `CPython ${found.python}`,
-      source: found.source,
-    };
+    const chosen = chooseEngine(pinned, found);
+    if (!chosen.ok) return chosen;
+    return { ...chosen, interpreter: found.path, source: found.source };
   };
 }
 

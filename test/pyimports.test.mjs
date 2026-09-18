@@ -79,6 +79,15 @@ describe('discovery finds the tests that import a target', () => {
     expect(pyFileImports(dir, join(dir, 'tests/test_unrelated.py'), 'demo/redact.py', 'tests/test_unrelated.py')).toBe(false);
   });
 
+  it('a package is reached by importing anything inside it', () => {
+    // `import demo.redact` loads demo/__init__.py too, so a test that imports a
+    // submodule defends a fault in the package's __init__.
+    write('tests/test_pkg.py', 'import demo.redact\n\ndef test_x():\n    assert demo.redact is not None\n');
+    expect(discoverDefenders(dir, 'demo/__init__.py')).toContain('tests/test_pkg.py');
+    // and a module that merely shares a prefix is not the package
+    expect(discoverDefenders(dir, 'demo/redact.py')).not.toContain('tests/test_unrelated.py');
+  });
+
   it('discovers Python defenders for a .py target, not JavaScript ones', () => {
     expect(discoverDefenders(dir, 'demo/redact.py')).toEqual(['tests/test_redact.py']);
   });
