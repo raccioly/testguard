@@ -5,6 +5,7 @@ import { probe } from '../probe/probe.mjs';
 import { writeSpecDoc, readSpecDoc } from '../evidence/writer.mjs';
 import { gate } from '../baseline/baseline.mjs';
 import { renderRecord, renderSummary, sortForReport, PROVISIONAL_WARNING } from '../render.mjs';
+import { methodOf, gatesUnder } from '../../spec/lib/verdicts.mjs';
 import { computeStatus } from '../status/status.mjs';
 import { resolveChangedRef, withChangedRef } from '../gate/changed.mjs';
 import { costReport, renderCost } from '../probe/cost.mjs';
@@ -89,7 +90,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
   if (!values.quiet && baseline) {
     io.out('');
     const tag = (r) => (g.new.includes(r) ? '[NEW]      ' : g.baselined.includes(r) ? '[baseline] ' : '[below floor] ');
-    for (const r of sortForReport(evidence.records).filter((x) => x.verdict !== 'killed')) io.out('  ' + tag(r) + renderRecord(r, { provisional }));
+    for (const r of sortForReport(evidence.records, evidence.run).filter((x) => gatesUnder(methodOf(evidence.run), x.verdict))) io.out('  ' + tag(r) + renderRecord(r, { provisional }));
   }
   io.out('');
   if (!values.quiet && !values.verbose) {

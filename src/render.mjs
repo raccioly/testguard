@@ -1,4 +1,9 @@
-const ORDER = ['survived', 'nocover', 'unverifiable', 'fault-invalid', 'timeout', 'flaky-defender', 'killed'];
+import { methodOf, gatesUnder, verdictOrder, VERDICTS } from '../spec/lib/verdicts.mjs';
+
+// Ordering is by ROLE, not by a hard-coded list of fault-injection's words, so
+// a document from any method sorts correctly. The role exists for exactly this:
+// a reader ranks findings without knowing which tool produced them.
+const orderOf = (method) => (v) => verdictOrder(method, v);
 
 /** Non-passing verdicts shout; the one pass does not. */
 export const formatVerdict = (v, provisional = false) => (v === 'killed' ? 'killed' : v.toUpperCase()) + (provisional ? '?' : '');
@@ -28,14 +33,23 @@ export function summarize(records) {
 
 export function renderSummary(records, run) {
   const byVerdict = summarize(records);
-  const parts = ORDER.filter((v) => byVerdict[v]).map((v) => `${byVerdict[v]} ${formatVerdict(v, run?.provisional)}`);
-  const unproven = records.filter((r) => r.verdict !== 'killed');
+  const method = methodOf(run);
+  const parts = Object.keys(VERDICTS[method] ?? VERDICTS['fault-injection'])
+    .sort((a, b) => orderOf(method)(a) - orderOf(method)(b))
+    .filter((v) => byVerdict[v])
+    .map((v) => `${byVerdict[v]} ${formatVerdict(v, run?.provisional)}`);
+  const unproven = records.filter((r) => gatesUnder(method, r.verdict));
   const claims = new Set(unproven.map((r) => r.claim.id)).size;
   const where = run ? ` Probed ${run.repo.snapshot ? `working tree (snapshot ${run.repo.snapshot.slice(0, 7)} of ${run.repo.head.slice(0, 7)})` : run.mode === 'in-place' ? `in place at ${run.repo.head.slice(0, 7)}${run.repo.dirty ? ' (dirty)' : ''}` : run.repo.head.slice(0, 7)}.` : '';
   return `${run?.provisional ? 'PROVISIONAL: ' : ''}${records.length} faults probed: ${parts.join(', ')}. ${unproven.length} unproven fault${unproven.length === 1 ? '' : 's'} across ${claims} claim${claims === 1 ? '' : 's'}.${where}`;
 }
 
-/** Survivors first, then by rank score; killed last. */
-export function sortForReport(records) {
-  return [...records].sort((a, b) => ORDER.indexOf(a.verdict) - ORDER.indexOf(b.verdict) || (b.rank?.score ?? 0) - (a.rank?.score ?? 0));
+/**
+ * Worst first, then by rank score, passing last. `run` is optional: without it
+ * the method is fault-injection, which is what every document written before
+ * methods existed is.
+ */
+export function sortForReport(records, run) {
+  const method = methodOf(run);
+  return [...records].sort((a, b) => verdictOrder(method, a.verdict) - verdictOrder(method, b.verdict) || (b.rank?.score ?? 0) - (a.rank?.score ?? 0));
 }

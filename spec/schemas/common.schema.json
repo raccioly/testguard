@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:claimspec:v1:common",
-  "title": "claimspec v1 \u2014 shared definitions",
+  "title": "claimspec v1 — shared definitions",
   "description": "Definitions shared by every Guard-spec format. Referenced as urn:claimspec:v1:common#/$defs/<name>.",
   "$defs": {
     "sha256": {
@@ -36,19 +36,22 @@
       ]
     },
     "verdict": {
-      "description": "Closed set. Only `killed` is a pass. Every other verdict gates by default (see GATE-SEMANTICS.md). `unverifiable` covers a fault that could not be applied (anchor missing/ambiguous) and a claim whose defenders failed to load (`defenders-failed-to-load`).",
+      "description": "An outcome, named by the METHOD that produced it. `fault-injection` answers \"would we detect this\" and keeps its original seven; `assertion` and `scan` answer \"is this true now\" and share `holds`/`violated`. A name means nothing without its method, so this enum is only the union — which method may emit which is enforced by the validator, and `GATE-SEMANTICS.md` carries the table. Only a verdict whose `gates` is false under its own method is a pass, and that is a per-method question.",
       "enum": [
-        "killed",
-        "survived",
-        "nocover",
-        "unverifiable",
-        "timeout",
         "fault-invalid",
-        "flaky-defender"
+        "flaky-defender",
+        "holds",
+        "killed",
+        "nocover",
+        "not-applicable",
+        "survived",
+        "timeout",
+        "unverifiable",
+        "violated"
       ]
     },
     "faultClass": {
-      "description": "Taxonomy of the injected change. Required on every fault so calibration (fault class \u2192 real-bug predictiveness) can be computed later. `field-dropped` = a field removed from a persisted/transmitted object, allow-list, schema or merge; `argument-swapped` = a call kept with a parameter-derived argument replaced by a trivial value; `element-removed` = a UI element no longer rendered; `handler-dropped` = an event handler no longer wired.",
+      "description": "Taxonomy of the injected change. Required on every fault so calibration (fault class → real-bug predictiveness) can be computed later. `field-dropped` = a field removed from a persisted/transmitted object, allow-list, schema or merge; `argument-swapped` = a call kept with a parameter-derived argument replaced by a trivial value; `element-removed` = a UI element no longer rendered; `handler-dropped` = an event handler no longer wired.",
       "enum": [
         "guard-removed",
         "condition-forced",
@@ -131,7 +134,7 @@
           ]
         },
         "nearestClaimId": {
-          "description": "The claim whose fault files share the longest directory prefix with this file \u2014 where to attach, not a verdict.",
+          "description": "The claim whose fault files share the longest directory prefix with this file — where to attach, not a verdict.",
           "$ref": "#/$defs/identifier"
         },
         "suggestion": {
@@ -218,6 +221,15 @@
         "scan"
       ],
       "default": "fault-injection"
+    },
+    "verdictRole": {
+      "description": "What an outcome MEANS, independent of the method that produced it. Read across the tools: `killed`/`pass` are both `held`, `survived`/`fail` are both `broken`, `nocover`/`no-matches`/`not-evaluated` are all `not-applicable`. The names differ because the questions differ; the roles do not, which is what lets one reader rank and count findings from several tools without knowing which produced them.",
+      "enum": [
+        "held",
+        "broken",
+        "not-applicable",
+        "indeterminate"
+      ]
     }
   }
 }

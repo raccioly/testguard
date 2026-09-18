@@ -7,14 +7,20 @@ import { fingerprint } from './fingerprint.mjs';
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 
 export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate', 'replay']);
+import { VERDICTS, methodOf, isVerdictOf, roleOf, gatesUnder, passingVerdicts } from './verdicts.mjs';
+
 /**
- * How a document says it tried to falsify its claims. Absent means
- * `fault-injection`, so every document written before the field existed is
- * held to exactly the rules it was written against.
+ * How a document says it tried to falsify its claims, and what its outcomes are
+ * allowed to be called. The vocabulary lives in `verdicts.mjs`; re-exported here
+ * because `validate.mjs` is the entry point a consumer already imports.
  */
-export const methodOf = (x) => x?.method ?? 'fault-injection';
+export { methodOf, isVerdictOf, roleOf, gatesUnder, passingVerdicts };
 const isInjection = (x) => methodOf(x) === 'fault-injection';
-export const PASSING_VERDICTS = Object.freeze(new Set(['killed']));
+/**
+ * @deprecated Passing is a per-method question — use `passingVerdicts(method)`.
+ * Kept as fault-injection's answer so an existing consumer keeps working.
+ */
+export const PASSING_VERDICTS = Object.freeze(new Set(passingVerdicts('fault-injection')));
 
 const ajv = new Ajv2020({ strict: true, allErrors: true });
 for (const f of readdirSync(schemaDir).filter((n) => n.endsWith('.schema.json'))) {
@@ -56,6 +62,7 @@ const semantic = {
 
   evidence(doc) {
     const errors = [];
+    const method = methodOf(doc.run);
     const injection = isInjection(doc.run);
     const n = doc.run.confirmRuns;
     // N-run agreement is what fault injection means by "confirmed". A method
@@ -72,6 +79,13 @@ const semantic = {
       const expected = fingerprint({ claimId: r.claim.id, subjectId: r.subject.id, file: r.subject.file ?? '', verdict: r.verdict });
       if (r.fingerprint !== expected) errors.push({ path: `${p}/fingerprint`, message: `fingerprint does not match spec derivation (expected ${expected})` });
 
+      // A name means nothing without its method. The schema can only check the
+      // union, so a document could otherwise report `holds` from an injecting
+      // run — a word that means "checked and true" attached to a run that
+      // checked nothing of the sort.
+      if (!isVerdictOf(method, r.verdict)) {
+        errors.push({ path: `${p}/verdict`, message: `"${r.verdict}" is not a verdict of method "${method}"; that method's verdicts are ${Object.keys(VERDICTS[method] ?? {}).join(', ') || '(unknown method)'}` });
+      }
       // What the schema no longer requires, the validator still does — for the
       // one method that means it. Fault injection without defenders, inputs or
       // runs is not a leaner document, it is a verdict with nothing behind it;

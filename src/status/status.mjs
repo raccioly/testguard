@@ -161,7 +161,7 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   }
   doc.counts.new = g.new.length + g.belowFloor.length;
   doc.counts.baselined = g.baselined.length;
-  const ranked = sortForReport([...g.new, ...g.belowFloor, ...g.baselined]);
+  const ranked = sortForReport([...g.new, ...g.belowFloor, ...g.baselined], evidence?.run);
   doc.findings = ranked.slice(0, max).map((r) => ({
     fingerprint: r.fingerprint, claimId: r.claim.id, subjectId: r.subject.id, verdict: r.verdict,
     ...(r.detail.reason ? { reason: r.detail.reason } : {}), severity: r.claim.severity,

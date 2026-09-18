@@ -16,7 +16,7 @@
   },
   "records": [
     {
-      "fingerprint": "7b86a358f37adcf78bcc51ef2f7dbfe74dbffcb31918752ef4fc65b98eabc440",
+      "fingerprint": "6b8b11bddecf0c3393b449e44f4e6c01833eafe03e90339d3dc134e1e6c976ae",
       "claim": {
         "id": "SEC-001",
         "statement": "No unauthenticated route reads from the user store.",
@@ -43,12 +43,85 @@
         },
         "contentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       },
-      "verdict": "killed",
+      "verdict": "violated",
       "detail": {
-        "reason": "rule-matched-nothing",
+        "reason": "unauthenticated-route-reaches-user-store",
         "methodDetail": {
           "attackClass": "missing-auth",
           "rule": "WS-AUTH-001"
+        }
+      }
+    },
+    {
+      "fingerprint": "39af95896307154ebad3cf1447f11b3067566471d7554a1b3376d31d6ff659b3",
+      "claim": {
+        "id": "SEC-002",
+        "statement": "No unauthenticated route reads from the user store.",
+        "severity": "critical",
+        "source": {
+          "kind": "spec",
+          "ref": "docs/THREAT-MODEL.md"
+        },
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-09-18T00:00:00Z"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "P1",
+        "description": "An unauthenticated route reaches the user store.",
+        "file": "src/routes/health.mjs",
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-09-18T00:00:00Z"
+        },
+        "contentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "verdict": "holds",
+      "detail": {
+        "methodDetail": {
+          "attackClass": "missing-auth",
+          "surface": "GET /healthz"
+        }
+      }
+    },
+    {
+      "fingerprint": "befac31afa6475d1f8d3e28970319c0b0ce1c8e403c8d8aceea9e3e78d173215",
+      "claim": {
+        "id": "SEC-003",
+        "statement": "No unauthenticated route reads from the user store.",
+        "severity": "critical",
+        "source": {
+          "kind": "spec",
+          "ref": "docs/THREAT-MODEL.md"
+        },
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-09-18T00:00:00Z"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "P1",
+        "description": "An unauthenticated route reaches the user store.",
+        "file": "src/routes/admin.mjs",
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-09-18T00:00:00Z"
+        },
+        "contentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "verdict": "not-applicable",
+      "detail": {
+        "reason": "surface-out-of-scope",
+        "methodDetail": {
+          "attackClass": "missing-auth",
+          "surface": "internal, not reachable from the edge"
         }
       }
     }
