@@ -1,7 +1,7 @@
 {
   "name": "testguard-cli",
   "version": "0.6.0",
-  "description": "Proves a test suite defends the claims a project makes: injects the faults those claims forbid and reports every one the tests fail to detect.",
+  "description": "Breaks your code on purpose and reports every promise your tests did not notice breaking. Mutation testing bound to the claims a project makes \u2014 vitest, jest, Playwright, pytest and unittest.",
   "type": "module",
   "license": "MIT",
   "engines": {

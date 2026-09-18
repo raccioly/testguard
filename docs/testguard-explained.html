@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TestGuard — Proving a Test Suite Defends What It Claims</title>
+<style>
+  :root {
+    --paper:      #faf9f5;
+    --card:       #ffffff;
+    --ink:        #191917;
+    --ink-soft:   #565550;
+    --ink-faint:  #918d83;
+    --rule:       #e6e2d8;
+    --rule-soft:  #f0ede4;
+    --clay:       #d97757;
+    --clay-deep:  #b85636;
+    --clay-wash:  #fbf1ec;
+    --sage:       #3f6b5f;
+    --sage-wash:  #eef4f1;
+    --slate:      #4a5568;
+    --sans: "Helvetica Neue", Helvetica, "Inter", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+    --mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+
+  @page { size: Letter; margin: 0; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; background: var(--paper); color: var(--ink);
+         font-family: var(--sans); font-size: 9.5pt; line-height: 1.5; letter-spacing: -0.005em; }
+
+  .page { page-break-after: always; display: flex; flex-direction: column;
+          min-height: 279.4mm; padding: 14mm 15mm 11mm; background: var(--paper); }
+  .page:last-child { page-break-after: auto; }
+
+  .masthead { display: flex; align-items: baseline; justify-content: space-between;
+              border-bottom: 2px solid var(--ink); padding-bottom: 7px; }
+  .wordmark { font-size: 12.5pt; font-weight: 700; letter-spacing: -0.025em; }
+  .wordmark .mark { color: var(--clay); }
+  .meta { font-family: var(--mono); font-size: 6.8pt; color: var(--ink-faint);
+          letter-spacing: 0.07em; text-transform: uppercase; }
+
+  h1 { font-size: 25pt; line-height: 1.08; font-weight: 700; letter-spacing: -0.032em;
+       margin: 24px 0 0; max-width: 20ch; }
+  .standfirst { font-size: 11.2pt; line-height: 1.45; color: var(--ink-soft);
+                margin: 12px 0 0; max-width: 60ch; }
+
+  h2 { font-size: 7.8pt; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+       color: var(--clay-deep); margin: 0 0 9px; }
+  h3 { font-size: 10pt; font-weight: 700; margin: 0 0 5px; letter-spacing: -0.012em; }
+
+  p { margin: 0 0 9px; }
+  .lede { font-size: 10.3pt; }
+  code { font-family: var(--mono); font-size: 0.88em; background: var(--rule-soft);
+         padding: 1px 4px; border-radius: 3px; }
+  .note { font-size: 8.4pt; color: var(--ink-soft); }
+
+  section { margin-top: 19px; }
+  .rule-top { border-top: 1px solid var(--rule); padding-top: 13px; }
+  .cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+  .cols-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+  .exhibit { border: 1px solid var(--rule); border-left: 3px solid var(--clay);
+             background: var(--card); padding: 11px 13px; margin: 0 0 9px; }
+  .exhibit pre { font-family: var(--mono); font-size: 8pt; line-height: 1.5; margin: 0;
+                 white-space: pre-wrap; color: #23221e; }
+  .exhibit .cap { font-family: var(--mono); font-size: 6.6pt; letter-spacing: 0.09em;
+                  text-transform: uppercase; color: var(--ink-faint); margin-bottom: 7px; }
+  .kw { color: #7a4fbf; } .str { color: #2f6f4f; } .num { color: #2a5b9b; }
+  .cm { color: var(--ink-faint); font-style: italic; }
+
+  .verdict { border: 1px solid var(--rule); padding: 11px 13px; background: var(--card); }
+  .verdict.bad  { border-left: 3px solid var(--clay); background: var(--clay-wash); }
+  .verdict.good { border-left: 3px solid var(--sage); background: var(--sage-wash); }
+  .verdict .tag { font-family: var(--mono); font-size: 8.3pt; font-weight: 700;
+                  letter-spacing: 0.04em; display: block; margin-bottom: 4px; }
+  .verdict.bad .tag  { color: var(--clay-deep); }
+  .verdict.good .tag { color: var(--sage); }
+  .verdict p { margin: 0; font-size: 9pt; }
+
+  .pull { border-top: 2px solid var(--ink); border-bottom: 1px solid var(--rule);
+          padding: 13px 0 12px; margin-top: 20px; }
+  .pull p { font-size: 12.4pt; line-height: 1.36; font-weight: 500;
+            letter-spacing: -0.018em; margin: 0; max-width: 64ch; }
+  .pull .attrib { font-family: var(--mono); font-size: 6.6pt; letter-spacing: 0.09em;
+                  text-transform: uppercase; color: var(--ink-faint); margin-top: 8px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 8.8pt; }
+  th { text-align: left; font-size: 6.9pt; letter-spacing: 0.1em; text-transform: uppercase;
+       color: var(--ink-faint); font-weight: 700; padding: 0 9px 6px 0;
+       border-bottom: 1.5px solid var(--ink); }
+  td { padding: 7px 9px 7px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  td:first-child { font-family: var(--mono); font-weight: 700; white-space: nowrap; width: 21%; }
+  tr:last-child td { border-bottom: none; }
+  .v-bad { color: var(--clay-deep); } .v-good { color: var(--sage); }
+
+  ul.ticks { list-style: none; margin: 0; padding: 0; }
+  ul.ticks li { position: relative; padding-left: 14px; margin-bottom: 6px; font-size: 8.7pt; }
+  ul.ticks li::before { content: "—"; position: absolute; left: 0; color: var(--clay); font-weight: 700; }
+
+  .versus { display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+            border: 1px solid var(--rule); background: var(--card); }
+  .versus > div { padding: 13px 15px; }
+  .versus > div:first-child { border-right: 1px solid var(--rule); background: #fbfaf7; }
+  .versus .q { font-family: var(--mono); font-size: 8.4pt; color: var(--ink-soft);
+               display: block; margin: 7px 0 8px; }
+  .versus .out { font-size: 9.1pt; font-weight: 600; }
+
+  .kicker { font-family: var(--mono); font-size: 6.7pt; letter-spacing: 0.11em;
+            text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
+  .figcap { font-family: var(--mono); font-size: 6.6pt; letter-spacing: 0.08em;
+            text-transform: uppercase; color: var(--ink-faint); margin: 7px 0 0; }
+  figure { margin: 0; }
+  svg { display: block; width: 100%; height: auto; }
+
+  .footer { margin-top: auto; display: flex; justify-content: space-between;
+            font-family: var(--mono); font-size: 6.4pt; color: var(--ink-faint);
+            letter-spacing: 0.07em; text-transform: uppercase;
+            border-top: 1px solid var(--rule); padding-top: 5px; }
+
+  .statband { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
+              border: 1px solid var(--rule); background: var(--card); margin-top: 13px; }
+  .statband > div { padding: 13px 15px; border-right: 1px solid var(--rule); }
+  .statband > div:last-child { border-right: none; }
+  .statband .fig { font-size: 23pt; font-weight: 700; letter-spacing: -0.035em; line-height: 1; }
+  .statband .fig.clay { color: var(--clay-deep); }
+  .statband .fig.sage { color: var(--sage); }
+  .statband .cap { font-size: 7.9pt; color: var(--ink-soft); margin-top: 6px; line-height: 1.35; }
+  .statband .src { font-family: var(--mono); font-size: 6.2px; font-size: 6.2pt; letter-spacing: 0.07em;
+                   text-transform: uppercase; color: var(--ink-faint); margin-top: 7px; }
+
+  /* svg type */
+  .s-lbl  { font-family: var(--mono); font-size: 7px; letter-spacing: 0.06em;
+            text-transform: uppercase; fill: var(--ink); font-weight: 700; }
+  .s-sub  { font-family: var(--sans); font-size: 7.4px; fill: var(--ink-soft); }
+  .s-tiny { font-family: var(--mono); font-size: 6.2px; letter-spacing: 0.07em;
+            text-transform: uppercase; fill: var(--ink-faint); }
+  .s-q    { font-family: var(--sans); font-size: 8.2px; fill: var(--ink); }
+  .s-v    { font-family: var(--mono); font-size: 7.4px; font-weight: 700; letter-spacing: 0.04em; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ PAGE 1 — THE IDEA ═══════════════ -->
+<div class="page">
+  <div class="masthead">
+    <div class="wordmark">Test<span class="mark">Guard</span></div>
+    <div class="meta">Technical Brief · v0.6 · MIT</div>
+  </div>
+
+  <h1>Your tests pass. That is not the same as your tests working.</h1>
+  <p class="standfirst">TestGuard takes the promises your code makes, breaks each one on purpose,
+  and reports every promise your tests did not notice breaking.</p>
+
+  <section class="rule-top">
+    <h2>The problem</h2>
+    <p class="lede"><strong>Coverage tells you a line ran. It never tells you anyone checked the result.</strong>
+    So a codebase can be fully covered and completely undefended — and nothing in CI will say a word.</p>
+
+    <div class="exhibit">
+      <div class="cap">A real test, from this project's own fixture</div>
+<pre><span class="kw">expect</span>(store.writeAudit).toHaveBeenCalledWith(
+  <span class="kw">expect</span>.objectContaining({ action: <span class="str">'MASK'</span>, scope: <span class="str">'g1'</span>, ruleCount: <span class="num">1</span> }),
+);  <span class="cm">// `content` is never named — so nothing checks it</span></pre>
+    </div>
+
+    <p><code>objectContaining</code> ignores keys it does not list. Swap the redacted text for the
+    <strong>raw secret</strong> and this test still passes. Coverage of that line: 100%. The audit log
+    now leaks the very thing it exists to protect.</p>
+
+    <figure style="margin-top:11px">
+      <svg viewBox="0 0 760 112" role="img" aria-label="One hundred percent coverage, zero tests that would notice the line breaking">
+        <rect x="0" y="0" width="368" height="112" rx="5" fill="#ffffff" stroke="#e6e2d8"/>
+        <text class="s-tiny" x="20" y="22">Coverage asks</text>
+        <text x="20" y="41" style="font-family:var(--sans);font-size:10px;font-weight:700;fill:#191917">“Did this line run?”</text>
+        <text x="20" y="79" style="font-family:var(--sans);font-size:30px;font-weight:700;letter-spacing:-0.035em;fill:#3f6b5f">100%</text>
+        <text class="s-sub" x="20" y="95" style="font-size:8px">covered — and it is telling the truth</text>
+        <rect x="20" y="102" width="328" height="5" rx="2.5" fill="#3f6b5f"/>
+
+        <rect x="392" y="0" width="368" height="112" rx="5" fill="#fbf1ec" stroke="#d97757"/>
+        <text class="s-tiny" x="412" y="22" style="fill:#b85636">TestGuard asks</text>
+        <text x="412" y="41" style="font-family:var(--sans);font-size:10px;font-weight:700;fill:#191917">“If I break it, does anything notice?”</text>
+        <text x="412" y="79" style="font-family:var(--sans);font-size:30px;font-weight:700;letter-spacing:-0.035em;fill:#b85636">0</text>
+        <text class="s-sub" x="412" y="95" style="font-size:8px">of the tests covering it would fail</text>
+        <rect x="412" y="102" width="328" height="5" rx="2.5" fill="#f0ded5"/>
+      </svg>
+      <p class="figcap">Fig. 1 — The same line of code, under two different questions. Only one of them is worth knowing.</p>
+    </figure>
+  </section>
+
+  <section class="rule-top">
+    <h2>The method</h2>
+    <div class="cols-2">
+      <div class="verdict good">
+        <span class="tag">killed</span>
+        <p>You broke it — a test failed. <strong>Good.</strong> That behaviour is genuinely defended.</p>
+      </div>
+      <div class="verdict bad">
+        <span class="tag">SURVIVED</span>
+        <p>You broke it — everything stayed green. <strong>A blind spot.</strong></p>
+      </div>
+    </div>
+    <p style="margin-top:10px"><strong>The word trips everyone once:</strong> it is the <em>fault</em> that
+    survived, not the test. SURVIVED is the bad news. A healthy report is full of <em>killed</em>.</p>
+  </section>
+
+  <div class="pull">
+    <p>A tool that reports everything as caught is worse than no tool at all —
+    because nobody questions good news.</p>
+    <div class="attrib">The design constraint everything else follows from</div>
+  </div>
+
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 1 of 5 · The idea</span></div>
+</div>
+
+<!-- ═══════════════ PAGE — THE EVIDENCE ═══════════════ -->
+<div class="page">
+  <div class="masthead">
+    <div class="wordmark">Test<span class="mark">Guard</span></div>
+    <div class="meta">02 — What it found in the field</div>
+  </div>
+
+  <section style="margin-top:17px">
+    <h2>Two independent runs, two AI-authored codebases</h2>
+    <p class="lede">Neither suite was sloppy. One had ~4,900 disciplined tests, no snapshots, and 0.4%
+    zero-assertion. Both were green. Both were substantially blind.</p>
+    <figure style="margin-top:13px">
+      <svg viewBox="0 0 760 338" role="img" aria-label="Field measurements: 21 of 39 faults survived a fully green suite; all 39 killed after tests were written">
+        <text class="s-tiny" x="0" y="12">Field report A — AI-authored production codebase, ~4,900 tests</text>
+        <rect x="0" y="20" width="760" height="70" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
+        <text x="20" y="58" style="font-family:var(--sans);font-size:30px;font-weight:700;letter-spacing:-0.03em;fill:#b85636">8 of 9</text>
+        <text class="s-sub" x="20" y="76" style="font-size:8px">real historical bugs the suite could not see</text>
+        <line x1="250" y1="34" x2="250" y2="78" stroke="#e6e2d8"/>
+        <text x="274" y="58" style="font-family:var(--sans);font-size:30px;font-weight:700;letter-spacing:-0.03em;fill:#191917">2,451</text>
+        <text class="s-sub" x="274" y="76" style="font-size:8px">tests green, at once, on known-broken code</text>
+        <line x1="470" y1="34" x2="470" y2="78" stroke="#e6e2d8"/>
+        <text x="494" y="58" style="font-family:var(--sans);font-size:30px;font-weight:700;letter-spacing:-0.03em;fill:#3f6b5f">100%</text>
+        <text class="s-sub" x="494" y="76" style="font-size:8px">coverage on the compliance path that leaked</text>
+
+        <text class="s-tiny" x="0" y="116">Field report B — a different codebase, 458 tests, 24 security claims, 39 faults injected</text>
+
+        <rect x="0" y="126" width="760" height="88" rx="4" fill="#ffffff" stroke="#d97757"/>
+        <text class="s-tiny" x="20" y="146" style="fill:#b85636">Before — every test green</text>
+        <g>
+          <circle cx="27" cy="164" r="5.2" fill="#3f6b5f"/>
+          <circle cx="44" cy="164" r="5.2" fill="#3f6b5f"/>
+          <circle cx="61" cy="164" r="5.2" fill="#3f6b5f"/>
+          <circle cx="78" cy="164" r="5.2" fill="#3f6b5f"/>
+          <circle cx="95" cy="164" r="5.2" fill="#3f6b5f"/>
+          <circle cx="112" cy="164" r="5.2" fill="#3f6b5f"/>
+          <circle cx="129" cy="164" r="5.2" fill="#3f6b5f"/>
+          <circle cx="146" cy="164" r="5.2" fill="#3f6b5f"/>
+          <circle cx="163" cy="164" r="5.2" fill="#3f6b5f"/>
+          <circle cx="180" cy="164" r="5.2" fill="#3f6b5f"/>
+          <circle cx="197" cy="164" r="5.2" fill="#3f6b5f"/>
+          <circle cx="214" cy="164" r="5.2" fill="#3f6b5f"/>
+          <circle cx="231" cy="164" r="5.2" fill="#3f6b5f"/>
+          <circle cx="27" cy="181" r="5.2" fill="#3f6b5f"/>
+          <circle cx="44" cy="181" r="5.2" fill="#3f6b5f"/>
+          <circle cx="61" cy="181" r="5.2" fill="#3f6b5f"/>
+          <circle cx="78" cy="181" r="5.2" fill="#3f6b5f"/>
+          <circle cx="95" cy="181" r="5.2" fill="#3f6b5f"/>
+          <circle cx="112" cy="181" r="5.2" fill="#d97757"/>
+          <circle cx="129" cy="181" r="5.2" fill="#d97757"/>
+          <circle cx="146" cy="181" r="5.2" fill="#d97757"/>
+          <circle cx="163" cy="181" r="5.2" fill="#d97757"/>
+          <circle cx="180" cy="181" r="5.2" fill="#d97757"/>
+          <circle cx="197" cy="181" r="5.2" fill="#d97757"/>
+          <circle cx="214" cy="181" r="5.2" fill="#d97757"/>
+          <circle cx="231" cy="181" r="5.2" fill="#d97757"/>
+          <circle cx="27" cy="198" r="5.2" fill="#d97757"/>
+          <circle cx="44" cy="198" r="5.2" fill="#d97757"/>
+          <circle cx="61" cy="198" r="5.2" fill="#d97757"/>
+          <circle cx="78" cy="198" r="5.2" fill="#d97757"/>
+          <circle cx="95" cy="198" r="5.2" fill="#d97757"/>
+          <circle cx="112" cy="198" r="5.2" fill="#d97757"/>
+          <circle cx="129" cy="198" r="5.2" fill="#d97757"/>
+          <circle cx="146" cy="198" r="5.2" fill="#d97757"/>
+          <circle cx="163" cy="198" r="5.2" fill="#d97757"/>
+          <circle cx="180" cy="198" r="5.2" fill="#d97757"/>
+          <circle cx="197" cy="198" r="5.2" fill="#d97757"/>
+          <circle cx="214" cy="198" r="5.2" fill="#d97757"/>
+          <circle cx="231" cy="198" r="5.2" fill="#d97757"/>
+        </g>
+        <text x="500" y="168" style="font-family:var(--sans);font-size:26px;font-weight:700;letter-spacing:-0.03em;fill:#b85636">21</text>
+        <text class="s-sub" x="540" y="168" style="font-size:8.4px">faults SURVIVED a fully green suite</text>
+        <text x="500" y="192" style="font-family:var(--sans);font-size:15px;font-weight:700;fill:#b85636">9</text>
+        <text class="s-sub" x="522" y="192" style="font-size:8.4px">of them critical — super-admin gating, cookie</text>
+        <text class="s-sub" x="522" y="203" style="font-size:8.4px">flags, the whole authorization callback</text>
+
+        <rect x="0" y="222" width="760" height="88" rx="4" fill="#ffffff" stroke="#3f6b5f"/>
+        <text class="s-tiny" x="20" y="242" style="fill:#3f6b5f">After — tests written against the survivors</text>
+        <g>
+          <circle cx="27" cy="260" r="5.2" fill="#3f6b5f"/>
+          <circle cx="44" cy="260" r="5.2" fill="#3f6b5f"/>
+          <circle cx="61" cy="260" r="5.2" fill="#3f6b5f"/>
+          <circle cx="78" cy="260" r="5.2" fill="#3f6b5f"/>
+          <circle cx="95" cy="260" r="5.2" fill="#3f6b5f"/>
+          <circle cx="112" cy="260" r="5.2" fill="#3f6b5f"/>
+          <circle cx="129" cy="260" r="5.2" fill="#3f6b5f"/>
+          <circle cx="146" cy="260" r="5.2" fill="#3f6b5f"/>
+          <circle cx="163" cy="260" r="5.2" fill="#3f6b5f"/>
+          <circle cx="180" cy="260" r="5.2" fill="#3f6b5f"/>
+          <circle cx="197" cy="260" r="5.2" fill="#3f6b5f"/>
+          <circle cx="214" cy="260" r="5.2" fill="#3f6b5f"/>
+          <circle cx="231" cy="260" r="5.2" fill="#3f6b5f"/>
+          <circle cx="27" cy="277" r="5.2" fill="#3f6b5f"/>
+          <circle cx="44" cy="277" r="5.2" fill="#3f6b5f"/>
+          <circle cx="61" cy="277" r="5.2" fill="#3f6b5f"/>
+          <circle cx="78" cy="277" r="5.2" fill="#3f6b5f"/>
+          <circle cx="95" cy="277" r="5.2" fill="#3f6b5f"/>
+          <circle cx="112" cy="277" r="5.2" fill="#3f6b5f"/>
+          <circle cx="129" cy="277" r="5.2" fill="#3f6b5f"/>
+          <circle cx="146" cy="277" r="5.2" fill="#3f6b5f"/>
+          <circle cx="163" cy="277" r="5.2" fill="#3f6b5f"/>
+          <circle cx="180" cy="277" r="5.2" fill="#3f6b5f"/>
+          <circle cx="197" cy="277" r="5.2" fill="#3f6b5f"/>
+          <circle cx="214" cy="277" r="5.2" fill="#3f6b5f"/>
+          <circle cx="231" cy="277" r="5.2" fill="#3f6b5f"/>
+          <circle cx="27" cy="294" r="5.2" fill="#3f6b5f"/>
+          <circle cx="44" cy="294" r="5.2" fill="#3f6b5f"/>
+          <circle cx="61" cy="294" r="5.2" fill="#3f6b5f"/>
+          <circle cx="78" cy="294" r="5.2" fill="#3f6b5f"/>
+          <circle cx="95" cy="294" r="5.2" fill="#3f6b5f"/>
+          <circle cx="112" cy="294" r="5.2" fill="#3f6b5f"/>
+          <circle cx="129" cy="294" r="5.2" fill="#3f6b5f"/>
+          <circle cx="146" cy="294" r="5.2" fill="#3f6b5f"/>
+          <circle cx="163" cy="294" r="5.2" fill="#3f6b5f"/>
+          <circle cx="180" cy="294" r="5.2" fill="#3f6b5f"/>
+          <circle cx="197" cy="294" r="5.2" fill="#3f6b5f"/>
+          <circle cx="214" cy="294" r="5.2" fill="#3f6b5f"/>
+          <circle cx="231" cy="294" r="5.2" fill="#3f6b5f"/>
+        </g>
+        <text x="500" y="268" style="font-family:var(--sans);font-size:26px;font-weight:700;letter-spacing:-0.03em;fill:#3f6b5f">39/39</text>
+        <text class="s-sub" x="572" y="268" style="font-size:8.4px">killed</text>
+        <text class="s-sub" x="500" y="292" style="font-size:8.4px">The suite was not bad.</text>
+        <text class="s-sub" x="500" y="303" style="font-size:8.4px">It was unexamined.</text>
+
+        <circle cx="5" cy="329" r="4.6" fill="#3f6b5f"/>
+        <text class="s-tiny" x="16" y="332">killed — defended</text>
+        <circle cx="133" cy="329" r="4.6" fill="#d97757"/>
+        <text class="s-tiny" x="144" y="332">SURVIVED — a blind spot</text>
+      </svg>
+      <p class="figcap">Fig. 2 — Measured, not modelled. Each dot is one injected fault.</p>
+    </figure>
+  </section>
+
+  <section class="rule-top">
+    <h2>The shape of the failure</h2>
+    <div class="cols-2">
+      <div>
+        <h3>It is not missing tests</h3>
+        <p class="note">One file had re-implemented the authorization logic <em>inside the test</em> and
+        asserted against its own copy. Fifteen tests, all green, all passing for the wrong reason — the
+        production path could be deleted outright without one of them noticing.</p>
+      </div>
+      <div>
+        <h3>It is assertions that name too little</h3>
+        <p class="note">The largest gap ran through a compliance-critical path at 100% coverage, where the
+        one assertion that mattered used <code>objectContaining</code> and omitted the field carrying the
+        data. Exactly the exhibit on page one.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="pull">
+    <p>A green suite is evidence that the tests agree with the code.
+    It is not evidence that either one is right.</p>
+    <div class="attrib">Why the question has to be asked adversarially</div>
+  </div>
+
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 2 of 5 · Evidence</span></div>
+</div>
+
+<!-- ═══════════════ PAGE 2 — HOW A RUN WORKS ═══════════════ -->
+<div class="page">
+  <div class="masthead">
+    <div class="wordmark">Test<span class="mark">Guard</span></div>
+    <div class="meta">03 — Anatomy of a run</div>
+  </div>
+
+  <section style="margin-top:17px">
+    <h2>One fault, start to verdict</h2>
+    <figure>
+      <svg viewBox="0 0 760 214" role="img" aria-label="Pipeline: isolate, baseline three times, inject, probe three times, restore, classify">
+        <defs>
+          <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#918d83"/>
+          </marker>
+        </defs>
+
+        <!-- stage boxes -->
+        <g>
+          <rect x="0"   y="34" width="104" height="46" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
+          <text class="s-lbl" x="14" y="54">Isolate</text>
+          <text class="s-sub" x="14" y="68">scratch worktree</text>
+
+          <rect x="120" y="34" width="104" height="46" rx="4" fill="#ffffff" stroke="#3f6b5f"/>
+          <text class="s-lbl" x="134" y="54" style="fill:#3f6b5f">Baseline</text>
+          <text class="s-sub" x="134" y="68">untouched code</text>
+          <rect x="196" y="40" width="22" height="13" rx="6.5" fill="#3f6b5f"/>
+          <text x="207" y="49.5" text-anchor="middle" style="font-family:var(--mono);font-size:7px;font-weight:700;fill:#fff">×3</text>
+
+          <rect x="240" y="34" width="104" height="46" rx="4" fill="#fbf1ec" stroke="#d97757"/>
+          <text class="s-lbl" x="254" y="54" style="fill:#b85636">Inject</text>
+          <text class="s-sub" x="254" y="68">apply the fault</text>
+
+          <rect x="360" y="34" width="104" height="46" rx="4" fill="#ffffff" stroke="#d97757"/>
+          <text class="s-lbl" x="374" y="54" style="fill:#b85636">Probe</text>
+          <text class="s-sub" x="374" y="68">same tests again</text>
+          <rect x="436" y="40" width="22" height="13" rx="6.5" fill="#d97757"/>
+          <text x="447" y="49.5" text-anchor="middle" style="font-family:var(--mono);font-size:7px;font-weight:700;fill:#fff">×3</text>
+
+          <rect x="480" y="34" width="104" height="46" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
+          <text class="s-lbl" x="494" y="54">Restore</text>
+          <text class="s-sub" x="494" y="68">always</text>
+
+          <rect x="600" y="34" width="160" height="46" rx="4" fill="#191917"/>
+          <text class="s-lbl" x="614" y="54" style="fill:#faf9f5">Classify</text>
+          <text class="s-sub" x="614" y="68" style="fill:#c9c5bb">one of seven verdicts</text>
+        </g>
+
+        <!-- arrows -->
+        <g stroke="#918d83" stroke-width="1.2" marker-end="url(#ar2)">
+          <line x1="106" y1="57" x2="118" y2="57"/>
+          <line x1="226" y1="57" x2="238" y2="57"/>
+          <line x1="346" y1="57" x2="358" y2="57"/>
+          <line x1="466" y1="57" x2="478" y2="57"/>
+          <line x1="586" y1="57" x2="598" y2="57"/>
+        </g>
+
+        <!-- gate annotation -->
+        <path d="M172 88 L172 102 L292 102" fill="none" stroke="#3f6b5f" stroke-width="1.2" stroke-dasharray="3 2.5"/>
+        <text class="s-tiny" x="176" y="115" style="fill:#3f6b5f">Must pass 3 of 3 — or the run stops here</text>
+        <text class="s-sub" x="176" y="129" style="font-size:7.2px">A suite that cannot stay green on untouched code</text>
+        <text class="s-sub" x="176" y="140" style="font-size:7.2px">cannot be asked anything about a fault.</text>
+
+        <!-- input / output rails -->
+        <rect x="0" y="0" width="230" height="22" rx="3" fill="#f0ede4"/>
+        <text class="s-tiny" x="12" y="14.5">In → testguard.claims.json</text>
+        <rect x="600" y="0" width="160" height="22" rx="3" fill="#f0ede4"/>
+        <text class="s-tiny" x="612" y="14.5">Out → evidence.json</text>
+
+        <!-- never-touched note -->
+        <rect x="420" y="172" width="340" height="34" rx="3" fill="#ffffff" stroke="#e6e2d8"/>
+        <text class="s-tiny" x="432" y="188">Your working tree</text>
+        <text class="s-sub" x="432" y="200" style="font-size:7.4px">is never modified — the fault is applied to a copy.</text>
+      </svg>
+      <p class="figcap">Fig. 3 — The probe loop. Every step repeats per fault; the baseline is cached per defender set.</p>
+    </figure>
+  </section>
+
+  <section class="rule-top">
+    <h2>How a verdict is decided</h2>
+    <p class="note" style="margin-bottom:10px">The order is the specification. Each check short-circuits the ones below it,
+    so the tool never reaches an optimistic answer through a question it should not have asked.</p>
+    <figure>
+      <svg viewBox="0 0 760 336" role="img" aria-label="Decision order producing each of the seven verdicts">
+        <defs>
+          <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#918d83"/>
+          </marker>
+        </defs>
+        <line x1="14" y1="14" x2="14" y2="296" stroke="#e6e2d8" stroke-width="1.4"/>
+        <g>
+          <circle cx="14" cy="26" r="3.6" fill="#918d83"/>
+          <text class="s-q" x="28" y="29">Does any test defend this claim?</text>
+          <line x1="352" y1="26" x2="412" y2="26" stroke="#918d83" stroke-width="1.1" marker-end="url(#ar3)"/>
+          <text class="s-tiny" x="360" y="21" style="fill:#918d83">no</text>
+          <rect x="420" y="15" width="130" height="22" rx="3" fill="#ffffff" stroke="#e6e2d8"/>
+          <text class="s-v" x="432" y="30" style="fill:#565550">NOCOVER</text>
+          <text class="s-sub" x="560" y="30" style="font-size:7.4px">nothing looks at this code</text>
+          <circle cx="14" cy="70" r="3.6" fill="#918d83"/>
+          <text class="s-q" x="28" y="73">Did the fault apply to exactly one place?</text>
+          <line x1="352" y1="70" x2="412" y2="70" stroke="#918d83" stroke-width="1.1" marker-end="url(#ar3)"/>
+          <text class="s-tiny" x="360" y="65" style="fill:#918d83">no</text>
+          <rect x="420" y="59" width="130" height="22" rx="3" fill="#ffffff" stroke="#e6e2d8"/>
+          <text class="s-v" x="432" y="74" style="fill:#565550">UNVERIFIABLE</text>
+          <text class="s-sub" x="560" y="74" style="font-size:7.4px">anchor moved, or matches twice</text>
+          <circle cx="14" cy="114" r="3.6" fill="#3f6b5f"/>
+          <text class="s-q" x="28" y="117">Was the baseline green, 3 of 3?</text>
+          <line x1="352" y1="114" x2="412" y2="114" stroke="#918d83" stroke-width="1.1" marker-end="url(#ar3)"/>
+          <text class="s-tiny" x="360" y="109" style="fill:#918d83">no</text>
+          <rect x="420" y="103" width="130" height="22" rx="3" fill="#ffffff" stroke="#e6e2d8"/>
+          <text class="s-v" x="432" y="118" style="fill:#565550">FLAKY-DEFENDER</text>
+          <text class="s-sub" x="560" y="118" style="font-size:7.4px">not steady enough to ask</text>
+          <circle cx="14" cy="158" r="3.6" fill="#918d83"/>
+          <text class="s-q" x="28" y="161">With the fault in, did the suite still load?</text>
+          <line x1="352" y1="158" x2="412" y2="158" stroke="#918d83" stroke-width="1.1" marker-end="url(#ar3)"/>
+          <text class="s-tiny" x="360" y="153" style="fill:#918d83">no</text>
+          <rect x="420" y="147" width="130" height="22" rx="3" fill="#ffffff" stroke="#e6e2d8"/>
+          <text class="s-v" x="432" y="162" style="fill:#565550">FAULT-INVALID</text>
+          <text class="s-sub" x="560" y="162" style="font-size:7.4px">our break was broken</text>
+          <circle cx="14" cy="202" r="3.6" fill="#918d83"/>
+          <text class="s-q" x="28" y="205">Did anything time out?</text>
+          <line x1="352" y1="202" x2="412" y2="202" stroke="#918d83" stroke-width="1.1" marker-end="url(#ar3)"/>
+          <text class="s-tiny" x="360" y="197" style="fill:#918d83">yes</text>
+          <rect x="420" y="191" width="130" height="22" rx="3" fill="#ffffff" stroke="#e6e2d8"/>
+          <text class="s-v" x="432" y="206" style="fill:#565550">TIMEOUT</text>
+          <text class="s-sub" x="560" y="206" style="font-size:7.4px">a hang is not a detection</text>
+          <circle cx="14" cy="246" r="3.6" fill="#3f6b5f"/>
+          <text class="s-q" x="28" y="249">Did a test <tspan style="font-weight:700">assert</tspan> its way to failure, in all 3 runs?</text>
+          <line x1="352" y1="246" x2="412" y2="246" stroke="#3f6b5f" stroke-width="1.3" marker-end="url(#ar3)"/>
+          <text class="s-tiny" x="360" y="241" style="fill:#3f6b5f">yes</text>
+          <rect x="420" y="235" width="130" height="22" rx="3" fill="#eef4f1" stroke="#3f6b5f"/>
+          <text class="s-v" x="432" y="250" style="fill:#3f6b5f">killed</text>
+          <text class="s-sub" x="560" y="250" style="font-size:7.4px">the only good outcome</text>
+          <circle cx="14" cy="290" r="3.6" fill="#d97757"/>
+          <text class="s-q" x="28" y="293">Everything passed, every run.</text>
+          <line x1="352" y1="290" x2="412" y2="290" stroke="#d97757" stroke-width="1.3" marker-end="url(#ar3)"/>
+          
+          <rect x="420" y="279" width="130" height="22" rx="3" fill="#fbf1ec" stroke="#d97757"/>
+          <text class="s-v" x="432" y="294" style="fill:#b85636">SURVIVED</text>
+          <text class="s-sub" x="560" y="294" style="font-size:7.4px">a real blind spot</text>
+        </g>
+        <text class="s-tiny" x="28" y="326">Anything in between — some runs killed, some passed — is FLAKY-DEFENDER, never a kill.</text>
+      </svg>
+      <p class="figcap">Fig. 4 — Verdict order. Every ambiguity resolves downward, toward “unproven”.</p>
+    </figure>
+  </section>
+
+  <section class="rule-top">
+    <h2>What a run costs, and why it is predictable</h2>
+    <div class="cols-2">
+      <div>
+        <p class="note" style="margin-bottom:8px">Wall clock is not a mystery. For each claim:</p>
+        <div class="exhibit" style="margin:0">
+<pre>(baseline runs + faults × N) × cost of the
+                       claim's defender set</pre>
+        </div>
+      </div>
+      <div>
+        <p class="note">The defender <em>set</em> is the unit, not the file — a run executes all of a claim's
+        tests at once. So one slow acceptance test named by five claims is paid for thirty times over, and
+        the report names that file rather than leaving you to guess.</p>
+        <p class="note" style="margin-bottom:0">Baselines are cached per defender set, and a verdict is
+        reused when the source, the defenders <em>and</em> the fault are all unchanged.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 3 of 5 · Anatomy</span></div>
+</div>
+
+<!-- ═══════════════ PAGE 3 — VERDICTS & ARCHITECTURE ═══════════════ -->
+<div class="page">
+  <div class="masthead">
+    <div class="wordmark">Test<span class="mark">Guard</span></div>
+    <div class="meta">04 — Verdicts &amp; architecture</div>
+  </div>
+
+  <section style="margin-top:17px">
+    <h2>Seven verdicts, because “did the tests fail?” is a sloppy question</h2>
+    <table>
+      <tr><th>Verdict</th><th>What it means</th></tr>
+      <tr><td class="v-good">killed</td><td>A test body ran and rejected the behaviour. The only good outcome.</td></tr>
+      <tr><td class="v-bad">SURVIVED</td><td>Everything passed. A real blind spot in the tests.</td></tr>
+      <tr><td>NOCOVER</td><td>No test even looks at this code. Not “weak tests” — <em>no</em> tests.</td></tr>
+      <tr><td>UNVERIFIABLE</td><td>The fault could not be applied: its anchor moved, or matches twice. Nothing was learned.</td></tr>
+      <tr><td>FAULT-INVALID</td><td>The break itself was broken — it did not compile. Our fault, not yours.</td></tr>
+      <tr><td>TIMEOUT</td><td>The suite hung. A hang is not a detection.</td></tr>
+      <tr><td>FLAKY-DEFENDER</td><td>The tests are not reliable enough on untouched code to be asked the question.</td></tr>
+    </table>
+  </section>
+
+  <section class="rule-top">
+    <h2>Where the pieces sit</h2>
+    <figure>
+      <svg viewBox="0 0 760 262" role="img" aria-label="Architecture: claims in, probe engine with runner adapters, evidence and baseline out, gate in CI">
+        <defs>
+          <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#918d83"/>
+          </marker>
+        </defs>
+
+        <!-- INPUT -->
+        <text class="s-tiny" x="0" y="10">Input — reviewed like code</text>
+        <rect x="0" y="18" width="176" height="60" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
+        <text class="s-lbl" x="14" y="37">claims.json</text>
+        <text class="s-sub" x="14" y="51" style="font-size:7.2px">Claim: what must be true</text>
+        <text class="s-sub" x="14" y="63" style="font-size:7.2px">Faults: how it could be false</text>
+
+        <!-- ENGINE -->
+        <rect x="212" y="18" width="330" height="144" rx="5" fill="#ffffff" stroke="#d97757"/>
+        <text class="s-tiny" x="226" y="10" style="fill:#b85636">Engine — testguard probe</text>
+
+        <rect x="228" y="32" width="136" height="34" rx="3" fill="#fbf1ec"/>
+        <text class="s-lbl" x="240" y="47" style="font-size:6.6px">Scratch worktree</text>
+        <text class="s-sub" x="240" y="59" style="font-size:6.9px">isolation + restore</text>
+
+        <rect x="378" y="32" width="150" height="34" rx="3" fill="#fbf1ec"/>
+        <text class="s-lbl" x="390" y="47" style="font-size:6.6px">Inject / run / N×</text>
+        <text class="s-sub" x="390" y="59" style="font-size:6.9px">budgeted processes</text>
+
+        <text class="s-tiny" x="228" y="84">Runner adapters — one report shape, five engines</text>
+        <g>
+          <rect x="228" y="90" width="56"  height="19" rx="3" fill="#f0ede4"/><text x="256" y="103" text-anchor="middle" style="font-family:var(--mono);font-size:6.5px;fill:#23221e">vitest</text>
+          <rect x="290" y="90" width="50"  height="19" rx="3" fill="#f0ede4"/><text x="315" y="103" text-anchor="middle" style="font-family:var(--mono);font-size:6.5px;fill:#23221e">jest</text>
+          <rect x="346" y="90" width="76"  height="19" rx="3" fill="#f0ede4"/><text x="384" y="103" text-anchor="middle" style="font-family:var(--mono);font-size:6.5px;fill:#23221e">playwright</text>
+          <rect x="428" y="90" width="56"  height="19" rx="3" fill="#f0ede4"/><text x="456" y="103" text-anchor="middle" style="font-family:var(--mono);font-size:6.5px;fill:#23221e">pytest</text>
+          <rect x="490" y="90" width="38"  height="19" rx="3" fill="#f0ede4"/><text x="509" y="103" text-anchor="middle" style="font-family:var(--mono);font-size:6.5px;fill:#23221e">unittest</text>
+        </g>
+
+        <rect x="228" y="120" width="300" height="30" rx="3" fill="#191917"/>
+        <text class="s-lbl" x="240" y="133" style="fill:#faf9f5;font-size:6.6px">classify()</text>
+        <text class="s-sub" x="240" y="144" style="fill:#c9c5bb;font-size:6.9px">pure; the check order is the specification</text>
+
+        <!-- OUTPUT -->
+        <text class="s-tiny" x="578" y="10">Output — schema-validated</text>
+        <rect x="578" y="18" width="182" height="34" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
+        <text class="s-lbl" x="592" y="33" style="font-size:6.8px">evidence.json</text>
+        <text class="s-sub" x="592" y="45" style="font-size:6.9px">a verdict per fault, with its runs</text>
+
+        <rect x="578" y="62" width="182" height="34" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
+        <text class="s-lbl" x="592" y="77" style="font-size:6.8px">baseline.json</text>
+        <text class="s-sub" x="592" y="89" style="font-size:6.9px">today's blind spots, frozen</text>
+
+        <rect x="578" y="106" width="182" height="44" rx="4" fill="#191917"/>
+        <text class="s-lbl" x="592" y="123" style="fill:#faf9f5;font-size:6.8px">gate → CI</text>
+        <text class="s-sub" x="592" y="135" style="fill:#c9c5bb;font-size:6.9px">fails only on blind spots that are</text>
+        <text class="s-sub" x="592" y="145" style="fill:#c9c5bb;font-size:6.9px">new since the baseline</text>
+
+        <!-- arrows -->
+        <g stroke="#918d83" stroke-width="1.2" marker-end="url(#ar4)">
+          <line x1="178" y1="48" x2="210" y2="48"/>
+          <line x1="544" y1="48" x2="576" y2="48"/>
+          <line x1="669" y1="54" x2="669" y2="60"/>
+          <line x1="669" y1="98" x2="669" y2="104"/>
+        </g>
+
+        <!-- adoption note -->
+        <rect x="0" y="196" width="760" height="58" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
+        <text class="s-tiny" x="16" y="214">Why the baseline matters</text>
+        <text class="s-sub" x="16" y="230" style="font-size:7.8px">A legacy codebase does not start with four hundred failures. Freeze what is already blind, then gate only on</text>
+        <text class="s-sub" x="16" y="243" style="font-size:7.8px">what gets worse — so the tool is adoptable on a Monday instead of being switched off on a Tuesday.</text>
+      </svg>
+      <p class="figcap">Fig. 5 — Claims in, evidence out, and a gate that measures the delta rather than the debt.</p>
+    </figure>
+  </section>
+
+  <section class="rule-top">
+    <h2>Every ambiguity rounds toward “unproven”</h2>
+    <div class="cols-3">
+      <div><ul class="ticks">
+        <li>Three runs, never one.</li>
+        <li>A green baseline before any fault is injected.</li>
+      </ul></div>
+      <div><ul class="ticks">
+        <li>A timeout is never a kill.</li>
+        <li>A suite that fails to load is never a kill.</li>
+      </ul></div>
+      <div><ul class="ticks">
+        <li>Mixed results across runs are not a kill.</li>
+        <li>A test that mocks what it defends is not a defender.</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 4 of 5 · Verdicts &amp; architecture</span></div>
+</div>
+
+<!-- ═══════════════ PAGE 4 — DIFFERENCE ═══════════════ -->
+<div class="page">
+  <div class="masthead">
+    <div class="wordmark">Test<span class="mark">Guard</span></div>
+    <div class="meta">05 — Prior art &amp; difference</div>
+  </div>
+
+  <section style="margin-top:17px">
+    <h2>What is not new</h2>
+    <p>Breaking code to test your tests is <strong>mutation testing</strong>, and it dates to the 1970s.
+    Stryker, PIT, mutmut and Cosmic Ray all do it. Anyone claiming that part is novel is selling something.</p>
+  </section>
+
+  <section class="rule-top">
+    <h2>What is different: the question being asked</h2>
+    <div class="versus">
+      <div>
+        <div class="kicker">Classic mutation testing</div>
+        <h3>Mutates everything, mechanically</h3>
+        <span class="q">“How good are my tests?”</span>
+        <p class="out">→ <em>Mutation score: 73%</em></p>
+        <p class="note" style="margin-top:8px">A number. Not actionable, not auditable, and it cannot tell
+        you which promise is at risk.</p>
+      </div>
+      <div>
+        <div class="kicker">TestGuard</div>
+        <h3>Binds every fault to a stated claim</h3>
+        <span class="q">“Is <em>this specific promise</em> defended?”</span>
+        <p class="out">→ <em>“Your project says a missing scope fails closed. Nothing checks that.”</em></p>
+        <p class="note" style="margin-top:8px">A finding. An assessor reads your claims — reviewable like
+        code — not a score.</p>
+      </div>
+    </div>
+
+    <figure style="margin-top:14px">
+      <svg viewBox="0 0 760 104" role="img" aria-label="A score compresses many faults into one number; a claim-bound finding stays attributable">
+        <text class="s-tiny" x="0" y="10">Mutation score — thousands of syntactic mutants, one number</text>
+        <g>
+          <rect x="0" y="18" width="330" height="26" rx="3" fill="#f0ede4"/>
+          <g fill="#c9c5bb">
+            <rect x="8"  y="24" width="5" height="14" rx="1"/><rect x="17" y="24" width="5" height="14" rx="1"/>
+            <rect x="26" y="24" width="5" height="14" rx="1"/><rect x="35" y="24" width="5" height="14" rx="1"/>
+            <rect x="44" y="24" width="5" height="14" rx="1"/><rect x="53" y="24" width="5" height="14" rx="1"/>
+            <rect x="62" y="24" width="5" height="14" rx="1"/><rect x="71" y="24" width="5" height="14" rx="1"/>
+            <rect x="80" y="24" width="5" height="14" rx="1"/><rect x="89" y="24" width="5" height="14" rx="1"/>
+            <rect x="98" y="24" width="5" height="14" rx="1"/><rect x="107" y="24" width="5" height="14" rx="1"/>
+            <rect x="116" y="24" width="5" height="14" rx="1"/><rect x="125" y="24" width="5" height="14" rx="1"/>
+            <rect x="134" y="24" width="5" height="14" rx="1"/><rect x="143" y="24" width="5" height="14" rx="1"/>
+            <rect x="152" y="24" width="5" height="14" rx="1"/><rect x="161" y="24" width="5" height="14" rx="1"/>
+            <rect x="170" y="24" width="5" height="14" rx="1"/><rect x="179" y="24" width="5" height="14" rx="1"/>
+            <rect x="188" y="24" width="5" height="14" rx="1"/><rect x="197" y="24" width="5" height="14" rx="1"/>
+            <rect x="206" y="24" width="5" height="14" rx="1"/><rect x="215" y="24" width="5" height="14" rx="1"/>
+            <rect x="224" y="24" width="5" height="14" rx="1"/><rect x="233" y="24" width="5" height="14" rx="1"/>
+            <rect x="242" y="24" width="5" height="14" rx="1"/><rect x="251" y="24" width="5" height="14" rx="1"/>
+            <rect x="260" y="24" width="5" height="14" rx="1"/><rect x="269" y="24" width="5" height="14" rx="1"/>
+            <rect x="278" y="24" width="5" height="14" rx="1"/><rect x="287" y="24" width="5" height="14" rx="1"/>
+            <rect x="296" y="24" width="5" height="14" rx="1"/><rect x="305" y="24" width="5" height="14" rx="1"/>
+            <rect x="314" y="24" width="5" height="14" rx="1"/>
+          </g>
+          <path d="M338 31 L360 31" stroke="#918d83" stroke-width="1.2" marker-end="url(#ar4)"/>
+          <rect x="366" y="18" width="92" height="26" rx="3" fill="#191917"/>
+          <text x="412" y="35" text-anchor="middle" style="font-family:var(--mono);font-size:9px;font-weight:700;fill:#faf9f5">73%</text>
+          <text class="s-sub" x="470" y="35" style="font-size:7.6px">Which promise is at risk? Unanswerable.</text>
+        </g>
+
+        <text class="s-tiny" x="0" y="66">Claim-bound finding — each fault keeps its name</text>
+        <g>
+          <rect x="0" y="74" width="330" height="26" rx="3" fill="#fbf1ec"/>
+          <text x="10" y="91" style="font-family:var(--mono);font-size:7px;fill:#23221e">REDACT-001/F1 · critical · src/redact.mjs</text>
+          <path d="M338 87 L360 87" stroke="#d97757" stroke-width="1.2" marker-end="url(#ar4)"/>
+          <rect x="366" y="74" width="92" height="26" rx="3" fill="#fbf1ec" stroke="#d97757"/>
+          <text x="412" y="91" text-anchor="middle" style="font-family:var(--mono);font-size:7.6px;font-weight:700;fill:#b85636">SURVIVED</text>
+          <text class="s-sub" x="470" y="91" style="font-size:7.6px">“The audit row never contains the original input.”</text>
+        </g>
+      </svg>
+      <p class="figcap">Fig. 6 — A score compresses everything into one number; a claim keeps the finding attributable.</p>
+    </figure>
+    <p style="margin-top:11px">That is the difference between a <strong>metric</strong> and an
+    <strong>audit</strong>, and it is the whole design.</p>
+  </section>
+
+  <section class="rule-top">
+    <h2>Three more things that follow from it</h2>
+    <div class="cols-3">
+      <div>
+        <h3>Paranoid about itself</h3>
+        <p class="note">Most tools mark a mutant killed when the test command exits non-zero — conflating
+        “a test caught it” with “everything exploded.” Here the verdict set is closed and each member
+        means something different.</p>
+      </div>
+      <div>
+        <h3>Evidence, not output</h3>
+        <p class="note">Schema-validated JSON with stable fingerprints, shared with the other Guard tools.
+        Freeze today's blind spots, gate CI on <em>new</em> ones.</p>
+      </div>
+      <div>
+        <h3>Built for AI-written code</h3>
+        <p class="note">When an agent writes the tests, the failure mode is not “no tests.” It is confident,
+        plausible tests that assert nothing. That is precisely what this detects.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="pull">
+    <p>Coverage tells you a line ran. TestGuard tells you which of your promises
+    nobody is actually defending.</p>
+    <div class="attrib">github.com/raccioly/testguard · npm testguard-cli · MIT</div>
+  </div>
+
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 5 of 5 · Difference</span></div>
+</div>
+
+</body>
+</html>

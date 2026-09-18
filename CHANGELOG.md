@@ -27,6 +27,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A five-page technical brief**, [`docs/testguard-explained.pdf`](docs/testguard-explained.pdf):
+  the whole idea on page one, the field measurements on page two, then
+  mechanics, architecture and prior art. Six diagrams, including a dot matrix
+  of the 39 injected faults from the second field report — 21 survived a fully
+  green suite, 39/39 killed after tests were written against the survivors. Built from
+  `docs/testguard-explained.html` with `node .github/scripts/build-one-pager.mjs`
+  (headless Chrome, so the one pinned runtime dependency stays one).
+
+### Changed
+
+- **The README leads with the plain explanation.** The research evidence is
+  still there and still matters, but it is not the first thing a newcomer
+  meets: an "In one minute" section now opens with what coverage cannot tell
+  you, the `objectContaining` exhibit, killed vs SURVIVED, the seven verdicts,
+  and — stated plainly — that mutation testing is from the 1970s and the novel
+  part is binding every fault to a claim.
+- The one-line descriptions on npm, PyPI and the GitHub Action now say what the
+  tool does rather than what category it belongs to.
+
+
+### Added
+
 - **`--progress auto|tty|plain|ndjson|none` on `probe`** (#68). A probe used
   to print its stage line only when `stderr` was a terminal, so CI, a
   redirected log and an agent harness saw nothing at all for the whole run —

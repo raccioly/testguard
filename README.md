@@ -10,9 +10,8 @@
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![deps](https://img.shields.io/badge/runtime%20deps-1%20pinned-brightgreen.svg)](./package.json)
 
-> Proves that a test suite actually defends the claims a project makes — by
-> injecting the faults those claims say cannot happen, and reporting every
-> fault the tests fail to detect.
+> Breaks your code on purpose and reports every promise your tests did not
+> notice breaking.
 
 **Not a test generator. A claim verifier.** Test generation is what happens
 after a claim turns out to be unfalsifiable.
@@ -24,6 +23,65 @@ surface ↔ code). All three run one loop:
 
 > declare what must be true → try mechanically to falsify it → freeze a
 > baseline → gate only the delta → brief the agent before it writes code.
+
+## In one minute
+
+**Coverage tells you a line ran. It never tells you anyone checked the
+result.** So a codebase can be fully covered and completely undefended, and
+nothing in CI will say a word.
+
+Here is a real test, from this repository's own fixture:
+
+```js
+expect(store.writeAudit).toHaveBeenCalledWith(
+  expect.objectContaining({ action: 'MASK', scope: 'g1', ruleCount: 1 }),
+);  // `content` is never named — so nothing checks it
+```
+
+`objectContaining` ignores keys it does not list. Swap the redacted text for
+the **raw secret** and this test still passes. Coverage of that line: 100%.
+The audit log now leaks the very thing it exists to protect.
+
+**The method: break the code deliberately, then watch what the tests do.**
+
+- **killed** — you broke it, a test failed. Good. That behaviour is genuinely
+  defended.
+- **SURVIVED** — you broke it, everything stayed green. A blind spot.
+
+The word trips everyone once: it is the *fault* that survived, not the test.
+**SURVIVED is the bad news.** A healthy report is full of `killed`.
+
+But *"did the tests fail?"* is a sloppy question — a red suite is not proof of
+detection. So there are seven verdicts, and each means something different:
+
+| Verdict | What it means |
+|---|---|
+| `killed` | A test body ran and rejected the behaviour. The only good outcome. |
+| `SURVIVED` | Everything passed. A real blind spot in the tests. |
+| `NOCOVER` | No test even looks at this code. Not "weak tests" — *no* tests. |
+| `UNVERIFIABLE` | The fault could not be applied: its anchor moved, or matches twice. Nothing was learned. |
+| `FAULT-INVALID` | The break itself was broken — it did not compile. Our fault, not yours. |
+| `TIMEOUT` | The suite hung. A hang is not a detection. |
+| `FLAKY-DEFENDER` | The tests are not reliable enough on untouched code to be asked the question. |
+
+Every ambiguity rounds toward *unproven*: three runs rather than one, a green
+baseline required before any fault is injected, and a timeout, a load failure
+or a mixed result is never a kill. The reason is the constraint the whole
+design follows from — **a tool that reports everything as caught is worse than
+no tool at all, because nobody questions good news.**
+
+**What is not new:** breaking code to test your tests is *mutation testing*,
+and it dates to the 1970s. Stryker, PIT, mutmut and Cosmic Ray all do it.
+
+**What is different is the question.** Classic mutation testing mutates
+everything mechanically and hands you *"mutation score: 73%"* — a number that
+is not actionable, not auditable, and cannot tell you which promise is at
+risk. TestGuard binds every fault to a **stated claim**, so the output is not
+a score but a finding: *"Your project says a missing scope fails closed.
+Nothing checks that."* That is the difference between a metric and an audit.
+
+📄 **[Read the three-page technical brief (PDF)](docs/testguard-explained.pdf)**
+— the idea on page one, mechanics and prior art after it.
 
 ## Why
 
