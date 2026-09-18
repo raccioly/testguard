@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **A release can tag itself even when `main` moves underneath it.** A GitHub
+  App may not *push* a ref whose `.github/workflows` differ from the current
+  default branch, so v0.8.1's tag was refused seven minutes after an unrelated
+  workflow PR merged — a release that was otherwise complete. `create-release`
+  still pushes first, and now falls back to creating the tag through the API,
+  which adds a ref to a commit already in the repository and so is not subject
+  to that restriction. Any other push failure is still fatal and says so.
+
+### Changed
+- **The cost budget records a from-scratch release measurement.** 999 s for
+  115 faults on the v0.8.1 release commit, corroborated at 988 s on the
+  commit before it, against the unchanged 1100 s ceiling. The previous record
+  was 962 s at 96 faults.
+
+### Fixed
 - **A release that cannot open its pull request says why.** `GITHUB_TOKEN`
   cannot call `createPullRequest` unless "Allow GitHub Actions to create and
   approve pull requests" is enabled, and v0.8.1 hit exactly that: the branch,

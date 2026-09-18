@@ -118,15 +118,43 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -o pipefail
           TAG="v${{ needs.detect-version.outputs.version }}"
           if git ls-remote --tags origin | grep -q "refs/tags/$TAG$"; then
             echo "✅ Tag $TAG already exists on remote"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag -a "$TAG" -m "Release $TAG"
-            git push origin "$TAG"
+            exit 0
           fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          if git push origin "$TAG" 2>/tmp/tag-err; then
+            echo "✅ Pushed $TAG"
+            exit 0
+          fi
+          cat /tmp/tag-err
+          # A GitHub App may not PUSH a ref whose .github/workflows differ from
+          # the CURRENT default branch. That is not a property of this release:
+          # it becomes true the moment any workflow change merges to main while
+          # the release is in flight, which is exactly how v0.8.1 lost its tag
+          # ("refusing to allow a GitHub App to create or update workflow
+          # .github/workflows/release.yml without `workflows` permission")
+          # seven minutes after an unrelated workflow PR merged.
+          #
+          # So fall back to the API. It adds a ref to a commit that is ALREADY
+          # in the repository and creates no file content, so the restriction
+          # does not apply. The push is tried first on purpose: it is the path
+          # every previous release took, and this fallback only has to cover
+          # the case that currently fails outright.
+          if ! grep -q 'workflows. permission' /tmp/tag-err; then
+            echo "::error::git push of $TAG failed for a reason other than the workflow-permission restriction — see above."
+            exit 1
+          fi
+          echo "::warning::Pushing $TAG was refused because main's workflows moved during this release; creating the tag through the API instead."
+          TAG_SHA=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/git/tags" -f tag="$TAG" -f message="Release $TAG" -f object="$GITHUB_SHA" -f type=commit --jq .sha) || {
+            echo "::error::Could not create the tag object for $TAG. Create it by hand: git tag -a $TAG $GITHUB_SHA -m 'Release $TAG' && git push origin $TAG"; exit 1; }
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/$TAG" -f sha="$TAG_SHA" --jq .ref || {
+            echo "::error::Could not create refs/tags/$TAG from tag object $TAG_SHA. Create it by hand: git tag -a $TAG $GITHUB_SHA -m 'Release $TAG' && git push origin $TAG"; exit 1; }
+          echo "✅ Created $TAG through the API at $GITHUB_SHA"
       - name: Release notes from CHANGELOG
         run: |
           VERSION="${{ needs.detect-version.outputs.version }}"
