@@ -171,19 +171,33 @@
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/probe.fixture.test.mjs"
+        "test/attribution.test.mjs"
       ],
       "faults": [
         {
           "id": "F1",
-          "description": "Single-run attribution: any escalation run with a failure credits the undeclared tests (the exact defect logged as bug-001 during development).",
-          "faultClass": "condition-forced",
-          "file": "src/probe/probe.mjs",
-          "find": "if (killers.size > 0 && runs.length === confirmRuns && runs.every(isKill)) {",
-          "replace": "if (runs.some(isKill)) {",
+          "description": "The killer set becomes a union instead of an intersection, so a test that failed in only one run is credited.",
+          "faultClass": "variable-swap",
+          "file": "src/probe/attribution.mjs",
+          "find": "  const killers = state.killers === null ? new Set(failedTests) : new Set([...state.killers].filter((t) => failedTests.includes(t)));",
+          "replace": "  const killers = new Set([...(state.killers ?? []), ...failedTests]);",
           "producedBy": {
             "producer": "human",
-            "by": "maintainer"
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Attribution no longer requires all N runs to have happened, so a stopped-early escalation can name a killer.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/attribution.mjs",
+          "find": "  const attributable = state.killers !== null && state.killers.size > 0 && complete && state.runs.every(isKill);",
+          "replace": "  const attributable = state.killers !== null && state.killers.size > 0 && state.runs.every(isKill);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
           }
         }
       ]
@@ -357,20 +371,34 @@
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/probe.fixture.test.mjs",
+        "test/attribution.test.mjs",
         "test/status.test.mjs"
       ],
       "faults": [
         {
           "id": "F1",
           "description": "The content hash is not recorded; a weakened fault is indistinguishable from the original.",
-          "faultClass": "statement-deleted",
-          "file": "src/probe/probe.mjs",
-          "find": ", contentHash: sha256(`${fault.find}\\n${fault.replace}`) },",
-          "replace": " },",
+          "faultClass": "field-dropped",
+          "file": "src/probe/attribution.mjs",
+          "find": "    contentHash: sha256(`${fault.find}\\n${fault.replace}`),\n",
+          "replace": "",
           "producedBy": {
             "producer": "human",
-            "by": "maintainer"
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The hash ignores the replacement, so weakening a fault's replacement leaves the hash unchanged and the edit invisible.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/attribution.mjs",
+          "find": "    contentHash: sha256(`${fault.find}\\n${fault.replace}`),",
+          "replace": "    contentHash: sha256(fault.find),",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
           }
         }
       ]
@@ -1127,7 +1155,6 @@
       },
       "defendedBy": [
         "test/runner-vitest.test.mjs",
-        "test/probe.fixture.test.mjs",
         "test/probe.jest.test.mjs"
       ],
       "faults": [
@@ -1136,12 +1163,12 @@
           "description": "vitest is invoked by bare name again, so PATH (or nothing) decides which binary runs.",
           "faultClass": "argument-swapped",
           "file": "src/probe/runners/vitest.mjs",
-          "find": "[...runnerArgv(opts.projectDir, 'vitest', 'vitest'), 'run', ...files,",
-          "replace": "['vitest', 'run', ...files,",
+          "find": "  [...runnerArgv(projectDir, 'vitest', 'vitest'), 'run', ...files,",
+          "replace": "  ['vitest', 'run', ...files,",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
-            "at": "2026-09-17T00:00:00Z"
+            "at": "2026-09-18T00:00:00Z"
           }
         },
         {
@@ -1149,12 +1176,12 @@
           "description": "jest is invoked by bare name again.",
           "faultClass": "argument-swapped",
           "file": "src/probe/runners/jest.mjs",
-          "find": "[...runnerArgv(opts.projectDir, 'jest', 'jest'), '--ci',",
-          "replace": "['jest', '--ci',",
+          "find": "  [...runnerArgv(projectDir, 'jest', 'jest'), '--ci',",
+          "replace": "  ['jest', '--ci',",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
-            "at": "2026-09-17T00:00:00Z"
+            "at": "2026-09-18T00:00:00Z"
           }
         }
       ]
@@ -1525,20 +1552,20 @@
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/probe.fixture.test.mjs"
+        "test/attribution.test.mjs"
       ],
       "faults": [
         {
           "id": "F1",
-          "description": "Load errors and timeouts are counted as flake failures; an unverifiable claim then also reports a flake rate, which the validator rejects as a contradiction.",
+          "description": "Timeouts and load errors are counted as measured runs, inventing flakiness that was never observed.",
           "faultClass": "condition-forced",
-          "file": "src/probe/probe.mjs",
-          "find": "      const measured = baseline.runs.filter((r) => r.outcome === 'pass' || r.outcome === 'fail');",
-          "replace": "      const measured = baseline.runs;",
+          "file": "src/probe/attribution.mjs",
+          "find": "  const measured = runs.filter((r) => r.outcome === 'pass' || r.outcome === 'fail');",
+          "replace": "  const measured = runs;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
-            "at": "2026-09-17T00:00:00Z"
+            "at": "2026-09-18T00:00:00Z"
           }
         }
       ]
@@ -1781,20 +1808,20 @@
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/probe.fixture.test.mjs"
+        "test/attribution.test.mjs"
       ],
       "faults": [
         {
           "id": "F1",
           "description": "The early stop is silent; a single escalation entry at --confirm 3 looks like a bug in the loop.",
-          "faultClass": "statement-deleted",
-          "file": "src/probe/probe.mjs",
-          "find": "            if (stoppedEarly) detail.escalationStoppedEarly = stoppedEarly;",
+          "faultClass": "field-dropped",
+          "file": "src/probe/attribution.mjs",
+          "find": "    ...(state.stoppedEarly ? { escalationStoppedEarly: state.stoppedEarly } : {}),\n",
           "replace": "",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
-            "at": "2026-09-17T00:00:00Z"
+            "at": "2026-09-18T00:00:00Z"
           }
         }
       ]
@@ -1951,6 +1978,96 @@
           "file": "src/init/init.mjs",
           "find": "  const onPath = `{ command -v testguard >/dev/null 2>&1 && testguard brief --text${arg} 2>/dev/null; }`;",
           "replace": "  const onPath = `{ command -v testguard >/dev/null 2>&1 && testguard brief --quiet${arg} 2>/dev/null; }`;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COST-COUNTS-EVERY-PHASE",
+      "statement": "A probe's reported cost is every run it paid for \u2014 the clean baseline runs and any escalation runs, not only the runs made with the fault applied. A cost report that undercounts the baseline understates the gate by more than half.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#cost"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/cost.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Only the fault runs are counted, so the clean baseline runs \u2014 half the wall clock \u2014 vanish from the report.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/cost.mjs",
+          "find": "  ...(record.detail?.baselineRuns ?? []),\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Escalation runs are dropped, so the claims that cost the most \u2014 the ones that escalated \u2014 look cheapest.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/cost.mjs",
+          "find": "  ...(record.detail?.escalationRuns ?? []),\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COST-NAMES-SHARED-DEFENDERS",
+      "statement": "A defender file is called shared only when more than one distinct CLAIM names it. One claim probing several faults through the same file is not sharing, and reporting it as such would point the reader at a split that saves nothing.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#cost"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/cost.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Sharing is counted by runs rather than by distinct claims, so a single claim with two faults is reported as a shared defender.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "    sharedDefenders: defenders.filter((d) => d.claims.length > 1),",
+          "replace": "    sharedDefenders: defenders.filter((d) => d.runs > 1),",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Every defender is reported as shared, drowning the one file that actually is.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "    sharedDefenders: defenders.filter((d) => d.claims.length > 1),",
+          "replace": "    sharedDefenders: defenders,",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",

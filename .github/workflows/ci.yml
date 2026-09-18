@@ -165,7 +165,9 @@ jobs:
       #    testguard.claims.json states invariants of the tool itself; every
       #    fault must be killed by the tool's own tests. Exit 0 = all defended. ──
       #    Runs on ONE Node leg: the verdicts do not depend on the Node minor,
-      #    and each from-scratch probe is ~14 minutes. The previous run's
+      #    and a from-scratch probe is ~10 minutes (it was ~24 before the
+    #    defender split in #67; `--cost` below prints where the time goes,
+    #    so a regression in gate cost is visible in the log). The previous run's
       #    evidence is restored from the cache so claims whose target and
       #    defenders did not change reuse their verdict (the tool's own
       #    reuse rule); only what changed is re-probed. No escalation in CI:
@@ -182,7 +184,7 @@ jobs:
 
       - name: probe TestGuard's own claims
         if: matrix.node-version == 22
-        run: node cli/testguard.mjs probe . --budget 180000 --no-escalate --out .testguard/ci-self-evidence.json
+        run: node cli/testguard.mjs probe . --budget 180000 --no-escalate --cost --out .testguard/ci-self-evidence.json
 
       # A stable, branch-named artifact so a developer can fetch the evidence
       # CI produced without knowing a run id (README: read CI's evidence

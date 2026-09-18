@@ -6,6 +6,9 @@ import { discoverDefendersDetailed } from '../probe/discover.mjs';
 import { classifyDefenders } from '../probe/mocks.mjs';
 import { computeRemovedClaims, renderRemoved } from '../claims/removed.mjs';
 import { evidencePath } from './probe.mjs';
+import { costReport, renderCost } from '../probe/cost.mjs';
+import { readSpecDoc } from '../evidence/writer.mjs';
+import { existsSync } from 'node:fs';
 
 export async function claimsCommand({ projectDir, values, version }, io) {
   const path = values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir);
@@ -19,8 +22,16 @@ export async function claimsCommand({ projectDir, values, version }, io) {
     ? computeRemovedClaims({ projectDir, ref: values.since, claimsPath: path, current: claims, ignorePath: values.ignore ? resolve(values.ignore) : undefined, evidencePath: evidencePath(projectDir), toolVersion: version })
     : undefined;
 
+  // Cost is read back out of evidence the probe already wrote; it never runs a test.
+  let cost;
+  if (values.cost) {
+    const ev = values.evidence ? resolve(values.evidence) : evidencePath(projectDir);
+    cost = existsSync(ev) ? costReport(readSpecDoc('evidence', ev).records) : undefined;
+    if (!cost && !values.json) io.err(`no evidence at ${ev} — run \`testguard probe\` first; cost is derived from the run durations it records`);
+  }
+
   if (values.json) {
-    io.out(JSON.stringify({ path, claims, annotations, drift, ...(removed ? { removed } : {}) }, null, 2));
+    io.out(JSON.stringify({ path, claims, annotations, drift, ...(removed ? { removed } : {}), ...(cost ? { cost } : {}) }, null, 2));
   } else {
     const annotated = new Set(drift.annotated);
     io.out(`${claims.claims.length} claims in ${path} — ${annotated.size} carry a @claim annotation in source (test files are not scanned)`);
@@ -53,6 +64,10 @@ export async function claimsCommand({ projectDir, values, version }, io) {
     if (removed) {
       io.out('');
       io.out(renderRemoved(removed));
+    }
+    if (cost) {
+      io.out('');
+      io.out(renderCost(cost));
     }
   }
   return drift.undeclared.length || drift.stale.length || (removed?.removed.length ?? 0) > 0 ? 1 : 0;

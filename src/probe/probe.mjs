@@ -13,10 +13,10 @@ import { selectRunner, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns } fr
 import { classify, shouldStopEarly } from './classify.mjs';
 import { blastRadius, rank } from './rank.mjs';
 import { classifyIndependence } from './independence.mjs';
+import { escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf } from './attribution.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
 import { fingerprint } from '../../spec/lib/fingerprint.mjs';
 
-const isKill = (r) => r.outcome === 'fail' && r.assertionFailures > 0;
 
 /** realpath when the path still exists; the path itself otherwise. Never throws. */
 function realpathSync(p) {
@@ -272,8 +272,8 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
       // the tests running and disagreeing with themselves. A load error or a
       // timeout is not flakiness — nothing was measured about stability — so
       // neither is counted, on either side of the ratio.
-      const measured = baseline.runs.filter((r) => r.outcome === 'pass' || r.outcome === 'fail');
-      if (measured.length) detail.flakeRate = { runs: measured.length, failures: measured.filter((r) => r.outcome === 'fail').length };
+      const rate = flakeRate(baseline.runs);
+      if (rate) detail.flakeRate = rate;
       if (baseline.runs.some((r) => r.outcome === 'error')) {
         // The defenders did not load. That is not flakiness and not a verdict
         // about the fault; the claim cannot be probed until they do.
@@ -298,27 +298,15 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
           // a test is an undeclared killer only if it fails in all N runs.
           const broader = allTests.filter((t) => !defenders.includes(t));
           if (provisional.verdict === 'survived' && escalate && broader.length > 0) {
-            const runs = [];
-            let killers = null;
-            let stoppedEarly;
+            // The rule lives in attribution.mjs as a pure fold; this loop only
+            // decides when to stop asking the runner.
+            let state = escalationStart();
             for (let i = 0; i < confirmRuns; i++) {
               stage('escalation', i + 1, confirmRuns);
-              const { run, failedTests } = await runDefenders(allTests);
-              runs.push(run);
-              killers = killers === null ? new Set(failedTests) : new Set(failedTests.filter((t) => killers.has(t)));
-              // Attribution needs a test that failed in ALL N runs. Once the
-              // intersection is empty no further run can name a killer, so the
-              // remaining runs are wasted; stopping can only fail to NAME a
-              // killer, never upgrade a verdict, which is the pessimistic side.
-              if (killers.size === 0) { stoppedEarly = 'no-common-failure'; break; }
+              state = foldEscalationRun(state, await runDefenders(allTests));
+              if (state.stoppedEarly) break;
             }
-            detail.escalated = true;
-            detail.escalationRuns = runs;
-            if (stoppedEarly) detail.escalationStoppedEarly = stoppedEarly;
-            if (killers.size > 0 && runs.length === confirmRuns && runs.every(isKill)) {
-              detail.reason = 'killed-by-undeclared-tests';
-              detail.undeclaredKillers = [...killers].sort();
-            }
+            Object.assign(detail, escalationResult(state, confirmRuns));
           }
         } finally {
           mutation.restore();
@@ -338,14 +326,14 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
   // already decided above, and ranking is the only consumer.
   if (verdict === 'killed' && historyRef) {
     // Only the tests that actually failed on the fault are its killers.
-    const killers = [...new Set(rawProbeRuns.flatMap((r) => r.failedTests ?? []).map((t) => t.split('::')[0]).filter(Boolean))];
+    const killers = killersFromRuns(rawProbeRuns);
     detail.independence = classifyIndependence({ dir: historyDir, ref: historyRef, targetFile: toRepoPath(fault.file), defenders: (killers.length ? killers : defenders).map(toRepoPath) });
   }
 
   return {
     fingerprint: fingerprint({ claimId: claim.id, subjectId: fault.id, file: fault.file, verdict }),
     claim: { id: claim.id, statement: claim.statement, severity: claim.severity, source: claim.source, producedBy: claim.producedBy },
-    subject: { kind: 'fault', id: fault.id, description: fault.description, file: fault.file, faultClass: fault.faultClass, producedBy: fault.producedBy, contentHash: sha256(`${fault.find}\n${fault.replace}`) },
+    subject: subjectOf(fault, sha256),
     verdict,
     detail,
     defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}), ...(byRunner ? { byRunner } : {}), ...(mocking.length ? { mocking } : {}), ...(signals.length ? { signals } : {}) },
