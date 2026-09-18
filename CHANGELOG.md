@@ -14,8 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the 0.4.0–0.7.0 tarballs, so `brew install` from the staged formula could
   never have verified. Set to the sha256 of the published
   `testguard-cli-0.8.0.tgz` (`5305ce22…`), computed from the registry, not
-  from a local `npm pack`. Automating this step in `release.yml` is tracked
-  separately.
+  from a local `npm pack`.
+- **`release.yml` sets the Homebrew `sha256` itself, after publishing to npm.**
+  The formula header used to tell a human to run `curl | shasum` each release,
+  and nobody did. `sync-release-version.mjs --sha256` now waits for the
+  registry to serve the tarball (a publish is `PUT 202`; the file can lag by
+  minutes), hashes exactly the bytes Homebrew will download, and writes the
+  formula only when the value changes; a `200` that is not a gzip tarball is
+  refused, never hashed. `main` is protected, so the change lands as a bot PR
+  with auto-merge armed and CI dispatched by the workflow. The hash is a
+  release surface like the URL beside it: `detect-version` compares the
+  formula against the tarball (`--check --online`) on every hourly sweep, so
+  a failed run is retried the way a failed publish is, and `--check` refuses
+  the `385d69f9…` placeholder outright. Claim
+  `TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT` gains three faults for the new modes.
+  Only the next release exercises the workflow path end to end.
 
 ## [0.8.0] - 2026-09-18
 

@@ -7,9 +7,11 @@
 # Publishing (this file stages the formula; taps live in their own repo):
 #   1. Tap repo: github.com/raccioly/homebrew-tap — copy to Formula/testguard.rb
 #   2. Users:  brew tap raccioly/tap && brew install raccioly/tap/testguard
-#   3. Each release, bump `url` (synced by .github/scripts/sync-release-version.mjs)
-#      and set `sha256` from the published tarball:
-#        curl -sL https://registry.npmjs.org/testguard-cli/-/testguard-cli-<VER>.tgz | shasum -a 256
+#   3. Each release, `url` is synced by .github/scripts/sync-release-version.mjs
+#      (in the release PR) and `sha256` is set by release.yml AFTER `npm publish`,
+#      from the registry tarball (`sync-release-version.mjs --sha256`), landing
+#      as an auto-merged bot PR. `--check` refuses the placeholder this file
+#      carried unchanged from v0.6.0 to v0.8.0. Nothing here is set by hand.
 class Testguard < Formula
   desc "Proves a test suite defends the claims a project makes"
   homepage "https://github.com/raccioly/testguard"
