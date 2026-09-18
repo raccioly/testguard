@@ -110,6 +110,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   commit before it, against the unchanged 1100 s ceiling. The previous record
   was 962 s at 96 faults.
 
+### Performance
+- **The new calibration claim costs 4.9 s instead of 51 s.** Its tests are
+  pure — no git, no fixture corpus, no scratch worktree — but they were added
+  to `replay.test.mjs`, whose scripted-corpus setup costs tens of seconds a
+  run, and a claim pays for every test in the file it names. Moved to
+  `calibration.test.mjs`, which exists for exactly this, and the claim
+  re-pointed. Same two faults, still killed 2/2.
+
 ### Documentation
 - The README shows an ignore-file entry. It was mentioned twice without one,
   so the field name (`pattern`, not `value`) and the fact that `expires` is a

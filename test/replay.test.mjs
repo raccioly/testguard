@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { replay, calibrationFrom, findFixCommits, dedupeByPatch, classifyReplay, renderReplay, selectCorpus, commitType } from '../src/replay/replay.mjs';
+import { replay, calibrationFrom, findFixCommits, dedupeByPatch, classifyReplay } from '../src/replay/replay.mjs';
 import { labelDiff } from '../src/replay/label.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 
@@ -358,90 +358,5 @@ describe('fresh', () => { it('is one', () => { expect(fresh()).toBe(1); }); });
     g('commit', '-q', '-m', 'no test here');
     await expect(replay({ projectDir: dir, range: 'HEAD~0..HEAD', toolVersion: 't' })).rejects.toThrow(/no fix commits|cannot read the range/);
     rmSync(dir, { recursive: true, force: true });
-  });
-});
-
-describe('the calibration counts escaped bugs, not every commit that touched a test', () => {
-  // A field report measured "12 of 12 measurable bugs invisible — 100%" over a
-  // corpus of which five were `feat:`, one `refactor:`, one `style:` and one a
-  // commit whose entire purpose was adding a test. Only four were `fix:`.
-  // Reverting a feature and finding the suite silent is not the same finding
-  // as reverting a bug fix and finding it silent, and `p` is defined as
-  // P(the suite misses it | a BUG of this class escapes).
-  //
-  // Selection stays broad: the pairing rule is all that can be judged without
-  // reading a subject, and replaying a feature still measures something. What
-  // narrows is the corpus `p` is computed over.
-  const rec = (subject, verdict, faultClass = 'guard-removed') => ({ commit: 'a'.repeat(40), subject, verdict, faultClass, ranTests: 3 });
-  const doc = (records) => ({ schemaVersion: 1, tool: { name: 'testguard', version: 't' }, run: { id: 'r', startedAt: '2026-09-18T00:00:00Z', finishedAt: '2026-09-18T00:00:00Z', range: 'HEAD~60..HEAD', runner: { name: 'vitest' }, confirmRuns: 3, candidates: records.length, duplicates: 0 }, records });
-
-  const fieldReport = doc([
-    rec('fix(dashboard): show an upstream failure instead of an empty archive', 'blind'),
-    rec('fix(audio): read the signed URL from the shape Pocket returns', 'blind'),
-    rec('fix(auth): reject a forged admin cookie', 'nocover'),
-    rec('fix(trial): skip Stripe-held trials', 'caught'),
-    rec('feat(campaign): email campaign', 'blind'),
-    rec('feat(onboarding): nudge cap', 'blind'),
-    rec('refactor(core): extract selection', 'blind'),
-    rec('test(archive): add coverage', 'blind'),
-  ]);
-
-  it('reads a conventional-commits type off a subject', () => {
-    expect(commitType('fix(audio): x')).toBe('fix');
-    expect(commitType('feat!: x')).toBe('feat');
-    expect(commitType('revert: x')).toBe('revert');
-    expect(commitType('Fix the archive bug')).toBe(null);
-  });
-
-  it('computes p over the fix: commits only, and records that it did', () => {
-    const { rule, corpus } = selectCorpus(fieldReport.records);
-    expect(rule).toBe('conventional-fix');
-    expect(corpus).toHaveLength(4);
-    const cal = calibrationFrom(fieldReport, { toolVersion: 'test' });
-    const n = Object.values(cal.buckets).reduce((a, b) => a + b.n, 0);
-    const positives = Object.values(cal.buckets).reduce((a, b) => a + b.positives, 0);
-    expect(n).toBe(4);        // not 8
-    expect(positives).toBe(3); // the caught fix: is not a miss
-    expect(cal.source.detail).toMatchObject({ candidateRule: 'conventional-fix', replayed: 8, selected: 4 });
-    expect(cal.source.detail.byType).toMatchObject({ fix: 4, feat: 2, refactor: 1, test: 1 });
-    expect(validate('calibration', cal).errors).toEqual([]);
-  });
-
-  it('states both rates so the narrowing can be checked, and calls only the fixes escaped bugs', () => {
-    const text = renderReplay(fieldReport);
-    expect(text).toContain('3 of 4 escaped bugs were invisible to the suite');
-    expect(text).toContain('the 4 fix:/revert: commits of 8 measurable');
-    expect(text).toMatch(/over all 8 .* it is 7 of 8, 88%/);
-    expect(text).not.toMatch(/\d+ fix commits replayed/); // not every replayed commit is a fix
-  });
-
-  it('a conventional repository with no fix: in range calibrates nothing rather than counting features', () => {
-    // The failure mode this exists to prevent is the silent one: falling back
-    // to "source and a test together" here would count two features as bugs.
-    const none = doc([rec('feat(a): x', 'blind'), rec('feat(b): y', 'blind'), rec('chore(c): z', 'caught')]);
-    const cal = calibrationFrom(none, { toolVersion: 'test' });
-    expect(Object.keys(cal.buckets)).toEqual([]);
-    expect(cal.source.detail).toMatchObject({ candidateRule: 'conventional-fix', selected: 0, replayed: 3 });
-    expect(renderReplay(none)).toContain('No fix:/revert: commits among the 3 replayed');
-    expect(renderReplay(none)).toContain('Widen the range');
-  });
-
-  it('falls back to every replayed commit when the project does not label them, and says so', () => {
-    const plain = doc([rec('Fix the archive bug', 'blind'), rec('Add campaign emails', 'blind'), rec('Tidy up', 'caught')]);
-    const cal = calibrationFrom(plain, { toolVersion: 'test' });
-    expect(cal.source.detail.candidateRule).toBe('source-and-test');
-    expect(Object.values(cal.buckets).reduce((a, b) => a + b.n, 0)).toBe(3);
-    const text = renderReplay(plain);
-    expect(text).toContain('measurable bugs were invisible'); // not "escaped bugs": we cannot tell
-    expect(text).toContain('not conventional-commits');
-  });
-
-  it('never lets two calibrations be compared without saying which rule produced them', () => {
-    // The finding one level up: the document must distinguish its populations.
-    const a = calibrationFrom(fieldReport, { toolVersion: 'test' });
-    const b = calibrationFrom(doc([rec('Fix it', 'blind'), rec('Add it', 'caught')]), { toolVersion: 'test' });
-    expect(a.measures).toBe(b.measures);       // same shape, same semantics field
-    expect(a.source.detail.candidateRule).not.toBe(b.source.detail.candidateRule);
-    expect(a.source.caveat).not.toBe(b.source.caveat);
   });
 });
