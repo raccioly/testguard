@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The release no longer waits for a human to click Approve.** v0.9.0 sat with
+  every required check green and merged nothing. The `pull_request` runs a
+  release PR creates are held at `action_required`, because the repository
+  requires approval from first-time contributors and `github-actions[bot]` is
+  permanently one — it never authors a merged commit, so it can never
+  graduate. Held runs leave check suites QUEUED on the head sha, the status
+  rollup never reaches a terminal state, and auto-merge waits on it even though
+  `test (20/22/24)` are already green from the dispatched run.
+
+  `scheduled-release.yml` now approves those runs itself. `GITHUB_TOKEN` is
+  permitted to do this — `actions: write` carries the approve permission,
+  measured 201 against a bot PR's own held run — and the workflow already held
+  that permission, so nothing was granted and no secret was added. It may still
+  not approve a *review*, which is a different gate and remains ours alone.
+  A run left held after the poll is an `::error::` naming the run, never a
+  silent wait.
+
+  This is the third `GITHUB_TOKEN` wall in the same chain, after "raises no
+  `pull_request` event" (#105) and "its push raises no `push` event" (the
+  hourly sweep in release.yml). All three have the same root: an action taken
+  by `GITHUB_TOKEN` does not trigger the event that would normally follow it.
+
 ## [0.9.0] - 2026-09-18
 
 Automated weekly release — everything merged since `v0.8.1`.
