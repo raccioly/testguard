@@ -106,7 +106,7 @@ fails the pull request naming the unclaimed file, and `status` reports
 | NFR-05 | `src/probe/probe.mjs` | `TG-FINGERPRINT-VERDICT`, `TG-FAULT-EDIT-VISIBLE` |
 | NFR-06 | `src/probe/contention.mjs`, `classify.mjs` | `TG-CONTENTION-NEVER-FAILS-A-PROBE`, `TG-ESCALATION-N-RUNS`, `TG-ONE-BAD-FAULT-KEEPS-THE-EVIDENCE`, `TG-A-PRECONDITION-STILL-REFUSES-THE-RUN`, `TG-A-PROBE-ERROR-IS-NEVER-REUSED`, `TG-SURVIVOR-PROVES-THE-SUBJECT-RUNS`, `TG-CONTROL-READS-ANY-RED-AS-REACHED`, `TG-FATAL-EDIT-CANNOT-COMPILE` |
 | NFR-07 | verdict reuse, `src/probe/rank.mjs`, `src/probe/cost.mjs` | `test/probe.fixture.test.mjs` reuse case, `test/cost.test.mjs`, `TG-COST-BUDGET-ACTUALLY-GATES` |
-| NFR-08 | `spec/` | `spec/conformance/schemas.test.mjs` |
+| NFR-08 | `spec/` | `spec/conformance/schemas.test.mjs`, `TG-WILSON-REPRODUCES-AT-THE-DOCUMENTS-PRECISION` |
 
 ## Revision History
 

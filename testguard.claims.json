@@ -1753,6 +1753,64 @@
       ]
     },
     {
+      "id": "TG-WILSON-REPRODUCES-AT-THE-DOCUMENTS-PRECISION",
+      "statement": "The spec's single Wilson implementation reproduces a cell at the precision the document wrote — rounding, not truncating, to the document's own decimal places — and accepts either the exact quantile or the textbook z, so an honest producer at 3 or 4 dp is never rejected and a truncated bound never passes.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#calibration-arithmetic-is-reproducible"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "spec/conformance/schemas.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Precision is forced to the 6 dp cap regardless of what the document wrote, so a 3 dp producer (websec-validator) no longer reproduces.",
+          "faultClass": "call-removed",
+          "file": "spec/lib/wilson.mjs",
+          "find": "  const pl = Math.min(places, MAX_PLACES);",
+          "replace": "  const pl = MAX_PLACES;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "roundTo truncates instead of rounding, so the spec example's corrected 0.10 no longer reproduces and the truncated 0.09 is accepted.",
+          "faultClass": "return-altered",
+          "file": "spec/lib/wilson.mjs",
+          "find": "export const roundTo = (x, places) => Number(x.toFixed(places));",
+          "replace": "export const roundTo = (x, places) => Math.trunc(x * 10 ** places) / 10 ** places;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Only the exact quantile is accepted; a producer using the textbook 1.96 (testguard, docguard) is rejected on the 93 cells at n <= 60 where the two round differently at 4 dp.",
+          "faultClass": "return-altered",
+          "file": "spec/lib/wilson.mjs",
+          "find": "  return conventional === undefined ? [exact] : [exact, conventional];",
+          "replace": "  return [exact];",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-CALIBRATION-P-IS-REPRODUCIBLE",
       "statement": "A calibration cell whose p is not positives/n at the document's precision does not conform; the validator recomputes it rather than trusting it.",
       "source": {

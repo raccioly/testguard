@@ -57,6 +57,13 @@
       "reason": "Restated as TG-PROBE-NEVER-EDITS-THE-TREE-IT-MEASURES, with both faults carried over unchanged. The old statement promised that a probe \"reproduces the known-answer fixture's verdicts exactly\", and no fault in it ever falsified that half: F1 removes the restore and F2 forces in-place isolation, which are both about tree safety. A claim that is defended and still over-promises is the one thing a probe cannot catch, so the statement was narrowed to what its faults actually prove. The fixture oracle is still run on every `npm test` and in CI; it is no longer the defender of a claim whose cost it dominated (444 s, 31% of the gate) for two faults a 4 s test set kills.",
       "by": "maintainer",
       "at": "2026-09-18T07:41:17Z"
+    },
+    {
+      "kind": "claim",
+      "pattern": "TG-CALIBRATION-EXCLUDES-UNINFORMATIVE",
+      "reason": "Replaced by TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS, which states the opposite of one half of it. The old statement said nocover \"carries no information about detection\" and its one fault (every verdict enters the denominator) was killed — but the claim it defended was wrong: nocover is a successful measurement with the worst result, and excluding it scored a project with no tests for a subsystem better than one with weak tests, because its worst outcomes left the denominator before the ratio was taken. The other half (flaky and unverifiable are failed measurements and enter neither side) is carried into the new claim's statement and test. Not a rename, because the statement had to change; not a silent removal, because this entry says why.",
+      "by": "maintainer",
+      "at": "2026-09-18T15:35:15Z"
     }
   ]
 }
