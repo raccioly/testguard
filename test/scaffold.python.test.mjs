@@ -151,3 +151,28 @@ describe('scaffoldFile on a Python file', () => {
     expect(stats.byClass['field-dropped']).toBeUndefined();
   });
 });
+
+describe('Python: the same two producer defects, in the syntax the file is written in', () => {
+  const scan = (line) => proposalsForLine([line], 0, {});
+
+  it('never proposes a no-op for a zero window or a collapsed work factor', () => {
+    // `timeout=0` is PEP 8 spacing for a keyword argument, so the unspaced
+    // form — the common one — was the no-op here.
+    expect(scan('    timeout=0,').filter((p) => p.replace === '    timeout=0,')).toEqual([]);
+    expect(scan('    timeout=0,').find((p) => p.faultClass === 'literal-changed').replace).toBe('    timeout=1000,');
+    expect(scan('    rounds=1,').filter((p) => p.faultClass === 'literal-changed')).toEqual([]);
+    expect(scan('    rounds=12,').find((p) => p.faultClass === 'literal-changed').replace).toBe('    rounds=1,');
+  });
+
+  it('reads continue and break as guard bodies', () => {
+    // Python's IF_LINE already accepted any same-line body; GUARD_BODY was the
+    // gate that rejected the shape, so a loop guard produced nothing.
+    expect(scan('        if not row.active: continue')[0]).toMatchObject({ faultClass: 'statement-deleted', replace: '        pass' });
+    expect(scan('        if n > cap: break')[0]).toMatchObject({ faultClass: 'statement-deleted', replace: '        pass' });
+    expect(proposalsForLine(['    if row.stripe_held:', '        continue'], 0, {})[0]).toMatchObject({ faultClass: 'condition-forced', replace: '    if False:' });
+  });
+
+  it('still proposes the raise and return forms it always did', () => {
+    expect(scan('    if not allowed: raise ValueError(1)')[0]).toMatchObject({ faultClass: 'statement-deleted', replace: '    pass' });
+  });
+});

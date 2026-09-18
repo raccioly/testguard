@@ -18,7 +18,7 @@ const COMMENT = /^\s*#/;
 
 // `if <cond>:` and `elif <cond>:`, with an optional same-line body.
 const IF_LINE = /^(\s*)(el)?if\s+(.+?)\s*:\s*(\S.*)?$/;
-const GUARD_BODY = /\braise\b|\breturn\b|\babort\b|\bsys\.exit\b|\bFalse\b|\bNone\b|\bHTTPException\b|\b4\d\d\b/;
+const GUARD_BODY = /\braise\b|\breturn\b|\bcontinue\b|\bbreak\b|\babort\b|\bsys\.exit\b|\bFalse\b|\bNone\b|\bHTTPException\b|\b4\d\d\b/;
 const RETURN_CHECK = /^(\s*)return\s+(.+?)\s*$/;
 const CHECK_EXPR = /(==|!=|\bin\b|\bis\b|\bnot\b|\band\b|\bor\b|\.startswith\(|\.endswith\(|\.match\(|\.search\(|\.fullmatch\(|isinstance\(|\.issubset\(|>=|<=|>|<)/;
 const CHECK_CALL = /^\s*(?:await\s+)?(?:[\w.]+\.)?(verify|validate|assert|check|require|ensure|authoriz|authentic|rate_limit|throttle|enforce|guard|sanitiz|escape|audit)\w*\s*\(.*\)\s*$/i;
@@ -198,9 +198,14 @@ export function proposalsForLine(lines, i, ctx = {}) {
     out.push({ faultClass: 'literal-changed', description: `samesite weakened: \`${m[3]}\` becomes \`none\`.`, replace: line.replace(m[0], `${m[1]}=${m[2]}none${m[2]}`) });
   }
   if ((m = COST_NUM.exec(line))) {
-    out.push({ faultClass: 'literal-changed', description: `Work factor collapsed: \`${m[1]}\` ${m[2]} becomes 1.`, replace: line.replace(m[0], `${m[1]}=1`) });
+    // 0 and 1 are already the weakest a work factor can be.
+    if (Number(m[2]) > 1) out.push({ faultClass: 'literal-changed', description: `Work factor collapsed: \`${m[1]}\` ${m[2]} becomes 1.`, replace: line.replace(m[0], `${m[1]}=1`) });
   } else if ((m = WINDOW_NUM.exec(line))) {
-    out.push({ faultClass: 'literal-changed', description: `Window widened ×1000: \`${m[1]}\` ${m[2]} becomes ${Number(m[2]) * 1000}.`, replace: line.replace(m[0], `${m[1]}=${Number(m[2]) * 1000}`) });
+    // ×1000 leaves a zero window at zero, and a zero window is the one worth
+    // widening: `max_age=0` is a session cookie, `expires_in=0` is already
+    // expired. Fall back to the factor itself so the fault is a real widening.
+    const widened = Number(m[2]) * 1000 || 1000;
+    out.push({ faultClass: 'literal-changed', description: `Window widened: \`${m[1]}\` ${m[2]} becomes ${widened}.`, replace: line.replace(m[0], `${m[1]}=${widened}`) });
   }
 
   if (ctx.fieldDrops !== false) out.push(...fieldDropProposals(lines, i));

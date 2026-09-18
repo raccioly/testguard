@@ -7,18 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- **The weekly release starts its own CI, so no human step is left.** A pull
-  request opened by `GITHUB_TOKEN` raises no `pull_request` event, so the three
-  required Node legs never started and auto-merge sat on checks that would
-  never run — the workflow simply printed `gh workflow run ci.yml --ref
-  release/vX.Y.Z` and waited for someone to read it. It now dispatches that
-  run itself, as `release.yml`'s `homebrew-sha` job already did, guarded so a
-  re-run does not queue a second identical run. With
-  "Allow GitHub Actions to create and approve pull requests" enabled, a
-  release now needs no manual step at all.
-
 ### Fixed
+- **`scaffold` no longer dies on a zero-valued window literal, and proposes a
+  real fault for one.** The window producer weakened a literal by ×1000, and
+  ×1000 of `0` is `0` — the replacement equalled its find, which the schema
+  rejects outright, so a single `expired: 0` aborted the whole file and printed
+  a raw Node stack. A 725-line source was unscaffoldable for this reason. The
+  same defect sat in the work-factor producer, where `rounds = 1` collapsed to
+  `1`, and in both Python producers, where `timeout=0` is PEP 8 spacing and so
+  the common form. The two cases are not the same, and are not fixed the same
+  way: a zero window is exactly the window worth widening, so it now widens to
+  a real value; a work factor already at 1 has nothing weaker to become, so it
+  proposes nothing rather than proposing itself. `usableProposal()` refuses a
+  no-op whatever a producer hands it, which makes the rule structural instead
+  of remembered.
+- **`if (…) continue;` and `if (…) break;` are guards.** Only `return` and
+  `throw` were read as guard bodies, so pure selection-over-rows — the shape
+  the "pure logic, caller does the IO" advice produces — got no proposals at
+  all. Two fully-claimed files of seven such guards each returned nothing,
+  while the hand-written faults on those same lines all killed: the shape
+  `scaffold` skipped was the one demonstrably worth proposing. Both the
+  single-line and the block form, in JavaScript and Python.
+- **An unexpected exception is named as our bug and keeps its trace.** Four
+  error classes became `error: …`; everything else reached the user as a Node
+  stack trace ending in `Node.js v24.18.0`, which reads as "your repository
+  broke the tool" and gives the operator nothing to do. It now says whose
+  defect it is and where to report it, and still prints the trace — a framed
+  error without one cannot be reported.
+- **Every surface that describes the session-start hook is held to the code,
+  not just the README.** 0.6.0 banned "falls back to npx" in README.md and
+  added a mechanical check there. The same sentence lived in the line `init`
+  prints as it installs the hook and in the `--help` entry, and both went on
+  promising an `npx --no-install` fallback that `hookCommand()` had stopped
+  emitting — the sentence the user reads at the moment the hook is installed
+  described the network-reaching mechanism that was removed for reaching the
+  network. `TG-README-HOOK-MATCHES-THE-CODE` is now a claim about the
+  property, over all four surfaces. The fourth, `docs-canonical/SECURITY.md`,
+  was found by DocGuard while this claim was being widened from one to
+  three; it is correct today, and is checked because that is where the
+  sentence lives, not because a defect had been found there.
+- **A test runner that has already exited is not reported as contention.**
+  `ps` is a snapshot, and a suite that finished between the snapshot and the
+  warning produced "1 test runner is already running (pid 65751)" for a process
+  the operator could not find. Liveness is re-checked immediately before
+  reporting. Detection stays best-effort: `EPERM` means running, not gone.
 - **A release can tag itself even when `main` moves underneath it.** A GitHub
   App may not *push* a ref whose `.github/workflows` differ from the current
   default branch, so v0.8.1's tag was refused seven minutes after an unrelated
@@ -26,14 +58,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still pushes first, and now falls back to creating the tag through the API,
   which adds a ref to a commit already in the repository and so is not subject
   to that restriction. Any other push failure is still fatal and says so.
-
-### Changed
-- **The cost budget records a from-scratch release measurement.** 999 s for
-  115 faults on the v0.8.1 release commit, corroborated at 988 s on the
-  commit before it, against the unchanged 1100 s ceiling. The previous record
-  was 962 s at 96 faults.
-
-### Fixed
 - **A release that cannot open its pull request says why.** `GITHUB_TOKEN`
   cannot call `createPullRequest` unless "Allow GitHub Actions to create and
   approve pull requests" is enabled, and v0.8.1 hit exactly that: the branch,
@@ -44,6 +68,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   manual `gh pr create` fallback, and say what stays stale until it is fixed.
   The failure is still a failure: the branch exists without a PR, and for the
   formula `detect-version` keeps reporting the hash owed on every sweep.
+
+### Changed
+- **The calibration counts escaped bugs, not every commit that changed source
+  and a test together.** `p` is P(the suite misses it | a *bug* of this class
+  escapes), but the corpus was every commit with a source-and-test pair — which
+  in a conventional-commits repository is every feature, since a feature ships
+  with its tests as a matter of course. One run reported "12 of 12 measurable
+  bugs invisible — 100%" over five `feat:`, a `refactor:`, a `style:` and a
+  commit whose entire purpose was adding a test; only four were `fix:`. The
+  finding survived the correction — all four real fixes came back `blind` — and
+  is stronger stated over the four honestly than over the twelve loosely.
+
+  Selection is unchanged: the source-and-test pairing is still all that can be
+  judged without reading a subject line, and replaying a feature still measures
+  something. What narrows is the estimator. Where a majority of replayed
+  subjects carry a conventional type, `p` is computed over the `fix:`/`revert:`
+  records; `replay` prints both rates and the type breakdown so the narrowing
+  can be checked; and `calibration.json` records which rule produced it in
+  `source.detail`, so two calibrations from two populations can never be
+  compared by accident. A conventional repository with no `fix:` in range
+  calibrates nothing and says to widen the range, rather than silently counting
+  features as bugs.
+- **`baseline` stops printing advice that rots, and stops repeating it.** It
+  named `.testguard/evidence.json` and `.testguard/brief.json` long after the
+  tool had grown to ten regenerated outputs, and printed them every run whether
+  or not the project already ignored them. The list now lives in one place,
+  owned by `init`, and only the outputs a project does not yet ignore are
+  printed — asked of git, so `.testguard/*` with negated exceptions, a global
+  ignore file and `.git/info/exclude` all answer correctly. `replay.json`,
+  `calibration.json`, `ci-self-evidence.json` and `.testguard/ci/` were missing
+  from the list `init` writes and have been added.
+- **The weekly release starts its own CI, so no human step is left.** A pull
+  request opened by `GITHUB_TOKEN` raises no `pull_request` event, so the three
+  required Node legs never started and auto-merge sat on checks that would
+  never run — the workflow simply printed `gh workflow run ci.yml --ref
+  release/vX.Y.Z` and waited for someone to read it. It now dispatches that
+  run itself, as `release.yml`'s `homebrew-sha` job already did, guarded so a
+  re-run does not queue a second identical run. With
+  "Allow GitHub Actions to create and approve pull requests" enabled, a
+  release now needs no manual step at all.
+- **The cost budget records a from-scratch release measurement.** 999 s for
+  115 faults on the v0.8.1 release commit, corroborated at 988 s on the
+  commit before it, against the unchanged 1100 s ceiling. The previous record
+  was 962 s at 96 faults.
+
+### Performance
+- **The self-probe cost budget is 1350 s, from 1100.** Six new claims and 14
+  new faults took the gate from 115 to 129 faults and 690 to 774 runs, and CI
+  measured 1123 s against the 1100 ceiling. The budget exists to make exactly
+  this visible rather than let it pass, so the raise is recorded with its
+  measurement and its reason in `testguard.cost-budget.json`. Two caveats are
+  written down there: the 1123 s run restored a cache under the fallback key
+  and so reused some verdicts, which makes it a floor rather than the
+  from-scratch figure this budget is defined against; and the number is
+  expected to come back down, because 44% of the gate is two shared defender
+  files re-run once per claim that names them. A third is recorded too: the
+  reported total is modelled rather than wall clock, because a reused record
+  contributes what it cost when it was last probed, so the same commit
+  measured 1123 s and then 1025 s depending on what the cache restored.
+- **The new calibration claim costs 4.9 s instead of 51 s.** Its tests are
+  pure — no git, no fixture corpus, no scratch worktree — but they were added
+  to `replay.test.mjs`, whose scripted-corpus setup costs tens of seconds a
+  run, and a claim pays for every test in the file it names. Moved to
+  `calibration.test.mjs`, which exists for exactly this, and the claim
+  re-pointed. Same two faults, still killed 2/2.
+
+### Documentation
+- The README shows an ignore-file entry. It was mentioned twice without one,
+  so the field name (`pattern`, not `value`) and the fact that `expires` is a
+  full timestamp rather than a date had to be discovered from a validator
+  refusal.
+- `--help` shows `gate --changed HEAD --include-dirty`. `--include-dirty` needs
+  a reference, and that combination is the one form a pre-commit hook wants.
 
 ## [0.8.1] - 2026-09-18
 

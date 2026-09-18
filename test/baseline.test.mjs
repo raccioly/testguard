@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { buildBaseline, gate, restampBaseline, sameFingerprints } from '../src/baseline/baseline.mjs';
 import { validate } from '../spec/lib/validate.mjs';
+import { GITIGNORE_LINES, COMMITTED_OUTPUTS } from '../src/init/init.mjs';
 
 const evidence = JSON.parse(readFileSync(new URL('../spec/conformance/examples/evidence.json', import.meta.url), 'utf8'));
 
@@ -74,5 +75,27 @@ describe('a baseline frozen from a working-tree snapshot, and re-stamping it', (
     const r = restampBaseline(frozen, fewer);
     expect(r.ok).toBe(false);
     expect(r.reason).toMatch(/does not reproduce/);
+  });
+});
+
+describe('the gitignore advice does not rot, and is not repeated at a project that is covered', () => {
+  // The printed advice named `.testguard/evidence.json` and `.testguard/brief.json`
+  // long after the tool had grown to ten regenerated outputs, and it printed
+  // every run even when the project already ignored them. A second copy of the
+  // list is what let it drift, so there is now one list and `init` owns it.
+  it('names every regenerated output, and never one that is committed', () => {
+    for (const committed of COMMITTED_OUTPUTS) expect(GITIGNORE_LINES).not.toContain(committed);
+    // The outputs that shipped after the advice was written, and were missing.
+    for (const l of ['.testguard/replay.json', '.testguard/calibration.json', '.testguard/gate.json']) {
+      expect(GITIGNORE_LINES).toContain(l);
+    }
+  });
+
+  it('keeps baseline.json and status.json committed — they are the contract, not output', () => {
+    expect(COMMITTED_OUTPUTS).toContain('.testguard/baseline.json');
+    expect(COMMITTED_OUTPUTS).toContain('.testguard/status.json');
+    // The CI-fetch helper is written by init and run by hand, so a bare
+    // `.testguard/*` would wrongly swallow it; the negation list must carry it.
+    expect(COMMITTED_OUTPUTS).toContain('.testguard/fetch-ci-evidence.sh');
   });
 });

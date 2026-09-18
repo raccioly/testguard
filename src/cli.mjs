@@ -20,8 +20,9 @@ import { mcpCommand } from './commands/mcp.mjs';
 import { admitCommand } from './commands/admit.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
+const ISSUES = 'https://github.com/raccioly/testguard/issues';
 
-const USAGE = `testguard ${VERSION} — proves a test suite defends the claims a project makes
+export const USAGE = `testguard ${VERSION} — proves a test suite defends the claims a project makes
 
   testguard status [dir]     where the project is and the ONE next action; --json is the machine entry point
   testguard init [dir]       install the agent layer at the git root (skill, session-start hook, AGENTS.md section) and the .gitignore lines in [dir]
@@ -89,7 +90,7 @@ admit      --claim <ID> (required)  --fault <FID> (one fault only)  --confirm <n
            ADMITTED (exit 0) only when every fault of the claim is killed N/N by defenders that are green N/N; anything else is NOT ADMITTED (exit 1) and names the first blocking fault
            the test must be a declared or discovered defender of the claim (exit 3 otherwise); evidence goes to .testguard/evidence-partial.json
 gate       --changed <ref>   measure the change since merge-base(ref, HEAD); auto-detected in GitHub Actions / GitLab CI
-           --include-dirty   compare the working tree (staged, unstaged and untracked) instead of HEAD — the pre-commit shape
+           --include-dirty   compare the working tree (staged, unstaged and untracked) instead of HEAD; needs a reference, so the pre-commit shape is: gate --changed HEAD --include-dirty
            --exclude <glob>  (repeatable) more files that never carry claims; --explain lists the defaults
            --strict          a non-empty change that evaluates nothing is a failure, not a note
            --ignore <path>   ignore file (default: <dir>/testguard.ignore.json; kind=path entries excuse files, with a reason)
@@ -100,7 +101,7 @@ status     --json (exit 0 clean · 1 unproven/stale/unclaimed · 2 nothing to pr
 init       --force (replace an existing skill file)  --here (keep the agent layer in [dir] instead of the git root)  --json
            --ci-evidence github|gitlab   write .testguard/fetch-ci-evidence.sh, an ON-DEMAND helper that downloads CI's evidence artifact and briefs from it; the session-start hook stays offline
            agent layer (skill, SessionStart hook, AGENTS.md section) → git root; project layer (.gitignore lines) → [dir]
-           the hook prefers a local install, falls back to npx --no-install, never fetches; exit 1 if a written file is gitignored
+           the hook prefers a local install, then a testguard already on PATH, then nothing; it never reaches the network. exit 1 if a written file is gitignored
            --mcp             print the MCP server config for Claude Code, Cursor and Codex (printed, never written: a harness config is yours)
 every command accepts --json; probe/baseline emit the status document plus their own result
 claims     --json
@@ -204,6 +205,14 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
       io.err(`error: ${e.message}`);
       return 2;
     }
-    throw e;
+    // Anything else is a defect in testguard, not a finding about the project.
+    // A bare Node trace reads as "your repository broke the tool" and gives the
+    // operator nothing to do, so name it as ours in the first line. The trace
+    // still goes out: it is the only part of this that makes a report
+    // actionable, and swallowing it would trade one unusable output for another.
+    io.err(`error: this is a bug in testguard ${VERSION}, not a problem with your project.`);
+    io.err(`Please report it at ${ISSUES} with the command you ran and the trace below.`);
+    io.err(e?.stack ?? String(e));
+    return 2;
   }
 }

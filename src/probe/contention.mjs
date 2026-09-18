@@ -19,6 +19,19 @@ const RUNNER_RE = /\b(vitest|jest|playwright|mocha|ava|karma|cypress)\b/i;
 // Our own child processes and this process are not contention.
 const SELF_RE = /testguard/i;
 
+/**
+ * Is this pid still running? Signal 0 checks for the process without touching
+ * it: ESRCH means gone, EPERM means alive but not ours. Injectable for tests.
+ */
+export function defaultAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e?.code === 'EPERM';
+  }
+}
+
 /** Rows of the process table as `{ pid, command }`, or [] when it cannot be read. */
 export function processList({ platform = process.platform, run = spawnSync } = {}) {
   try {
@@ -42,13 +55,19 @@ export function processList({ platform = process.platform, run = spawnSync } = {
  * `{ detected, runners: [{ pid, command }] }`; `detected` is false when
  * nothing was found or the process list could not be read.
  */
-export function detectContention({ self = process.pid, ...opts } = {}) {
+export function detectContention({ self = process.pid, alive = defaultAlive, ...opts } = {}) {
   const rows = processList(opts);
   const runners = rows
     .filter((p) => p.pid !== self && RUNNER_RE.test(p.command) && !SELF_RE.test(p.command))
     // `ps` lists the grep/ps itself and any shell wrapper; a runner's command
     // line always names its own binary, so require it to look like an exec.
     .filter((p) => !/^\s*(ps|grep|wmic)\b/.test(p.command))
+    // The process list is a snapshot, and a suite that finished between `ps`
+    // and this line would be reported as contention that no longer exists — a
+    // warning the operator cannot act on and cannot verify, since the pid is
+    // already gone by the time they look. Re-check liveness immediately before
+    // reporting. A pid we may not signal is still running, so EPERM is alive.
+    .filter((p) => alive(p.pid))
     .map((p) => ({ pid: p.pid, command: p.command.length > 200 ? p.command.slice(0, 197) + '…' : p.command }));
   return { detected: runners.length > 0, runners };
 }

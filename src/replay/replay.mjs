@@ -273,6 +273,54 @@ export function wilson(positives, n, z = 1.96) {
 export const MEASURED_VERDICTS = Object.freeze(['caught', 'blind', 'nocover']);
 
 /**
+ * Which replayed commits are ESCAPED BUGS, as opposed to merely commits that
+ * changed source and a test together.
+ *
+ * Selection stays broad on purpose — findFixCommits' pairing rule is the only
+ * thing that can be evaluated without reading a subject line, and replaying a
+ * feature still says something about the suite. But `p` is
+ * P(the suite misses it | a BUG of this class escapes), and a reverted feature
+ * is not a bug that escaped. A field report measured a 100% miss rate over
+ * twelve commits of which five were `feat:` and one was a commit whose whole
+ * purpose was adding a test; the finding survived the correction, and the
+ * number should have been stated over the four `fix:` commits that carried it.
+ *
+ * So the corpus narrows where the repository gives us the evidence to narrow
+ * it, and the document records which rule ran — two calibrations computed
+ * under different rules must never be comparable by accident.
+ */
+const CONVENTIONAL = /^([a-z]+)(?:\([^)]*\))?!?:\s/;
+const BUG_TYPES = new Set(['fix', 'revert']);
+
+/** The conventional-commits type of a subject (`fix(scope)!: …` → `fix`), or null. */
+export const commitType = (subject) => CONVENTIONAL.exec(subject ?? '')?.[1] ?? null;
+
+/**
+ * The corpus `p` is computed over, and the rule that chose it.
+ *
+ * `conventional-fix` when a majority of the replayed subjects carry a
+ * conventional type — then, and only then, a missing `fix:` prefix means "not
+ * a bug" rather than "this project does not label its commits". Detection reads
+ * the replayed records rather than the range, so the rule is a property of the
+ * corpus the number is computed from and cannot drift between two readings of
+ * the same document.
+ *
+ * A conventional repository with no `fix:` in range yields an EMPTY corpus, not
+ * a fallback to counting features as bugs: n=0 makes `p` null and says to widen
+ * the range, which is the honest answer. Silently counting a feature would be
+ * the bug this function exists to remove.
+ */
+export function selectCorpus(records) {
+  const measured = records.filter((r) => MEASURED_VERDICTS.includes(r.verdict));
+  const byType = {};
+  for (const r of measured) byType[commitType(r.subject) ?? 'untyped'] = (byType[commitType(r.subject) ?? 'untyped'] ?? 0) + 1;
+  const typed = measured.filter((r) => commitType(r.subject)).length;
+  const rule = measured.length && typed * 2 > measured.length ? 'conventional-fix' : 'source-and-test';
+  const corpus = rule === 'conventional-fix' ? measured.filter((r) => BUG_TYPES.has(commitType(r.subject))) : measured;
+  return { rule, corpus, measured, byType };
+}
+
+/**
  * Calibration from a replay document: per fault class, the share of real
  * escaped bugs of that shape the suite failed to catch.
  *
@@ -283,9 +331,9 @@ export const MEASURED_VERDICTS = Object.freeze(['caught', 'blind', 'nocover']);
  * and why `nocover` is a miss rather than an exclusion.
  */
 export function calibrationFrom(replayDoc, { confidence = 0.95, computedAt = new Date().toISOString(), toolVersion } = {}) {
+  const { rule, corpus, measured, byType } = selectCorpus(replayDoc.records);
   const buckets = {};
-  for (const r of replayDoc.records) {
-    if (!MEASURED_VERDICTS.includes(r.verdict)) continue;
+  for (const r of corpus) {
     const key = r.faultClass ?? 'other';
     buckets[key] ??= { n: 0, positives: 0, breakdown: {} };
     buckets[key].n += 1;
@@ -310,7 +358,15 @@ export function calibrationFrom(replayDoc, { confidence = 0.95, computedAt = new
       // The ground truth is this repository's own history, which `ref` names,
       // so there is no external corpus to list. The caveat is the sentence a
       // consumer shows beside any number it quotes from here.
-      caveat: 'measured on this repository\'s own fix history: every replayed bug is one that escaped, so a first run is expected to be high — the number to move is this one, over time',
+      caveat: rule === 'conventional-fix'
+        ? `measured on the ${corpus.length} fix:/revert: commit${corpus.length === 1 ? '' : 's'} in this range, of ${measured.length} replayed: every one is a bug that escaped, so a first run is expected to be high — the number to move is this one, over time`
+        : 'measured on this repository\'s own fix history: every replayed bug is one that escaped, so a first run is expected to be high — the number to move is this one, over time',
+      // `detail` is the spec's unconstrained provenance slot. What p was
+      // computed over belongs here rather than in prose: without it a
+      // conventional-fix calibration and a source-and-test one carry the same
+      // shape and the same `measures`, and a consumer would merge or compare
+      // them with nothing to say they are different populations.
+      detail: { candidateRule: rule, replayed: measured.length, selected: corpus.length, byType },
     },
     buckets,
   };
@@ -326,12 +382,37 @@ export function renderReplay(doc) {
   }
   const order = ['blind', 'nocover', 'flaky', 'unverifiable', 'caught'];
   lines.push('');
-  lines.push(`${doc.records.length} fix commit${doc.records.length === 1 ? '' : 's'} replayed from ${doc.run.candidates} candidate${doc.run.candidates === 1 ? '' : 's'}` +
+  lines.push(`${doc.records.length} commit${doc.records.length === 1 ? '' : 's'} replayed from ${doc.run.candidates} candidate${doc.run.candidates === 1 ? '' : 's'}` +
     (doc.run.duplicates ? ` (${doc.run.duplicates} dropped as the same patch)` : '') + ': ' +
     order.filter((v) => by[v]).map((v) => `${by[v]} ${v}`).join(', ') + '.');
-  const measurable = MEASURED_VERDICTS.reduce((s, v) => s + (by[v] ?? 0), 0);
-  const missed = measurable - (by.caught ?? 0);
-  if (measurable) lines.push(`${missed} of ${measurable} measurable bugs were invisible to the suite (${by.blind ?? 0} blind, ${by.nocover ?? 0} with no test at all) — the escaped-bug miss rate is ${((missed / measurable) * 100).toFixed(0)}%.`);
+  // The headline is the calibrated corpus, not everything replayed: a reverted
+  // feature is not an escaped bug. Both numbers are printed, because the reader
+  // who wants to check the narrowing has to be able to see what it dropped.
+  const { rule, corpus, measured, byType } = selectCorpus(doc.records);
+  const rate = (rs) => {
+    const missed = rs.filter((r) => r.verdict !== 'caught').length;
+    return { missed, n: rs.length, pct: rs.length ? ((missed / rs.length) * 100).toFixed(0) : null };
+  };
+  const types = Object.entries(byType).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t} ${n}`).join(', ');
+  const all = rate(measured);
+
+  if (rule === 'conventional-fix' && corpus.length === 0) {
+    lines.push(`No fix:/revert: commits among the ${measured.length} replayed (${types}) — nothing to calibrate from. Widen the range.`);
+    lines.push('This project labels its commits, so a commit without a fix:/revert: prefix is read as "not a bug" rather than "unlabelled". Every measurable commit here is a feature or a chore.');
+    return lines.join('\n');
+  }
+
+  const c = rate(corpus);
+  const blind = corpus.filter((r) => r.verdict === 'blind').length;
+  const nocover = corpus.filter((r) => r.verdict === 'nocover').length;
+  const noun = rule === 'conventional-fix' ? 'escaped bug' : 'measurable bug';
+  if (c.n) lines.push(`${c.missed} of ${c.n} ${noun}${c.n === 1 ? ' was' : 's were'} invisible to the suite (${blind} blind, ${nocover} with no test at all) — the escaped-bug miss rate is ${c.pct}%.`);
+  if (rule === 'conventional-fix') {
+    lines.push(`  corpus: the ${corpus.length} fix:/revert: commit${corpus.length === 1 ? '' : 's'} of ${measured.length} measurable (${types}).`);
+    if (measured.length > corpus.length) lines.push(`  over all ${all.n} — features and chores included, which are not escaped bugs — it is ${all.missed} of ${all.n}, ${all.pct}%.`);
+  } else if (c.n) {
+    lines.push(`  corpus: all ${measured.length} commits that changed source and a test together (${types}); this project's subjects are not conventional-commits, so a bug fix cannot be told from a feature here.`);
+  }
   lines.push('A bug that reached production is by construction one the suite missed, so a high rate is expected on a first run. The number to move is this one, over time.');
   return lines.join('\n');
 }

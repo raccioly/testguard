@@ -410,6 +410,37 @@ excuses nothing. Non-source files and documented never-claimed patterns
 (`*.d.ts`, `*.config.*`, fixtures, mocks; `--explain` lists them) are
 excluded and said so; `--strict` fails a change that evaluated nothing.
 
+An ignore file is a list of `entries`. The field is `pattern`, and `reason` is
+not optional — it is the whole point of the mechanism:
+
+```json
+{
+  "$schema": "./node_modules/testguard-cli/spec/schemas/ignore.schema.json",
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "kind": "path",
+      "pattern": "src/commands/**",
+      "reason": "Thin wrappers: read flags, call the module, print. The logic is claimed in the modules they call.",
+      "by": "maintainer",
+      "at": "2026-09-17T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "src/legacy/billing.ts",
+      "reason": "Scheduled for deletion in Q4; claims would outlive the file.",
+      "by": "maintainer",
+      "at": "2026-09-17T00:00:00Z",
+      "expires": "2026-12-31T00:00:00Z"
+    }
+  ]
+}
+```
+
+`kind: "claim"` entries take the same shape and excuse a *removed claim*
+instead of an unclaimed file. An entry past its `expires` excuses nothing and
+is reported as `EXPIRED`.
+
 With a reference known, `status --changed <ref>` reports `unclaimed-changes`
 **before** any evidence state and makes the claim the next action; the brief
 lists the unclaimed files first. The claim is written before more code.

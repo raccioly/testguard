@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scaffoldFile } from '../src/scaffold/scaffold.mjs';
+import { scaffoldFile, usableProposal } from '../src/scaffold/scaffold.mjs';
 import { proposalsForLine, functionHead, functionParams, openerIndex } from '../src/scaffold/producers.mjs';
 import { locate } from '../src/probe/inject.mjs';
 import { validate } from '../spec/lib/validate.mjs';
@@ -298,5 +298,95 @@ export function GreetingRow({ on, save, submit }) {
     expect(validate('claims', doc).errors).toEqual([]);
     const t = scaffoldFile({ projectDir: dir, file: 'src/__tests__/row.test.tsx', toolVersion: 'test' });
     expect(t.doc.claims.flatMap((c) => c.faults).filter((f) => /element-removed|handler-dropped/.test(f.faultClass))).toEqual([]);
+  });
+});
+
+describe('a proposal is never a no-op (the crash a zero-valued window caused)', () => {
+  // A 725-line source file could not be scaffolded at all because one
+  // `expired: 0` in it produced a proposal whose replacement equalled its find.
+  // The schema rejects that outright, so scaffoldFile() threw and the whole
+  // run died — and the CLI printed the raw Node trace. Two defects, and this
+  // covers the one that matters: the producer must not emit it.
+  const scan = (line) => proposalsForLine([line], 0, {});
+  const noop = (line) => scan(line).filter((p) => p.replace === line);
+
+  it('a zero-valued window is widened to a real value rather than to itself', () => {
+    expect(noop('  const maxAge = 0;')).toEqual([]);
+    expect(scan('  const maxAge = 0;')[0]).toMatchObject({ faultClass: 'literal-changed', replace: '  const maxAge = 1000;' });
+    expect(scan('  timeout: 0,')[0].replace).toBe('  timeout: 1000,');
+    expect(scan('  expiresIn: 0,')[0].replace).toBe('  expiresIn: 1000,');
+  });
+
+  it('still widens a non-zero window by the same factor', () => {
+    expect(scan('  const maxAge = 5;')[0].replace).toBe('  const maxAge = 5000;');
+    expect(scan('  clockSkew: 30,')[0].replace).toBe('  clockSkew: 30000,');
+  });
+
+  it('proposes nothing for a work factor already at its weakest, rather than proposing itself', () => {
+    // Unlike a window, a cost of 1 has no weaker value to move to. Silence is
+    // the honest proposal; a no-op would be a crash and a fake fault is worse.
+    expect(scan('  const rounds = 1;')).toEqual([]);
+    expect(scan('  const rounds = 0;')).toEqual([]);
+    expect(scan('  const rounds = 12;')[0].replace).toBe('  const rounds = 1;');
+  });
+
+  it('the keep predicate refuses a no-op outright, whatever a producer hands it', () => {
+    // The backstop, exercised directly. No current producer emits a fixed
+    // point, so this predicate is the only place the invariant is observable —
+    // and a guard nothing can exercise is a guard nobody can prove.
+    const source = 'const maxAge = 0;\n';
+    const noop = { file: 'x.mjs', find: 'const maxAge = 0;', replace: 'const maxAge = 0;' };
+    expect(usableProposal(source, noop)).toBe(false);
+    expect(usableProposal(source, { ...noop, replace: 'const maxAge = 1000;' })).toBe(true);
+    // The other refusal is unchanged and is a different failure: an anchor that
+    // does not locate is unverifiable, not a no-op.
+    expect(usableProposal(source, { file: 'x.mjs', find: 'not in the file', replace: 'anything' })).toBe(false);
+  });
+
+  it('no file can crash a scaffold run: a draft over zero-valued literals conforms', () => {
+    // The structural backstop. Producers refuse their own fixed points where
+    // they know the arithmetic; this is what holds when a later one forgets.
+    const dir = mkdtempSync(join(tmpdir(), 'tg-noop-'));
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(join(dir, 'src', 'billing.ts'), [
+      'export function charge(account) {',
+      '  const maxAge = 0;',
+      '  const rounds = 1;',
+      '  if (!account.active) return null;',
+      '  return account.id;',
+      '}',
+      '',
+    ].join('\n'));
+    const { doc } = scaffoldFile({ projectDir: dir, file: 'src/billing.ts', toolVersion: 'test' });
+    expect(validate('claims', doc).errors).toEqual([]);
+    const faults = doc.claims.flatMap((c) => c.faults);
+    expect(faults.length).toBeGreaterThan(0);
+    for (const f of faults) expect(f.replace, f.description).not.toBe(f.find);
+  });
+});
+
+describe('a loop guard is a guard (`continue` and `break`, not only `return`)', () => {
+  // Pure selection-over-rows — the shape the "pure logic, caller does the IO"
+  // advice produces — is written with `continue`, and scaffold proposed
+  // nothing at all for it. Two files of seven such guards each returned zero
+  // proposals, while the hand-written faults on those same lines all killed.
+  const scan = (lines, i = 0) => proposalsForLine(lines, i, {});
+
+  it('proposes removing a single-line continue or break guard', () => {
+    expect(scan(['  if (!row.active) continue;'])[0]).toMatchObject({ faultClass: 'statement-deleted', replace: '' });
+    expect(scan(['  if (n > cap) break;'])[0]).toMatchObject({ faultClass: 'statement-deleted', replace: '' });
+    expect(scan(['  } else if (row.stripeHeld) continue;'])[0]).toMatchObject({ faultClass: 'statement-deleted', replace: '' });
+  });
+
+  it('proposes forcing a block guard whose body only continues or breaks', () => {
+    // Not negated, so the `!` shortcut in isGuard() cannot carry it: the body
+    // is the only evidence that the `if` guards anything.
+    expect(scan(['  if (row.stripeHeld) {', '    continue;', '  }'])[0]).toMatchObject({ faultClass: 'condition-forced', replace: '  if (false) {' });
+    expect(scan(['  if (queue.done) {', '    break;', '  }'])[0]).toMatchObject({ faultClass: 'condition-forced', replace: '  if (false) {' });
+  });
+
+  it('still proposes the return and throw forms it always did', () => {
+    expect(scan(['  if (!row.active) return null;'])[0]).toMatchObject({ faultClass: 'statement-deleted' });
+    expect(scan(['  if (!ctx || !ctx.scope) {'])[0]).toMatchObject({ faultClass: 'condition-forced' });
   });
 });

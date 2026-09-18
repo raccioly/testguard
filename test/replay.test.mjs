@@ -167,7 +167,10 @@ describe('replay on a scripted corpus', () => {
     expect(cal.bucketBy).toBe('faultClass');
     expect(cal.source).toMatchObject({ kind: 'bug-replay', ref: 'HEAD~3..HEAD' });
     expect(cal.measures).toBe('escape-missed');
-    expect(cal.source.caveat).toMatch(/own fix history/);
+    // The caveat's wording now depends on which corpus p was computed over;
+    // what must always hold is the sentence a consumer shows beside a number.
+    expect(cal.source.caveat).toMatch(/a first run is expected to be high/);
+    expect(cal.source.detail.candidateRule).toBe('conventional-fix'); // the scripted corpus labels its commits
     const total = Object.values(cal.buckets).reduce((n, b) => n + b.n, 0);
     const positives = Object.values(cal.buckets).reduce((n, b) => n + b.positives, 0);
     expect(total).toBe(2);      // both were measurable

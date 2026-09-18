@@ -45,7 +45,7 @@ function scanJs({ source, lines, fieldDrops, keep, anchor }) {
     for (const p of proposalsForLine(lines, i, { params, fieldDrops })) {
       const { hits, occurrence } = anchor(line, offset);
       const fault = { ...p, find: line, replace: p.replace, expectHits: hits, occurrence, line: i + 1, fn, annotation: pendingAnnotation };
-      if (keep(fault)) proposals.push(fault); // never propose an anchor that would be unverifiable
+      if (keep(fault)) proposals.push(fault); // never propose an unverifiable anchor or a no-op
     }
 
     depth += (line.match(/\{/g) ?? []).length - (line.match(/\}/g) ?? []).length;
@@ -86,13 +86,35 @@ function scanPython({ source, lines, fieldDrops, keep, anchor }) {
     for (const p of py.proposalsForLine(lines, i, { params, fieldDrops })) {
       const { hits, occurrence } = anchor(line, offset);
       const fault = { ...p, find: line, replace: p.replace, expectHits: hits, occurrence, line: i + 1, fn, annotation: pendingAnnotation };
-      if (keep(fault)) proposals.push(fault);
+      if (keep(fault)) proposals.push(fault); // as scanJs: unverifiable anchors and no-ops never reach the draft
     }
 
     if (pendingAnnotation && !ann && !head && line.trim() && !py.isComment(line)) pendingAnnotation = null;
     offset += line.length + 1;
   });
   return proposals;
+}
+
+/**
+ * May this proposal reach the draft?
+ *
+ * Two reasons it may not, and they are different failures. An anchor that does
+ * not locate is UNVERIFIABLE: the fault could not be injected, so probing it
+ * would say nothing. A replacement equal to its find is a NO-OP: the schema
+ * rejects it outright, so a single one aborts the whole file — a 725-line
+ * source was unscaffoldable because of one `expired: 0`.
+ *
+ * Producers refuse their own fixed points where they know the arithmetic (see
+ * the literal shapes in producers.mjs), which is what keeps a real fault for a
+ * zero-valued window instead of silently dropping it. This is the backstop that
+ * makes the rule structural rather than remembered, so a producer added later
+ * cannot reintroduce the crash. It is exported because a guard nothing can
+ * exercise is a guard nobody can prove: no current producer emits a fixed
+ * point, so this predicate is the only place the invariant is observable.
+ */
+export function usableProposal(source, fault) {
+  if (fault.replace === fault.find) return false;
+  return locate(source, fault).status === 'ok';
 }
 
 /** How many times `find` occurs, and which occurrence the line at `offset` is. */
@@ -128,7 +150,7 @@ export function scaffoldFile({ projectDir, file, claimId, existingClaims, toolVe
 
   const fieldDrops = !(isPython(file) ? NO_FIELD_DROPS_PY : NO_FIELD_DROPS).test(file);
   const scan = isPython(file) ? scanPython : scanJs;
-  const proposals = scan({ source, lines, fieldDrops, keep: (fault) => locate(source, fault).status === 'ok', anchor: (find, offset) => anchorFor(source, find, offset) });
+  const proposals = scan({ source, lines, fieldDrops, keep: (fault) => usableProposal(source, fault), anchor: (find, offset) => anchorFor(source, find, offset) });
 
   const existing = new Map((existingClaims?.claims ?? []).map((c) => [c.id, c]));
   const usedIds = new Set();

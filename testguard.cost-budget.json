@@ -1,6 +1,6 @@
 {
   "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine.",
-  "seconds": 1100,
+  "seconds": 1350,
   "measured": {
     "seconds": 804,
     "at": "2026-09-18",
@@ -20,25 +20,63 @@
       "seconds": 1100,
       "at": "2026-09-18",
       "why": "#82 added eight unit-defended faults (~30 s in CI) and main went 906 -> 981 s from scratch, red against 950. Re-pointing the two replay-defended calibration claims onto pure tests took it to 962 s. The remaining overage was the budget itself: set 18% over a local 804 s, it was 4.6% over the 906 s CI already measured. Raised to 1100 against the CI figure. The heavy claims it names — TG-ADMIT-NEEDS-ALL-KILLED 87 s, TG-PROBE-NEVER-EDITS-THE-TREE-IT-MEASURES 70 s, the two TG-MCP-* at 42 s — are the next #73-style cut, tracked separately."
+    },
+    {
+      "seconds": 1350,
+      "at": "2026-09-18",
+      "why": "The 0.8.1 field-report fixes added 6 claims and 14 faults (115 -> 129 faults, 690 -> 774 runs, +12.2%) and ci.yml measured 1123 s against 1100, over by 23 s. Two things make 1123 the wrong number to budget against, in opposite directions. It is LOW: the run restored a cache under the `self-evidence-` fallback key, so claims whose target and defenders were untouched reused their verdict, and this budget is defined against a from-scratch probe because the release job is from scratch. It is also not the whole story: 46 s of the growth was avoidable and already removed — the new calibration claim's tests are pure but were added to replay.test.mjs, whose scripted-corpus setup costs tens of seconds a run, and re-pointing them at calibration.test.mjs took that claim from 51 s to 4.9 s. A from-scratch local run of the same commit measured 1168 s on a contended machine. 1350 is ~14% over an expected from-scratch CI figure of ~1185, which is the same headroom rule that set 1100 against 962. Expected to come DOWN: the shared-defender cut below is the next piece of work and should return the gate to under 900 s."
     }
   ],
   "measuredInCI": {
-    "seconds": 999,
+    "seconds": 1123,
     "at": "2026-09-18",
-    "run": "35387153652",
-    "commit": "8ddad99",
-    "faults": 115,
-    "runs": 690,
-    "how": "release.yml test(24): probe . --budget 180000 --cost, from scratch on the v0.8.1 release commit — the release job's own measurement, no reuse",
+    "run": "35395439072",
+    "commit": "9eddee6",
+    "faults": 129,
+    "runs": 774,
+    "how": "ci.yml test(22): probe . --budget 180000 --no-escalate --cost, on PR #107",
+    "reuse": "PARTIAL — the cache hit the `self-evidence-` fallback key (main's claims hash c264301b), so untouched claims reused their verdict. This change edits eight source files, so most claims were invalidated and re-probed anyway, but the figure is a floor and not the from-scratch number this budget is defined against. Replace it with the release job's figure, which never reuses.",
     "before": {
-      "seconds": 962,
-      "commit": "393ac3a",
-      "note": "ci.yml at 96 faults, before the five faults the release-pipeline work added"
+      "seconds": 999,
+      "commit": "8ddad99",
+      "note": "release.yml at 115 faults, from scratch, before these six claims"
     },
-    "corroboration": {
-      "seconds": 988,
-      "commit": "2abac1d",
-      "note": "the same probe on the release commit itself, 11 s lower — runner-to-runner variation on an identical fault set"
+    "localFromScratch": {
+      "seconds": 1168,
+      "runs": 774,
+      "note": "probe . --include-dirty --budget 180000 --cost on a contended developer machine, before the calibration re-point that removed 46 s"
+    },
+    "variance": {
+      "observed": [
+        {
+          "seconds": 1123,
+          "run": "35395439072",
+          "note": "first run on the branch"
+        },
+        {
+          "seconds": 1025,
+          "run": "35397969312",
+          "reused": 92,
+          "note": "second run, same 129 faults and 774 runs, after the budget commit"
+        }
+      ],
+      "why": "The reported total is modelled, not wall clock: a reused record contributes what it cost when it was last probed, on another run and another runner. So the same commit reports differently depending on what the `self-evidence-` fallback key happened to restore — about 10% here. Both figures are reuse-affected and both are floors. The from-scratch figure this budget is defined against comes from the release job, which never reuses; record it there when it runs."
     }
+  },
+  "nextCut": {
+    "why": "44% of the gate is two files, each re-run once per claim that names it. This is the tool's own advice, printed at the end of every --cost run: split the behaviour a shared defender proves into a test that does not need the expensive setup, and point the claim at that. It took the new calibration claim from 51 s to 4.9 s.",
+    "candidates": [
+      {
+        "file": "test/negative-control.test.mjs",
+        "seconds": 327,
+        "claims": 6
+      },
+      {
+        "file": "test/replay.test.mjs",
+        "seconds": 183,
+        "claims": 6
+      }
+    ],
+    "expected": "250-350 s, which would put the gate under 900 s with all 129 faults. Lower this budget when it lands."
   }
 }

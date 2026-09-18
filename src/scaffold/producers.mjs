@@ -23,8 +23,8 @@
  */
 
 const COMMENT = /^\s*(\/\/|\*|\/\*)/;
-const GUARD_BODY = /\b(return|throw)\b|\.status\(\s*4\d\d|\bredirect\(|\bfalse\b|\bnull\b/;
-const IF_LINE = /^(\s*)(?:\}\s*)?(?:else\s+)?if\s*\((.+)\)\s*(\{\s*|(?:return|throw)\b.*;\s*)?$/;
+const GUARD_BODY = /\b(return|throw|continue|break)\b|\.status\(\s*4\d\d|\bredirect\(|\bfalse\b|\bnull\b/;
+const IF_LINE = /^(\s*)(?:\}\s*)?(?:else\s+)?if\s*\((.+)\)\s*(\{\s*|(?:return|throw|continue|break)\b.*;\s*)?$/;
 const RETURN_CHECK = /^\s*return\s+(.+);\s*$/;
 const CHECK_EXPR = /(===|!==|\.includes\(|\.has\(|\.some\(|\.every\(|\.test\(|\.startsWith\(|\.endsWith\(|\binstanceof\b|&&|\|\||^!)/;
 const CHECK_CALL = /^\s*(?:await\s+)?(?:[\w$]+\.)*(verify|validate|assert|check|require|ensure|authoriz|authentic|rateLimit|throttle|enforce|guard)\w*\s*\(.*\)\s*;\s*$/i;
@@ -254,7 +254,7 @@ export function proposalsForLine(lines, i, ctx = {}) {
 
   const ifm = IF_LINE.exec(line);
   if (ifm && isGuard(ifm[2], lines, i)) {
-    const singleLine = ifm[3] && /^(return|throw)\b/.test(ifm[3].trim());
+    const singleLine = ifm[3] && /^(return|throw|continue|break)\b/.test(ifm[3].trim());
     if (singleLine) {
       out.push({ faultClass: 'statement-deleted', description: `Guard removed: \`${line.trim()}\` no longer runs.`, replace: '' });
     } else {
@@ -274,6 +274,12 @@ export function proposalsForLine(lines, i, ctx = {}) {
     out.push({ faultClass: 'statement-deleted', description: `State change removed: \`${line.trim()}\` no longer runs.`, replace: '' });
   }
 
+  // A weakening that lands on the value already there is not a fault: the
+  // replacement would equal the find, which the schema rejects outright and
+  // which would say nothing about the tests even if it did not. Both numeric
+  // producers can reach their own input — a cost already 1, a window already
+  // 0 — so each refuses where it knows the arithmetic, rather than emitting a
+  // no-op for keep() to throw away.
   let m;
   if ((m = FLAG_TRUE.exec(line))) {
     out.push({ faultClass: 'literal-changed', description: `Security flag flipped: \`${m[1]}: true\` becomes \`${m[1]}: false\`.`, replace: line.replace(m[0], `${m[1]}: false`) });
@@ -282,9 +288,14 @@ export function proposalsForLine(lines, i, ctx = {}) {
     out.push({ faultClass: 'literal-changed', description: `sameSite weakened: \`${m[2]}\` becomes \`none\`.`, replace: line.replace(m[0], `sameSite: ${m[1]}none${m[1]}`) });
   }
   if ((m = COST_NUM.exec(line))) {
-    out.push({ faultClass: 'literal-changed', description: `Work factor collapsed: \`${m[1]}\` ${m[3]} becomes 1.`, replace: line.replace(m[0], `${m[1]}${m[2] === ':' ? ': ' : ' = '}1`) });
+    // 0 and 1 are already the weakest a work factor can be.
+    if (Number(m[3]) > 1) out.push({ faultClass: 'literal-changed', description: `Work factor collapsed: \`${m[1]}\` ${m[3]} becomes 1.`, replace: line.replace(m[0], `${m[1]}${m[2] === ':' ? ': ' : ' = '}1`) });
   } else if ((m = WINDOW_NUM.exec(line))) {
-    out.push({ faultClass: 'literal-changed', description: `Window widened ×1000: \`${m[1]}\` ${m[3]} becomes ${Number(m[3]) * 1000}.`, replace: line.replace(m[0], `${m[1]}${m[2] === ':' ? ': ' : ' = '}${Number(m[3]) * 1000}`) });
+    // ×1000 leaves a zero window at zero, and a zero window is exactly the one
+    // worth widening: `maxAge: 0` is a session cookie, `expiresIn: 0` is already
+    // expired. Fall back to the factor itself so the fault is a real widening.
+    const widened = Number(m[3]) * 1000 || 1000;
+    out.push({ faultClass: 'literal-changed', description: `Window widened: \`${m[1]}\` ${m[3]} becomes ${widened}.`, replace: line.replace(m[0], `${m[1]}${m[2] === ':' ? ': ' : ' = '}${widened}`) });
   }
 
   if (ctx.fieldDrops !== false) {
