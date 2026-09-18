@@ -46,7 +46,14 @@ jobs:
 
             const { data: files } = await github.rest.pulls.listFiles({ owner, repo, pull_number: num, per_page: 300 });
             const paths = files.map((f) => f.filename);
-            const RELEASE_SURFACES = new Set(['package.json', 'package-lock.json', 'pyproject.toml', 'CHANGELOG.md', 'action.yml', 'packaging/homebrew/testguard.rb', 'README.md']);
+            // Deliberately spelled out, not derived: this is the gate that merges
+            // without human review, so what a bot may touch stays readable here
+            // and is not computed from code the PR itself could change. Keep it
+            // in step with `sync-release-version.mjs --list-surfaces` plus the
+            // three files the bump writes — test/release-sync.test.mjs fails if
+            // a surface is missing, which is how the GitLab template's absence
+            // (it would have held every release PR for review) was found.
+            const RELEASE_SURFACES = new Set(['package.json', 'package-lock.json', 'pyproject.toml', 'CHANGELOG.md', 'action.yml', 'packaging/homebrew/testguard.rb', 'README.md', 'packaging/gitlab/testguard.gitlab-ci.yml']);
 
             if (author === 'dependabot[bot]') {
               const m = /from (\d+)\.(\d+)\.\S+ to (\d+)\.(\d+)\./.exec(pr.title || '');

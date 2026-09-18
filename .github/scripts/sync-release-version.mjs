@@ -39,6 +39,13 @@
  * download — never from a local `npm pack`: a provenance-signed publish can
  * differ byte for byte from the pack output.
  *
+ *   --list-surfaces    print every file this script may write, one per line. The
+ *                      release workflows allow-list exactly these (plus
+ *                      package.json, package-lock.json and CHANGELOG.md, which
+ *                      the bump writes directly), so a surface added above can
+ *                      never again be rejected as an "unexpected file in the
+ *                      release diff" — which is what stopped every weekly
+ *                      release after the GitLab template became a surface.
  *   --registry <url>   registry base (default https://registry.npmjs.org); the
  *                      tests point it at a local server so `npm test` is offline.
  *   --wait <s>         how long --sha256 keeps polling (default 900).
@@ -58,6 +65,7 @@ const option = (name, fallback) => {
   return i === -1 ? fallback : argv[i + 1];
 };
 const check = flag('--check');
+const listSurfaces = flag('--list-surfaces');
 const online = flag('--online');
 const setSha = flag('--sha256');
 const registry = (option('--registry', 'https://registry.npmjs.org')).replace(/\/+$/, '');
@@ -88,6 +96,12 @@ const surfaces = [
   ['packaging/gitlab/testguard.gitlab-ci.yml', /testguard\/v\d+\.\d+\.\d+\/packaging/g, `testguard/v${version}/packaging`],
   ['packaging/gitlab/testguard.gitlab-ci.yml', /(\n    version:\n      description: [^\n]*\n      default: ")\d+\.\d+\.\d+(")/, `$1${version}$2`],
 ];
+
+if (listSurfaces) {
+  // Derived from the same table the writes use, so the two cannot disagree.
+  for (const rel of [...new Set(surfaces.map(([rel]) => rel))]) console.log(rel);
+  process.exit(0);
+}
 
 /** The formula's current `sha256 "…"` value, or a throw when the line is missing. */
 function formulaSha256() {

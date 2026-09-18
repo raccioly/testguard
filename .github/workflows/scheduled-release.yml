@@ -112,12 +112,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           BRANCH="release/v${NEW_VERSION}"
-          # Only release surfaces may change in a release PR.
+          # Only release surfaces may change in a release PR. The list is
+          # DERIVED from the sync script, never retyped here: when the GitLab
+          # template became a surface it was left out of the hand-written list,
+          # so the first release to reach this guard would have been rejected
+          # for writing a file the release is supposed to write. The three
+          # extras are the ones the bump step writes directly.
+          ALLOWED=$(node .github/scripts/sync-release-version.mjs --list-surfaces; printf 'package.json\npackage-lock.json\nCHANGELOG.md\n')
+          echo "Release surfaces allowed in this diff:"; printf '%s\n' "$ALLOWED" | sed 's/^/  /'
           CHANGED=$(git diff --name-only HEAD --)
           for f in $CHANGED; do
-            case "$f" in package.json|package-lock.json|pyproject.toml|CHANGELOG.md|action.yml|packaging/homebrew/testguard.rb|README.md) ;;
-              *) echo "::error::unexpected file in release diff: $f"; exit 1;;
-            esac
+            printf '%s\n' "$ALLOWED" | grep -qxF "$f" || { echo "::error::unexpected file in release diff: $f"; exit 1; }
           done
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
             echo "::error::branch $BRANCH already exists; refusing to overwrite"; exit 1

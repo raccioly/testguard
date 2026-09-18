@@ -264,3 +264,55 @@ describe('sync-release-version: the Homebrew sha256 is a release surface, comput
     }
   });
 });
+
+/**
+ * The release workflows must allow exactly the files a release writes.
+ *
+ * This is the bug that stopped every weekly release: the GitLab template was
+ * added to the sync script's surface table on 2026-09-17 and to neither of the
+ * two hand-written allow-lists, so `scheduled-release.yml` would have rejected
+ * the release for writing a file the release exists to write, and
+ * `auto-merge.yml` would have held the PR for human review. Nobody saw it
+ * because the workflow already failed one step earlier.
+ *
+ * `scheduled-release.yml` now derives its list from `--list-surfaces`, so it
+ * cannot drift. `auto-merge.yml` spells it out on purpose — it is the gate
+ * that merges without review — so THIS test is what keeps it honest.
+ */
+describe('sync-release-version: the release workflows allow exactly what a release writes', () => {
+  /** What the bump step writes directly, beside the synced surfaces. */
+  const BUMP_WRITES = ['package.json', 'package-lock.json', 'CHANGELOG.md'];
+  const listed = () => {
+    const r = spawnSync('node', [join(ROOT, '.github', 'scripts', 'sync-release-version.mjs'), '--list-surfaces'], { encoding: 'utf8' });
+    expect(r.status, r.stderr).toBe(0);
+    return r.stdout.split('\n').filter(Boolean);
+  };
+
+  it('--list-surfaces names every file a real sync writes, and nothing it does not', () => {
+    const { dir, run, bump } = sandbox();
+    bump('9.8.7');
+    expect(run().status).toBe(0);
+    // Which files did the sync actually change? Compare the sandbox to the repo.
+    const written = SURFACES.slice(1).filter((rel) => readFileSync(join(dir, rel), 'utf8') !== readFileSync(join(ROOT, rel), 'utf8'));
+    expect(written.length).toBeGreaterThan(0);
+    for (const rel of written) expect(listed()).toContain(rel);
+    // And the reverse: nothing is listed that a sync leaves untouched.
+    for (const rel of listed()) expect(written).toContain(rel);
+  });
+
+  it('auto-merge.yml allows every release surface, so a release PR is never held for a file the release must write', () => {
+    const text = readFileSync(join(ROOT, '.github', 'workflows', 'auto-merge.yml'), 'utf8');
+    const m = /const RELEASE_SURFACES = new Set\(\[([^\]]*)\]\)/.exec(text);
+    expect(m, 'RELEASE_SURFACES not found in auto-merge.yml').toBeTruthy();
+    const allowed = new Set([...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]));
+    const missing = [...listed(), ...BUMP_WRITES].filter((rel) => !allowed.has(rel));
+    expect(missing, `auto-merge.yml would hold a release PR that touches: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('scheduled-release.yml derives its allow-list from the script instead of repeating it', () => {
+    const text = readFileSync(join(ROOT, '.github', 'workflows', 'scheduled-release.yml'), 'utf8');
+    expect(text).toContain('--list-surfaces');
+    // A retyped `case` list is exactly what drifted; it must not come back.
+    expect(text).not.toMatch(/case "\$f" in package\.json\|/);
+  });
+});

@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **A release is no longer blocked by an allow-list that forgot one of its own
+  surfaces.** `sync-release-version.mjs` rewrites
+  `packaging/gitlab/testguard.gitlab-ci.yml`, and that path was missing from
+  both release guards: `scheduled-release.yml` would have failed with
+  "unexpected file in release diff" for a file the release exists to write,
+  and `auto-merge.yml` would have held every release PR for human review. The
+  script gained `--list-surfaces`, derived from the same table the writes use;
+  `scheduled-release.yml` now builds its allow-list from that instead of a
+  retyped copy. `auto-merge.yml` keeps an explicit list on purpose — it is the
+  gate that merges without review — and a test now fails when that list omits
+  any release surface. Claim `TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT` gains a
+  fifth fault.
 - **The weekly release workflow can actually cut a release.** Its "verify the
   tree is still green" step probed in worktree mode straight after syncing the
   version surfaces, so the probe refused to run: the sync leaves
