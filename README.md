@@ -345,15 +345,18 @@ most resembles, which is the join key that turns an uninterpretable mutation
 score into a statement with a sample size:
 
 ```
-  guard-removed          blind   7/9    p=0.78  ci [0.45, 0.94]
-  field-dropped          blind   4/4    p=1.00  ci [0.51, 1.00]
+  guard-removed          missed  7/9    p=0.78  ci [0.45, 0.94]
+  field-dropped          missed  4/4    p=1.00  ci [0.51, 1.00]
 ```
 
-Read as *"when a fault of this class survives, how often does that
-correspond to a bug that really escaped"*. It is written as a
-`calibration` document beside the replay one. Only `caught` and `blind`
-carry information; the other verdicts are excluded from both sides of the
-ratio.
+Read as *"when a real bug of this class escapes, how often does the suite
+miss it"* — a miss rate, so a high `p` is bad. It is written as a
+`calibration` document beside the replay one. `caught`, `blind` and
+`nocover` are measurements and enter the ratio, `nocover` as a miss: leaving
+it out would score a project with no tests at all for a subsystem *better*
+than one with weak tests. `flaky` and `unverifiable` are failed measurements
+and enter neither side. Every `p` and `ci` is recomputable from `n` and the
+miss count, and the validator recomputes them.
 
 **The open question this exists to answer.** Does a calibration learned on a
 repository *with* history transfer to a greenfield one that has none? AI

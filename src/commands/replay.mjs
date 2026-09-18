@@ -50,7 +50,7 @@ export async function replayCommand({ projectDir, values, version }, io) {
     io.out(renderReplay(doc));
     io.out('');
     for (const [cls, b] of Object.entries(calibration.buckets).sort((a, b2) => b2[1].n - a[1].n)) {
-      io.out(`  ${cls.padEnd(22)} blind ${String(b.positives).padStart(3)}/${String(b.n).padEnd(3)}  p=${b.p.toFixed(2)}  ci [${b.ci[0].toFixed(2)}, ${b.ci[1].toFixed(2)}]`);
+      io.out(`  ${cls.padEnd(22)} missed ${String(b.positives).padStart(3)}/${String(b.n).padEnd(3)}  p=${b.p.toFixed(2)}  ci [${b.ci[0].toFixed(2)}, ${b.ci[1].toFixed(2)}]`);
     }
     if (Object.keys(calibration.buckets).length === 0) io.out('  no measurable bug in this range: nothing to calibrate from yet.');
     io.out('');
