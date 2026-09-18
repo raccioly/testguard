@@ -45,6 +45,8 @@ code were wrong, would anything fail?*
 | Ranking | Severity, claim provenance and blast radius; alias resolution | `src/probe/rank.mjs` |
 | Contention | Detect competing test runners; record them on the evidence | `src/probe/contention.mjs` |
 | Independence | Record, per kill, whether an unrelated test also failed | `src/probe/independence.mjs` |
+| Attribution | Escalation's killer intersection, flake rate, the subject record — pure | `src/probe/attribution.mjs` |
+| Cost | What a probe spent, per claim and per defender file, derived from evidence | `src/probe/cost.mjs` |
 | Change gate | Claim coverage of a diff | `src/gate/changed.mjs` |
 | Baseline | Freeze debt; gate the delta; re-stamp | `src/baseline/baseline.mjs` |
 | Status | The single state machine every rendering derives from | `src/status/status.mjs` |

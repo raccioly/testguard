@@ -26,12 +26,21 @@ the test that defends it, and CI fails if any injected fault survives.
 
 ### How the gate duration is measured
 
-Sum `detail.baselineRuns[].durationMs` and `detail.probeRuns[].durationMs`
-across every record of an evidence document, and compare with
-`run.finishedAt − run.startedAt`. The gap between the two is the work the
-baseline cache avoided. One defender dominates the total: a single 49.5 s
-acceptance test defends five claims and accounts for roughly 15 of the 24
-minutes, which is tracked as issue #67.
+`probe --cost` and `claims --cost` report this directly, derived from the
+`durationMs` already on every run in an evidence document. They re-measure
+nothing.
+
+A probe's wall clock is, per claim,
+`(baseline runs + faults × --confirm) × the cost of that claim's defender
+SET`. One slow acceptance test named by several claims is therefore paid for
+once per claim, which is what made the gate take 24 minutes: a single 49.5 s
+fixture test defended five claims. Those claims now point at pure functions
+with unit-test defenders (issue #67), and the gate measures **9.6 minutes**
+from scratch, serially, for 68 faults.
+
+Per-file cost figures are an **upper bound, not a share**: a run executes a
+claim's whole defender set at once, so the runner never attributes time to
+one file. They overlap and do not sum to the total.
 
 ## Coverage Rules
 
@@ -59,6 +68,8 @@ What is gated instead:
 | `src/probe/discover.mjs`, `src/probe/mocks.mjs` | `test/discover.test.mjs`, `test/mocks.test.mjs` |
 | `src/probe/rank.mjs` | `test/rank-aliases.test.mjs`, `test/discover.test.mjs` |
 | `src/probe/runners/` | `test/runner-vitest.test.mjs`, `test/runner-command.test.mjs`, `test/runner-playwright.test.mjs` |
+| `src/probe/attribution.mjs` | `test/attribution.test.mjs` |
+| `src/probe/cost.mjs` | `test/cost.test.mjs` |
 | `src/probe/contention.mjs` | `test/contention.test.mjs` |
 | `src/gate/changed.mjs` | `test/gate.test.mjs` |
 | `src/baseline/baseline.mjs` | `test/baseline.test.mjs` |

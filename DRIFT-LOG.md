@@ -27,6 +27,6 @@ as issues rather than drift because the intent has not changed.
 
 | Topic | Intent | Today | Tracking |
 |---|---|---|---|
-| Gate duration | A release gate a person will wait for | ~25 min cold; one acceptance test is ~15 of it | #67 |
+| Gate duration | A release gate a person will wait for | **9.6 min cold** (was 24.1); `--cost` names what is left, now the jest and replay suites | resolved by #67 |
 | Probe observability | A running probe reports progress | progress is gated on `stderr.isTTY`, so CI sees silence | #68 |
 | Probe robustness | A disturbed run degrades, not crashes | a deleted scratch worktree crashes the run and loses all evidence | #64 |
