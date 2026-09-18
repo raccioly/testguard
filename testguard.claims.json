@@ -1926,6 +1926,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-README-HOOK-MATCHES-THE-CODE",
+      "statement": "Every session-start hook command the README shows is one the code actually emits; documentation that describes a hook the tool no longer writes is a finding, not a detail.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#brief"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/init.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The README's hook commands are no longer compared with hookCommand(), so a documented fallback can outlive the code that produced it.",
+          "faultClass": "condition-forced",
+          "file": "src/init/init.mjs",
+          "find": "  const onPath = `{ command -v testguard >/dev/null 2>&1 && testguard brief --text${arg} 2>/dev/null; }`;",
+          "replace": "  const onPath = `{ command -v testguard >/dev/null 2>&1 && testguard brief --quiet${arg} 2>/dev/null; }`;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

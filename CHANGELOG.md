@@ -176,6 +176,15 @@ blind spots that were previously invisible.
 
 ### Fixed
 
+- **The README described a hook the code no longer writes.** Three passages
+  still documented the `npx --no-install` fallback that this release removes,
+  one of them repeating the "never fetches from the network" wording the
+  measurement above disproves — in the security-relevant paragraph, in a
+  release about detection power. Corrected, and now checked mechanically:
+  every `||`-chained `brief --text` command in the README must be one
+  `hookCommand()` actually emits, and the phrase "falls back to npx" is
+  banned outright. Both regressions were verified to fail the check before it
+  was accepted. Self-claim `TG-README-HOOK-MATCHES-THE-CODE`.
 - **A claim can be defended and still over-promise, and no probe can catch
   that.** `TG-INIT-HOOK-NO-NETWORK` was killed 3/3 on every run while the
   code it guarded could still reach the registry: the fault matched the
