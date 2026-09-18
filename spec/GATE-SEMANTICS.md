@@ -68,6 +68,14 @@ Rules that follow from the table:
    content hash; the status document lists every fault whose content
    changed since it was probed, with its previous verdict. The change is
    allowed; it is never invisible.
+   The same hash governs **reuse**: a tool that carries a prior verdict
+   forward to save a run may only do so for the fault that produced it. A
+   verdict is an answer about one exact `find`/`replace`, so once those
+   change the old answer is not an answer to the new question — a weakened
+   fault would keep the verdict it earned before, and a repaired anchor would
+   keep `unverifiable`. Where the prior record has no content hash to compare,
+   the fault is probed again: the cost of re-measuring is a run, the cost of
+   the other direction is a verdict nobody measured.
 
 ## Replay reports; it never gates
 

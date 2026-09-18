@@ -404,6 +404,48 @@
       ]
     },
     {
+      "id": "TG-REUSE-NEVER-CROSSES-A-FAULT-EDIT",
+      "statement": "A prior verdict is reused only for the fault that produced it; editing a fault's find or replace forces it to be probed again.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/attribution.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Reuse ignores the fault's content hash, so an edited fault keeps the verdict measured against the fault it replaced.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/attribution.mjs",
+          "find": "    && prior.subject.contentHash === current.contentHash;",
+          "replace": "    && true;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A prior record with no content hash is reused instead of re-probed, so pre-upgrade evidence carries verdicts that were never compared.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/attribution.mjs",
+          "find": "  if (!prior || !prior.subject?.contentHash) return false;",
+          "replace": "  if (!prior) return false;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-GATE-EXPIRED-NEVER-EXCUSES",
       "statement": "An expired ignore entry never excuses a changed file; it is reported as expired and the file stays uncovered.",
       "source": {

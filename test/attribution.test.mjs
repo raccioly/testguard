@@ -2,7 +2,7 @@
 // @req NFR-05
 // @req NFR-06
 import { describe, it, expect } from 'vitest';
-import { escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf } from '../src/probe/attribution.mjs';
+import { escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf, isReusable } from '../src/probe/attribution.mjs';
 import { sha256 } from '../src/util/hash.mjs';
 
 /** A spec `testRun`. `kill` means a genuine assertion failure, which is the only thing that can attribute. */
@@ -126,5 +126,62 @@ describe('the subject record makes a fault edit visible', () => {
     const a = subjectOf({ ...fault, find: 'a\nb', replace: '' }, sha256).contentHash;
     const b = subjectOf({ ...fault, find: 'a', replace: 'b' }, sha256).contentHash;
     expect(a).not.toBe(b);
+  });
+});
+
+describe('reuse — a prior verdict may only stand for the fault that produced it', () => {
+  const fault = { id: 'F1', description: 'd', file: 'src/a.mjs', faultClass: 'guard-removed', producedBy: { producer: 'human' }, find: 'if (ok) {', replace: 'if (true) {' };
+  const current = () => ({
+    inputs: { targetHash: 'T', defenderHashes: { 'a.test.mjs': 'D' } },
+    requested: ['a.test.mjs'],
+    resolved: ['a.test.mjs'],
+    contentHash: subjectOf(fault, sha256).contentHash,
+  });
+  const prior = (over = {}) => ({
+    inputs: { targetHash: 'T', defenderHashes: { 'a.test.mjs': 'D' } },
+    defenders: { requested: ['a.test.mjs'], resolved: ['a.test.mjs'] },
+    subject: subjectOf(fault, sha256),
+    ...over,
+  });
+
+  it('reuses when the source, the defenders and the fault are all unchanged', () => {
+    expect(isReusable(prior(), current())).toBe(true);
+  });
+
+  it('never reuses across an edited fault — the verdict was measured against a fault that no longer exists', () => {
+    // The whole premise is that a fault edit cannot be invisible. Weakening a
+    // `replace` after a fault survived, or repairing a rotted anchor, changes
+    // what is being asked; the old answer is not an answer to the new question.
+    const weakened = { ...fault, replace: 'if (ok) { /* no-op */' };
+    const repaired = { ...fault, find: 'if (ok) {   // moved' };
+    expect(isReusable(prior(), { ...current(), contentHash: subjectOf(weakened, sha256).contentHash })).toBe(false);
+    expect(isReusable(prior(), { ...current(), contentHash: subjectOf(repaired, sha256).contentHash })).toBe(false);
+  });
+
+  it('re-probes rather than reuses when a prior record predates contentHash', () => {
+    const old = prior();
+    delete old.subject.contentHash;
+    expect(isReusable(old, current())).toBe(false);
+  });
+
+  it('re-probes a prior with no subject at all, instead of throwing on it', () => {
+    // Evidence from a non-TestGuard adopter of the spec, or from before the
+    // subject was recorded, must degrade to "measure it again" — never to a
+    // crash, and never to a reuse that was never compared.
+    const headless = prior();
+    delete headless.subject;
+    expect(() => isReusable(headless, current())).not.toThrow();
+    expect(isReusable(headless, current())).toBe(false);
+  });
+
+  it('still refuses reuse when the source, a defender or the defender set changed', () => {
+    expect(isReusable(prior({ inputs: { targetHash: 'OTHER', defenderHashes: { 'a.test.mjs': 'D' } } }), current())).toBe(false);
+    expect(isReusable(prior({ inputs: { targetHash: 'T', defenderHashes: { 'a.test.mjs': 'CHANGED' } } }), current())).toBe(false);
+    expect(isReusable(prior({ defenders: { requested: [], resolved: ['a.test.mjs'] } }), current())).toBe(false);
+    expect(isReusable(prior({ defenders: { requested: ['a.test.mjs'], resolved: ['a.test.mjs', 'b.test.mjs'] } }), current())).toBe(false);
+  });
+
+  it('has nothing to reuse without a prior', () => {
+    expect(isReusable(undefined, current())).toBe(false);
   });
 });

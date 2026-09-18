@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A prior verdict is no longer reused across a fault edit.** `probe` decided
+  reuse from the source hash, the defender hashes and the defender set — never
+  from the fault itself. So editing a fault's `find` or `replace` kept the
+  verdict measured against the fault it replaced: a weakened fault held the
+  `survived` it earned before, and a repaired anchor held `unverifiable`, with
+  the evidence reporting a result nobody had measured against the file's
+  current contents. `status` flagged the changed hash afterwards, but by then
+  the evidence had already said something untrue — and for a tool whose
+  premise is that a fault edit can never be invisible, that was the wrong
+  default. Reuse is now also keyed on the fault's content hash; a prior record
+  that carries none is probed again, because the cost of re-measuring is a run
+  and the cost of the other direction is a verdict nobody took.
+  Found by using the tool on itself: repairing two rotted anchors left both
+  claims reporting `UNVERIFIABLE (reused)` on the next probe.
+
+
 ### Added
 
 - **`--progress auto|tty|plain|ndjson|none` on `probe`** (#68). A probe used
