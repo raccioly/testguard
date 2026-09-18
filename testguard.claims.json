@@ -703,7 +703,7 @@
     },
     {
       "id": "TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT",
-      "statement": "The release version check exits non-zero when any version surface is out of step with package.json — including a Homebrew formula whose sha256 is the known-stale placeholder or, checked online, does not match the published tarball — and the sha256 mode writes the hash of the registry tarball into the formula; a release can never ship with drifting version strings or an unverifiable formula.",
+      "statement": "The release version check exits non-zero when any version surface is out of step with package.json — including a Homebrew formula whose sha256 is the known-stale placeholder or, checked online, does not match the published tarball — the sha256 mode writes the hash of the registry tarball into the formula, and --list-surfaces names every file a release writes so the release workflows allow exactly those; a release can never ship with drifting version strings, an unverifiable formula, or be blocked by a surface its own allow-list forgot.",
       "source": {
         "kind": "spec",
         "ref": "CONTRIBUTING.md#releases"
@@ -764,6 +764,19 @@
           "file": ".github/scripts/sync-release-version.mjs",
           "find": "if (current === sha256) {",
           "replace": "if (true) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "--list-surfaces prints only part of the surface table; the release workflow derives its allow-list from it and would reject the release for writing a file the release exists to write.",
+          "faultClass": "field-dropped",
+          "file": ".github/scripts/sync-release-version.mjs",
+          "find": "for (const rel of [...new Set(surfaces.map(([rel]) => rel))]) console.log(rel);",
+          "replace": "for (const rel of [...new Set(surfaces.map(([rel]) => rel))].slice(0, 1)) console.log(rel);",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
