@@ -1,6 +1,6 @@
 {
   "name": "testguard-cli",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Breaks your code on purpose and reports every promise your tests did not notice breaking. Mutation testing bound to the claims a project makes — vitest, jest, Playwright, pytest and unittest.",
   "type": "module",
   "license": "MIT",
