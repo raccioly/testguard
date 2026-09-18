@@ -8,6 +8,44 @@ import { spawnSync } from 'node:child_process';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SURFACES = ['package.json', 'pyproject.toml', 'action.yml', 'README.md', 'packaging/homebrew/testguard.rb', 'packaging/gitlab/testguard.gitlab-ci.yml'];
 
+/**
+ * Every textual form that pins a PUBLISHED release of this project, with the
+ * version captured.
+ *
+ * Derived from content, deliberately not from the script's `surfaces` list:
+ * a test that read that list could only ever confirm the script agrees with
+ * itself. The bug this guards against is a surface that exists in a file and
+ * is not in the list at all — which is silent, because the script only
+ * verifies what it was told to look at.
+ */
+const PINS = [
+  /raccioly\/testguard@v(\d+\.\d+\.\d+)/g,       // GitHub Action reference
+  /testguard\/v(\d+\.\d+\.\d+)\/packaging/g,     // raw.githubusercontent template URL
+  /testguard-cli-(\d+\.\d+\.\d+)\.tgz/g,          // npm tarball (homebrew)
+];
+
+/**
+ * Files where a version string names a RELEASE rather than history or a
+ * fixture. CHANGELOG records past versions on purpose; the lockfile pins
+ * dependencies; this file carries deliberate 9.8.7 fixtures.
+ */
+const HISTORICAL = new Set(['CHANGELOG.md', 'package-lock.json', 'test/release-sync.test.mjs']);
+
+/** Every `[file, version]` pin found under `dir`, for the given relative paths. */
+function pinsIn(dir, files) {
+  const found = [];
+  for (const rel of files) {
+    let text;
+    try {
+      text = readFileSync(join(dir, rel), 'utf8');
+    } catch {
+      continue;
+    }
+    for (const re of PINS) for (const m of text.matchAll(re)) found.push([rel, m[1]]);
+  }
+  return found;
+}
+
 /** A copy of every version surface plus the script, so the real repository is never rewritten. */
 function sandbox() {
   const dir = mkdtempSync(join(tmpdir(), 'tg-release-sync-'));
@@ -45,6 +83,29 @@ describe('sync-release-version: package.json is the single source of truth for t
     expect(gitlab).toContain('testguard/v9.8.7/packaging');
     expect(gitlab).toMatch(/\n    version:\n      description: [^\n]*\n      default: "9\.8\.7"/);
     expect(run('--check').status).toBe(0);
+  });
+
+  /**
+   * The bug this pins is not a stale string. It is that `--check` reported
+   * success about a surface it had never been told to look at: README.md
+   * carries the GitLab include URL twice, the script matched that pattern only
+   * inside the GitLab template, and v0.6.0 shipped with both README copies
+   * left at v0.5.0 while the check printed "all version surfaces at 0.6.0".
+   */
+  it('after a sync, NO pinned reference anywhere still carries the old version — including one the surfaces list forgot', () => {
+    const { dir, run, bump } = sandbox();
+    bump('9.8.7');
+    expect(run().status).toBe(0);
+    const stale = pinsIn(dir, SURFACES).filter(([, v]) => v !== '9.8.7');
+    expect(stale).toEqual([]);
+  });
+
+  it('every release pin in the working tree is at the current version', () => {
+    const version = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
+    const tracked = spawnSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' }).stdout
+      .split('\n').filter(Boolean).filter((f) => !HISTORICAL.has(f));
+    const stale = pinsIn(ROOT, tracked).filter(([, v]) => v !== version);
+    expect(stale).toEqual([]);
   });
 
   it('refuses a non-stable version, so a pre-release never reaches the surfaces', () => {

@@ -6,6 +6,14 @@
  *   - action.yml             default of the `version` input
  *   - packaging/homebrew/*.rb the tarball URL (sha256 is set after publish)
  *   - packaging/gitlab/*.yml  the include URL tag and the `version` input default
+ *   - README.md               the GitHub Action reference AND the GitLab include URL
+ *
+ * A file may carry more than one form, and each needs its own entry: README
+ * holds both the `raccioly/testguard@vX.Y.Z` action reference and the
+ * `testguard/vX.Y.Z/packaging` template URL. Only the first was listed, so
+ * v0.6.0 shipped with both README copies of the GitLab URL left at v0.5.0
+ * while `--check` reported "all version surfaces at 0.6.0" — a surface this
+ * script was never told to look at cannot drift in its eyes.
  *
  * `--check` verifies instead of writing (used by release.yml).
  */
@@ -22,6 +30,7 @@ const surfaces = [
   ['action.yml', /(\n  version:\n    description: [^\n]*\n    required: false\n    default: ')[^']*(')/, `$1${version}$2`],
   ['packaging/homebrew/testguard.rb', /testguard-cli-\d+\.\d+\.\d+\.tgz/g, `testguard-cli-${version}.tgz`],
   ['README.md', /raccioly\/testguard@v\d+\.\d+\.\d+/g, `raccioly/testguard@v${version}`],
+  ['README.md', /testguard\/v\d+\.\d+\.\d+\/packaging/g, `testguard/v${version}/packaging`],
   ['packaging/gitlab/testguard.gitlab-ci.yml', /testguard\/v\d+\.\d+\.\d+\/packaging/g, `testguard/v${version}/packaging`],
   ['packaging/gitlab/testguard.gitlab-ci.yml', /(\n    version:\n      description: [^\n]*\n      default: ")\d+\.\d+\.\d+(")/, `$1${version}$2`],
 ];
