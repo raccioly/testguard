@@ -36,6 +36,13 @@
       "reason": "Acceptance test for the Playwright fixture; it runs only where the fixture's own dependencies are installed (the CI playwright job) and is skipped elsewhere. Naming it as a self-claim defender would make that claim a false survivor in the main job. The fixture's expected.json is its oracle.",
       "by": "maintainer",
       "at": "2026-09-17T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": ".github/scripts/**",
+      "reason": "Build and release scripts that run only in CI and are proven by CI failing: the install smoke, the version sync (claimed as TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT where its logic lives), and the PDF build for the technical brief. None ships in the package.",
+      "by": "maintainer",
+      "at": "2026-09-18T00:00:00Z"
     }
   ]
 }
