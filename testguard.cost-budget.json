@@ -2,12 +2,13 @@
   "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine.",
   "seconds": 1230,
   "measured": {
-    "seconds": 804,
+    "seconds": 816,
     "at": "2026-09-18",
-    "commit": "cf5a083",
-    "faults": 96,
-    "runs": 576,
-    "how": "probe . --serial --no-escalate --cost, idle machine, from scratch"
+    "commit": "288005d",
+    "faults": 132,
+    "runs": 792,
+    "how": "probe . --include-dirty --budget 180000 --cost, from scratch, idle developer machine, after the shared-defender cut",
+    "note": "LOCAL. Not comparable with measuredInCI and not what this budget is set from. The previous local from-scratch figure (1168 s, 129 faults) was taken on a contended machine, so 1168 -> 816 overstates the cut."
   },
   "headroom": "The local figure (804 s) is what a developer sees; the CI figure (906 s before #82, 962 s after) is what the check runs against, and a CI runner is ~13% slower than the idle machine above. The first budget was 18% over the LOCAL figure and only 4.6% over the CI one, so the first PR to add any claim tripped it. 1100 is ~14% over the CI measurement: an ordinary run never flaps; a 59-to-91 style jump (+76%) still fails. Budget against the from-scratch CI number, never a run that reused verdicts — the release job probes from scratch.",
   "history": [
@@ -55,20 +56,29 @@
     }
   },
   "nextCut": {
-    "why": "44% of the gate is two files, each re-run once per claim that names it. This is the tool's own advice, printed at the end of every --cost run: split the behaviour a shared defender proves into a test that does not need the expensive setup, and point the claim at that. It took the new calibration claim from 51 s to 4.9 s.",
-    "candidates": [
+    "done": [
       {
-        "file": "test/negative-control.test.mjs",
-        "seconds": 327,
-        "claims": 6
+        "claim": "TG-SURVIVOR-PROVES-THE-SUBJECT-RUNS",
+        "from": 65.3,
+        "to": 1.9,
+        "why": "faults classify(), a pure function; was defended by negative-control.test.mjs, which spawns real runners against fixture repositories"
       },
       {
-        "file": "test/replay.test.mjs",
-        "seconds": 183,
-        "claims": 6
+        "claim": "TG-LABEL-NEVER-GUESSES",
+        "from": 30,
+        "to": 1.8,
+        "why": "faults labelDiff(), pure; was defended by replay.test.mjs, which builds a scripted git corpus"
+      },
+      {
+        "claim": "TG-REPLAY-FLAKY-IS-NEVER-CAUGHT",
+        "from": 30,
+        "to": 2,
+        "why": "faults classifyReplay(), pure; same file"
       }
     ],
-    "expected": "250-350 s, which would put the gate near 800 s with all 129 faults. Lower BOTH ceilings when it lands."
+    "expectedInCI": "~145 s off the CI figure, so ~935 s against the 1081 s measured at 129 faults — with three MORE faults. Confirm against the next release job, which probes from scratch, and tighten `seconds` to ~14% over it then. Do not tighten from a local run.",
+    "remaining": "The eight claims still on negative-control.test.mjs and replay.test.mjs fault probe.mjs, the runners and git-walking code, where the expensive fixture is the point. Forcing those onto unit tests would trade real end-to-end coverage for seconds.",
+    "rule": "A claim whose fault lands in a pure module should have a pure defender. All three cuts above fit that shape, and so did the 51 s calibration claim before them. This is mechanically checkable — compare the imports of the faulted file against those of its defenders — and is the shape of a future `claims --lint`."
   },
   "perClaimSeconds": 100,
   "perClaim": {
