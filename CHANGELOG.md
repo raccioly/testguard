@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-09-18
+
+Automated weekly release — everything merged since `v0.8.0`.
+
+### Changed
+
+- fix(release): the release allow-list is derived, not retyped (#100)
+- fix(release): the weekly release verifies the tree it is about to ship (#99)
+- ci(release): set the Homebrew sha256 from the published tarball (#98)
+- chore(homebrew): sha256 for v0.8.0, from the published tarball (#97)
+
+
 ### Fixed
 - **A release is no longer blocked by an allow-list that forgot one of its own
   surfaces.** `sync-release-version.mjs` rewrites
