@@ -148,8 +148,8 @@
           "description": "restore() marks itself done but never writes the original back.",
           "faultClass": "statement-deleted",
           "file": "src/probe/inject.mjs",
-          "find": "    live.delete(restore);\n    writeFileSync(path, original);",
-          "replace": "    live.delete(restore);",
+          "find": "    live.delete(restore);\n    try {\n      writeFileSync(path, original);",
+          "replace": "    live.delete(restore);\n    try {",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -2140,8 +2140,8 @@
           "description": "An applied fault is never restored, so the probe leaves its own edits in the tree and every later fault is measured against corrupted source.",
           "faultClass": "call-removed",
           "file": "src/probe/probe.mjs",
-          "find": "        } finally {\n          mutation.restore();\n        }",
-          "replace": "        } finally {\n          void mutation;\n        }",
+          "find": "        } finally {\n          mutation.restore();",
+          "replace": "        } finally {\n          void mutation;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
