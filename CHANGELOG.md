@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The Homebrew formula's `sha256` matches its own `url`.** It had carried
+  `385d69f9…` unchanged across v0.6.0, v0.7.0 and v0.8.0 while
+  `release:sync` bumped the `url` each time — a hash that matches none of
+  the 0.4.0–0.7.0 tarballs, so `brew install` from the staged formula could
+  never have verified. Set to the sha256 of the published
+  `testguard-cli-0.8.0.tgz` (`5305ce22…`), computed from the registry, not
+  from a local `npm pack`. Automating this step in `release.yml` is tracked
+  separately.
+
 ## [0.8.0] - 2026-09-18
 
 A calibration you can quote.
