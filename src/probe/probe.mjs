@@ -7,9 +7,9 @@ import { discoverDefenders, discoverDefendersDetailed } from './discover.mjs';
 import { classifyDefenders } from './mocks.mjs';
 import { detectContention, contentionWarning } from './contention.mjs';
 import { createScratch, inPlace, PreconditionError } from './worktree.mjs';
-import { applyFault, locate } from './inject.mjs';
+import { applyContent, applyFault, locate } from './inject.mjs';
 import { resolveDefenders, parseCommandTemplate } from './runners/shared.mjs';
-import { selectRunner, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns, runnerLabel } from './runners/index.mjs';
+import { selectRunner, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns, runnerLabel, runnerFor } from './runners/index.mjs';
 import { classify, shouldStopEarly } from './classify.mjs';
 import { blastRadius, rank } from './rank.mjs';
 import { classifyIndependence } from './independence.mjs';
@@ -165,6 +165,12 @@ export async function probe({
     };
     const allTests = [...new Set([...runner.tests(iso.projectDir).filter((t) => !owned.some((r) => r.owns(iso.projectDir, t))), ...owned.flatMap((r) => r.tests(iso.projectDir))])].sort();
     const baselineCache = new Map();
+    // The negative control is charged per (target file, defender set): two
+    // claims over the same file with the same defenders ask the same question.
+    const controlCache = new Map();
+    // The runner that will LOAD the subject, which is not always the project
+    // runner — a `.py` source file is Python's whatever the project runs.
+    const fatalEditFor = (file) => runnerFor(iso.projectDir, file, runner).fatalEdit?.();
     const prior = previous && previous.run.confirmRuns === confirmRuns
       ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
       : new Map();
@@ -201,7 +207,7 @@ export async function probe({
         const common = { claim, fault, defenders, discovered: declared === null, byRunner: byRunner(defenders), mocking: mockInfo.mocking, signals: mockInfo.signals };
         let record;
         try {
-          record = await probeOne({ ...common, allTests, iso, isoReal, onWarn, confirmRuns, escalate, baselineCache, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id,
+          record = await probeOne({ ...common, allTests, iso, isoReal, onWarn, confirmRuns, escalate, baselineCache, controlCache, fatalEditFor, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id,
             historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root,
             // A path from the runner is absolute inside the SCRATCH worktree, or
             // project-relative. Either way history is read from the real repository,
@@ -292,7 +298,53 @@ function safeInputs(projectDir, fault, defenders) {
   return { targetHash: h(fault.file), defenderHashes: Object.fromEntries(defenders.map((f) => [f, h(f)])) };
 }
 
-async function probeOne({ claim, fault, defenders, discovered, allTests, iso, isoReal, onWarn = () => {}, confirmRuns, escalate, baselineCache, runDefenders, stage, prior, priorRunId, byRunner, mocking = [], signals = [], historyRef, historyDir, toRepoPath }) {
+/**
+ * The negative control the green baseline cannot provide.
+ *
+ * A green baseline proves the defenders can PASS on unmodified source, which
+ * makes "the harness is broken, so everything looks killed" structurally
+ * impossible. It says nothing about the opposite direction: if the fault is
+ * applied to code the test process never executes, the baseline is green,
+ * every probe run is green, and every claim is reported SURVIVED. The output
+ * reads as a devastating audit finding and is entirely false, and nothing in
+ * the run contradicts it, because every individual check passed.
+ *
+ * So ask the question directly: replace the subject with something its loader
+ * cannot parse, and see whether the defenders go red. If they stay green they
+ * are not executing that file, and every verdict about it is meaningless.
+ *
+ * The predicate is "the run did not stay green", not "a test failed" — an
+ * unparseable module usually fails to LOAD, so the runner reports zero tests
+ * rather than a failure. Measured, not assumed.
+ *
+ * One run, not N: the defenders were already green N/N on this exact set, and
+ * neither answer here is the optimistic one — `survived` and `unverifiable`
+ * both gate.
+ */
+async function negativeControl({ file, defenders, iso, runDefenders, fatalEditFor, cache, stage }) {
+  const key = `${file}\n${defenders.join('\n')}`;
+  if (cache.has(key)) return cache.get(key);
+  const content = fatalEditFor(file);
+  // A runner that cannot say what "this cannot compile" looks like for its
+  // language does not get to guess. No control, no signal, verdict unchanged.
+  if (content == null) {
+    cache.set(key, undefined);
+    return undefined;
+  }
+  const control = applyContent(iso.projectDir, file, content, { inPlace: iso.mode === 'in-place' });
+  let run;
+  try {
+    stage('negative-control', 1, 1);
+    ({ run } = await runDefenders(defenders, [file]));
+  } finally {
+    control.restore();
+  }
+  const reached = run.outcome !== 'pass';
+  cache.set(key, reached);
+  return reached;
+}
+
+async function probeOne({ claim, fault, defenders, discovered, allTests, iso, isoReal, onWarn = () => {}, confirmRuns, escalate, baselineCache, controlCache, fatalEditFor, runDefenders, stage, prior, priorRunId, byRunner, mocking = [], signals = [], historyRef, historyDir, toRepoPath }) {
   const targetPath = join(iso.projectDir, fault.file);
   const targetExists = existsSync(targetPath);
   const inputs = {
@@ -310,6 +362,7 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
   const detail = { baselineRuns: [], probeRuns: [] };
   const rawProbeRuns = []; // spec testRun + the runner's timeout count, which classify needs
   let anchor = null;
+  let subjectReached; // the negative control's answer; undefined until it is worth asking
 
   if (defenders.length > 0) {
     anchor = targetExists ? locate(readFileSync(targetPath, 'utf8'), fault) : { status: 'file-missing', hits: 0, expected: fault.expectHits ?? 1 };
@@ -372,12 +425,26 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
           }
           detail.probeRuns = probeRuns.map(({ timeouts, loadMessage, failedTests, ...run }) => run);
           const provisional = classify({ defenders, anchor, baselineRuns: detail.baselineRuns, probeRuns, confirmRuns });
+          // `provisional` is deliberately computed BEFORE the control: the control is what turns a survivor into an unverifiable, so asking it first would be circular.
+
+          // Charge the negative control only where a false answer is expensive:
+          // on a survivor. A kill already proves the defenders reached the code,
+          // and paying for it on every fault would be waste.
+          if (provisional.verdict === 'survived') {
+            subjectReached = await negativeControl({ file: fault.file, defenders, iso, runDefenders, fatalEditFor, cache: controlCache, stage });
+            if (subjectReached !== undefined) detail.negativeControl = subjectReached ? 'reached' : 'not-reached';
+            if (subjectReached === false) {
+              onWarn(`${claim.id}/${fault.id}: the defenders stayed green with ${fault.file} replaced by something that cannot compile, so they never execute it. Every verdict about this file would be about their reach, not their assertions — reported as unverifiable rather than as a survivor.`);
+            }
+          }
 
           // Escalation: does anything *undeclared* catch it? A single run cannot
           // say — a flaky test elsewhere in the suite would take the credit — so
           // a test is an undeclared killer only if it fails in all N runs.
+          // Skipped when the subject is not executed at all: nothing the wider
+          // suite does could be evidence about a file nobody loads.
           const broader = allTests.filter((t) => !defenders.includes(t));
-          if (provisional.verdict === 'survived' && escalate && broader.length > 0) {
+          if (provisional.verdict === 'survived' && subjectReached !== false && escalate && broader.length > 0) {
             // The rule lives in attribution.mjs as a pure fold; this loop only
             // decides when to stop asking the runner.
             let state = escalationStart();
@@ -400,7 +467,7 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
     }
   }
 
-  const { verdict, reason } = classify({ defenders, anchor, baselineRuns: detail.baselineRuns, probeRuns: rawProbeRuns, confirmRuns });
+  const { verdict, reason } = classify({ defenders, anchor, baselineRuns: detail.baselineRuns, probeRuns: rawProbeRuns, confirmRuns, subjectReached });
   if (reason && !detail.reason) detail.reason = reason;
   if (anchor && anchor.status !== 'ok' && anchor.status !== 'file-missing' && anchor.status !== 'defenders-failed-to-load') detail.anchor = { hits: anchor.hits, expected: anchor.expected };
 
@@ -457,7 +524,7 @@ function checkProvenance({ claim, fault, provenance, isoReal, detail, onWarn }) 
   const loaded = provenance[fault.file];
   if (loaded === null) {
     detail.targetNotImported = true;
-    onWarn(`${claim.id}/${fault.id}: the defenders never imported ${fault.file}, so nothing they do could detect a fault in it. A verdict of "survived" here is a statement about the defenders' reach, not about their assertions.`);
+    onWarn(`${claim.id}/${fault.id}: the defenders never imported ${fault.file}, so nothing they do could detect a fault in it. Whatever the runs show is a statement about the defenders' reach, not about their assertions.`);
     return;
   }
   if (isoReal && !isInside(isoReal, loaded)) {

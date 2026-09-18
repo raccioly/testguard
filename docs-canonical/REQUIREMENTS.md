@@ -36,7 +36,7 @@
 | NFR-03 | The user's working tree is never damaged | scratch worktree by default; restore on signal, exception and exit; refusal to run in place over a dirty target; a restore failure is raised in every case but a scratch target that has already been deleted |
 | NFR-04 | Every emitted document conforms to the published schema before it is written | `writeSpecDoc` refuses non-conforming output |
 | NFR-05 | Verdicts are reproducible and attributable to a commit | evidence records `repo.head`, the snapshot when the working tree was probed, and the runner and its source |
-| NFR-06 | A verdict is never optimistic under uncertainty | contention recorded; flaky and timeout verdicts gate; escalation cannot upgrade a verdict |
+| NFR-06 | A verdict is never optimistic under uncertainty | contention recorded; flaky and timeout verdicts gate; escalation cannot upgrade a verdict; a survivor is unverifiable until the defenders are shown to fail because of the subject |
 | NFR-07 | Cost grows with what changed, not with the size of the project | verdict reuse on unchanged inputs; blast-radius-targeted escalation |
 | NFR-08 | Portable contract | schemas are JSON Schema 2020-12, readable and implementable without this codebase |
 
@@ -87,7 +87,7 @@ fails the pull request naming the unclaimed file, and `status` reports
 |---|---|---|
 | FR-01 | `src/claims/load.mjs`, `spec/schemas/claims.schema.json` | `spec/conformance/`, `TG-WRITER-REFUSES` |
 | FR-02 | `src/probe/worktree.mjs`, `src/probe/inject.mjs` | `test/worktree.test.mjs`, `test/inject.test.mjs`, `TG-RESTORE-ALWAYS`, `TG-RESTORE-SURVIVES-A-VANISHED-TARGET`, `TG-IN-PLACE-STILL-RAISES-A-MISSING-TARGET`, `TG-SYMLINK-NODE-MODULES` |
-| FR-03 | `src/probe/classify.mjs` | `test/classify.test.mjs`, the known-answer fixtures |
+| FR-03 | `src/probe/classify.mjs` | `test/classify.test.mjs`, `test/negative-control.test.mjs`, the known-answer fixtures |
 | FR-04 | `src/probe/probe.mjs` | `TG-KILL-NEEDS-N` |
 | FR-05 | `src/probe/classify.mjs` | `TG-TIMEOUT-NEVER-KILLS`, `TG-PW-TIMEOUT-NEVER-KILLS` |
 | FR-06 | `src/baseline/baseline.mjs` | `test/baseline.test.mjs`, `TG-RESTAMP-REQUIRES-SAME-FINGERPRINTS` |
@@ -101,10 +101,10 @@ fails the pull request naming the unclaimed file, and `status` reports
 | FR-14 | `src/mcp/` | `test/mcp.test.mjs` |
 | NFR-01 | `src/init/init.mjs`, runner resolution | `TG-INIT-HOOK-NO-NETWORK`, `TG-README-HOOK-MATCHES-THE-CODE` |
 | NFR-02 | `package.json` | `npm run test:install` in CI |
-| NFR-03 | `src/probe/inject.mjs`, `src/probe/probe.mjs` | `TG-DIRTY-DEFENDERS-REFUSED`, `TG-IGNORED-DIRTY-RECORDED`, `TG-IN-PLACE-STILL-RAISES-A-MISSING-TARGET` |
+| NFR-03 | `src/probe/inject.mjs`, `src/probe/probe.mjs` | `TG-DIRTY-DEFENDERS-REFUSED`, `TG-IGNORED-DIRTY-RECORDED`, `TG-IN-PLACE-STILL-RAISES-A-MISSING-TARGET`, `TG-CONTROL-RESTORES-THE-SUBJECT` |
 | NFR-04 | `src/evidence/writer.mjs` | `test/writer.test.mjs` |
 | NFR-05 | `src/probe/probe.mjs` | `TG-FINGERPRINT-VERDICT`, `TG-FAULT-EDIT-VISIBLE` |
-| NFR-06 | `src/probe/contention.mjs`, `classify.mjs` | `TG-CONTENTION-NEVER-FAILS-A-PROBE`, `TG-ESCALATION-N-RUNS`, `TG-ONE-BAD-FAULT-KEEPS-THE-EVIDENCE`, `TG-A-PRECONDITION-STILL-REFUSES-THE-RUN`, `TG-A-PROBE-ERROR-IS-NEVER-REUSED` |
+| NFR-06 | `src/probe/contention.mjs`, `classify.mjs` | `TG-CONTENTION-NEVER-FAILS-A-PROBE`, `TG-ESCALATION-N-RUNS`, `TG-ONE-BAD-FAULT-KEEPS-THE-EVIDENCE`, `TG-A-PRECONDITION-STILL-REFUSES-THE-RUN`, `TG-A-PROBE-ERROR-IS-NEVER-REUSED`, `TG-SURVIVOR-PROVES-THE-SUBJECT-RUNS`, `TG-CONTROL-READS-ANY-RED-AS-REACHED`, `TG-FATAL-EDIT-CANNOT-COMPILE` |
 | NFR-07 | verdict reuse, `src/probe/rank.mjs` | `test/probe.fixture.test.mjs` reuse case |
 | NFR-08 | `spec/` | `spec/conformance/schemas.test.mjs` |
 

@@ -156,6 +156,10 @@ to every other surface and `--check` fails the build on drift.
    │        │     └─ disagreed ───────────────────► FLAKY-DEFENDER│
    │        │     └─ threw ───────────────────────► UNVERIFIABLE  │
    │        │            (probe-error; the run continues)         │
+   │        ├─ on a survivor: negative control — make the subject │
+   │        │  unparseable and rerun the defenders once           │
+   │        │     └─ still green ───────────────────► UNVERIFIABLE │
+   │        │            (subject-not-executed)                   │
    │        ├─ escalate survivors against the whole suite         │
    │        └─ restore (a scratch target already gone is recorded)│
    └──────────────────────────┬───────────────────────────────────┘

@@ -131,3 +131,12 @@ export const run = (opts) => {
   const env = { PLAYWRIGHT_JSON_OUTPUT_FILE: '{out}', PLAYWRIGHT_JSON_OUTPUT_NAME: '{out}' };
   return runProcess({ ...opts, env, parse: parseReport, argv: (files) => [npx, 'playwright', 'test', '--reporter=json', ...(opts.serial ? ['--workers=1'] : []), ...files] });
 };
+
+/**
+ * The negative control's edit: content this runner's loader cannot possibly
+ * parse. Used to prove the defenders actually execute a file before a
+ * `survived` verdict about it is allowed to stand. An unterminated group is
+ * a syntax error at every JavaScript/TypeScript parser, whatever the file
+ * contained before.
+ */
+export const fatalEdit = () => '/* testguard negative control: this file must not parse */\n(\n';

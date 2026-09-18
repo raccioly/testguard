@@ -2685,6 +2685,156 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-SURVIVOR-PROVES-THE-SUBJECT-RUNS",
+      "statement": "A fault that survives is only reported as survived once the defenders are shown to go red when the subject cannot compile; defenders that stay green never execute it, and the verdict is unverifiable instead.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/negative-control.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The control result is ignored, so a suite that never loads the subject reports every claim about it as SURVIVED — total blindness where there was none.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/classify.mjs",
+          "find": "    if (subjectReached === false) return { verdict: 'unverifiable', reason: 'subject-not-executed' };",
+          "replace": "    if (false) return { verdict: 'unverifiable', reason: 'subject-not-executed' };",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONTROL-READS-ANY-RED-AS-REACHED",
+      "statement": "The negative control asks whether the defenders stayed green, not whether a test failed: a module that cannot parse usually fails to load, which the runner reports as an error with no tests run.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/negative-control.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Only an assertion failure counts as reached, so every defender that loads the subject is misreported as never executing it and its real verdict is thrown away.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "  const reached = run.outcome !== 'pass';",
+          "replace": "  const reached = run.outcome === 'fail';",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FATAL-EDIT-CANNOT-COMPILE",
+      "statement": "Every runner supplies content for its language that its loader cannot parse; a negative control whose edit still compiles proves nothing.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/negative-control.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The JavaScript fatal edit parses cleanly, so the control can never turn a suite red and every survivor is rubber-stamped as reached.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/vitest.mjs",
+          "find": "export const fatalEdit = () => '/* testguard negative control: this file must not parse */\\n(\\n';",
+          "replace": "export const fatalEdit = () => '/* testguard negative control */\\n';",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONTROL-RESTORES-THE-SUBJECT",
+      "statement": "The negative control replaces the whole subject file and always puts it back; a probe that leaves its own control edit behind has destroyed the thing it was asked to measure.",
+      "source": {
+        "kind": "spec",
+        "ref": "docs-canonical/SECURITY.md#authorization"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/negative-control.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The control never restores, so the subject is left as unparseable rubbish and every later fault is measured against it.",
+          "faultClass": "call-removed",
+          "file": "src/probe/probe.mjs",
+          "find": "  } finally {\n    control.restore();\n  }",
+          "replace": "  } finally {\n    void control;\n  }",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PINNED-RUNNER-KEEPS-ITS-CAPABILITIES",
+      "statement": "A runner pinned to one engine carries every capability the module has; a capability present on `--runner python` and absent on `--runner pytest` is a silently weaker gate under a flag that reads like a narrowing.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/negative-control.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The pinned runner drops fatalEdit, so a survivor probed with --runner pytest or --runner unittest is never checked against the negative control and reports survived however unreachable the subject is.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/runners/python.mjs",
+          "find": "  return { name: engine, testGlobs, owns, tests, parseReport, fatalEdit, check: makeCheck(engine), run: makeRun(engine) };",
+          "replace": "  return { name: engine, testGlobs, owns, tests, parseReport, check: makeCheck(engine), run: makeRun(engine) };",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
     }
   ]
 }

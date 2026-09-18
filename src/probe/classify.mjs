@@ -6,8 +6,13 @@
  * encodes GATE-SEMANTICS.md: nothing to run → nocover; nothing to apply →
  * unverifiable; defenders not green → flaky-defender; then, and only then,
  * does the fault's own result count.
+ *
+ * `subjectReached` is the negative control's answer and is consulted at one
+ * point only: a would-be `survived`. It is never asked about a kill — a kill
+ * already proves the defenders reached the code — and `undefined` (the control
+ * was not run) never changes a verdict.
  */
-export function classify({ defenders, anchor, baselineRuns, probeRuns, confirmRuns }) {
+export function classify({ defenders, anchor, baselineRuns, probeRuns, confirmRuns, subjectReached }) {
   if (defenders.length === 0) return { verdict: 'nocover' };
   if (anchor && anchor.status !== 'ok') return { verdict: 'unverifiable', reason: anchor.status };
   if (baselineRuns.length === 0 || baselineRuns.some((r) => r.outcome !== 'pass')) {
@@ -24,7 +29,18 @@ export function classify({ defenders, anchor, baselineRuns, probeRuns, confirmRu
   const killedRuns = probeRuns.filter((r) => r.outcome === 'fail' && r.assertionFailures > 0);
   const passedRuns = probeRuns.filter((r) => r.outcome === 'pass');
   if (probeRuns.length === confirmRuns && killedRuns.length === confirmRuns) return { verdict: 'killed' };
-  if (probeRuns.length === confirmRuns && passedRuns.length === confirmRuns) return { verdict: 'survived' };
+  if (probeRuns.length === confirmRuns && passedRuns.length === confirmRuns) {
+    // The negative control. A green baseline proves the defenders can PASS; it
+    // says nothing about whether they can fail because of THIS file. If the
+    // subject was replaced with something that cannot compile and the
+    // defenders still went green, they never execute it — and then `survived`
+    // is a statement about their reach, not their assertions, and reads as a
+    // devastating audit finding while being entirely false.
+    // `undefined` means the control was not run, which is not evidence either
+    // way and leaves the verdict alone.
+    if (subjectReached === false) return { verdict: 'unverifiable', reason: 'subject-not-executed' };
+    return { verdict: 'survived' };
+  }
   // Some runs killed, some passed: the defenders' response to this fault is
   // nondeterministic. Reporting it as killed would be the optimistic bias
   // the research warned about; reporting survived would be a lie the other way.

@@ -389,6 +389,13 @@
           },
           "additionalProperties": false
         },
+        "negativeControl": {
+          "description": "The result of replacing the subject with content its loader cannot parse, and running the defenders once. `reached`: they went red, so they do execute this file and a `survived` verdict is about their assertions. `not-reached`: they stayed green, so they never execute it and the verdict becomes `unverifiable` with reason `subject-not-executed`. Charged only where a false answer is expensive \u2014 on a would-be survivor \u2014 because a kill already proves the defenders reached the code. Absent when the control was not run or the runner cannot say what \"cannot compile\" means for its language.",
+          "enum": [
+            "reached",
+            "not-reached"
+          ]
+        },
         "targetNotImported": {
               "description": "True when, with the fault applied, no defender caused the subject's module to be imported at all. Reported by runners that can tell (Python), never inferred. It does not change the verdict, and it is the one thing that makes a `survived` unreadable: the tests were not blind to the fault, they never reached it. A module imported from OUTSIDE the tree being probed is not recorded here \u2014 that run is refused outright, because every verdict in it would be false.",
               "const": true

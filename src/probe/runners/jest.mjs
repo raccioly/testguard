@@ -10,3 +10,12 @@ export const tests = (projectDir) => listTestFiles(projectDir, testGlobs);
 export const argvFor = (projectDir, files, outFile, { serial = false } = {}) =>
   [...runnerArgv(projectDir, 'jest', 'jest'), '--ci', '--json', `--outputFile=${outFile}`, ...(serial ? ['--runInBand'] : []), '--runTestsByPath', ...files];
 export const run = (opts) => runProcess({ ...opts, argv: (files, outFile) => argvFor(opts.projectDir, files, outFile, opts) });
+
+/**
+ * The negative control's edit: content this runner's loader cannot possibly
+ * parse. Used to prove the defenders actually execute a file before a
+ * `survived` verdict about it is allowed to stand. An unterminated group is
+ * a syntax error at every JavaScript/TypeScript parser, whatever the file
+ * contained before.
+ */
+export const fatalEdit = () => '/* testguard negative control: this file must not parse */\n(\n';
