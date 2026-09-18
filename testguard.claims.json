@@ -2924,6 +2924,48 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-COST-BUDGET-ACTUALLY-GATES",
+      "statement": "The cost budget is a gate, not a number in a log: a probe whose total exceeds the budget fails, and a budget that is missing or not a positive number is refused rather than treated as unlimited.",
+      "source": {
+        "kind": "spec",
+        "ref": "docs-canonical/TEST-SPEC.md#how-the-gate-duration-is-measured"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/cost.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Any total passes the budget, so the check reports success on a gate that has tripled and nothing ever fails.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "    ok: totalMs <= budgetMs,",
+          "replace": "    ok: true,",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A missing or malformed budget is accepted instead of refused, so a typo in the budget file silently disables the gate.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/cost.mjs",
+          "find": "  if (typeof budgetSeconds !== 'number' || !Number.isFinite(budgetSeconds) || budgetSeconds <= 0) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
     }
   ]
 }

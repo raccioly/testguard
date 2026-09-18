@@ -20,7 +20,7 @@ the test that defends it, and CI fails if any injected fault survives.
 | Unit | `test/*.test.mjs` | One pure function's branches, without a runner | milliseconds |
 | Conformance | `spec/conformance/` | Every valid example validates; every must-reject document is rejected for the defect its filename names | ~1 s |
 | Fixture acceptance | `test/probe.fixture.test.mjs`, `test/probe.jest.test.mjs`, `test/probe.playwright.test.mjs` | The whole pipeline reproduces a known-answer oracle, one per runner | 10–50 s each |
-| Self-verification | `testguard.claims.json`, run by `npm run self:probe` | The tool's own invariants survive fault injection | **24 min** cold (measured 2026-09-18: 59 faults, `--serial`, idle machine; 1002 s baseline + 888 s probe); seconds when verdicts are reused, which is why CI restores the previous evidence from cache |
+| Self-verification | `testguard.claims.json`, run by `npm run self:probe` | The tool's own invariants survive fault injection | **13.4 min** cold (measured 2026-09-18 at `cf5a083`: 96 faults, 576 defender runs, 804 s, `--serial`, idle machine); seconds when verdicts are reused, which is why CI restores the previous evidence from cache. Budgeted at 950 s in `testguard.cost-budget.json` and **gated** in CI — the figure above went 9.6 → 23.6 min across one merged change while `--cost` printed it into a log nobody read |
 | Install smoke | `.github/scripts/install-smoke.mjs` | The **packed tarball** runs with production dependencies only | ~20 s |
 | Runtime budget | `ci.yml` | The suite has not silently started walking the wrong tree | gate, not a test |
 
