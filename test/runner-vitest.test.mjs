@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseReport, runProcess, checkRunner, resolveRunner, runnerArgv, resetRunnerCache } from '../src/probe/runners/shared.mjs';
+import { argvFor as vitestArgv } from '../src/probe/runners/vitest.mjs';
+import { argvFor as jestArgv } from '../src/probe/runners/jest.mjs';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -103,5 +105,27 @@ describe('runner resolution: the project package first, PATH second, npx never',
       rmSync(bin, { recursive: true, force: true });
       resetRunnerCache();
     }
+  });
+});
+
+describe('each runner invokes the binary resolved for the project, not a bare name', () => {
+  it('vitest: the command line starts with the resolved binary and asks for a JSON report at our path', () => {
+    const argv = vitestArgv(ROOT, ['test/a.test.mjs'], '/tmp/out.json');
+    expect(argv.slice(0, 2)).toEqual(runnerArgv(ROOT, 'vitest', 'vitest'));
+    expect(argv[0]).toBe(process.execPath);            // the project's own binary, run with this node
+    expect(argv).not.toContain('vitest');              // never a bare name for PATH to resolve
+    expect(argv).toContain('--reporter=json');
+    expect(argv).toContain('--outputFile=/tmp/out.json');
+    expect(vitestArgv(ROOT, [], '/tmp/o.json', { serial: true })).toContain('--no-file-parallelism');
+    expect(vitestArgv(ROOT, [], '/tmp/o.json')).not.toContain('--no-file-parallelism');
+  });
+
+  it('jest: same rule, plus exact paths rather than regexes', () => {
+    const argv = jestArgv(ROOT, ['test/a.test.js'], '/tmp/out.json');
+    expect(argv.slice(0, 2)).toEqual(runnerArgv(ROOT, 'jest', 'jest'));
+    expect(argv).not.toContain('jest');
+    expect(argv).toContain('--runTestsByPath');
+    expect(argv).toContain('--ci');
+    expect(jestArgv(ROOT, [], '/tmp/o.json', { serial: true })).toContain('--runInBand');
   });
 });

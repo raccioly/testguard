@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`--cost`, on `probe` and `claims`** — what the defenders actually cost,
+  per claim and per defender file, read back out of the `durationMs` the
+  probe already records. It re-measures nothing and spawns nothing.
+  A probe's wall clock is `(baseline runs + faults × --confirm) × the cost of
+  the claim's defender SET`, per claim, so one slow acceptance test named by
+  five claims is paid for thirty times — and until now nothing in the output
+  said which file that was. The report names it, under **shared defenders**,
+  with the claims that pay for it.
+  Per-file figures are an **upper bound, not a share**: a run executes the
+  whole defender set at once, so the runner never says how much belonged to
+  which file. They overlap by construction and do not sum to the total, which
+  the report says on its own face. Only `totalMs` is additive.
+
+### Changed
+
+- **The self-probe gate no longer runs a fifty-second acceptance test thirty
+  times.** Five claims named `test/probe.fixture.test.mjs` as their only
+  defender, which is what made the release gate take ~24 minutes. The
+  decisions those claims are about — how escalation attributes an undeclared
+  killer, what counts as a measurable run for the flake rate, which binary a
+  runner invokes, what makes a fault edit visible — are rules you can state in
+  three lines, and none of them needs a fixture to falsify. They are now pure
+  functions in `src/probe/attribution.mjs` and exported `argvFor` builders in
+  the runners, unit-tested in `test/attribution.test.mjs` (~0.5s).
+  This mirrors why `classify()` has always been pure: the order of its checks
+  *is* the spec, and every branch should be falsifiable without a runner.
+  No claim was weakened to get there. Each re-pointed claim was re-probed and
+  still **kills** its faults; two of them SURVIVED on the first narrowing
+  attempt, which is exactly the failure mode `--cost` now makes visible before
+  someone ships a cheaper, weaker gate.
+  **Measured on the same machine, serially, from scratch: 24.1 min → 9.6 min**
+  (68 faults, 68 killed, 0 unproven). `--cost` names what is left: the jest
+  and replay suites now dominate, at 207s and 148s of defender time.
+
 ## [0.6.0] - 2026-09-17
 
 Everything the field asked for. Two independent field reports on private

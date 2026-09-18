@@ -452,6 +452,58 @@ things make that safe:
   previous verdict, and makes reviewing that edit the next action. Editing a
   claim is allowed — claims can be wrong — but it is never invisible.
 
+### What the probe costs, and why a gate gets slow
+
+A probe's wall clock is not a function of how many claims you have. Per claim
+it is roughly
+
+```
+(baseline runs + faults × --confirm) × the cost of that claim's defender SET
+```
+
+so one slow acceptance test, named as a defender by five claims, is paid for
+thirty times. The symptom is a gate that takes twenty minutes; the cause is a
+single line in the claims file, and nothing in the output used to say which.
+
+```bash
+npx testguard-cli claims . --cost     # read back from the last probe's evidence
+npx testguard-cli probe . --cost      # what the run you just made spent
+```
+
+```
+63 fault records cost 24m across 378 defender runs.
+
+most expensive claims
+    4m 58s  TG-FAULT-EDIT-VISIBLE              1 fault  · 6 runs
+
+defender files, by the time of the runs that included them
+  (a claim runs its whole defender set at once, so these overlap and do not sum to the total)
+    24m 3s  test/probe.fixture.test.mjs                  5 claims
+
+shared defenders — each claim pays the file's full cost again
+    24m 3s  test/probe.fixture.test.mjs
+            named by TG-ESCALATION-N-RUNS, TG-FAULT-EDIT-VISIBLE, …
+```
+
+Every number is read back out of the `durationMs` the probe already records.
+`--cost` re-measures nothing, spawns nothing, and costs the price of reading
+one JSON file.
+
+**The per-file figures overlap.** A run executes a claim's whole defender set
+at once, so the runner never says how much of it belonged to which file. A
+file's `ms` is the time of every run that *included* it: an upper bound on
+what removing it could save, which is the decision you are making. Only
+`totalMs` is additive.
+
+**What to do about a shared defender.** Extract the decision it proves into a
+pure function, unit-test that, and point the claim at the unit test. This is
+not a testing trick — it is the same reason `classify()` in this codebase is
+pure. A rule you can state in three lines should not need a fifty-second
+acceptance test to falsify it. When the extraction is right the claim still
+fails on the fault; when it is wrong the claim SURVIVES, and the probe tells
+you so before you have shipped a weaker gate. Do not narrow `defendedBy` and
+assume — re-probe the claim and read the verdict.
+
 ### Authoring faults mechanically
 
 Writing faults by hand means reading the code to find exact anchors. Two

@@ -7,6 +7,7 @@ import { gate } from '../baseline/baseline.mjs';
 import { renderRecord, renderSummary, sortForReport, PROVISIONAL_WARNING } from '../render.mjs';
 import { computeStatus } from '../status/status.mjs';
 import { resolveChangedRef, withChangedRef } from '../gate/changed.mjs';
+import { costReport, renderCost } from '../probe/cost.mjs';
 export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
@@ -68,7 +69,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
   const g = gate(evidence.records, baseline, { severityFloor: values.severity });
   if (values.json) {
     const status = withChangedRef(resolveChangedRef({ explicit: values.changed }), (changedRef) => computeStatus({ projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'], evidence: outPath }), io.err);
-    io.out(JSON.stringify({ ...status, run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode: g.new.length > 0 ? 1 : 0 } }, null, 2));
+    io.out(JSON.stringify({ ...status, run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode: g.new.length > 0 ? 1 : 0 }, ...(values.cost ? { cost: costReport(evidence.records) } : {}) }, null, 2));
     return g.new.length > 0 ? 1 : 0;
   }
   if (!values.quiet && baseline) {
@@ -82,6 +83,11 @@ export async function probeCommand({ projectDir, values, version }, io) {
     if (killed) io.out(`  ${killed} killed (not listed; --verbose to see them)`);
   }
   io.out(renderSummary(evidence.records, evidence.run) + (baseline ? ` ${g.new.length} new since baseline, ${g.baselined.length} baselined.` : ' No baseline.'));
+  if (values.cost) {
+    io.out('');
+    io.out(renderCost(costReport(evidence.records)));
+    io.out('');
+  }
   io.out(`evidence: ${outPath}${only ? ` (partial: --claim ${only.join(',')}; not the canonical evidence file)` : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
   return g.new.length > 0 ? 1 : 0;

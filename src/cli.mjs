@@ -48,6 +48,7 @@ probe
   --include-dirty      probe the working tree (a snapshot commit) instead of HEAD; uncommitted tests count
                        (without it, a dirty defender/target with the implicit HEAD is refused: the silent-mismatch trap)
   --verbose            also print each killed fault (default: only unproven ones, plus a count)
+  --cost               (probe, claims) report what the defenders cost, per claim and per defender file
                        --confirm below 3 is PROVISIONAL: verdicts print with "?", evidence goes to .testguard/evidence-provisional.json
   --runner <name>      vitest | jest | playwright | auto (default: auto — first of vitest, jest that resolves; a defender under
                        playwright's testDir always runs under playwright, whatever the project runner)
@@ -93,6 +94,7 @@ init       --force (replace an existing skill file)  --here (keep the agent laye
            --mcp             print the MCP server config for Claude Code, Cursor and Codex (printed, never written: a harness config is yours)
 every command accepts --json; probe/baseline emit the status document plus their own result
 claims     --json
+           --cost            what the last probe spent, per claim and per defender file, read back from the recorded run durations. Names the files more than one claim pays for, which is where a slow gate comes from
            --since <ref>     report every claim and fault that existed at <ref> and does not now; a claim entry in testguard.ignore.json (with a reason) excuses one. exit 1 on any unexcused removal
 baseline   --evidence <path>  --out <path>  --allow-provisional (freeze unconfirmed evidence; normally refused)
            --restamp          move head to the commit of a later CLEAN probe that reproduced the same fingerprints
@@ -148,6 +150,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         json: { type: 'boolean', default: false },
         text: { type: 'boolean', default: false },
         markdown: { type: 'boolean', default: false },
+        cost: { type: 'boolean', default: false },
         help: { type: 'boolean', short: 'h', default: false },
         version: { type: 'boolean', short: 'v', default: false },
       },

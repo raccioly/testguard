@@ -80,7 +80,7 @@ jobs:
       - name: Install smoke — the tarball must run with production deps only
         run: npm run test:install
       - name: Self-probe must be fully defended before anything ships
-        run: node cli/testguard.mjs probe . --budget 180000 --out "$RUNNER_TEMP/self-evidence.json" --quiet
+        run: node cli/testguard.mjs probe . --budget 180000 --out "$RUNNER_TEMP/self-evidence.json" --quiet --cost
       - name: Version surfaces are in sync
         run: node .github/scripts/sync-release-version.mjs --check
 
