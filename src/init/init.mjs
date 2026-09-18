@@ -6,7 +6,16 @@ import { spawnSync } from 'node:child_process';
 const TEMPLATES = join(dirname(fileURLToPath(import.meta.url)), 'templates');
 const AGENTS_BEGIN = '<!-- testguard:begin -->';
 const AGENTS_END = '<!-- testguard:end -->';
-const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json'];
+export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json', '.testguard/replay.json', '.testguard/calibration.json', '.testguard/ci-self-evidence.json', '.testguard/ci/'];
+
+/**
+ * The `.testguard/` files that ARE committed: the frozen contract, its
+ * snapshot, and the CI-fetch helper the user runs by hand. Everything else in
+ * the directory is regenerated. Named here so the two places that reason about
+ * the directory — the lines init writes and the advice baseline prints — cannot
+ * disagree about which of them is which.
+ */
+export const COMMITTED_OUTPUTS = ['.testguard/baseline.json', '.testguard/status.json', '.testguard/fetch-ci-evidence.sh'];
 
 /**
  * The session-start hook command. It runs from the git root (where the agent
@@ -170,7 +179,11 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
     settings.hooks.SessionStart.push({ hooks: [{ type: 'command', command: cmd }] });
     mkdirSync(dirname(settingsPath), { recursive: true });
     writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-    done.push(`${rel(settingsPath)}: SessionStart hook → brief --text${dir === '.' ? '' : ` ${dir}`} (local install first, npx --no-install fallback, never a fetch)`);
+    // Describes hookCommand() above, which emits no npx of any kind: a local
+    // install, then a testguard on PATH, then nothing. The claim
+    // TG-README-HOOK-MATCHES-THE-CODE holds this sentence to that, here and in
+    // every other surface that describes the hook.
+    done.push(`${rel(settingsPath)}: SessionStart hook → brief --text${dir === '.' ? '' : ` ${dir}`} (local install first, then a testguard on PATH, never a fetch)`);
     note(settingsPath);
   }
 

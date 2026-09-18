@@ -36,7 +36,7 @@
 | NFR-03 | The user's working tree is never damaged | scratch worktree by default; restore on signal, exception and exit; refusal to run in place over a dirty target; a restore failure is raised in every case but a scratch target that has already been deleted |
 | NFR-04 | Every emitted document conforms to the published schema before it is written | `writeSpecDoc` refuses non-conforming output |
 | NFR-05 | Verdicts are reproducible and attributable to a commit | evidence records `repo.head`, the snapshot when the working tree was probed, and the runner and its source |
-| NFR-06 | A verdict is never optimistic under uncertainty | contention recorded; flaky and timeout verdicts gate; escalation cannot upgrade a verdict; a survivor is unverifiable until the defenders are shown to fail because of the subject |
+| NFR-06 | A verdict is never optimistic under uncertainty | contention recorded and re-checked for liveness before it is reported; flaky and timeout verdicts gate; escalation cannot upgrade a verdict; a survivor is unverifiable until the defenders are shown to fail because of the subject; an unexpected exception is named as the tool's own defect rather than shown as a bare stack |
 | NFR-07 | Cost grows with what changed, not with the size of the project | verdict reuse on unchanged inputs; blast-radius-targeted escalation; a committed cost budget gated in CI, so growth is signed for rather than discovered |
 | NFR-08 | Portable contract | schemas are JSON Schema 2020-12, readable and implementable without this codebase |
 
@@ -95,16 +95,16 @@ fails the pull request naming the unclaimed file, and `status` reports
 | FR-08 | `src/gate/changed.mjs` | `test/gate.test.mjs`, `TG-GATE-UNCLAIMED-EXITS-1` |
 | FR-09 | `src/probe/mocks.mjs` | `test/mocks.test.mjs`, `TG-MOCKING-FILE-IS-NOT-A-DEFENDER` |
 | FR-10 | `src/probe/runners/` | fixture acceptance per runner, `TG-RUNNER-FROM-PROJECT-FIRST` |
-| FR-11 | `src/scaffold/producers.mjs` | `test/scaffold.test.mjs`, `TG-SCAFFOLD-ANCHORS-HIT` |
+| FR-11 | `src/scaffold/producers.mjs` | `test/scaffold.test.mjs`, `test/scaffold.python.test.mjs`, `TG-SCAFFOLD-ANCHORS-HIT`, `TG-SCAFFOLD-NEVER-PROPOSES-A-NO-OP`, `TG-SCAFFOLD-LOOP-GUARD-IS-A-GUARD` |
 | FR-12 | `src/admit/admit.mjs` | `test/admit.test.mjs`, `TG-ADMIT-NEEDS-ALL-KILLED` |
-| FR-13 | `src/replay/` | `test/replay.test.mjs`, `test/calibration.test.mjs`, `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT`, `TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS` |
+| FR-13 | `src/replay/` | `test/replay.test.mjs`, `test/calibration.test.mjs`, `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT`, `TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS`, `TG-CALIBRATION-COUNTS-ONLY-BUGS` |
 | FR-14 | `src/mcp/` | `test/mcp.test.mjs` |
-| NFR-01 | `src/init/init.mjs`, runner resolution | `TG-INIT-HOOK-NO-NETWORK`, `TG-README-HOOK-MATCHES-THE-CODE` |
+| NFR-01 | `src/init/init.mjs`, runner resolution | `TG-INIT-HOOK-NO-NETWORK`, `TG-README-HOOK-MATCHES-THE-CODE` (every surface, not only the README), `TG-GITIGNORE-ADVICE-IS-ONE-LIST` |
 | NFR-02 | `package.json` | `npm run test:install` in CI |
 | NFR-03 | `src/probe/inject.mjs`, `src/probe/probe.mjs` | `TG-DIRTY-DEFENDERS-REFUSED`, `TG-IGNORED-DIRTY-RECORDED`, `TG-IN-PLACE-STILL-RAISES-A-MISSING-TARGET`, `TG-CONTROL-RESTORES-THE-SUBJECT` |
 | NFR-04 | `src/evidence/writer.mjs` | `test/writer.test.mjs` |
 | NFR-05 | `src/probe/probe.mjs` | `TG-FINGERPRINT-VERDICT`, `TG-FAULT-EDIT-VISIBLE` |
-| NFR-06 | `src/probe/contention.mjs`, `classify.mjs` | `TG-CONTENTION-NEVER-FAILS-A-PROBE`, `TG-ESCALATION-N-RUNS`, `TG-ONE-BAD-FAULT-KEEPS-THE-EVIDENCE`, `TG-A-PRECONDITION-STILL-REFUSES-THE-RUN`, `TG-A-PROBE-ERROR-IS-NEVER-REUSED`, `TG-SURVIVOR-PROVES-THE-SUBJECT-RUNS`, `TG-CONTROL-READS-ANY-RED-AS-REACHED`, `TG-FATAL-EDIT-CANNOT-COMPILE` |
+| NFR-06 | `src/probe/contention.mjs`, `classify.mjs` | `TG-CONTENTION-NEVER-FAILS-A-PROBE`, `TG-ESCALATION-N-RUNS`, `TG-ONE-BAD-FAULT-KEEPS-THE-EVIDENCE`, `TG-A-PRECONDITION-STILL-REFUSES-THE-RUN`, `TG-A-PROBE-ERROR-IS-NEVER-REUSED`, `TG-SURVIVOR-PROVES-THE-SUBJECT-RUNS`, `TG-CONTROL-READS-ANY-RED-AS-REACHED`, `TG-FATAL-EDIT-CANNOT-COMPILE`, `TG-CONTENTION-IGNORES-A-DEAD-PID`, `TG-CLI-NAMES-ITS-OWN-BUGS` |
 | NFR-07 | verdict reuse, `src/probe/rank.mjs`, `src/probe/cost.mjs` | `test/probe.fixture.test.mjs` reuse case, `test/cost.test.mjs`, `TG-COST-BUDGET-ACTUALLY-GATES` |
 | NFR-08 | `spec/` | `spec/conformance/schemas.test.mjs`, `TG-WILSON-REPRODUCES-AT-THE-DOCUMENTS-PRECISION` |
 

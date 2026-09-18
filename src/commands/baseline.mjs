@@ -4,6 +4,21 @@ import { readSpecDoc, writeSpecDoc } from '../evidence/writer.mjs';
 import { buildBaseline, restampBaseline } from '../baseline/baseline.mjs';
 import { evidencePath, baselinePath } from './probe.mjs';
 import { computeStatus } from '../status/status.mjs';
+import { isGitIgnored, GITIGNORE_LINES, COMMITTED_OUTPUTS } from '../init/init.mjs';
+
+/**
+ * The regenerated outputs this project does not yet ignore.
+ *
+ * Asked of git rather than of the .gitignore text, so `.testguard/*` with
+ * negated exceptions, a global ignore file and .git/info/exclude all answer
+ * correctly — which is what stops the advice being repeated every run at a
+ * project that is already covered. The list itself comes from init, because
+ * keeping a second copy here is precisely how this advice rotted: it named
+ * evidence.json and brief.json while the tool had grown to ten outputs.
+ */
+function unignoredOutputs(projectDir) {
+  return GITIGNORE_LINES.filter((l) => !isGitIgnored(projectDir, l.replace('*', 'x')));
+}
 
 export async function baselineCommand({ projectDir, values, version }, io) {
   const evPath = values.evidence ? resolve(values.evidence) : evidencePath(projectDir);
@@ -39,8 +54,14 @@ export async function baselineCommand({ projectDir, values, version }, io) {
     return 0;
   }
   io.out(`baseline: ${n} unproven finding${n === 1 ? '' : 's'} frozen at ${baseline.head.slice(0, 12)}${baseline.snapshot ? ` (working-tree snapshot ${baseline.snapshot.slice(0, 7)}; after you commit, a clean probe + \`baseline --restamp\` moves head to that commit)` : baseline.dirty ? ' (working tree was dirty)' : ''}${evidence.run.provisional ? ' — FROM PROVISIONAL EVIDENCE (--allow-provisional)' : ''} → ${outPath}`);
-  io.out('Commit this file; from now on only new findings gate. Ignore the regenerated ones — add to .gitignore:');
-  io.out('  .testguard/evidence.json');
-  io.out('  .testguard/brief.json');
+  io.out('Commit this file; from now on only new findings gate.');
+  const missing = unignoredOutputs(projectDir);
+  if (missing.length) {
+    io.out(`The rest of .testguard/ is regenerated per run; ${missing.length} output${missing.length === 1 ? ' is' : 's are'} not ignored yet. Add to .gitignore:`);
+    for (const l of missing) io.out(`  ${l}`);
+    io.out(`Or ignore the directory and keep what is committed — the form that needs no update as outputs are added:`);
+    io.out('  .testguard/*');
+    for (const l of COMMITTED_OUTPUTS) io.out(`  !${l}`);
+  }
   return 0;
 }

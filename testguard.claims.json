@@ -1778,11 +1778,11 @@
       "faults": [
         {
           "id": "F1",
-          "description": "nocover is excluded from both sides again, so a corpus of untested bugs reports a low miss rate — the optimistic bias this claim exists to forbid.",
+          "description": "nocover leaves the measured set, so a fault class with no test at all scores better than one with a weak test.",
           "faultClass": "literal-changed",
           "file": "src/replay/replay.mjs",
-          "find": "    if (!MEASURED_VERDICTS.includes(r.verdict)) continue;",
-          "replace": "    if (!['caught', 'blind'].includes(r.verdict)) continue;",
+          "find": "  const measured = records.filter((r) => MEASURED_VERDICTS.includes(r.verdict));",
+          "replace": "  const measured = records.filter((r) => ['caught', 'blind'].includes(r.verdict));",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -2184,7 +2184,7 @@
     },
     {
       "id": "TG-README-HOOK-MATCHES-THE-CODE",
-      "statement": "Every session-start hook command the README shows is one the code actually emits; documentation that describes a hook the tool no longer writes is a finding, not a detail.",
+      "statement": "No surface that describes the session-start hook names a mechanism the hook does not use. The README, the `--help` entry and the line `init` prints as it installs the hook are one claim, not three: the 0.6.0 fix scoped this to the README, and both other surfaces went on promising an `npx --no-install` fallback that hookCommand() had stopped emitting.",
       "source": {
         "kind": "spec",
         "ref": "README.md#brief"
@@ -2206,6 +2206,32 @@
           "file": "src/init/init.mjs",
           "find": "  const onPath = `{ command -v testguard >/dev/null 2>&1 && testguard brief --text${arg} 2>/dev/null; }`;",
           "replace": "  const onPath = `{ command -v testguard >/dev/null 2>&1 && testguard brief --quiet${arg} 2>/dev/null; }`;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The line init prints as it installs the hook describes a mechanism hookCommand() does not emit.",
+          "faultClass": "literal-changed",
+          "file": "src/init/init.mjs",
+          "find": "    done.push(`${rel(settingsPath)}: SessionStart hook → brief --text${dir === '.' ? '' : ` ${dir}`} (local install first, then a testguard on PATH, never a fetch)`);",
+          "replace": "    done.push(`${rel(settingsPath)}: SessionStart hook → brief --text${dir === '.' ? '' : ` ${dir}`} (local install first, npx --no-install fallback, never a fetch)`);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The --help entry describes a mechanism hookCommand() does not emit.",
+          "faultClass": "literal-changed",
+          "file": "src/cli.mjs",
+          "find": "           the hook prefers a local install, then a testguard already on PATH, then nothing; it never reaches the network. exit 1 if a written file is gitignored",
+          "replace": "           the hook prefers a local install, falls back to npx --no-install, never fetches; exit 1 if a written file is gitignored",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -3280,6 +3306,304 @@
             "at": "2026-09-18T00:00:00Z"
           }
         }
+      ]
+    },
+    {
+      "id": "TG-SCAFFOLD-NEVER-PROPOSES-A-NO-OP",
+      "statement": "A proposed fault always changes the line it anchors to. A replacement equal to its find is rejected by the schema, so a single one aborts the whole scaffold run — one `expired: 0` made a 725-line file impossible to scaffold. Each numeric producer refuses its own fixed point where it knows the arithmetic, and a zero-valued window is still widened to a real value rather than dropped: 0 is exactly the window worth widening.",
+      "source": {
+        "kind": "manual",
+        "ref": "field report 2026-09-18 (pocket-archive, 0.8.1)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/scaffold.test.mjs",
+        "test/scaffold.python.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A zero-valued window widens to itself: ×1000 of 0 is 0, the replacement equals the find, and the run aborts.",
+          "faultClass": "literal-changed",
+          "file": "src/scaffold/producers.mjs",
+          "find": "    const widened = Number(m[3]) * 1000 || 1000;",
+          "replace": "    const widened = Number(m[3]) * 1000;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A work factor already at 1 is collapsed to 1: the same no-op, from the other numeric producer.",
+          "faultClass": "condition-forced",
+          "file": "src/scaffold/producers.mjs",
+          "find": "    if (Number(m[3]) > 1) out.push({ faultClass: 'literal-changed', description: `Work factor collapsed: \\`${m[1]}\\` ${m[3]} becomes 1.`, replace: line.replace(m[0], `${m[1]}${m[2] === ':' ? ': ' : ' = '}1`) });",
+          "replace": "    out.push({ faultClass: 'literal-changed', description: `Work factor collapsed: \\`${m[1]}\\` ${m[3]} becomes 1.`, replace: line.replace(m[0], `${m[1]}${m[2] === ':' ? ': ' : ' = '}1`) });",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The backstop stops refusing a no-op, so a producer added later can abort a whole scaffold run again.",
+          "faultClass": "statement-deleted",
+          "file": "src/scaffold/scaffold.mjs",
+          "find": "  if (fault.replace === fault.find) return false;",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Python: a zero-valued window widens to itself. `timeout=0` is PEP 8 spacing, so this is the common form.",
+          "faultClass": "literal-changed",
+          "file": "src/scaffold/producers.python.mjs",
+          "find": "    const widened = Number(m[2]) * 1000 || 1000;",
+          "replace": "    const widened = Number(m[2]) * 1000;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "scaffold",
+        "field-report"
+      ]
+    },
+    {
+      "id": "TG-SCAFFOLD-LOOP-GUARD-IS-A-GUARD",
+      "statement": "`if (…) continue;` and `if (…) break;` are guards and are proposed as faults. Pure selection-over-rows is the shape the “pure logic, caller does the IO” advice produces, and scaffold returned nothing at all for two fully-claimed files of seven such guards each — while the hand-written faults on those same lines all killed. The shape scaffold skipped was the one demonstrably worth proposing.",
+      "source": {
+        "kind": "manual",
+        "ref": "field report 2026-09-18 (pocket-archive, 0.8.1)"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/scaffold.test.mjs",
+        "test/scaffold.python.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A block guard whose body only continues or breaks is no longer read as a guard.",
+          "faultClass": "literal-changed",
+          "file": "src/scaffold/producers.mjs",
+          "find": "const GUARD_BODY = /\\b(return|throw|continue|break)\\b|\\.status\\(\\s*4\\d\\d|\\bredirect\\(|\\bfalse\\b|\\bnull\\b/;",
+          "replace": "const GUARD_BODY = /\\b(return|throw)\\b|\\.status\\(\\s*4\\d\\d|\\bredirect\\(|\\bfalse\\b|\\bnull\\b/;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A single-line `if (…) continue;` no longer matches the if-shape at all, so nothing is proposed for it.",
+          "faultClass": "literal-changed",
+          "file": "src/scaffold/producers.mjs",
+          "find": "const IF_LINE = /^(\\s*)(?:\\}\\s*)?(?:else\\s+)?if\\s*\\((.+)\\)\\s*(\\{\\s*|(?:return|throw|continue|break)\\b.*;\\s*)?$/;",
+          "replace": "const IF_LINE = /^(\\s*)(?:\\}\\s*)?(?:else\\s+)?if\\s*\\((.+)\\)\\s*(\\{\\s*|(?:return|throw)\\b.*;\\s*)?$/;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Python: a loop guard is no longer read as a guard.",
+          "faultClass": "literal-changed",
+          "file": "src/scaffold/producers.python.mjs",
+          "find": "const GUARD_BODY = /\\braise\\b|\\breturn\\b|\\bcontinue\\b|\\bbreak\\b|\\babort\\b|\\bsys\\.exit\\b|\\bFalse\\b|\\bNone\\b|\\bHTTPException\\b|\\b4\\d\\d\\b/;",
+          "replace": "const GUARD_BODY = /\\braise\\b|\\breturn\\b|\\babort\\b|\\bsys\\.exit\\b|\\bFalse\\b|\\bNone\\b|\\bHTTPException\\b|\\b4\\d\\d\\b/;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "scaffold",
+        "field-report"
+      ]
+    },
+    {
+      "id": "TG-CALIBRATION-COUNTS-ONLY-BUGS",
+      "statement": "`p` is computed over escaped BUGS, not over every commit that changed source and a test together. Where a repository labels its commits a `feat:` is not a bug: a run measured “12 of 12 measurable bugs invisible — 100%” over a corpus of five features, a refactor, a style change and a commit whose whole purpose was adding a test. Selection stays broad, the estimator narrows, and the document records which rule produced it so two calibrations can never be compared by accident.",
+      "source": {
+        "kind": "manual",
+        "ref": "field report 2026-09-18 (pocket-archive, 0.8.1)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/replay.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The corpus stops narrowing: features and chores are counted as escaped bugs again.",
+          "faultClass": "condition-forced",
+          "file": "src/replay/replay.mjs",
+          "find": "  const rule = measured.length && typed * 2 > measured.length ? 'conventional-fix' : 'source-and-test';",
+          "replace": "  const rule = 'source-and-test';",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The calibration stops recording which rule produced it, so two different populations carry the same shape.",
+          "faultClass": "field-dropped",
+          "file": "src/replay/replay.mjs",
+          "find": "      detail: { candidateRule: rule, replayed: measured.length, selected: corpus.length, byType },",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "replay",
+        "calibration",
+        "field-report"
+      ]
+    },
+    {
+      "id": "TG-CLI-NAMES-ITS-OWN-BUGS",
+      "statement": "An unexpected exception reaches the user as a testguard bug with its trace, never as a bare Node stack. A producer defect printed `Node.js v24.18.0` at someone debugging their own project; a tool whose thesis is “never optimistic, always legible” owes the operator the sentence that says whose fault it is. The trace stays: a framed error without one cannot be reported.",
+      "source": {
+        "kind": "manual",
+        "ref": "field report 2026-09-18 (pocket-archive, 0.8.1)"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/probe-error.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The unexpected error is re-thrown, so the user gets a raw Node stack trace instead of a named finding.",
+          "faultClass": "statement-deleted",
+          "file": "src/cli.mjs",
+          "find": "    io.err(`error: this is a bug in testguard ${VERSION}, not a problem with your project.`);",
+          "replace": "    throw e;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "cli",
+        "field-report"
+      ]
+    },
+    {
+      "id": "TG-CONTENTION-IGNORES-A-DEAD-PID",
+      "statement": "A runner that exited between the process snapshot and the warning is not reported as contention. `ps` is a snapshot; a suite that finishes in that window produced “1 test runner is already running (pid 65751)” for a process the operator could not find. Detection stays best-effort — it may under-report — but it may not invent load that is not there.",
+      "source": {
+        "kind": "manual",
+        "ref": "field report 2026-09-18 (pocket-archive, 0.8.1)"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/contention.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The liveness re-check is dropped, so a pid that has already exited is warned about.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/contention.mjs",
+          "find": "    .filter((p) => alive(p.pid))",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "probe",
+        "field-report"
+      ]
+    },
+    {
+      "id": "TG-GITIGNORE-ADVICE-IS-ONE-LIST",
+      "statement": "The regenerated `.testguard/` outputs are named in exactly one place. `baseline` kept its own copy and printed two filenames long after the tool wrote ten, and printed them every run whether or not the project was already covered. One list, owned by `init`, read by both.",
+      "source": {
+        "kind": "manual",
+        "ref": "field report 2026-09-18 (pocket-archive, 0.8.1)"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/baseline.test.mjs",
+        "test/init.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The outputs that shipped after the advice was written fall off the list again, so a project is told to ignore a set that no longer matches what the tool writes.",
+          "faultClass": "field-dropped",
+          "file": "src/init/init.mjs",
+          "find": "export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json', '.testguard/replay.json', '.testguard/calibration.json', '.testguard/ci-self-evidence.json', '.testguard/ci/'];",
+          "replace": "export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json'];",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "init",
+        "field-report"
       ]
     }
   ]

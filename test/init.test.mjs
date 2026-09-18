@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { initProject, hookCommand } from '../src/init/init.mjs';
+import { USAGE } from '../src/cli.mjs';
 
 const gitInit = (dir) => { const g = (...a) => spawnSync('git', ['-c', 'user.email=i@example.invalid', '-c', 'user.name=i', ...a], { cwd: dir }); g('init', '-q'); };
 
@@ -35,6 +36,50 @@ describe('the README documents the hook the code actually emits', () => {
     // RUN the tool. This is the one phrasing that asserted npx *inside the
     // hook*, and it survived review twice.
     expect(readme).not.toMatch(/falls back to `?npx/i);
+  });
+});
+
+describe('no surface describes a hook mechanism the code does not use', () => {
+  // The 0.6.0 fix scoped this guard to README.md, because that is where the
+  // defect was found. The same sentence lived in two other places — the line
+  // `init` prints as it installs the hook, and the `--help` entry — and both
+  // still promised an `npx --no-install` fallback that hookCommand() had
+  // stopped emitting. Scoping a claim to the artifact instead of to the
+  // property is what let it drift, so the property is what is checked here:
+  // a description of the hook may not name a mechanism the hook does not use.
+  const MECHANISMS = /\b(npx|curl|wget|download)\b/i;
+  const command = hookCommand('.');
+
+  // "never a fetch", "no form of npx" and "never reaches the network" are the
+  // sentences we WANT; they name a mechanism only to deny it. Drop negated
+  // clauses before looking, so the check reads assertions, not denials.
+  const assertionsOnly = (text) => text.replace(/\b(never|no form of|not|without|rather than|instead of)\b[^,.;)\n]*/gi, '');
+
+  // An INVOCATION is not a description: `npx testguard-cli init` is how a
+  // reader runs the tool, and the hook it then installs is a separate thing.
+  // Only prose is held to the property.
+  const isInvocation = (l) => /^\s*(?:[$>]\s*)?(?:npx|node|pnpm|yarn|bunx|testguard)\b/.test(l);
+
+  const offenders = (text) => assertionsOnly(text)
+    .split(/\n/)
+    .filter((l) => /session-?start hook|brief --text|the hook/i.test(l))
+    .filter((l) => !isInvocation(l))
+    .filter((l) => { const m = l.match(MECHANISMS); return m && !command.includes(m[1].toLowerCase()); });
+
+  it('--help does not', () => {
+    expect(offenders(USAGE)).toEqual([]);
+  });
+
+  it('the lines init prints as it installs the hook do not', () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-surface-')));
+    const r = initProject({ projectDir: dir });
+    const printed = [...r.done, ...r.skipped, ...r.warnings].join('\n');
+    expect(printed).toMatch(/SessionStart hook/); // the surface under test is actually present
+    expect(offenders(printed)).toEqual([]);
+  });
+
+  it('the README does not', () => {
+    expect(offenders(readFileSync(new URL('../README.md', import.meta.url), 'utf8'))).toEqual([]);
   });
 });
 
