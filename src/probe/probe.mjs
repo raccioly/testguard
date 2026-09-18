@@ -13,7 +13,7 @@ import { selectRunner, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns } fr
 import { classify, shouldStopEarly } from './classify.mjs';
 import { blastRadius, rank } from './rank.mjs';
 import { classifyIndependence } from './independence.mjs';
-import { escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf } from './attribution.mjs';
+import { escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf, isReusable } from './attribution.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
 import { fingerprint } from '../../spec/lib/fingerprint.mjs';
 
@@ -231,8 +231,10 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
     defenderHashes: Object.fromEntries(defenders.map((f) => [f, hashFile(join(iso.projectDir, f))])),
   };
 
-  // Same source, same defenders, same N: the verdict cannot have changed.
-  if (prior && sameInputs(prior, inputs, claim.defendedBy ?? [], defenders)) {
+  const subject = subjectOf(fault, sha256);
+
+  // Same source, same defenders, same N, same fault: the verdict cannot have changed.
+  if (isReusable(prior, { inputs, requested: claim.defendedBy ?? [], resolved: defenders, contentHash: subject.contentHash })) {
     return { ...prior, reusedFrom: prior.reusedFrom ?? priorRunId };
   }
 
@@ -337,7 +339,7 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
   return {
     fingerprint: fingerprint({ claimId: claim.id, subjectId: fault.id, file: fault.file, verdict }),
     claim: { id: claim.id, statement: claim.statement, severity: claim.severity, source: claim.source, producedBy: claim.producedBy },
-    subject: subjectOf(fault, sha256),
+    subject,
     verdict,
     detail,
     defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}), ...(byRunner ? { byRunner } : {}), ...(mocking.length ? { mocking } : {}), ...(signals.length ? { signals } : {}) },
@@ -346,10 +348,3 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
   };
 }
 
-function sameInputs(prior, inputs, requested, resolved) {
-  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  return prior.inputs.targetHash === inputs.targetHash
-    && same(prior.inputs.defenderHashes, inputs.defenderHashes)
-    && same(prior.defenders.requested, requested)
-    && same(prior.defenders.resolved, resolved);
-}

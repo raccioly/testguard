@@ -92,3 +92,29 @@ export function subjectOf(fault, sha256) {
     contentHash: sha256(`${fault.find}\n${fault.replace}`),
   };
 }
+
+/**
+ * May a prior record stand in for this one, or must the fault be probed again?
+ *
+ * Same source, same defenders, same N — and the SAME FAULT. The last is not a
+ * refinement: a verdict is an answer about one specific `find`/`replace`, and
+ * once those change the old answer is not an answer to the new question.
+ * Without it, weakening a fault that survived keeps its old verdict, and
+ * repairing a rotted anchor keeps `unverifiable` — the evidence reporting a
+ * result that was never measured against the fault the file now contains.
+ * `status` flags the changed hash afterwards, but by then the evidence has
+ * already said something untrue.
+ *
+ * A prior that predates `contentHash` cannot be compared, so it is re-probed.
+ * The cost of re-measuring is a run; the cost of the other direction is a
+ * verdict nobody measured.
+ */
+export function isReusable(prior, current) {
+  if (!prior || !prior.subject?.contentHash) return false;
+  const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+  return prior.inputs.targetHash === current.inputs.targetHash
+    && same(prior.inputs.defenderHashes, current.inputs.defenderHashes)
+    && same(prior.defenders.requested, current.requested)
+    && same(prior.defenders.resolved, current.resolved)
+    && prior.subject.contentHash === current.contentHash;
+}

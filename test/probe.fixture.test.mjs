@@ -166,6 +166,38 @@ describe('probe reproduces the known-answer fixture', () => {
       expect(lines.out.join('\n')).toMatch(/0 new since baseline, 10 baselined/);
     }, 30_000);
 
+    it('probe again after EDITING a fault: that record is re-probed, never reused', async () => {
+      // The reuse cache keys on the source, the defenders and the fault. Drop
+      // the fault and the old verdict is an answer to a question no longer
+      // being asked — which is how a rotted anchor kept reporting the verdict
+      // it had before the code moved under it.
+      const claimsPath = join(scratch, 'testguard.claims.json');
+      const claims = JSON.parse(readFileSync(claimsPath, 'utf8'));
+      const target = claims.claims.find((c) => c.id === 'REDACT-001').faults.find((f) => f.id === 'F1');
+      const original = target.find;
+      target.find = 'content: redacted, // an anchor that is not in the source';
+      writeFileSync(claimsPath, JSON.stringify(claims, null, 2) + '\n');
+      // Probe into a copy of the existing evidence, so the prior is present
+      // to be reused — and the canonical evidence the later tests read is
+      // left alone.
+      const out = join(scratch, 'edited.json');
+      cpSync(join(scratch, '.testguard', 'evidence.json'), out);
+      try {
+        const { io } = capture();
+        await main(['probe', scratch, '--budget', '30000', '--claim', 'REDACT-001', '--out', out], io);
+        const after = readSpecDoc('evidence', out);
+        const edited = after.records.find((r) => r.subject.id === 'F1');
+        expect(edited.reusedFrom).toBeUndefined();
+        expect(edited.verdict).toBe('unverifiable');   // the anchor no longer locates
+        expect(edited.detail.reason).toBe('anchor-missing');
+        // its siblings, whose faults did not change, are still reused
+        expect(after.records.find((r) => r.subject.id === 'F2').reusedFrom).toBeTruthy();
+      } finally {
+        target.find = original;
+        writeFileSync(claimsPath, JSON.stringify(claims, null, 2) + '\n');
+      }
+    }, 60_000);
+
     it('brief --text: prints the block without writing a file; new-since-baseline is zero', async () => {
       const { lines, io } = capture();
       expect(await main(['brief', scratch, '--text'], io)).toBe(0);
