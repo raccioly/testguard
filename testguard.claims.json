@@ -2075,6 +2075,51 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-PIPELINE-REPRODUCES-THE-ORACLE",
+      "statement": "End to end, a probe reproduces the known-answer fixture's verdicts exactly and leaves the source tree byte-identical. Every fault it applies is restored, whatever happens while it is applied \u2014 a probe that changes the code it is measuring has destroyed the thing it was asked to check.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/probe.fixture.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An applied fault is never restored, so the probe leaves its own edits in the tree and every later fault is measured against corrupted source.",
+          "faultClass": "call-removed",
+          "file": "src/probe/probe.mjs",
+          "find": "        } finally {\n          mutation.restore();\n        }",
+          "replace": "        } finally {\n          void mutation;\n        }",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Isolation falls back to editing the project in place, so a probe mutates the source tree it was asked to measure.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "  const iso = mode === 'worktree' ? createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules }) : inPlace({ repoRoot: root, projectDir });",
+          "replace": "  const iso = inPlace({ repoRoot: root, projectDir });",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }
