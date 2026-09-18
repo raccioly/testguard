@@ -12,7 +12,7 @@ The verdict set is closed. Only one value is a pass.
 | `killed` | Fault applied; every one of N probe runs failed with a genuine assertion failure, on a defender set that was green N/N unmodified. | no |
 | `survived` | Fault applied; every one of N probe runs passed. The claim is **unproven**. | **yes** |
 | `nocover` | No defending test exists: the declared globs resolve to nothing, or no test imports the subject. Worse than `survived` — nothing was even tried. | **yes** |
-| `unverifiable` | The claim could not be probed: the fault's anchor is missing or ambiguous, its defenders failed to load (`defenders-failed-to-load`), or probing it threw (`probe-error`). Carries a `reason`. A loud, gating verdict — a claim that cannot be probed is not "skipped", it is undefended until someone fixes the fault or the defenders. Never confused with `flaky-defender`, which requires tests that *ran*. | **yes** |
+| `unverifiable` | The claim could not be probed: the fault's anchor is missing or ambiguous, its defenders failed to load (`defenders-failed-to-load`), probing it threw (`probe-error`), or the defenders do not execute the subject at all (`subject-not-executed`). Carries a `reason`. A loud, gating verdict — a claim that cannot be probed is not "skipped", it is undefended until someone fixes the fault or the defenders. Never confused with `flaky-defender`, which requires tests that *ran*. | **yes** |
 | `timeout` | Probe run exceeded its budget. Not counted as a kill; the pessimistic reading is the safe one because flakiness biases the metric optimistically. | **yes** |
 | `fault-invalid` | The replacement does not load or compile. A bad fault, not a detection. | **yes** |
 | `flaky-defender` | Defenders were not green N/N on unmodified source (`defenders-not-green`), or the N probe runs disagreed with each other (`inconsistent-probe`). Either way no verdict about the fault can be trusted; fix the defenders first. | **yes** |
@@ -128,6 +128,28 @@ Rules that follow from the table:
    same condition is the user's own file gone and must be raised. Any other
    failure to write the original back is raised in both modes: it can mean a
    mutated file left on disk.
+
+12. **A survivor must prove the defenders execute the subject.** A green
+   baseline proves the defenders can *pass*. It does not prove they can fail
+   *because of this file* — and if the fault is applied to code the test
+   process never executes, the baseline is green, every probe run is green,
+   and every claim is reported `survived`. That output reads as a devastating
+   audit finding and is entirely false, and no individual check in the run
+   contradicts it.
+   So a would-be `survived` is charged one more run: the subject is replaced
+   with content its loader cannot parse, and the defenders run once. Going red
+   proves they execute it (`detail.negativeControl: "reached"`), and the
+   `survived` stands. Staying green proves they do not, and the verdict is
+   `unverifiable` with reason `subject-not-executed` — the pessimistic reading,
+   and the only honest one, because nothing was measured about their
+   assertions.
+   Charged **only** on a would-be survivor, and cached per subject and defender
+   set. A kill already proves the defenders reached the code, so paying there
+   would be waste. A runner that cannot say what "cannot compile" means for its
+   language does not guess: no control is run, no signal is recorded, and the
+   verdict is unchanged. `detail.targetNotImported` (reported by runners that
+   can name the file the interpreter loaded) answers the same question more
+   precisely for one language; where both are present they must agree.
 
 ## Replay reports; it never gates
 

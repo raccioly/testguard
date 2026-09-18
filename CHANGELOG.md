@@ -67,6 +67,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A survivor now has to prove the defenders execute the subject** (#74). A
+  green baseline makes one failure mode structurally impossible — a misread
+  runner cannot flatter the suite, because a kill requires the defenders to
+  pass on unmodified source first. It says nothing about the opposite
+  direction. If the fault is applied to code the test process never executes,
+  the baseline is green, every probe run is green, and **every claim is
+  reported SURVIVED**. That output reads as a devastating audit finding and is
+  entirely false, and nothing in the run contradicts it, because every
+  individual check passed.
+  This is not hypothetical: a strict editable Python install registers a meta
+  path finder that is consulted before `sys.path`, so the interpreter loads the
+  original module while TestGuard faults the copy in its scratch worktree.
+  Measured, not argued — a fault independently verified to fail 2 of 4 tests
+  reported `4 passed`.
+  A would-be `survived` is now charged one more run: the subject is replaced
+  with content its loader cannot parse, and the defenders run once. Going red
+  proves they execute it (`detail.negativeControl: "reached"`) and the verdict
+  stands. Staying green proves they do not, and the verdict becomes
+  `unverifiable` with reason `subject-not-executed`. Charged **only** on a
+  survivor — a kill already proves the defenders reached the code — and cached
+  per subject and defender set. Each runner supplies what "cannot compile"
+  means for its language; one that cannot say does not guess, and no control is
+  run.
+  The predicate is *"the run did not stay green"*, not *"a test failed"*: an
+  unparseable module usually fails to **load**, which the runner reports as an
+  error with no tests run at all.
+
 - **`--progress auto|tty|plain|ndjson|none` on `probe`** (#68). A probe used
   to print its stage line only when `stderr` was a terminal, so CI, a
   redirected log and an agent harness saw nothing at all for the whole run —

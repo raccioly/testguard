@@ -63,8 +63,9 @@ export function mutate(source, fault) {
 }
 
 /**
- * Apply a fault to a file on disk. Returns a handle whose `restore()` puts the
- * original back; restore is idempotent and also runs on process exit/signal.
+ * Replace a file's contents on disk. Returns a handle whose `restore()` puts
+ * the original back; restore is idempotent and also runs on process
+ * exit/signal. `content` is the new text, or a function of the original.
  *
  * `inPlace` decides what a *missing* target means at restore time, and the two
  * modes are opposites. In worktree mode the mutation only ever existed inside a
@@ -75,15 +76,13 @@ export function mutate(source, fault) {
  * all. In `--in-place` mode the same condition means the user's own file is
  * gone, and silence would be the worst possible answer.
  */
-export function applyFault(projectDir, fault, { inPlace = false } = {}) {
+export function applyContent(projectDir, file, content, { inPlace = false } = {}) {
   installHandlers();
-  const path = join(projectDir, fault.file);
+  const path = join(projectDir, file);
   const original = readFileSync(path, 'utf8');
-  const anchor = locate(original, fault);
-  if (anchor.status !== 'ok') return { anchor, applied: false, restore: () => {} };
 
   let restored = false;
-  const handle = { anchor, applied: true, restore: null };
+  const handle = { applied: true, restore: null };
   const restore = () => {
     if (restored) return;
     restored = true;
@@ -100,6 +99,20 @@ export function applyFault(projectDir, fault, { inPlace = false } = {}) {
   };
   handle.restore = restore;
   live.add(restore);
-  writeFileSync(path, mutate(original, fault));
+  writeFileSync(path, typeof content === 'function' ? content(original) : content);
+  return handle;
+}
+
+/**
+ * Apply a fault to a file on disk. Returns a handle whose `restore()` puts the
+ * original back; `applied` is false and nothing is written when the anchor does
+ * not hit exactly as declared.
+ */
+export function applyFault(projectDir, fault, opts = {}) {
+  const anchor = locate(readFileSync(join(projectDir, fault.file), 'utf8'), fault);
+  if (anchor.status !== 'ok') return { anchor, applied: false, restore: () => {} };
+  // The same object, never a spread: `restoreSkipped` is set on it later.
+  const handle = applyContent(projectDir, fault.file, (src) => mutate(src, fault), opts);
+  handle.anchor = anchor;
   return handle;
 }

@@ -113,6 +113,23 @@ const semantic = {
       if (r.detail.targetNotImported && r.verdict === 'killed') {
         errors.push({ path: `${p}/detail/targetNotImported`, message: 'the subject was never imported, so the defenders cannot have killed the fault' });
       }
+      // The control is only ever charged on a would-be survivor, so a `reached`
+      // record must be one, and `not-reached` must have become unverifiable.
+      if (r.detail.negativeControl === 'reached' && r.verdict !== 'survived') {
+        errors.push({ path: `${p}/detail/negativeControl`, message: `negativeControl "reached" belongs to a survivor, not to ${r.verdict}` });
+      }
+      if (r.detail.negativeControl === 'not-reached' && !(r.verdict === 'unverifiable' && r.detail.reason === 'subject-not-executed')) {
+        errors.push({ path: `${p}/detail/negativeControl`, message: 'negativeControl "not-reached" requires verdict unverifiable with reason subject-not-executed' });
+      }
+      if (r.detail.reason === 'subject-not-executed' && r.detail.negativeControl !== 'not-reached') {
+        errors.push({ path: `${p}/detail/reason`, message: 'subject-not-executed requires the negativeControl that established it' });
+      }
+      // Python's import provenance and the general control answer the same
+      // question. A document where they disagree describes a run that cannot
+      // have happened.
+      if (r.detail.targetNotImported && r.detail.negativeControl === 'reached') {
+        errors.push({ path: `${p}/detail/negativeControl`, message: 'the subject was never imported, so the negative control cannot have reached it' });
+      }
       if (r.verdict === 'unverifiable' && !r.detail.reason) {
         errors.push({ path: `${p}/detail/reason`, message: 'unverifiable requires a reason (e.g. anchor-missing, anchor-ambiguous)' });
       }

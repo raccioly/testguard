@@ -62,7 +62,7 @@ What is gated instead:
 
 | Module | Defending tests |
 |---|---|
-| `src/probe/classify.mjs` | `test/classify.test.mjs` |
+| `src/probe/classify.mjs` | `test/classify.test.mjs`, `test/negative-control.test.mjs` |
 | `src/probe/inject.mjs` | `test/inject.test.mjs` |
 | `src/probe/probe.mjs` | `test/probe.fixture.test.mjs`, `test/probe-preconditions.test.mjs`, `test/probe-error.test.mjs` |
 | `src/probe/discover.mjs`, `src/probe/mocks.mjs` | `test/discover.test.mjs`, `test/mocks.test.mjs` |

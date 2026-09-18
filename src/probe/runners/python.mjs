@@ -307,3 +307,10 @@ export const run = makeRun(null);
 export function pinned(engine) {
   return { name: engine, testGlobs, owns, tests, parseReport, check: makeCheck(engine), run: makeRun(engine) };
 }
+
+/**
+ * The negative control's edit, for Python: an unterminated group, which is a
+ * `SyntaxError` at import time whatever the module contained. See the
+ * JavaScript runners for why this exists.
+ */
+export const fatalEdit = () => '# testguard negative control: this file must not parse\n(\n';
