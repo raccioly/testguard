@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-18
+
+Automated weekly release — everything merged since `v0.8.1`.
+
+### Changed
+
+- fix: the five findings from the 0.8.1 pocket-archive field report (#107)
+- chore(deps): jest 30.5.1 -> 30.5.2 (#106)
+- feat(release): the release PR starts its own CI (#105)
+- fix(release): tag through the API when the push is refused (#104)
+- chore(homebrew): sha256 for v0.8.1, from the published tarball (#103)
+- fix(release): a blocked pull request says which setting blocks it (#102)
+
+
 ### Fixed
 - **`scaffold` no longer dies on a zero-valued window literal, and proposes a
   real fault for one.** The window producer weakened a literal by ×1000, and
