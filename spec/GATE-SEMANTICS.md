@@ -12,7 +12,7 @@ The verdict set is closed. Only one value is a pass.
 | `killed` | Fault applied; every one of N probe runs failed with a genuine assertion failure, on a defender set that was green N/N unmodified. | no |
 | `survived` | Fault applied; every one of N probe runs passed. The claim is **unproven**. | **yes** |
 | `nocover` | No defending test exists: the declared globs resolve to nothing, or no test imports the subject. Worse than `survived` — nothing was even tried. | **yes** |
-| `unverifiable` | The claim could not be probed: the fault's anchor is missing or ambiguous, or its defenders failed to load (`defenders-failed-to-load`). Carries a `reason`. A loud, gating verdict — a claim that cannot be probed is not "skipped", it is undefended until someone fixes the fault or the defenders. Never confused with `flaky-defender`, which requires tests that *ran*. | **yes** |
+| `unverifiable` | The claim could not be probed: the fault's anchor is missing or ambiguous, its defenders failed to load (`defenders-failed-to-load`), or probing it threw (`probe-error`). Carries a `reason`. A loud, gating verdict — a claim that cannot be probed is not "skipped", it is undefended until someone fixes the fault or the defenders. Never confused with `flaky-defender`, which requires tests that *ran*. | **yes** |
 | `timeout` | Probe run exceeded its budget. Not counted as a kill; the pessimistic reading is the safe one because flakiness biases the metric optimistically. | **yes** |
 | `fault-invalid` | The replacement does not load or compile. A bad fault, not a detection. | **yes** |
 | `flaky-defender` | Defenders were not green N/N on unmodified source (`defenders-not-green`), or the N probe runs disagreed with each other (`inconsistent-probe`). Either way no verdict about the fault can be trusted; fix the defenders first. | **yes** |
@@ -107,6 +107,27 @@ Rules that follow from the table:
    dropping the file would report `nocover` for a claim that is well defended.
    The file stays a defender and carries `target-attribute-patched`, naming
    the attributes. Signals never change a verdict.
+
+11. **One fault's failure costs that fault, not the run.** A fault whose probe
+   throws is recorded as `unverifiable` with reason `probe-error` and a
+   `detail.message` naming what threw; the run continues and still writes its
+   evidence. Losing the document would throw away every verdict already
+   decided and leave a caller with an exit code this document does not define,
+   which is strictly worse than one loud unverifiable claim. A `probe-error`
+   record is never reused by a later run: it says something about the run, not
+   about the code. The one exception is a **precondition** failure — the
+   interpreter loading the source from outside the probed tree, a runner that
+   does not resolve — which is a statement about every verdict in the run and
+   still refuses it outright.
+   Restoring the source is held to the same reading. The restore is
+   belt-and-braces in worktree mode, where the mutation only ever existed
+   inside a scratch worktree that is discarded anyway, so a target that has
+   vanished is already restored and is recorded as
+   `detail.restoreSkipped: "target-missing"` rather than raised — a reader can
+   still see that the tree moved underneath the run. Under `--in-place` the
+   same condition is the user's own file gone and must be raised. Any other
+   failure to write the original back is raised in both modes: it can mean a
+   mutated file left on disk.
 
 ## Replay reports; it never gates
 

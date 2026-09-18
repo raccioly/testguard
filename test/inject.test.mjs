@@ -2,7 +2,7 @@
 // @req NFR-03
 // Requirements live in docs-canonical/REQUIREMENTS.md; the matrix there must agree with these.
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { locate, mutate, applyFault } from '../src/probe/inject.mjs';
@@ -45,5 +45,49 @@ describe('applyFault', () => {
     expect(h.applied).toBe(false);
     expect(h.anchor.status).toBe('anchor-missing');
     expect(readFileSync(file, 'utf8')).toBe(SRC);
+  });
+
+  // A parallel session pruning its OWN leaked scratch worktrees is enough to
+  // delete this run's, mid-probe. Before this, `restore()` threw ENOENT from a
+  // `finally`, the probe died, and every verdict already decided was lost with
+  // the evidence file that was never written.
+  describe('a target that vanished between apply and restore', () => {
+    const vanish = () => {
+      const d = mkdtempSync(join(tmpdir(), 'tg-inject-gone-'));
+      mkdirSync(join(d, 'src'));
+      writeFileSync(join(d, 'src', 'x.mjs'), SRC);
+      return d;
+    };
+
+    it('is already restored in worktree mode: no throw, and the record says the tree moved', () => {
+      const d = vanish();
+      const h = applyFault(d, { file: 'src/x.mjs', find: 'b();', replace: 'B();' });
+      rmSync(d, { recursive: true, force: true });
+      expect(() => h.restore()).not.toThrow();
+      expect(h.restoreSkipped).toBe('target-missing');
+    });
+
+    it('still throws under --in-place, where the missing target is the user own file', () => {
+      const d = vanish();
+      const h = applyFault(d, { file: 'src/x.mjs', find: 'b();', replace: 'B();' }, { inPlace: true });
+      rmSync(d, { recursive: true, force: true });
+      expect(() => h.restore()).toThrow(/ENOENT/);
+    });
+
+    it('does not swallow a failure that is not a missing target', () => {
+      // Read-only directory: the write fails with EACCES, which can mean a
+      // mutated file left on disk. Loud in both modes, never recorded.
+      const d = vanish();
+      const h = applyFault(d, { file: 'src/x.mjs', find: 'b();', replace: 'B();' });
+      chmodSync(join(d, 'src'), 0o500);
+      chmodSync(join(d, 'src', 'x.mjs'), 0o400);
+      try {
+        expect(() => h.restore()).toThrow();
+        expect(h.restoreSkipped).toBeUndefined();
+      } finally {
+        chmodSync(join(d, 'src'), 0o700);
+        rmSync(d, { recursive: true, force: true });
+      }
+    });
   });
 });

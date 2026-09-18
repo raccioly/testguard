@@ -154,8 +154,10 @@ to every other surface and `--check` fails the build on drift.
    │        │     ├─ all pass ────────────────────► SURVIVED      │
    │        │     ├─ timed out ───────────────────► TIMEOUT       │
    │        │     └─ disagreed ───────────────────► FLAKY-DEFENDER│
+   │        │     └─ threw ───────────────────────► UNVERIFIABLE  │
+   │        │            (probe-error; the run continues)         │
    │        ├─ escalate survivors against the whole suite         │
-   │        └─ restore                                            │
+   │        └─ restore (a scratch target already gone is recorded)│
    └──────────────────────────┬───────────────────────────────────┘
                               ▼
                      .testguard/evidence.json

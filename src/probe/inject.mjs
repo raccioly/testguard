@@ -65,8 +65,17 @@ export function mutate(source, fault) {
 /**
  * Apply a fault to a file on disk. Returns a handle whose `restore()` puts the
  * original back; restore is idempotent and also runs on process exit/signal.
+ *
+ * `inPlace` decides what a *missing* target means at restore time, and the two
+ * modes are opposites. In worktree mode the mutation only ever existed inside a
+ * scratch worktree that is discarded at the end of the run, so a target that has
+ * vanished is already restored in every sense that matters — a parallel session
+ * pruning its own leaked worktrees is enough to cause it, and throwing there
+ * converts a harmless cleanup race into a probe that dies with no evidence at
+ * all. In `--in-place` mode the same condition means the user's own file is
+ * gone, and silence would be the worst possible answer.
  */
-export function applyFault(projectDir, fault) {
+export function applyFault(projectDir, fault, { inPlace = false } = {}) {
   installHandlers();
   const path = join(projectDir, fault.file);
   const original = readFileSync(path, 'utf8');
@@ -74,13 +83,23 @@ export function applyFault(projectDir, fault) {
   if (anchor.status !== 'ok') return { anchor, applied: false, restore: () => {} };
 
   let restored = false;
+  const handle = { anchor, applied: true, restore: null };
   const restore = () => {
     if (restored) return;
     restored = true;
     live.delete(restore);
-    writeFileSync(path, original);
+    try {
+      writeFileSync(path, original);
+    } catch (err) {
+      // Only a target that is no longer there. A permission failure or a
+      // directory where a file should be can still mean a mutated file left on
+      // disk, and those must stay loud in either mode.
+      if (inPlace || err.code !== 'ENOENT') throw err;
+      handle.restoreSkipped = 'target-missing';
+    }
   };
+  handle.restore = restore;
   live.add(restore);
   writeFileSync(path, mutate(original, fault));
-  return { anchor, applied: true, restore };
+  return handle;
 }

@@ -393,6 +393,17 @@
               "description": "True when, with the fault applied, no defender caused the subject's module to be imported at all. Reported by runners that can tell (Python), never inferred. It does not change the verdict, and it is the one thing that makes a `survived` unreadable: the tests were not blind to the fault, they never reached it. A module imported from OUTSIDE the tree being probed is not recorded here \u2014 that run is refused outright, because every verdict in it would be false.",
               "const": true
         },
+        "message": {
+          "description": "Human-readable detail for a reason that carries one \u2014 today `probe-error`, whose first line names what threw. Never parsed; a reader should not have to reproduce the run to learn what happened.",
+          "type": "string",
+          "maxLength": 1024
+        },
+        "restoreSkipped": {
+          "description": "The fault was applied but the restore found nothing to put back: the target file no longer existed. In worktree mode that is a disturbed run rather than a failed one \u2014 the mutation only ever existed inside a scratch worktree, and something outside the process deleted it \u2014 but the verdicts in that run were measured against a tree that was being removed underneath them, and a reader has to be able to see that. In `--in-place` mode it never appears: there a missing target is the user's own file gone, and the restore throws.",
+          "enum": [
+            "target-missing"
+          ]
+        },
         "anchor": {
               "description": "With an anchor-related reason: how many times `find` occurred versus how many were expected.",
               "type": "object",

@@ -314,7 +314,7 @@
       "faults": [
         {
           "id": "F1",
-          "description": "Only the vitest wording is matched; esbuild's `Expected \u2026 but found` falls back to suite-failed-to-load.",
+          "description": "Only the vitest wording is matched; esbuild's `Expected … but found` falls back to suite-failed-to-load.",
           "faultClass": "literal-changed",
           "file": "src/probe/classify.mjs",
           "find": "/syntax|parse|transform failed|expected .+ but found|unexpected token/i",
@@ -1088,7 +1088,7 @@
     },
     {
       "id": "TG-INIT-HOOK-NO-NETWORK",
-      "statement": "The session-start hook resolves an already-installed testguard \u2014 the project's, the git root's, or one on PATH \u2014 and contains no form of npx, because even `npx --no-install` resolves the package from the registry before declining to install it.",
+      "statement": "The session-start hook resolves an already-installed testguard — the project's, the git root's, or one on PATH — and contains no form of npx, because even `npx --no-install` resolves the package from the registry before declining to install it.",
       "source": {
         "kind": "spec",
         "ref": "README.md#built-for-agents-to-run"
@@ -2030,7 +2030,7 @@
     },
     {
       "id": "TG-COST-COUNTS-EVERY-PHASE",
-      "statement": "A probe's reported cost is every run it paid for \u2014 the clean baseline runs and any escalation runs, not only the runs made with the fault applied. A cost report that undercounts the baseline understates the gate by more than half.",
+      "statement": "A probe's reported cost is every run it paid for — the clean baseline runs and any escalation runs, not only the runs made with the fault applied. A cost report that undercounts the baseline understates the gate by more than half.",
       "source": {
         "kind": "spec",
         "ref": "README.md#cost"
@@ -2047,7 +2047,7 @@
       "faults": [
         {
           "id": "F1",
-          "description": "Only the fault runs are counted, so the clean baseline runs \u2014 half the wall clock \u2014 vanish from the report.",
+          "description": "Only the fault runs are counted, so the clean baseline runs — half the wall clock — vanish from the report.",
           "faultClass": "statement-deleted",
           "file": "src/probe/cost.mjs",
           "find": "  ...(record.detail?.baselineRuns ?? []),\n",
@@ -2060,7 +2060,7 @@
         },
         {
           "id": "F2",
-          "description": "Escalation runs are dropped, so the claims that cost the most \u2014 the ones that escalated \u2014 look cheapest.",
+          "description": "Escalation runs are dropped, so the claims that cost the most — the ones that escalated — look cheapest.",
           "faultClass": "statement-deleted",
           "file": "src/probe/cost.mjs",
           "find": "  ...(record.detail?.escalationRuns ?? []),\n",
@@ -2120,7 +2120,7 @@
     },
     {
       "id": "TG-PIPELINE-REPRODUCES-THE-ORACLE",
-      "statement": "End to end, a probe reproduces the known-answer fixture's verdicts exactly and leaves the source tree byte-identical. Every fault it applies is restored, whatever happens while it is applied \u2014 a probe that changes the code it is measuring has destroyed the thing it was asked to check.",
+      "statement": "End to end, a probe reproduces the known-answer fixture's verdicts exactly and leaves the source tree byte-identical. Every fault it applies is restored, whatever happens while it is applied — a probe that changes the code it is measuring has destroyed the thing it was asked to check.",
       "source": {
         "kind": "spec",
         "ref": "spec/GATE-SEMANTICS.md"
@@ -2210,7 +2210,7 @@
     },
     {
       "id": "TG-PROGRESS-NEVER-ON-STDOUT",
-      "statement": "Progress is written to stderr, never stdout. stdout carries the result \u2014 with --json it is one document and nothing else \u2014 so a progress line there does not degrade the output, it destroys it for every consumer that parses it.",
+      "statement": "Progress is written to stderr, never stdout. stdout carries the result — with --json it is one document and nothing else — so a progress line there does not degrade the output, it destroys it for every consumer that parses it.",
       "source": {
         "kind": "spec",
         "ref": "README.md#progress"
@@ -2529,6 +2529,156 @@
           "file": "src/probe/runners/shared.mjs",
           "find": "  const unknownShape = report == null || typeof report !== 'object' || !Array.isArray(report.testResults);",
           "replace": "  const unknownShape = false;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RESTORE-SURVIVES-A-VANISHED-TARGET",
+      "statement": "In worktree mode a restore whose target no longer exists is recorded, never raised: the mutation only ever existed inside a scratch worktree, and one cleanup race must not cost the evidence for every fault already decided.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/inject.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The restore raises on a missing target again, so a pruned scratch worktree kills the run.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/inject.mjs",
+          "find": "      if (inPlace || err.code !== 'ENOENT') throw err;",
+          "replace": "      throw err;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-IN-PLACE-STILL-RAISES-A-MISSING-TARGET",
+      "statement": "Under --in-place a target that vanished before the restore is the user’s own file gone, and is always raised; only a worktree run may record it instead.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/inject.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The mode is ignored, so an in-place run silently leaves the user with no file and no error.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/inject.mjs",
+          "find": "      if (inPlace || err.code !== 'ENOENT') throw err;",
+          "replace": "      if (err.code !== 'ENOENT') throw err;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-ONE-BAD-FAULT-KEEPS-THE-EVIDENCE",
+      "statement": "A fault whose probe throws is recorded as unverifiable with reason probe-error and the run continues, so one bad fault never costs the verdicts already decided or the evidence document that carries them.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/probe-error.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The throw escapes the per-fault body again: no evidence file, every prior verdict lost.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/probe.mjs",
+          "find": "          if (err instanceof PreconditionError) throw err;",
+          "replace": "          throw err;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-A-PRECONDITION-STILL-REFUSES-THE-RUN",
+      "statement": "A precondition failure is a statement about every verdict in the run and still refuses it outright; the per-fault safety net never absorbs one into a single unverifiable claim.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/probe-error.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The safety net swallows a precondition failure, so a run in which no verdict means anything reports one quiet unverifiable claim and exits on the others.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/probe.mjs",
+          "find": "          if (err instanceof PreconditionError) throw err;",
+          "replace": "          if (false) throw err;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-A-PROBE-ERROR-IS-NEVER-REUSED",
+      "statement": "A probe-error record says something about the run and nothing about the code, so a later run always measures that fault again however unchanged its inputs are.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/attribution.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A disturbed run becomes a permanent verdict: the error record is reused for as long as the file is untouched.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/attribution.mjs",
+          "find": "  if (prior.detail?.reason === 'probe-error') return false;",
+          "replace": "  if (false) return false;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"

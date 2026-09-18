@@ -111,6 +111,9 @@ export function subjectOf(fault, sha256) {
  */
 export function isReusable(prior, current) {
   if (!prior || !prior.subject?.contentHash) return false;
+  // A record that exists because the probe threw is a statement about the run,
+  // not about the code. Reusing it would make one disturbed run permanent.
+  if (prior.detail?.reason === 'probe-error') return false;
   const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
   return prior.inputs.targetHash === current.inputs.targetHash
     && same(prior.inputs.defenderHashes, current.inputs.defenderHashes)

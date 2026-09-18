@@ -25,6 +25,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tool does rather than what category it belongs to.
 
 ### Fixed
+- **A vanished scratch worktree no longer costs the whole probe** (#64). A
+  parallel session cleaning up its *own* leaked scratch worktrees deleted this
+  run's while it was mid-fault; `restore()` then tried to write the original
+  back into a directory that was gone, threw `ENOENT` out of a `finally`, and
+  the probe died with no evidence file at all — every verdict already decided
+  thrown away, and an exit code `GATE-SEMANTICS.md` does not define.
+  In worktree mode the restore is belt-and-braces: the mutation only ever
+  existed inside a scratch worktree that is discarded at the end of the run, so
+  a target that has vanished is already restored in every sense that matters.
+  It is now recorded as `detail.restoreSkipped: "target-missing"` — a reader
+  can still see that the tree moved underneath the run — and the probe
+  continues. Under `--in-place` the same condition is the user's own file gone
+  and is still raised, loudly; so is any other failure to write the original
+  back, in both modes, because a permission error can mean a mutated file left
+  on disk.
+  More generally, **one bad fault no longer costs the evidence for the other
+  forty**. An unexpected throw inside a fault's probe ends *that fault* as
+  `unverifiable` with reason `probe-error` and a `detail.message` naming what
+  threw; the run finishes and writes its document. The verdict gates, so the
+  failure is loud rather than absorbed into a green run, and a `probe-error`
+  record is never reused by a later run — it says something about the run, not
+  about the code. A **precondition** failure is the deliberate exception: the
+  interpreter loading the source from outside the probed tree, or a runner that
+  does not resolve, is a statement about every verdict in the run and still
+  refuses it outright.
 - **A prior verdict is no longer reused across a fault edit.** `probe` decided
   reuse from the source hash, the defender hashes and the defender set — never
   from the fault itself. So editing a fault's `find` or `replace` kept the

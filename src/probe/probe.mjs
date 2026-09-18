@@ -198,14 +198,26 @@ export async function probe({
         const mockInfo = declared ? classifyDefenders(iso.projectDir, fault.file, declared) : discoverDefendersDetailed(iso.projectDir, fault.file);
         const defenders = declared ?? mockInfo.canDetect;
         const stage = (name, i, n) => onStage({ claimId: claim.id, faultId: fault.id, stage: name, i, n });
-        const record = await probeOne({ claim, fault, defenders, discovered: declared === null, allTests, iso, isoReal, onWarn, confirmRuns, escalate, baselineCache, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, byRunner: byRunner(defenders), mocking: mockInfo.mocking, signals: mockInfo.signals,
-          historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root,
-          // A path from the runner is absolute inside the SCRATCH worktree, or
-          // project-relative. Either way history is read from the real repository,
-          // so both must land on a repo-root-relative path. The runner reports
-          // realpaths (/private/var on macOS) while the worktree path may not be
-          // one — realpath both sides or every comparison silently misses.
-          toRepoPath: (p) => relative(root, join(projectDir, isAbsolute(p) ? relative(isoReal, realpathSync(p)) : p)) });
+        const common = { claim, fault, defenders, discovered: declared === null, byRunner: byRunner(defenders), mocking: mockInfo.mocking, signals: mockInfo.signals };
+        let record;
+        try {
+          record = await probeOne({ ...common, allTests, iso, isoReal, onWarn, confirmRuns, escalate, baselineCache, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id,
+            historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root,
+            // A path from the runner is absolute inside the SCRATCH worktree, or
+            // project-relative. Either way history is read from the real repository,
+            // so both must land on a repo-root-relative path. The runner reports
+            // realpaths (/private/var on macOS) while the worktree path may not be
+            // one — realpath both sides or every comparison silently misses.
+            toRepoPath: (p) => relative(root, join(projectDir, isAbsolute(p) ? relative(isoReal, realpathSync(p)) : p)) });
+        } catch (err) {
+          // A precondition failure is a statement about the whole run — the
+          // interpreter is loading a different copy of the source, the runner
+          // is not resolvable — and continuing would produce verdicts that are
+          // all false. Everything else is this one fault's problem.
+          if (err instanceof PreconditionError) throw err;
+          record = errorRecord({ ...common, error: err, inputs: safeInputs(iso.projectDir, fault, defenders) });
+          onWarn(`${claim.id}/${fault.id}: ${record.detail.message} — reported as unverifiable so the rest of the run still produces evidence.`);
+        }
         records.push(record);
         onProgress(record);
       }
@@ -236,6 +248,48 @@ export async function probe({
     },
     records,
   };
+}
+
+/**
+ * The record a fault gets when probing it threw.
+ *
+ * Before this existed, an unexpected error anywhere inside one fault's probe
+ * killed the process: no evidence file at all, every verdict already decided
+ * thrown away, and an exit code no caller can read against GATE-SEMANTICS. One
+ * bad fault should cost that fault and nothing else.
+ *
+ * `unverifiable` is the honest verdict — the claim could not be probed — and it
+ * gates, so the failure is loud rather than absorbed into a green run. Pure, so
+ * every branch is testable without provoking a crash.
+ */
+export function errorRecord({ claim, fault, defenders, discovered, byRunner, mocking = [], signals = [], error, inputs }) {
+  const message = String(error?.message ?? error).split('\n')[0].slice(0, 1024);
+  return {
+    fingerprint: fingerprint({ claimId: claim.id, subjectId: fault.id, file: fault.file, verdict: 'unverifiable' }),
+    claim: { id: claim.id, statement: claim.statement, severity: claim.severity, source: claim.source, producedBy: claim.producedBy },
+    subject: subjectOf(fault, sha256),
+    verdict: 'unverifiable',
+    detail: { baselineRuns: [], probeRuns: [], reason: 'probe-error', message },
+    defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}), ...(byRunner ? { byRunner } : {}), ...(mocking.length ? { mocking } : {}), ...(signals.length ? { signals } : {}) },
+    inputs,
+  };
+}
+
+/**
+ * `inputs` for a record built after something threw — which is exactly when a
+ * file may no longer be readable. Hashing must not be the second failure, so an
+ * unreadable file hashes as empty: never equal to a real file's hash, so the
+ * record can only ever fail a reuse check, never pass one by accident.
+ */
+function safeInputs(projectDir, fault, defenders) {
+  const h = (f) => {
+    try {
+      return hashFile(join(projectDir, f));
+    } catch {
+      return sha256('');
+    }
+  };
+  return { targetHash: h(fault.file), defenderHashes: Object.fromEntries(defenders.map((f) => [f, h(f)])) };
 }
 
 async function probeOne({ claim, fault, defenders, discovered, allTests, iso, isoReal, onWarn = () => {}, confirmRuns, escalate, baselineCache, runDefenders, stage, prior, priorRunId, byRunner, mocking = [], signals = [], historyRef, historyDir, toRepoPath }) {
@@ -302,7 +356,7 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
       }
 
       if (detail.baselineRuns.every((r) => r.outcome === 'pass') && detail.baselineRuns.length === confirmRuns) {
-        const mutation = applyFault(iso.projectDir, fault);
+        const mutation = applyFault(iso.projectDir, fault, { inPlace: iso.mode === 'in-place' });
         try {
           const probeRuns = rawProbeRuns;
           for (let i = 0; i < confirmRuns; i++) {
@@ -336,6 +390,11 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
           }
         } finally {
           mutation.restore();
+          // The restore found nothing to put back. In worktree mode that is a
+          // disturbed run, not a failed one (see applyFault) — but a reader
+          // has to be able to tell, because it means something outside this
+          // process was deleting the tree the verdicts came from.
+          if (mutation.restoreSkipped) detail.restoreSkipped = mutation.restoreSkipped;
         }
       }
     }

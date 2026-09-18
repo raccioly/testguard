@@ -116,6 +116,18 @@ const semantic = {
       if (r.verdict === 'unverifiable' && !r.detail.reason) {
         errors.push({ path: `${p}/detail/reason`, message: 'unverifiable requires a reason (e.g. anchor-missing, anchor-ambiguous)' });
       }
+      // `probe-error` is the one reason that names nothing on its own: it says
+      // the run threw, not what threw. Without the message the record is a
+      // dead end for anyone reading the document instead of rerunning it.
+      if (r.detail.reason === 'probe-error' && !r.detail.message) {
+        errors.push({ path: `${p}/detail/message`, message: 'probe-error requires a message naming what threw' });
+      }
+      // In-place is the mode where a vanished target is the user's own file
+      // gone; it raises rather than records. A document claiming otherwise
+      // describes a run that cannot have happened.
+      if (r.detail.restoreSkipped && doc.run.mode === 'in-place') {
+        errors.push({ path: `${p}/detail/restoreSkipped`, message: 'restoreSkipped cannot occur in in-place mode, where a missing target is raised' });
+      }
     });
     return errors;
   },
