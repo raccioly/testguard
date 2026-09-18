@@ -1,5 +1,5 @@
 name: 'TestGuard — Claim Verification'
-description: 'Prove your test suite defends the claims your project makes. Injects the faults those claims forbid; fails on any the tests miss.'
+description: 'Breaks your code on purpose and fails the build on every promise your tests did not notice breaking.'
 author: 'Ricardo Accioly'
 
 branding:

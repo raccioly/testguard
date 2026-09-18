@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TestGuard — Proving a Test Suite Defends What It Claims</title>
+<style>
+  :root {
+    --ink:        #14161a;
+    --ink-soft:   #4b5563;
+    --ink-faint:  #8a93a0;
+    --rule:       #e4e7ec;
+    --rule-soft:  #f0f2f5;
+    --accent:     #b3122b;
+    --accent-dim: #fdf2f4;
+    --good:       #0f6b3f;
+    --good-dim:   #eff8f3;
+    --paper:      #ffffff;
+    --sans: "Helvetica Neue", Helvetica, "Inter", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+    --mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+
+  @page { size: Letter; margin: 14mm 15mm 13mm; }
+
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); font-size: 9.6pt; line-height: 1.5;
+    letter-spacing: -0.005em;
+  }
+
+  .page { page-break-after: always; display: flex; flex-direction: column;
+          min-height: 252mm; /* Letter minus the @page margins */ }
+  .page:last-child { page-break-after: auto; }
+
+  /* ── masthead ───────────────────────────────────────────── */
+  .masthead { display: flex; align-items: baseline; justify-content: space-between;
+              border-bottom: 2.5px solid var(--ink); padding-bottom: 7px; }
+  .wordmark { font-size: 13pt; font-weight: 700; letter-spacing: -0.02em; }
+  .wordmark .mark { color: var(--accent); }
+  .meta { font-family: var(--mono); font-size: 6.9pt; color: var(--ink-faint);
+          letter-spacing: 0.06em; text-transform: uppercase; }
+
+  h1 { font-size: 25pt; line-height: 1.1; font-weight: 700; letter-spacing: -0.03em;
+       margin: 22px 0 0; max-width: 20ch; }
+  .standfirst { font-size: 11.4pt; line-height: 1.45; color: var(--ink-soft);
+                margin: 11px 0 0; max-width: 62ch; font-weight: 400; }
+
+  h2 { font-size: 8pt; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase;
+       color: var(--accent); margin: 0 0 9px; }
+  h3 { font-size: 10.2pt; font-weight: 700; margin: 0 0 5px; letter-spacing: -0.01em; }
+
+  p { margin: 0 0 9px; }
+  .lede { font-size: 10.4pt; }
+  strong { font-weight: 700; }
+  em { font-style: italic; }
+  code { font-family: var(--mono); font-size: 0.88em; background: var(--rule-soft);
+         padding: 1px 4px; border-radius: 3px; }
+
+  section { margin-top: 20px; }
+  .rule-top { border-top: 1px solid var(--rule); padding-top: 13px; }
+
+  /* ── layout helpers ─────────────────────────────────────── */
+  .cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .cols-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+  /* ── code exhibit ───────────────────────────────────────── */
+  .exhibit { border: 1px solid var(--rule); border-left: 3px solid var(--accent);
+             background: #fcfcfd; padding: 11px 13px; margin: 0 0 9px; }
+  .exhibit pre { font-family: var(--mono); font-size: 8.1pt; line-height: 1.5;
+                 margin: 0; white-space: pre-wrap; color: #1f2430; }
+  .exhibit .cap { font-family: var(--mono); font-size: 6.8pt; letter-spacing: 0.09em;
+                  text-transform: uppercase; color: var(--ink-faint); margin-bottom: 7px; }
+  .kw { color: #8250df; } .str { color: #0a7b52; } .num { color: #0550ae; } .cm { color: var(--ink-faint); font-style: italic; }
+
+  /* ── verdict cards ──────────────────────────────────────── */
+  .verdict { border: 1px solid var(--rule); padding: 11px 13px; }
+  .verdict.bad  { border-left: 3px solid var(--accent); background: var(--accent-dim); }
+  .verdict.good { border-left: 3px solid var(--good);   background: var(--good-dim); }
+  .verdict .tag { font-family: var(--mono); font-size: 8.4pt; font-weight: 700;
+                  letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
+  .verdict.bad .tag  { color: var(--accent); }
+  .verdict.good .tag { color: var(--good); }
+  .verdict p { margin: 0; font-size: 9.1pt; }
+
+  /* ── pull quote ─────────────────────────────────────────── */
+  .pull { border-top: 2.5px solid var(--ink); border-bottom: 1px solid var(--rule);
+          padding: 13px 0 12px; margin-top: 20px; }
+  .pull p { font-size: 12.6pt; line-height: 1.38; font-weight: 500;
+            letter-spacing: -0.017em; margin: 0; max-width: 66ch; }
+  .pull .attrib { font-family: var(--mono); font-size: 6.8pt; letter-spacing: 0.09em;
+                  text-transform: uppercase; color: var(--ink-faint); margin-top: 8px; }
+
+  /* ── tables ─────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; font-size: 8.9pt; }
+  th { text-align: left; font-size: 7.1pt; letter-spacing: 0.1em; text-transform: uppercase;
+       color: var(--ink-faint); font-weight: 700; padding: 0 9px 6px 0;
+       border-bottom: 1.5px solid var(--ink); }
+  td { padding: 7px 9px 7px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  td:first-child { font-family: var(--mono); font-weight: 700; white-space: nowrap; width: 20%; }
+  tr:last-child td { border-bottom: none; }
+  .v-bad  { color: var(--accent); }
+  .v-good { color: var(--good); }
+
+  /* ── numbered steps ─────────────────────────────────────── */
+  ol.steps { list-style: none; counter-reset: s; margin: 0; padding: 0; }
+  ol.steps li { counter-increment: s; position: relative; padding-left: 26px; margin-bottom: 9px; }
+  ol.steps li::before {
+    content: counter(s); position: absolute; left: 0; top: 0;
+    font-family: var(--mono); font-size: 7.4pt; font-weight: 700; color: var(--paper);
+    background: var(--ink); width: 17px; height: 17px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  ol.steps li p { margin: 0; }
+  ol.steps .h { font-weight: 700; }
+
+  ul.ticks { list-style: none; margin: 0; padding: 0; }
+  ul.ticks li { position: relative; padding-left: 15px; margin-bottom: 6px; }
+  ul.ticks li::before { content: "—"; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+
+  /* ── comparison ─────────────────────────────────────────── */
+  .versus { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--rule); }
+  .versus > div { padding: 12px 14px; }
+  .versus > div:first-child { border-right: 1px solid var(--rule); background: #fbfbfc; }
+  .versus h3 { font-size: 8.6pt; letter-spacing: 0.04em; }
+  .versus .q { font-family: var(--mono); font-size: 8.5pt; color: var(--ink-soft);
+               display: block; margin: 7px 0 8px; }
+  .versus .out { font-size: 9.2pt; font-weight: 600; }
+
+  .footer { margin-top: auto; padding-bottom: 0;
+            display: flex; justify-content: space-between;
+            font-family: var(--mono); font-size: 6.6pt; color: var(--ink-faint);
+            letter-spacing: 0.07em; text-transform: uppercase;
+            border-top: 1px solid var(--rule); padding-top: 5px; }
+
+  .kicker { font-family: var(--mono); font-size: 6.9pt; letter-spacing: 0.11em;
+            text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
+  .note { font-size: 8.5pt; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ PAGE 1 — THE WHOLE IDEA ══════════════════ -->
+<div class="page">
+  <div class="masthead">
+    <div class="wordmark">Test<span class="mark">Guard</span></div>
+    <div class="meta">Technical Brief · v0.6 · MIT</div>
+  </div>
+
+  <h1>Your tests pass. That is not the same as your tests working.</h1>
+
+  <p class="standfirst">TestGuard takes the promises your code makes, breaks each one on purpose,
+  and reports every promise your tests did not notice breaking.</p>
+
+  <section class="rule-top">
+    <h2>The problem</h2>
+    <p class="lede"><strong>Coverage tells you a line ran. It never tells you anyone checked the result.</strong>
+    So a codebase can be fully covered and completely undefended — and nothing in CI will say a word.</p>
+
+    <div class="exhibit">
+      <div class="cap">A real test, from this project's own fixture</div>
+<pre><span class="kw">expect</span>(store.writeAudit).toHaveBeenCalledWith(
+  <span class="kw">expect</span>.objectContaining({ action: <span class="str">'MASK'</span>, scope: <span class="str">'g1'</span>, ruleCount: <span class="num">1</span> }),
+);  <span class="cm">// `content` is never named — so nothing checks it</span></pre>
+    </div>
+
+    <p><code>objectContaining</code> ignores keys it does not list. Swap the redacted text for the
+    <strong>raw secret</strong> and this test still passes. Coverage of that line: 100%. The audit log now
+    leaks the very thing it exists to protect.</p>
+
+    <p class="note">This shape is disproportionately common in AI-written tests, which are fluent,
+    plausible, and pin down far less than they appear to.</p>
+  </section>
+
+  <section class="rule-top">
+    <h2>The method</h2>
+    <p>Break the code deliberately. Watch what the tests do.</p>
+    <div class="cols-2" style="margin-top:11px">
+      <div class="verdict good">
+        <span class="tag">killed</span>
+        <p>You broke it — a test failed. <strong>Good.</strong> That behaviour is genuinely defended.</p>
+      </div>
+      <div class="verdict bad">
+        <span class="tag">SURVIVED</span>
+        <p>You broke it — everything stayed green. <strong>A blind spot.</strong></p>
+      </div>
+    </div>
+    <p style="margin-top:10px"><strong>The word trips everyone once:</strong> it is the <em>fault</em> that survived,
+    not the test. SURVIVED is the bad news. A healthy report is full of <em>killed</em>.</p>
+  </section>
+
+  <div class="pull">
+    <p>A tool that reports everything as caught is worse than no tool at all —
+    because nobody questions good news.</p>
+    <div class="attrib">The design constraint everything else follows from</div>
+  </div>
+
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 1 of 3 · The idea</span></div>
+</div>
+
+<!-- ══════════════════ PAGE 2 — HOW IT WORKS ══════════════════ -->
+<div class="page">
+  <div class="masthead">
+    <div class="wordmark">Test<span class="mark">Guard</span></div>
+    <div class="meta">02 — Mechanics &amp; Verdicts</div>
+  </div>
+
+  <section style="margin-top:17px">
+    <h2>How a run works</h2>
+    <ol class="steps">
+      <li><p><span class="h">You state a claim.</span> Plain language, in a file: <em>“A missing scope fails closed.”</em>
+      <em>“The audit row never contains the original input.”</em></p></li>
+      <li><p><span class="h">Each claim carries faults</span> — concrete edits that would make that promise false.</p></li>
+      <li><p><span class="h">Probe isolates.</span> Your repository is copied to a scratch worktree. Your working tree is never touched.</p></li>
+      <li><p><span class="h">Baseline, three times.</span> The claim's tests run on <em>unmodified</em> code and must pass all three.
+      If they cannot, nothing about that claim can be trusted, and the run says so instead of guessing.</p></li>
+      <li><p><span class="h">Inject, run three times, restore.</span> The fault goes in, the same tests run again, the file is put back.</p></li>
+      <li><p><span class="h">Read the structured report — never the exit code.</span> An exit code cannot tell
+      “a test failed” apart from “nothing loaded.”</p></li>
+      <li><p><span class="h">Write evidence.</span> One verdict per fault, with the runs that produced it.</p></li>
+    </ol>
+  </section>
+
+  <section class="rule-top">
+    <h2>Seven verdicts, because “did the tests fail?” is a sloppy question</h2>
+    <p style="margin-bottom:11px">A red suite is not proof of detection. Most of the design is refusing to conflate these:</p>
+    <table>
+      <tr><th>Verdict</th><th>What it means</th></tr>
+      <tr><td class="v-good">killed</td><td>A test body ran and rejected the behaviour. The only good outcome.</td></tr>
+      <tr><td class="v-bad">SURVIVED</td><td>Everything passed. A real blind spot in the tests.</td></tr>
+      <tr><td>NOCOVER</td><td>No test even looks at this code. Not “weak tests” — <em>no</em> tests.</td></tr>
+      <tr><td>UNVERIFIABLE</td><td>The fault could not be applied: its anchor moved, or matches twice. Nothing was learned.</td></tr>
+      <tr><td>FAULT-INVALID</td><td>The break itself was broken — it did not compile. Our fault, not yours.</td></tr>
+      <tr><td>TIMEOUT</td><td>The suite hung. A hang is not a detection.</td></tr>
+      <tr><td>FLAKY-DEFENDER</td><td>The tests are not reliable enough on untouched code to be asked the question.</td></tr>
+    </table>
+  </section>
+
+  <section class="rule-top">
+    <h2>Every ambiguity rounds toward “unproven”</h2>
+    <div class="cols-3">
+      <div><ul class="ticks">
+        <li>Three runs, never one.</li>
+        <li>A green baseline is required before any fault is injected.</li>
+      </ul></div>
+      <div><ul class="ticks">
+        <li>A timeout is never a kill.</li>
+        <li>A suite that fails to load is never a kill.</li>
+      </ul></div>
+      <div><ul class="ticks">
+        <li>Mixed results across runs are not a kill.</li>
+        <li>A test that mocks what it defends is not a defender.</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 2 of 3 · Mechanics</span></div>
+</div>
+
+<!-- ══════════════════ PAGE 3 — WHY IT IS DIFFERENT ══════════════════ -->
+<div class="page">
+  <div class="masthead">
+    <div class="wordmark">Test<span class="mark">Guard</span></div>
+    <div class="meta">03 — Prior Art &amp; Difference</div>
+  </div>
+
+  <section style="margin-top:17px">
+    <h2>What is not new</h2>
+    <p>Breaking code to test your tests is <strong>mutation testing</strong>, and it dates to the 1970s.
+    Stryker, PIT, mutmut and Cosmic Ray all do it. Anyone claiming that part is novel is selling something.</p>
+  </section>
+
+  <section class="rule-top">
+    <h2>What is different: the question being asked</h2>
+    <div class="versus">
+      <div>
+        <div class="kicker">Classic mutation testing</div>
+        <h3>Mutates everything, mechanically</h3>
+        <span class="q">“How good are my tests?”</span>
+        <p class="out">→ <em>Mutation score: 73%</em></p>
+        <p class="note" style="margin-top:8px">A number. Not actionable, not auditable, and it cannot
+        tell you which promise is at risk.</p>
+      </div>
+      <div>
+        <div class="kicker">TestGuard</div>
+        <h3>Binds every fault to a stated claim</h3>
+        <span class="q">“Is <em>this specific promise</em> defended?”</span>
+        <p class="out">→ <em>“Your project says a missing scope fails closed. Nothing checks that.”</em></p>
+        <p class="note" style="margin-top:8px">A finding. An assessor reads your claims — reviewable
+        like code — not a score.</p>
+      </div>
+    </div>
+    <p style="margin-top:11px">That is the difference between a <strong>metric</strong> and an
+    <strong>audit</strong>, and it is the whole design.</p>
+  </section>
+
+  <section class="rule-top">
+    <h2>Three more things that follow from it</h2>
+    <div class="cols-3">
+      <div>
+        <h3>Paranoid about itself</h3>
+        <p class="note">Most tools mark a mutant killed when the test command exits non-zero — conflating
+        “a test caught it” with “everything exploded.” Here, the verdict set is closed and each member
+        means something different.</p>
+      </div>
+      <div>
+        <h3>Evidence, not output</h3>
+        <p class="note">Schema-validated JSON with stable fingerprints. Freeze today's blind spots as a
+        baseline, gate CI on <em>new</em> ones — so a legacy codebase can adopt it on Monday without
+        four hundred failures.</p>
+      </div>
+      <div>
+        <h3>Built for AI-written code</h3>
+        <p class="note">When an agent writes the tests, the failure mode is not “no tests.” It is
+        confident, plausible tests that assert nothing. That is precisely what this detects.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="pull">
+    <p>Coverage tells you a line ran. TestGuard tells you which of your promises
+    nobody is actually defending.</p>
+    <div class="attrib">github.com/raccioly/testguard · npm testguard-cli · MIT</div>
+  </div>
+
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 3 of 3 · Difference</span></div>
+</div>
+
+</body>
+</html>
