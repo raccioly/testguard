@@ -1,6 +1,6 @@
 {
   "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine.",
-  "seconds": 1350,
+  "seconds": 1230,
   "measured": {
     "seconds": 804,
     "at": "2026-09-18",
@@ -25,42 +25,33 @@
       "seconds": 1350,
       "at": "2026-09-18",
       "why": "The 0.8.1 field-report fixes added 6 claims and 14 faults (115 -> 129 faults, 690 -> 774 runs, +12.2%) and ci.yml measured 1123 s against 1100, over by 23 s. Two things make 1123 the wrong number to budget against, in opposite directions. It is LOW: the run restored a cache under the `self-evidence-` fallback key, so claims whose target and defenders were untouched reused their verdict, and this budget is defined against a from-scratch probe because the release job is from scratch. It is also not the whole story: 46 s of the growth was avoidable and already removed — the new calibration claim's tests are pure but were added to replay.test.mjs, whose scripted-corpus setup costs tens of seconds a run, and re-pointing them at calibration.test.mjs took that claim from 51 s to 4.9 s. A from-scratch local run of the same commit measured 1168 s on a contended machine. 1350 is ~14% over an expected from-scratch CI figure of ~1185, which is the same headroom rule that set 1100 against 962. Expected to come DOWN: the shared-defender cut below is the next piece of work and should return the gate to under 900 s."
+    },
+    {
+      "seconds": 1230,
+      "at": "2026-09-18",
+      "why": "Tightened from 1350 once a FROM-SCRATCH figure existed. 1350 was set defensively against a reuse-affected 1123 s, because this budget is defined against a from-scratch probe and none had run yet. release.yml then measured 1081 s at 129 faults / 774 runs on the v0.9.0 release commit with no reuse: 129 faults cost 1081 s against 115 faults at 999 s, so +82 s for +14 faults. 1230 is ~14% over 1081, the same headroom rule that set 1100 against 962. Leaving 1350 in place would have let a 25% regression pass unnoticed, which is the opposite of what this file is for."
     }
   ],
   "measuredInCI": {
-    "seconds": 1123,
+    "seconds": 1081,
     "at": "2026-09-18",
-    "run": "35395439072",
-    "commit": "9eddee6",
+    "run": "35400415299",
+    "commit": "3780e6e",
     "faults": 129,
     "runs": 774,
-    "how": "ci.yml test(22): probe . --budget 180000 --no-escalate --cost, on PR #107",
-    "reuse": "PARTIAL — the cache hit the `self-evidence-` fallback key (main's claims hash c264301b), so untouched claims reused their verdict. This change edits eight source files, so most claims were invalidated and re-probed anyway, but the figure is a floor and not the from-scratch number this budget is defined against. Replace it with the release job's figure, which never reuses.",
+    "how": "release.yml test: probe . --budget 180000 --cost, from scratch on the v0.9.0 release commit. No verdict reuse, which is what this budget is defined against.",
     "before": {
       "seconds": 999,
       "commit": "8ddad99",
-      "note": "release.yml at 115 faults, from scratch, before these six claims"
+      "faults": 115,
+      "note": "the same job at 115 faults, before the six field-report claims"
     },
-    "localFromScratch": {
-      "seconds": 1168,
-      "runs": 774,
-      "note": "probe . --include-dirty --budget 180000 --cost on a contended developer machine, before the calibration re-point that removed 46 s"
-    },
-    "variance": {
+    "reuseAffected": {
       "observed": [
-        {
-          "seconds": 1123,
-          "run": "35395439072",
-          "note": "first run on the branch"
-        },
-        {
-          "seconds": 1025,
-          "run": "35397969312",
-          "reused": 92,
-          "note": "second run, same 129 faults and 774 runs, after the budget commit"
-        }
+        1123,
+        1025
       ],
-      "why": "The reported total is modelled, not wall clock: a reused record contributes what it cost when it was last probed, on another run and another runner. So the same commit reports differently depending on what the `self-evidence-` fallback key happened to restore — about 10% here. Both figures are reuse-affected and both are floors. The from-scratch figure this budget is defined against comes from the release job, which never reuses; record it there when it runs."
+      "note": "ci.yml figures are NOT comparable with this one. Its cache restore-key chain ends in a bare 'self-evidence-' prefix, so any previous evidence can be restored regardless of claims hash, and a reused record contributes what it cost when it was last probed on another runner. The same commit reported 1123 s and then 1025 s. Correctness is unaffected - TG-REUSE-NEVER-CROSSES-A-FAULT-EDIT re-probes any changed fault - only the reported total moves."
     }
   },
   "nextCut": {
@@ -77,6 +68,17 @@
         "claims": 6
       }
     ],
-    "expected": "250-350 s, which would put the gate under 900 s with all 129 faults. Lower this budget when it lands."
+    "expected": "250-350 s, which would put the gate near 800 s with all 129 faults. Lower BOTH ceilings when it lands."
+  },
+  "perClaimSeconds": 75,
+  "perClaim": {
+    "seconds": 75,
+    "why": "A SECOND ceiling, because neither unit works alone. The total can only ever be raised - claims should grow forever - so a number that always goes up stops being read. A per-fault average is worse: the regression that prompted this budget raised the fault count 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine. The measured pathology is per-CLAIM, and specifically a claim naming an expensive SHARED defender file, because a claim pays for every test in the file it names. TG-ADMIT-NEEDS-ALL-KILLED costs 67 s for ONE fault; a new calibration claim landed at 51 s for two purely by being written into replay.test.mjs rather than calibration.test.mjs, and re-pointing it took it to 4.9 s. The total absorbed that silently; this does not.",
+    "rule": "No new claim may be worse than the worst we already have. 75 s sits just above today's worst, so the ceiling stays meaningful as claims are added and should be tightened as the shared-defender cut lands.",
+    "todayWorst": {
+      "id": "TG-ADMIT-NEEDS-ALL-KILLED",
+      "seconds": 67,
+      "faults": 1
+    }
   }
 }

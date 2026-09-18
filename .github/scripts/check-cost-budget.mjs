@@ -8,7 +8,7 @@
  *
  * usage: check-cost-budget.mjs <evidence.json> [previous-evidence.json]
  */
-import { readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { costReport, checkCostBudget, renderCostBudget } from '../../src/probe/cost.mjs';
@@ -34,9 +34,45 @@ if (previousPath) {
   }
 }
 
-const decision = checkCostBudget(costReport(read(evidencePath).records), { budgetSeconds: budget.seconds, previousMs });
+const report = costReport(read(evidencePath).records);
+const decision = checkCostBudget(report, {
+  budgetSeconds: budget.seconds,
+  perClaimSeconds: budget.perClaimSeconds,
+  previousMs,
+});
 const text = renderCostBudget(decision);
 console.log(text);
+
+// The gate's own history is the argument for writing this where it is seen:
+// the run went 9.6 -> 23.6 minutes across one merged pull request and nothing
+// said a word, because --cost only ever printed into a log nobody opens while
+// it is passing. A new claim that quietly costs 51 s is the same failure one
+// size down. A job summary is read without opening anything, so the number is
+// in front of a reviewer while the change is still a change.
+if (process.env.GITHUB_STEP_SUMMARY) {
+  const rows = (report.claims ?? []).slice(0, 10)
+    .map((c) => `| \`${c.claimId}\` | ${(c.ms / 1000).toFixed(1)}s | ${c.runs} |`)
+    .join('\n');
+  appendFileSync(process.env.GITHUB_STEP_SUMMARY, [
+    `## Self-probe cost \u2014 ${decision.ok ? 'within budget' : 'OVER BUDGET'}`,
+    '',
+    '```',
+    text,
+    '```',
+    '',
+    '<details><summary>Most expensive claims</summary>',
+    '',
+    '| claim | cost | runs |',
+    '| --- | ---: | ---: |',
+    rows,
+    '',
+    'A claim pays for every test in the file it names, so the fix for an expensive',
+    'claim is usually a cheaper defender rather than a bigger budget.',
+    '</details>',
+    '',
+  ].join('\n'));
+}
+
 if (!decision.ok) {
   console.log(`::error::${text.split('\n')[0]}`);
   process.exit(1);

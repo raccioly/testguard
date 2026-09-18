@@ -3159,8 +3159,8 @@
           "description": "Any total passes the budget, so the check reports success on a gate that has tripled and nothing ever fails.",
           "faultClass": "condition-forced",
           "file": "src/probe/cost.mjs",
-          "find": "    ok: totalMs <= budgetMs,",
-          "replace": "    ok: true,",
+          "find": "    ok: totalMs <= budgetMs && overPerClaim.length === 0,",
+          "replace": "    ok: overPerClaim.length === 0,",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -3603,6 +3603,69 @@
       ],
       "tags": [
         "init",
+        "field-report"
+      ]
+    },
+    {
+      "id": "TG-PER-CLAIM-BUDGET-ACTUALLY-GATES",
+      "statement": "A claim over the per-claim ceiling fails the gate even when the total is comfortably inside its budget. The total alone cannot see this: a calibration claim cost 51 s for two faults purely by naming replay.test.mjs instead of calibration.test.mjs, and re-pointing it took it to 4.9 s while the total never moved. A per-fault average cannot see it either - the regression that prompted this budget raised the fault count 59 to 91 while per-fault cost barely moved. The ceiling is optional and additive: a budget without one behaves exactly as it did.",
+      "source": {
+        "kind": "manual",
+        "ref": "field report 2026-09-18 (pocket-archive, 0.8.1) — cost analysis"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/cost.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A claim over the ceiling no longer fails the gate: the per-claim result is computed and then ignored in the verdict.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "    ok: totalMs <= budgetMs && overPerClaim.length === 0,",
+          "replace": "    ok: totalMs <= budgetMs,",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The ceiling stops being applied at all, so every claim passes however expensive it is.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "  const overPerClaim = perClaimMs === undefined ? [] : (report.claims ?? [])",
+          "replace": "  const overPerClaim = [];\n  const _unusedClaims = (report.claims ?? [])",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A breach stops naming the claims it found, so the operator is told a number is wrong but not which claim to look at.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/cost.mjs",
+          "find": "    for (const c of d.overPerClaim) out.push(`  ${secs(c.ms).padStart(7)}  ${c.id}  (${c.runs} runs)`);",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "cost",
+        "budget",
         "field-report"
       ]
     }

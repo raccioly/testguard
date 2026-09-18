@@ -163,18 +163,41 @@ export function renderCost(report, { limit = 10 } = {}) {
  *
  * Pure. Reads a report, returns a decision; the caller owns exit codes and I/O.
  */
-export function checkCostBudget(report, { budgetSeconds, previousMs, worst = 5 } = {}) {
+export function checkCostBudget(report, { budgetSeconds, perClaimSeconds, previousMs, worst = 5 } = {}) {
   if (typeof budgetSeconds !== 'number' || !Number.isFinite(budgetSeconds) || budgetSeconds <= 0) {
     throw new TypeError('checkCostBudget: budgetSeconds must be a positive number');
   }
   const budgetMs = budgetSeconds * 1000;
   const totalMs = report.totalMs ?? 0;
+
+  // ── Why a SECOND ceiling, on the claim. ──
+  // The total alone is a treadmill: claims should grow forever, so it can only
+  // ever be raised, and a number that always goes up stops being read. A
+  // per-FAULT average is worse — the regression that prompted this budget
+  // raised the fault count 59 -> 91 while per-fault cost barely moved, so an
+  // average would have reported everything fine.
+  //
+  // The measured pathology is per-CLAIM, and it is a claim naming an expensive
+  // SHARED defender: a claim pays for every test in the file it names, so
+  // TG-ADMIT-NEEDS-ALL-KILLED costs 67 s for ONE fault. A new calibration
+  // claim landed at 51 s for two faults purely by being written into
+  // replay.test.mjs instead of calibration.test.mjs; re-pointing it took it to
+  // 4.9 s. The total absorbed that silently. This does not.
+  //
+  // So the rule is "no new claim may be worse than the worst we already have",
+  // which stays meaningful as claims are added and tightens as they get cheaper.
+  const perClaimMs = typeof perClaimSeconds === 'number' && perClaimSeconds > 0 ? perClaimSeconds * 1000 : undefined;
+  const overPerClaim = perClaimMs === undefined ? [] : (report.claims ?? [])
+    .filter((c) => c.ms > perClaimMs)
+    .map((c) => ({ id: c.claimId, ms: c.ms, runs: c.runs }));
+
   return {
-    ok: totalMs <= budgetMs,
+    ok: totalMs <= budgetMs && overPerClaim.length === 0,
     totalMs,
     budgetMs,
     overByMs: Math.max(0, totalMs - budgetMs),
     headroomMs: Math.max(0, budgetMs - totalMs),
+    ...(perClaimMs === undefined ? {} : { perClaimMs, overPerClaim }),
     ...(typeof previousMs === 'number' ? { previousMs, deltaMs: totalMs - previousMs } : {}),
     // Named so a failure opens with which claims to look at, not just a number.
     // claimCosts emits `claimId`; reading `id` here printed "undefined" for every
@@ -189,10 +212,24 @@ export function renderCostBudget(d) {
   const delta = typeof d.deltaMs === 'number'
     ? ` (${d.deltaMs >= 0 ? '+' : ''}${secs(Math.abs(d.deltaMs))} against the previous run's ${secs(d.previousMs)})`
     : '';
-  out.push(d.ok
-    ? `cost ${secs(d.totalMs)} of a ${secs(d.budgetMs)} budget — ${secs(d.headroomMs)} to spare${delta}.`
-    : `COST BUDGET EXCEEDED: ${secs(d.totalMs)} against a ${secs(d.budgetMs)} budget, over by ${secs(d.overByMs)}${delta}.`);
-  if (!d.ok && d.worst.length) {
+  const overTotal = d.totalMs > d.budgetMs;
+  out.push(overTotal
+    ? `COST BUDGET EXCEEDED: ${secs(d.totalMs)} against a ${secs(d.budgetMs)} budget, over by ${secs(d.overByMs)}${delta}.`
+    : `cost ${secs(d.totalMs)} of a ${secs(d.budgetMs)} budget — ${secs(d.headroomMs)} to spare${delta}.`);
+
+  // A per-claim breach is its own finding and names its own remedy: the claim
+  // is not too big, it is pointed at too expensive a defender file.
+  if (d.overPerClaim?.length) {
+    out.push('');
+    out.push(`PER-CLAIM BUDGET EXCEEDED: ${d.overPerClaim.length} claim${d.overPerClaim.length === 1 ? '' : 's'} over the ${secs(d.perClaimMs)} per-claim ceiling.`);
+    for (const c of d.overPerClaim) out.push(`  ${secs(c.ms).padStart(7)}  ${c.id}  (${c.runs} runs)`);
+    out.push('');
+    out.push('A claim pays for every test in the file it names. Point it at a test that');
+    out.push('does not need the expensive setup, re-probe to confirm the fault still dies,');
+    out.push('and only then raise the ceiling if it is still over.');
+  }
+
+  if (overTotal && d.worst.length) {
     out.push('');
     out.push('most expensive claims');
     for (const c of d.worst) out.push(`  ${secs(c.ms).padStart(7)}  ${c.id}  (${c.runs} runs)`);

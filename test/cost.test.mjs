@@ -1,6 +1,7 @@
 // @req NFR-05
 // @req NFR-06
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { runsOf, recordCost, claimCosts, defenderCosts, costReport, renderCost, checkCostBudget, renderCostBudget } from '../src/probe/cost.mjs';
 
 const run = (durationMs) => ({ outcome: 'pass', durationMs });
@@ -184,5 +185,69 @@ describe('checkCostBudget — the gate has to gate on its own cost', () => {
     for (const bad of [undefined, 0, -1, NaN, '900']) {
       expect(() => checkCostBudget(report(1), { budgetSeconds: bad })).toThrow(TypeError);
     }
+  });
+});
+
+describe('the per-claim ceiling — what the total absorbs silently', () => {
+  // Neither unit works alone. The total can only ever be raised, because claims
+  // should grow forever, so a number that always goes up stops being read. A
+  // per-fault average is worse: the regression that prompted this budget raised
+  // the fault count 59 -> 91 while per-fault cost barely moved.
+  //
+  // The measured pathology is per-CLAIM, and specifically a claim naming an
+  // expensive SHARED defender file, since a claim pays for every test in the
+  // file it names. A calibration claim landed at 51 s for two faults purely by
+  // being written into replay.test.mjs rather than calibration.test.mjs;
+  // re-pointing it took it to 4.9 s, and the total never noticed.
+  const report = (totalMs, claims = []) => ({ totalMs, claims, defenders: [] });
+  const pig = [{ claimId: 'TG-PIG', ms: 80_000, runs: 6 }, { claimId: 'TG-FINE', ms: 5_000, runs: 6 }];
+
+  it('fails a claim over the ceiling even when the total is comfortably inside it', () => {
+    const d = checkCostBudget(report(100_000, pig), { budgetSeconds: 1230, perClaimSeconds: 75 });
+    expect(d.ok).toBe(false);                       // the total is fine; the claim is not
+    expect(d.totalMs).toBeLessThan(d.budgetMs);
+    expect(d.overPerClaim.map((c) => c.id)).toEqual(['TG-PIG']);
+  });
+
+  it('names the claim and its remedy, which is a cheaper defender rather than a bigger budget', () => {
+    const text = renderCostBudget(checkCostBudget(report(100_000, pig), { budgetSeconds: 1230, perClaimSeconds: 75 }));
+    expect(text).toMatch(/PER-CLAIM BUDGET EXCEEDED: 1 claim over the 75s per-claim ceiling/);
+    expect(text).toContain('TG-PIG');
+    expect(text).not.toContain('TG-FINE');
+    expect(text).toMatch(/pays for every test in the file it names/);
+    // The total is inside its budget and must still say so, not be overwritten
+    // by the per-claim failure: two ceilings, two findings.
+    expect(text).toMatch(/^cost .* to spare/m);
+    expect(text).not.toContain('COST BUDGET EXCEEDED');
+  });
+
+  it('reports both when the total and a claim are over', () => {
+    const text = renderCostBudget(checkCostBudget(report(2_000_000, pig), { budgetSeconds: 1230, perClaimSeconds: 75 }));
+    expect(text).toContain('COST BUDGET EXCEEDED');
+    expect(text).toContain('PER-CLAIM BUDGET EXCEEDED');
+  });
+
+  it('is exactly at-or-under, like the total', () => {
+    expect(checkCostBudget(report(1, [{ claimId: 'X', ms: 75_000, runs: 6 }]), { budgetSeconds: 1230, perClaimSeconds: 75 }).ok).toBe(true);
+    expect(checkCostBudget(report(1, [{ claimId: 'X', ms: 75_001, runs: 6 }]), { budgetSeconds: 1230, perClaimSeconds: 75 }).ok).toBe(false);
+  });
+
+  it('is optional: a budget with no per-claim ceiling behaves exactly as before', () => {
+    // The field is additive. An older budget file, or another project's, must
+    // not start failing because this ceiling exists.
+    const d = checkCostBudget(report(100_000, pig), { budgetSeconds: 1230 });
+    expect(d.ok).toBe(true);
+    expect(d.perClaimMs).toBeUndefined();
+    expect(d.overPerClaim).toBeUndefined();
+    expect(renderCostBudget(d)).not.toContain('PER-CLAIM');
+  });
+
+  it("this project's own budget sits just above its worst claim, so the rule stays meaningful", () => {
+    // The ceiling is "no new claim may be worse than the worst we already
+    // have". A ceiling far above the worst would gate nothing.
+    const budget = JSON.parse(readFileSync(new URL('../testguard.cost-budget.json', import.meta.url), 'utf8'));
+    expect(budget.perClaimSeconds).toBeGreaterThan(budget.perClaim.todayWorst.seconds);
+    expect(budget.perClaimSeconds).toBeLessThan(budget.perClaim.todayWorst.seconds * 1.5);
+    expect(budget.seconds).toBeGreaterThan(budget.measuredInCI.seconds);
   });
 });

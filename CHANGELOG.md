@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A second cost ceiling, on the claim.** The total alone cannot see the
+  failure it was meant to catch: a new calibration claim cost 51 s for two
+  faults purely by being written into `replay.test.mjs` rather than
+  `calibration.test.mjs`, and re-pointing it took it to 4.9 s while the total
+  never moved. A per-fault average is worse — the regression that prompted
+  this budget raised the fault count 59 to 91 while per-fault cost barely
+  moved, so an average would have reported everything fine.
+
+  `perClaimSeconds` is 75 s, just above today's worst claim
+  (`TG-ADMIT-NEEDS-ALL-KILLED`, 67 s for one fault), so the rule reads: no new
+  claim may be worse than the worst we already have. A breach names the claim
+  and its remedy — a cheaper defender, not a bigger budget. The field is
+  optional and additive: a budget without one behaves exactly as before.
+- **The cost report goes to the CI job summary, not only the log.** The gate
+  went from 9.6 to 23.6 minutes across one merged pull request and nothing
+  said a word, because `--cost` only ever printed into a log nobody opens
+  while it is passing. The summary is read without opening anything, so the
+  number is in front of a reviewer while the change is still a change.
+
+### Changed
+- **The cost budget is 1230 s, from 1350.** 1350 was set defensively against a
+  reuse-affected 1123 s, because this budget is defined against a from-scratch
+  probe and none had run yet. `release.yml` then measured **1081 s** at 129
+  faults on the v0.9.0 release commit with no reuse — so the six field-report
+  claims cost +82 s, not the +120 s a per-fault average predicted. 1230 is
+  ~14% over 1081, the same headroom rule that set 1100 against 962. Leaving it
+  at 1350 would have let a 25% regression pass unnoticed.
+
 ### Fixed
 - **The release no longer waits for a human to click Approve.** v0.9.0 sat with
   every required check green and merged nothing. The `pull_request` runs a
