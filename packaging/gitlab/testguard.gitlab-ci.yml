@@ -48,6 +48,12 @@ spec:
     no_escalate:
       description: "probe: skip re-running survivors against the whole suite"
       default: "false"
+    runner:
+      description: "probe: vitest | jest | playwright | python | pytest | unittest | auto. `python` picks pytest when the interpreter can import it and stdlib unittest otherwise; `pytest`/`unittest` pin that choice and fail rather than fall back. The default Node image has no Python — set `image` to one that does before probing a Python project."
+      default: "auto"
+    python:
+      description: "probe: Python interpreter for .py defenders (default: $VIRTUAL_ENV, then the project .venv/venv, then python3 on PATH)"
+      default: ""
     strict:
       description: "gate: fail a change whose files were all excluded instead of passing with a note"
       default: "false"
@@ -88,6 +94,7 @@ testguard:probe:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
     - ARGS="--severity $[[ inputs.severity ]] --confirm $[[ inputs.confirm ]] --budget $[[ inputs.budget ]]"; [ "$[[ inputs.no_escalate ]]" = "true" ] && ARGS="$ARGS --no-escalate"
+    - '[ "$[[ inputs.runner ]]" != "auto" ] && ARGS="$ARGS --runner $[[ inputs.runner ]]"; [ -n "$[[ inputs.python ]]" ] && ARGS="$ARGS --python $[[ inputs.python ]]"; true'
     - status=0; npx -y "testguard-cli@${TESTGUARD_VERSION}" probe . --quiet $ARGS || status=$?
     # The brief is written whatever the probe's exit code: reviewers read it either way.
     - npx -y "testguard-cli@${TESTGUARD_VERSION}" brief . >/dev/null || true

@@ -1,0 +1,16 @@
+{
+  "testguard": 1,
+  "runner": "pytest",
+  "rootdir": "/tmp/project",
+  "collectionErrors": [],
+  "tests": [
+    { "id": "tests/test_redact.py::test_masks", "file": "tests/test_redact.py", "name": "test_masks", "outcome": "passed", "phase": "call", "exceptionType": null, "message": null },
+    { "id": "tests/test_redact.py::test_audit_row", "file": "tests/test_redact.py", "name": "test_audit_row", "outcome": "failed", "phase": "call", "exceptionType": "AssertionError", "message": "assert '*bc' == 'NOPE'" },
+    { "id": "tests/test_redact.py::test_crashes", "file": "tests/test_redact.py", "name": "test_crashes", "outcome": "failed", "phase": "call", "exceptionType": "TypeError", "message": "TypeError: 'NoneType' object is not subscriptable" },
+    { "id": "tests/test_slow.py::test_hangs", "file": "tests/test_slow.py", "name": "test_hangs", "outcome": "failed", "phase": "call", "exceptionType": "Failed", "message": "Failed: Timeout >5.0s" },
+    { "id": "tests/test_redact.py::test_skipped", "file": "tests/test_redact.py", "name": "test_skipped", "outcome": "skipped", "phase": "setup", "exceptionType": null, "message": "no reason" },
+    { "id": "tests/test_redact.py::test_xfail", "file": "tests/test_redact.py", "name": "test_xfail", "outcome": "xfail", "phase": "call", "exceptionType": "AssertionError", "message": "expected" },
+    { "id": "tests/test_redact.py::test_xpass", "file": "tests/test_redact.py", "name": "test_xpass", "outcome": "xpass", "phase": "call", "exceptionType": null, "message": "Unexpected success" }
+  ],
+  "provenance": { "demo/redact.py": "/tmp/project/demo/redact.py" }
+}

@@ -1,18 +1,26 @@
 import { join } from 'node:path';
 import { listTestFiles } from './runners/shared.mjs';
+import { testGlobs as PY_TEST_GLOBS } from './runners/python.mjs';
 import { fileImports } from './rank.mjs';
+import { pyFileImports } from './pyimports.mjs';
 import { classifyDefenders } from './mocks.mjs';
+
+/** A target's language decides how its importers are found. Nothing else about it matters here. */
+export const isPython = (rel) => rel.endsWith('.py');
 
 /**
  * When a claim declares no defenders: the test files that import the fault's
- * target file — directly, by relative path or through a resolved alias — and
- * do NOT mock it. A file that mocks the target cannot detect any fault in it;
- * counting it would make `nocover` under-report and waste probe runs on files
- * that cannot fail. `nocover` therefore means exactly "no test file imports
- * this source without mocking it".
+ * target file — directly, by relative path or through a resolved alias in
+ * JavaScript, by module name in Python — and do NOT replace it wholesale. A
+ * file that mocks the target cannot detect any fault in it; counting it would
+ * make `nocover` under-report and waste probe runs on files that cannot fail.
+ * `nocover` therefore means exactly "no test file imports this source without
+ * mocking it".
  */
 export function discoverDefendersDetailed(projectDir, targetRel) {
-  const importing = listTestFiles(projectDir).filter((t) => fileImports(projectDir, join(projectDir, t), targetRel));
+  const importing = isPython(targetRel)
+    ? listTestFiles(projectDir, PY_TEST_GLOBS).filter((t) => pyFileImports(projectDir, join(projectDir, t), targetRel, t))
+    : listTestFiles(projectDir).filter((t) => fileImports(projectDir, join(projectDir, t), targetRel));
   return { importing, ...classifyDefenders(projectDir, targetRel, importing) };
 }
 

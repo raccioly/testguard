@@ -115,7 +115,10 @@ describe('playwright config, ownership and per-file runner selection', () => {
     // playwright as the project runner owns everything it matches
     expect([...partitionByRunner(dir, ['e2e/a.spec.ts'], playwright).keys()].map((r) => r.name)).toEqual(['playwright']);
     expect(RUNNERS.playwright).toBe(playwright);
-    expect(OWNED_RUNNERS).toEqual([playwright]);
+    // Playwright owns files under its testDir; python owns every .py. Both are
+    // per-file runners, so a repository with a JavaScript and a Python package
+    // is probed in one run.
+    expect(OWNED_RUNNERS.map((r) => r.name)).toEqual(['playwright', 'python']);
   });
 });
 

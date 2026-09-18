@@ -1,0 +1,4 @@
+# written by tests/test_flaky.py to alternate pass/fail deterministically
+.flake-counter
+__pycache__/
+.pytest_cache/

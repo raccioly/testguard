@@ -36,10 +36,16 @@ Rules that follow from the table:
    that failed and then passed on retry (Playwright's `flaky`) is a
    **non-green run** even when the runner exits 0, and a test the runner
    reports as timed out (`timedOut`) is a timeout, never an assertion
-   failure. When one claim's defenders run under several runners, their
-   runs merge pessimistically — any load error is an error, any timeout is
-   a timeout, any failure is a failure — and the evidence names which file
-   ran under which runner.
+   failure. Python is read the same way: an `AssertionError` and any other
+   exception raised by the test body both count, because both are the suite
+   rejecting the behaviour; a collection error — a module that will not
+   import, which is what a replacement that does not parse looks like from
+   Python — is a load failure and never a kill; and a test the suite expected
+   to fail that passed (`xpass`) makes the run non-green without ever being an
+   assertion failure, exactly as Playwright's `flaky` does. When one claim's
+   defenders run under several runners, their runs merge pessimistically —
+   any load error is an error, any timeout is a timeout, any failure is a
+   failure — and the evidence names which file ran under which runner.
 4. **A mixed result is not a kill.** If some of the N probe runs fail and
    others pass, the defender's response to the fault is nondeterministic.
    Reporting `killed` would be the optimistic bias flakiness introduces;
@@ -76,6 +82,31 @@ Rules that follow from the table:
    keep `unverifiable`. Where the prior record has no content hash to compare,
    the fault is probed again: the cost of re-measuring is a run, the cost of
    the other direction is a verdict nobody measured.
+
+9. **The fault must be the code that ran.** A green baseline proves the
+   harness is not reporting everything as broken. It proves nothing about the
+   opposite direction: a fault the interpreter never executes leaves the
+   baseline green, every verdict `survived`, and a report that reads as a
+   devastating finding while being entirely false. A tool that can tell which
+   file was actually loaded must check it while the fault is applied, and must
+   **refuse the run** when the subject was loaded from outside the tree being
+   probed — in Python an editable install (PEP 660) registers an import hook
+   consulted ahead of every path entry, and a plain install leaves a copy in
+   `site-packages`, so this is the normal case, not an exotic one. When no
+   defender imported the subject at all, the run continues: an import inside a
+   branch the fault does not reach is legitimate. It is recorded as
+   `detail.targetNotImported`, because a `survived` there is a statement about
+   the defenders' reach and not about their assertions, and the two must not
+   be read as the same finding.
+10. **A signal describes a file, and says which kind of blindness it is.**
+   Replacing a whole module (`vi.mock`, `jest.mock`, a Python `patch` of the
+   module itself) removes a file from the defenders: it cannot detect anything
+   in what it replaced. Replacing **one attribute** of a module —
+   `patch("pkg.mod.fn")`, which is what Python code almost always does — does
+   not: a fault anywhere else in that module is still fully detectable, and
+   dropping the file would report `nocover` for a claim that is well defended.
+   The file stays a defender and carries `target-attribute-patched`, naming
+   the attributes. Signals never change a verdict.
 
 ## Replay reports; it never gates
 

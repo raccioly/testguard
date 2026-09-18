@@ -6,11 +6,12 @@ import { createScratch, PreconditionError } from '../probe/worktree.mjs';
 import { selectRunner, RUNNERS } from '../probe/runners/index.mjs';
 import { parseCommandTemplate } from '../probe/runners/shared.mjs';
 import { fileImports } from '../probe/rank.mjs';
+import { IS_PY_TEST, pyFileImports } from '../probe/pyimports.mjs';
 import { labelDiff } from './label.mjs';
 
 const TEST_RE = /(^|\/)(__tests__|tests?)\//;
-const IS_TEST = (f) => /\.(test|spec)\.[cm]?[jt]sx?$/.test(f) || TEST_RE.test(f);
-const SOURCE_EXT = /\.[cm]?[jt]sx?$/;
+const IS_TEST = (f) => /\.(test|spec)\.[cm]?[jt]sx?$/.test(f) || IS_PY_TEST.test(f) || TEST_RE.test(f);
+const SOURCE_EXT = /\.([cm]?[jt]sx?|py)$/;
 
 /**
  * Fix commits in a range: those that change source AND a test together.

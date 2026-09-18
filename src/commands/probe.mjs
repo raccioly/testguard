@@ -60,6 +60,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
     runnerCommand: values['runner-cmd'],
     runnerName: values.runner,
     nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
+    python: values.python ? resolve(values.python) : undefined,
     only,
     escalate: !values['no-escalate'],
     toolVersion: version,

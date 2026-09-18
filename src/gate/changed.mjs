@@ -5,6 +5,7 @@ import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
 import { readSpecDoc } from '../evidence/writer.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
+import { IS_PY_TEST } from '../probe/pyimports.mjs';
 import { globToRegExp } from '../util/glob.mjs';
 
 /**
@@ -20,8 +21,14 @@ import { globToRegExp } from '../util/glob.mjs';
  * the smallest unit the rest of the contract already understands.
  */
 
-export const SOURCE_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.jsx', '.tsx']);
+// `.py` belongs here for the same reason every other extension does: a file
+// the gate does not recognise as source is excluded as `non-source`, which
+// means a changed Python file could never be reported as uncovered and the
+// gate would pass while saying nothing.
+export const SOURCE_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.jsx', '.tsx', '.py']);
 const TEST_RE = /\.(test|spec)\.[cm]?[jt]sx?$/;
+// Python names tests by file, not by a dotted suffix: `test_foo.py`, `foo_test.py`.
+const isTestFile = (f) => TEST_RE.test(f) || IS_PY_TEST.test(f);
 
 /** Files that are source by extension but never carry claims. Printed by --explain. */
 export const DEFAULT_EXCLUDES = Object.freeze([
@@ -163,7 +170,7 @@ export function computeChangedGate({ projectDir, ref, includeDirty = false, excl
     const dx = defaultExcludes.find((x) => x.re.test(file));
     if (dx) { excluded.push({ file, by: `default:${dx.glob}` }); continue; }
 
-    const isTest = TEST_RE.test(file);
+    const isTest = isTestFile(file);
     if (faultFiles.has(file)) { covered.push({ file, by: 'fault', claimIds: faultFiles.get(file) }); continue; }
     if (isTest && defenderFiles.has(file)) { covered.push({ file, by: 'defender', claimIds: defenderFiles.get(file) }); continue; }
     const active = pathEntries.find((p) => !p.expired && p.re.test(file));

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, realpathSync as fsRealpathSync } from 'node:fs';
 import { git } from '../git.mjs';
 import { createRequire } from 'node:module';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { repoRoot as gitRoot, headSha, isDirty, snapshotWorkingTree } from '../git.mjs';
 import { discoverDefenders, discoverDefendersDetailed } from './discover.mjs';
 import { classifyDefenders } from './mocks.mjs';
@@ -9,7 +9,7 @@ import { detectContention, contentionWarning } from './contention.mjs';
 import { createScratch, inPlace, PreconditionError } from './worktree.mjs';
 import { applyFault, locate } from './inject.mjs';
 import { resolveDefenders, parseCommandTemplate } from './runners/shared.mjs';
-import { selectRunner, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns } from './runners/index.mjs';
+import { selectRunner, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns, runnerLabel } from './runners/index.mjs';
 import { classify, shouldStopEarly } from './classify.mjs';
 import { blastRadius, rank } from './rank.mjs';
 import { classifyIndependence } from './independence.mjs';
@@ -17,6 +17,11 @@ import { escalationStart, foldEscalationRun, escalationResult, flakeRate, killer
 import { hashFile, sha256 } from '../util/hash.mjs';
 import { fingerprint } from '../../spec/lib/fingerprint.mjs';
 
+
+/** Is `child` the same file as `root`, or under it? Both must already be real paths. */
+function isInside(root, child) {
+  return child === root || child.startsWith(root.endsWith(sep) ? root : root + sep);
+}
 
 /** realpath when the path still exists; the path itself otherwise. Never throws. */
 function realpathSync(p) {
@@ -53,6 +58,7 @@ export async function probe({
   runnerCommand,
   runnerName = 'auto',
   nodeModules,
+  python,
   only,
   includeDirty = false,
   onStage = () => {},
@@ -125,12 +131,17 @@ export async function probe({
   let runnerVersion;
   let runnerSource;
   let runner = RUNNERS[runnerName === 'auto' ? 'vitest' : runnerName];
+  // A runner with more than one engine (Python: pytest or unittest) is recorded
+  // by the engine that actually ran, never by the module's name. TestGuard does
+  // not say pytest ran when the stdlib runner did.
+  const engines = new Map();
+  const labelOf = (r) => runnerLabel(r, engines);
   const runnersUsed = new Map(); // every runner that ran defenders, beyond the project runner
   try {
     const commandTemplate = runnerCommand ? parseCommandTemplate(runnerCommand) : undefined;
     if (!commandTemplate) {
       // An unresolvable runner is a precondition failure, not a flaky defender.
-      const sel = await selectRunner({ projectDir: iso.projectDir, name: runnerName });
+      const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, python, name: runnerName });
       if (sel.error) {
         throw new PreconditionError(`test runner is not resolvable in the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${sel.error}). ` +
           (mode === 'worktree' ? 'No usable node_modules was linked: pass --node-modules <path>, or run with --in-place.' : 'Install dependencies first.'));
@@ -138,30 +149,34 @@ export async function probe({
       runner = sel.runner;
       runnerVersion = sel.version;
       runnerSource = sel.source;
+      if (sel.engine) engines.set(sel.runner, sel.engine);
     }
-    runnersUsed.set(runner.name, runnerVersion ?? readRunnerVersion(projectDir, runner.name));
+    runnersUsed.set(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name));
     // Files an owning runner (Playwright) claims run under it, whatever the
     // project runner is; it must resolve before the first such defender runs.
     const owned = OWNED_RUNNERS.filter((r) => r !== runner);
     const ownedChecked = new Map();
     const ensureOwned = async (r, file) => {
-      if (!ownedChecked.has(r)) ownedChecked.set(r, await r.check({ projectDir: iso.projectDir }));
+      if (!ownedChecked.has(r)) ownedChecked.set(r, await r.check({ projectDir: iso.projectDir, sourceDir: projectDir, python }));
       const c = ownedChecked.get(r);
-      if (!c.ok) throw new PreconditionError(`${file} is a ${r.name} test (it lives under ${r.name}'s testDir) but ${r.name} is not resolvable in the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${c.message}).`);
-      runnersUsed.set(r.name, c.version);
+      if (!c.ok) throw new PreconditionError(`${file} is a ${r.name} test (${r.name === 'python' ? 'it is a .py file' : `it lives under ${r.name}'s testDir`}) but ${r.name} is not resolvable for the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${c.message}).`);
+      if (c.engine) engines.set(r, c.engine);
+      runnersUsed.set(labelOf(r), c.version);
     };
     const allTests = [...new Set([...runner.tests(iso.projectDir).filter((t) => !owned.some((r) => r.owns(iso.projectDir, t))), ...owned.flatMap((r) => r.tests(iso.projectDir))])].sort();
     const baselineCache = new Map();
     const prior = previous && previous.run.confirmRuns === confirmRuns
       ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
       : new Map();
-    const runDefenders = async (files) => {
-      if (commandTemplate) return runner.run({ projectDir: iso.projectDir, files, budgetMs, commandTemplate, serial });
+    // `targets` are the fault's files, passed so a runner that can tell which
+    // file the interpreter actually loaded (Python) reports it back.
+    const runDefenders = async (files, targets = []) => {
+      if (commandTemplate) return runner.run({ projectDir: iso.projectDir, sourceDir: projectDir, python, files, budgetMs, commandTemplate, serial, targets });
       const groups = partitionByRunner(iso.projectDir, files, runner);
       const parts = [];
       for (const [r, group] of groups) {
         if (r !== runner) await ensureOwned(r, group[0]);
-        parts.push(await r.run({ projectDir: iso.projectDir, files: group, budgetMs, serial }));
+        parts.push(await r.run({ projectDir: iso.projectDir, sourceDir: projectDir, python, files: group, budgetMs, serial, targets }));
       }
       return mergeRuns(parts);
     };
@@ -169,7 +184,7 @@ export async function probe({
     const byRunner = (files) => {
       const groups = partitionByRunner(iso.projectDir, files, runner);
       if (groups.size <= 1) return undefined; // one runner ran them all, whichever it was
-      return Object.fromEntries([...groups].map(([r, group]) => [r.name, group]));
+      return Object.fromEntries([...groups].map(([r, group]) => [labelOf(r), group]));
     };
 
     for (const claim of claims.claims) {
@@ -183,7 +198,7 @@ export async function probe({
         const mockInfo = declared ? classifyDefenders(iso.projectDir, fault.file, declared) : discoverDefendersDetailed(iso.projectDir, fault.file);
         const defenders = declared ?? mockInfo.canDetect;
         const stage = (name, i, n) => onStage({ claimId: claim.id, faultId: fault.id, stage: name, i, n });
-        const record = await probeOne({ claim, fault, defenders, discovered: declared === null, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, byRunner: byRunner(defenders), mocking: mockInfo.mocking, signals: mockInfo.signals,
+        const record = await probeOne({ claim, fault, defenders, discovered: declared === null, allTests, iso, isoReal, onWarn, confirmRuns, escalate, baselineCache, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, byRunner: byRunner(defenders), mocking: mockInfo.mocking, signals: mockInfo.signals,
           historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root,
           // A path from the runner is absolute inside the SCRATCH worktree, or
           // project-relative. Either way history is read from the real repository,
@@ -207,7 +222,7 @@ export async function probe({
       startedAt,
       finishedAt: new Date().toISOString(),
       repo: { head, dirty: isDirty(root), ...(snapshot ? { snapshot } : {}), ...(ignoredDirty.length ? { ignoredDirty } : {}) },
-      runner: { name: runner.name, ...((runnerVersion ?? readRunnerVersion(projectDir, runner.name)) ? { version: runnerVersion ?? readRunnerVersion(projectDir, runner.name) } : {}) },
+      runner: { name: labelOf(runner), ...((runnerVersion ?? readRunnerVersion(projectDir, runner.name)) ? { version: runnerVersion ?? readRunnerVersion(projectDir, runner.name) } : {}) },
       ...(runnersUsed.size > 1 ? { runners: [...runnersUsed].map(([n, v]) => ({ name: n, ...(v ? { version: v } : {}) })) } : {}),
       confirmRuns,
       ...(serial ? { serial: true } : {}),
@@ -223,7 +238,7 @@ export async function probe({
   };
 }
 
-async function probeOne({ claim, fault, defenders, discovered, allTests, iso, confirmRuns, escalate, baselineCache, runDefenders, stage, prior, priorRunId, byRunner, mocking = [], signals = [], historyRef, historyDir, toRepoPath }) {
+async function probeOne({ claim, fault, defenders, discovered, allTests, iso, isoReal, onWarn = () => {}, confirmRuns, escalate, baselineCache, runDefenders, stage, prior, priorRunId, byRunner, mocking = [], signals = [], historyRef, historyDir, toRepoPath }) {
   const targetPath = join(iso.projectDir, fault.file);
   const targetExists = existsSync(targetPath);
   const inputs = {
@@ -292,8 +307,13 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
           const probeRuns = rawProbeRuns;
           for (let i = 0; i < confirmRuns; i++) {
             stage('probe', i + 1, confirmRuns);
-            const { run, timeouts, loadMessage, failedTests } = await runDefenders(defenders);
+            const { run, timeouts, loadMessage, failedTests, provenance } = await runDefenders(defenders, [fault.file]);
             probeRuns.push({ ...run, timeouts, loadMessage, failedTests });
+            // Only when the suite actually loaded. A run that failed to load
+            // explains an absent import by itself — saying the defenders never
+            // reached the file would be true and useless, and it would put the
+            // signal on every fault whose replacement does not parse.
+            if (i === 0 && run.outcome !== 'error') checkProvenance({ claim, fault, provenance, isoReal, detail, onWarn });
             if (shouldStopEarly(probeRuns)) break;
           }
           detail.probeRuns = probeRuns.map(({ timeouts, loadMessage, failedTests, ...run }) => run);
@@ -348,3 +368,53 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, co
   };
 }
 
+/**
+ * The negative control the green baseline cannot provide.
+ *
+ * A clean baseline proves the harness is not reporting everything as broken —
+ * the failure mode where a misread runner flatters nothing. It says nothing
+ * about the opposite direction: a fault that the interpreter never executes.
+ * Then the baseline is green, every fault SURVIVES, and the report reads as a
+ * devastating audit finding while being entirely false.
+ *
+ * Node cannot reach that state from a scratch worktree, because Node loads
+ * files by path. Python can. `sys.path[0]` is the working directory, so an
+ * ordinary editable install — a `.pth` file appended to sys.path — loses to
+ * the tree being probed and is harmless. What wins is a **meta path finder**:
+ * a strict editable install registers one, and it is consulted before every
+ * path entry. Then the tests import the original file while TestGuard faults
+ * the copy, and the whole run is false in the one direction nothing else
+ * catches. Measured, not assumed: with the fault live the reporter is asked
+ * which file was actually loaded, and the answer is checked.
+ *
+ * Loaded from outside the tree being probed is never recoverable and never
+ * ambiguous: the whole run is refused. Never loaded at all is recorded and
+ * warned about but not refused — an import inside a branch the fault does not
+ * reach is legitimate, and refusing would be the tool substituting its
+ * judgement for the author's.
+ */
+function checkProvenance({ claim, fault, provenance, isoReal, detail, onWarn }) {
+  if (!provenance || !(fault.file in provenance)) return;
+  const loaded = provenance[fault.file];
+  if (loaded === null) {
+    detail.targetNotImported = true;
+    onWarn(`${claim.id}/${fault.id}: the defenders never imported ${fault.file}, so nothing they do could detect a fault in it. A verdict of "survived" here is a statement about the defenders' reach, not about their assertions.`);
+    return;
+  }
+  if (isoReal && !isInside(isoReal, loaded)) {
+    throw new PreconditionError(
+      `${fault.file}: the fault was applied to ${join(isoReal, fault.file)}, but the interpreter imported ${loaded} instead. ` +
+      'Python loaded a different copy of this module, so nothing TestGuard changes can ever run and every claim would be reported as SURVIVED however good the tests are. ' +
+      'The usual cause is an install that registers an import hook ahead of sys.path — a strict editable install (`pip install -e . --config-settings editable_mode=strict`, and some build backends by default) — or a plain install that left a copy in site-packages. ' +
+      'Either reinstall the project against the tree being probed, or run with --in-place so the tree the install points at is the tree that is faulted.',
+    );
+  }
+}
+
+function sameInputs(prior, inputs, requested, resolved) {
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  return prior.inputs.targetHash === inputs.targetHash
+    && same(prior.inputs.defenderHashes, inputs.defenderHashes)
+    && same(prior.defenders.requested, requested)
+    && same(prior.defenders.resolved, resolved);
+}

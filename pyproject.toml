@@ -14,7 +14,7 @@ authors = [
 ]
 keywords = [
     "testing", "fault-injection", "mutation-testing", "test-quality",
-    "claims", "verification", "vitest", "ai-agents", "quality-assurance"
+    "claims", "verification", "pytest", "unittest", "vitest", "ai-agents", "quality-assurance"
 ]
 classifiers = [
     "Development Status :: 4 - Beta",

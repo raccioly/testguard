@@ -99,7 +99,19 @@ const semantic = {
       }
       for (const s of r.defenders.signals ?? []) {
         if (s.signal === 'unasserted-annotated' && !s.reason) errors.push({ path: `${p}/defenders/signals`, message: `unasserted-annotated on ${s.file} requires the annotation's reason` });
-        if (!(r.defenders.mocking ?? []).includes(s.file)) errors.push({ path: `${p}/defenders/signals`, message: `${s.file} carries a mock signal but is not listed in defenders.mocking` });
+        // An attribute patch (Python) leaves the file a defender, so it belongs
+        // to `resolved` and not to `mocking`; every other signal is about a file
+        // that replaced the module and must be listed as mocking it.
+        if (s.signal === 'target-attribute-patched') {
+          if (!s.reason) errors.push({ path: `${p}/defenders/signals`, message: `target-attribute-patched on ${s.file} requires the patched attributes as its reason` });
+          if (!r.defenders.resolved.includes(s.file)) errors.push({ path: `${p}/defenders/signals`, message: `${s.file} patches attributes of the subject but is not a resolved defender` });
+        } else if (!(r.defenders.mocking ?? []).includes(s.file)) {
+          errors.push({ path: `${p}/defenders/signals`, message: `${s.file} carries a mock signal but is not listed in defenders.mocking` });
+        }
+      }
+      // A module the defenders never imported cannot have been killed by them.
+      if (r.detail.targetNotImported && r.verdict === 'killed') {
+        errors.push({ path: `${p}/detail/targetNotImported`, message: 'the subject was never imported, so the defenders cannot have killed the fault' });
       }
       if (r.verdict === 'unverifiable' && !r.detail.reason) {
         errors.push({ path: `${p}/detail/reason`, message: 'unverifiable requires a reason (e.g. anchor-missing, anchor-ambiguous)' });

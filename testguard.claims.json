@@ -286,8 +286,8 @@
           "description": "Every test file counts as an importer of the target; discovery no longer depends on the import.",
           "faultClass": "statement-deleted",
           "file": "src/probe/discover.mjs",
-          "find": "  const importing = listTestFiles(projectDir).filter((t) => fileImports(projectDir, join(projectDir, t), targetRel));",
-          "replace": "  const importing = listTestFiles(projectDir);",
+          "find": "    : listTestFiles(projectDir).filter((t) => fileImports(projectDir, join(projectDir, t), targetRel));",
+          "replace": "    : listTestFiles(projectDir);",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -1250,7 +1250,7 @@
           "description": "An unknown runner name silently falls back to the first candidate instead of erroring.",
           "faultClass": "return-altered",
           "file": "src/probe/runners/index.mjs",
-          "find": "  if (!candidates[0]) return { error: `unknown runner \"${name}\"; use vitest, jest, playwright or auto` };",
+          "find": "  if (!candidates[0]) return { error: `unknown runner \"${name}\"; use ${RUNNER_NAMES.join(', ')} or auto` };",
           "replace": "  if (!candidates[0]) candidates = [vitest];",
           "producedBy": {
             "producer": "human",

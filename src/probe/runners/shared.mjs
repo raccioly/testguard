@@ -136,6 +136,13 @@ export function firstInformativeLine(message) {
 }
 
 export function parseReport(report, durationMs) {
+  // A report that parsed as JSON but carries no `testResults` is not a suite
+  // that ran zero tests — it is a report of a shape this parser does not
+  // understand, which is what `--runner-cmd` pointed at a non-jest reporter
+  // produces. The verdict is already safe (a non-green baseline makes the
+  // claim unverifiable rather than passing), but without this the user is told
+  // `defenders-failed-to-load` with no reason at all.
+  const unknownShape = report == null || typeof report !== 'object' || !Array.isArray(report.testResults);
   const files = report.testResults ?? [];
   const loadFailed = files.some((f) => f.status === 'failed' && (f.assertionResults?.length ?? 0) === 0);
   const results = files.flatMap((f) => (f.assertionResults ?? []).map((t) => ({ ...t, id: `${f.name}::${t.fullName ?? t.title ?? ''}` }))).filter((t) => t.status === 'failed');
@@ -153,7 +160,9 @@ export function parseReport(report, durationMs) {
   // jest opens a load failure with "● Test suite failed to run" and puts the
   // cause lines below; vitest puts it on the first line. Take the first line
   // that names an error, else the first non-empty one.
-  const loadMessage = loadFailed ? firstInformativeLine(files.find((f) => f.message)?.message ?? '') : undefined;
+  const loadMessage = unknownShape
+    ? 'the runner produced a report with no `testResults` array: this parser reads the jest-compatible JSON report, so a --runner-cmd must emit that shape (vitest --reporter=json, jest --json)'
+    : loadFailed ? firstInformativeLine(files.find((f) => f.message)?.message ?? '') : undefined;
   return { run, timeouts, loadMessage, failedTests };
 }
 
