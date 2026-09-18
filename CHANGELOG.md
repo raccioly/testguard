@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **The weekly release workflow can actually cut a release.** Its "verify the
+  tree is still green" step probed in worktree mode straight after syncing the
+  version surfaces, so the probe refused to run: the sync leaves
+  `packaging/gitlab/testguard.gitlab-ci.yml` uncommitted and that file is the
+  fault target of `TG-GITLAB-PROBE-EXIT-PRESERVED`, which worktree mode
+  correctly treats as a dirty defender (exit 2). It now probes with
+  `--include-dirty`, which verifies the bumped tree that is about to be
+  released rather than the version before it. `scheduled-release.yml` had
+  never completed a run since the GitLab template became both a sync surface
+  and a fault target on 2026-09-17; every release so far was cut by hand.
 - **The Homebrew formula's `sha256` matches its own `url`.** It had carried
   `385d69f9…` unchanged across v0.6.0, v0.7.0 and v0.8.0 while
   `release:sync` bumped the `url` each time — a hash that matches none of

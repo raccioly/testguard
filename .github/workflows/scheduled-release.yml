@@ -88,10 +88,23 @@ jobs:
 
       - name: Verify the tree is still green
         if: steps.check.outputs.changed == 'true'
+        # --include-dirty is REQUIRED here, not a convenience. The step above
+        # bumped the version and synced every surface, and those writes are
+        # still uncommitted: the commit happens later, in the PR step. One of
+        # those surfaces, packaging/gitlab/testguard.gitlab-ci.yml, is the
+        # fault target of TG-GITLAB-PROBE-EXIT-PRESERVED, so the default
+        # worktree mode refuses to run at all — "1 defender/target file has
+        # uncommitted changes … worktree mode probes HEAD, so those changes
+        # would be silently ignored" (exit 2). That refusal is correct; the
+        # answer is to probe the tree we are about to release, which is what
+        # --include-dirty does (it snapshots the working tree into a scratch
+        # commit). --ignore-dirty would probe HEAD and quietly verify the
+        # PREVIOUS version instead, which is the optimistic reading this
+        # project does not take.
         run: |
           npm ci
           npm test
-          node cli/testguard.mjs probe . --budget 180000 --quiet --out "$RUNNER_TEMP/self.json"
+          node cli/testguard.mjs probe . --budget 180000 --quiet --include-dirty --out "$RUNNER_TEMP/self.json"
 
       - name: Open release PR with auto-merge armed
         if: steps.check.outputs.changed == 'true'
