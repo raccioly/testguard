@@ -45,7 +45,11 @@
       },
       "verdict": "killed",
       "detail": {
-        "reason": "rule-matched-nothing"
+        "reason": "rule-matched-nothing",
+        "methodDetail": {
+          "attackClass": "missing-auth",
+          "rule": "WS-AUTH-001"
+        }
       }
     }
   ]

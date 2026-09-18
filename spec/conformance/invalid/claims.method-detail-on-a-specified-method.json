@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "C-1",
+      "statement": "The guard rejects an unauthenticated caller.",
+      "source": {
+        "kind": "manual"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "faults": [
+        {
+          "id": "F1",
+          "method": "fault-injection",
+          "description": "The guard is removed.",
+          "faultClass": "guard-removed",
+          "file": "src/auth.mjs",
+          "find": "if (!user) throw",
+          "replace": "if (false) throw",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          },
+          "methodDetail": {
+            "note": "fault-injection has a specified shape; this does not belong here"
+          }
+        }
+      ]
+    }
+  ]
+}

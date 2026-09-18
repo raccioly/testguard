@@ -77,6 +77,9 @@ const semantic = {
       // runs is not a leaner document, it is a verdict with nothing behind it;
       // relaxing the schema was to let a scanner conform, never to let an
       // injecting tool stop showing its work.
+      if (injection && r.detail.methodDetail) {
+        errors.push({ path: `${p}/detail/methodDetail`, message: 'methodDetail is for a method the spec has not specified; fault-injection has a specified shape and must not acquire a junk drawer' });
+      }
       if (injection) {
         for (const k of ['defenders', 'inputs']) {
           if (!r[k]) errors.push({ path: `${p}/${k}`, message: `fault-injection requires ${k} on every record` });

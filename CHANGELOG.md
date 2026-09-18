@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A reserved method can now say something.** #81 reserved `assertion` and
+  `scan` without required fields, and `fault` / `detail` are both
+  `additionalProperties: false` — so a probe using a reserved method could
+  declare that it existed and **nothing whatsoever about it**: not which rule
+  was checked, not where. That is not a reservation, it is a dead end, and
+  DocGuard's writer would have hit it on its first line.
+  Both now carry `methodDetail`: an object the spec deliberately does not
+  constrain, on the probe and on the record. It is **forbidden under
+  `fault-injection`**, whose shape is specified and must not acquire a junk
+  drawer — a self-claim fails if that ever stops being enforced — and it is a
+  staging area rather than a permanent home. What the first real consumer puts
+  there is the evidence for what the specified shape should become.
+
 ## [0.7.0] - 2026-09-18
 
 Python, and a fault that cannot hide.
