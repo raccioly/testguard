@@ -36,6 +36,13 @@ for (const r of evidence.records) {
   if (Boolean(want.targetNotImported) !== Boolean(r.detail.targetNotImported)) {
     problems.push(`${key}: targetNotImported ${Boolean(r.detail.targetNotImported)}, expected ${Boolean(want.targetNotImported)}`);
   }
+  // The negative control is pinned too, not merely tolerated: a fixture that
+  // accepted either answer would stop defending the one behaviour it exists
+  // to prove, and the verdict alone cannot tell "the defenders reached this
+  // file and said nothing" from "they never reached it".
+  if ((want.negativeControl ?? null) !== (r.detail.negativeControl ?? null)) {
+    problems.push(`${key}: negativeControl ${r.detail.negativeControl ?? 'absent'}, expected ${want.negativeControl ?? 'absent'}`);
+  }
 }
 for (const key of Object.keys(oracle)) if (!seen.has(key)) problems.push(`${key}: expected but never probed`);
 

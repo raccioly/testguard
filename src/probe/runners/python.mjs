@@ -305,7 +305,7 @@ export const run = makeRun(null);
 
 /** `--runner pytest` / `--runner unittest`: the same adapter with the engine pinned. */
 export function pinned(engine) {
-  return { name: engine, testGlobs, owns, tests, parseReport, check: makeCheck(engine), run: makeRun(engine) };
+  return { name: engine, testGlobs, owns, tests, parseReport, fatalEdit, check: makeCheck(engine), run: makeRun(engine) };
 }
 
 /**

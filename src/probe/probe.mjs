@@ -524,7 +524,7 @@ function checkProvenance({ claim, fault, provenance, isoReal, detail, onWarn }) 
   const loaded = provenance[fault.file];
   if (loaded === null) {
     detail.targetNotImported = true;
-    onWarn(`${claim.id}/${fault.id}: the defenders never imported ${fault.file}, so nothing they do could detect a fault in it. A verdict of "survived" here is a statement about the defenders' reach, not about their assertions.`);
+    onWarn(`${claim.id}/${fault.id}: the defenders never imported ${fault.file}, so nothing they do could detect a fault in it. Whatever the runs show is a statement about the defenders' reach, not about their assertions.`);
     return;
   }
   if (isoReal && !isInside(isoReal, loaded)) {

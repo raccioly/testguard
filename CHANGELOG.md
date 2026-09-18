@@ -94,6 +94,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unparseable module usually fails to **load**, which the runner reports as an
   error with no tests run at all.
 
+- **A runner pinned to one engine keeps every capability the module has.**
+  `pinned()` rebuilt the runner as an explicit allow-list of properties, so
+  `--runner pytest` and `--runner unittest` silently lost the negative control
+  that `--runner python` has: a survivor probed through either flag was never
+  checked, and an unreachable subject reported `survived` exactly as before.
+  Found by the Python fixture, not by the unit test, which iterated the four
+  runner modules rather than the registry the tool actually resolves through —
+  it was checking the code that was written instead of the code that runs. The
+  test now iterates `RUNNERS`, which is what makes the next capability added to
+  a runner fail loudly instead of quietly.
+
 - **`--progress auto|tty|plain|ndjson|none` on `probe`** (#68). A probe used
   to print its stage line only when `stderr` was a terminal, so CI, a
   redirected log and an agent harness saw nothing at all for the whole run —

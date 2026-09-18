@@ -2805,6 +2805,36 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-PINNED-RUNNER-KEEPS-ITS-CAPABILITIES",
+      "statement": "A runner pinned to one engine carries every capability the module has; a capability present on `--runner python` and absent on `--runner pytest` is a silently weaker gate under a flag that reads like a narrowing.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/negative-control.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The pinned runner drops fatalEdit, so a survivor probed with --runner pytest or --runner unittest is never checked against the negative control and reports survived however unreachable the subject is.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/runners/python.mjs",
+          "find": "  return { name: engine, testGlobs, owns, tests, parseReport, fatalEdit, check: makeCheck(engine), run: makeRun(engine) };",
+          "replace": "  return { name: engine, testGlobs, owns, tests, parseReport, check: makeCheck(engine), run: makeRun(engine) };",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
     }
   ]
 }

@@ -4,7 +4,8 @@
   "expected": {
     "REDACT-001/F1": {
       "verdict": "survived",
-      "why": "The audit-row test checks action, scope and rule_count and never checks `content`; a row carrying the raw input passes. The exhibit."
+      "why": "The audit-row test checks action, scope and rule_count and never checks `content`; a row carrying the raw input passes. The exhibit. Negative control verified by hand 2026-09-18: `tests/test_redact.py` does `from demo.redact import ...`, so with `demo/redact.py` replaced by an unterminated group the import raises and the run reports an error rather than passing. The defenders do execute this module, so the survival is about what they assert.",
+      "negativeControl": "reached"
     },
     "REDACT-001/F2": {
       "verdict": "killed",
@@ -12,7 +13,8 @@
     },
     "REDACT-001/F3": {
       "verdict": "survived",
-      "why": "Verified by hand 2026-09-17 with `python -m unittest`, reading its exit code, not TestGuard's reporter: with the content key removed, all four tests pass. The assertions name three keys and a row with no content at all is indistinguishable from a correct one."
+      "why": "Verified by hand 2026-09-17 with `python -m unittest`, reading its exit code, not TestGuard's reporter: with the content key removed, all four tests pass. The assertions name three keys and a row with no content at all is indistinguishable from a correct one. Negative control verified by hand 2026-09-18: `tests/test_redact.py` does `from demo.redact import ...`, so with `demo/redact.py` replaced by an unterminated group the import raises and the run reports an error rather than passing. The defenders do execute this module, so the survival is about what they assert.",
+      "negativeControl": "reached"
     },
     "REDACT-002/F1": {
       "verdict": "killed",
@@ -20,7 +22,8 @@
     },
     "REDACT-003/F1": {
       "verdict": "survived",
-      "why": "No test exercises a missing scope; the fail-closed guard is undefended."
+      "why": "No test exercises a missing scope; the fail-closed guard is undefended. Negative control verified by hand 2026-09-18: `tests/test_redact.py` does `from demo.redact import ...`, so with `demo/redact.py` replaced by an unterminated group the import raises and the run reports an error rather than passing. The defenders do execute this module, so the survival is about what they assert.",
+      "negativeControl": "reached"
     },
     "REDACT-004/F1": {
       "verdict": "timeout",
@@ -67,9 +70,11 @@
       "why": "The defender patches demo.redact.compile_rules but exercises mask for real, so it is a defender and it notices: verified by hand 2026-09-17 with `python -m unittest`, reading its exit code, not testguard's reporter: collapsing each match to one asterisk fails its assertion. The JavaScript rule \u2014 drop any file that mocks the target \u2014 would have reported this claim as nocover. The evidence records target-attribute-patched instead."
     },
     "UNREACHED-001/F1": {
-      "verdict": "survived",
+      "verdict": "unverifiable",
       "targetNotImported": true,
-      "why": "The declared defender never imports demo.orphan, so nothing it asserts could detect this fault. The tests are not blind to the fault; they never reach it. Recorded as detail.targetNotImported, which is what distinguishes this from a real survivor."
+      "why": "Verified by hand 2026-09-18 without TestGuard: `tests/test_redact.py` never mentions `demo.orphan`; `python -m unittest tests.test_redact` reports 4 tests OK on healthy source, `demo/orphan.py` replaced by an unterminated group raises SyntaxError under py_compile, and the same 4 tests still report OK. The defenders cannot detect anything in that module, so the fault's result is a statement about their reach and not about their assertions. This entry read `survived` before the negative control existed (#74); that was the wrong answer the control was built to correct, not an expectation edited to match new output. `targetNotImported` stays true: Python can name the file the interpreter loaded, which is the same finding reported more precisely, and the two may never disagree.",
+      "reason": "subject-not-executed",
+      "negativeControl": "not-reached"
     }
   }
 }

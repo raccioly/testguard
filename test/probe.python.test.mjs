@@ -81,13 +81,24 @@ describe.skipIf(!HAS_PYTHON)('probe reproduces the known-answer fixture with the
     expect(patched.defenders.signals).toEqual([{ file: 'tests/test_patched.py', signal: 'target-attribute-patched', reason: 'demo.redact.compile_rules' }]);
   });
 
-  it('a module the defenders never imported is a survived that says so', () => {
+  it('a module the defenders never imported is unverifiable, and both signals agree', () => {
     const unreached = evidence.records.find((r) => r.claim.id === 'UNREACHED-001');
-    expect(unreached.verdict).toBe('survived');
+    // Not `survived`. The defenders stayed green with the subject replaced by
+    // something that cannot compile, so nothing was measured about their
+    // assertions and reporting a survivor would be a confident lie (#74).
+    expect(unreached.verdict).toBe('unverifiable');
+    expect(unreached.detail.reason).toBe('subject-not-executed');
+    expect(unreached.detail.negativeControl).toBe('not-reached');
+    // Python can name the file the interpreter actually loaded, which is the
+    // same finding reported more precisely. The two may never disagree, and a
+    // validator rule makes a document where they do invalid.
     expect(unreached.detail.targetNotImported).toBe(true);
     // A fault whose replacement does not parse leaves nothing imported either;
     // that is explained by the load failure and must not be flagged as reach.
-    expect(evidence.records.find((r) => r.claim.id === 'REDACT-006').detail.targetNotImported).toBeUndefined();
+    // It is also not a survivor, so it is never charged for a control at all.
+    const invalid = evidence.records.find((r) => r.claim.id === 'REDACT-006');
+    expect(invalid.detail.targetNotImported).toBeUndefined();
+    expect(invalid.detail.negativeControl).toBeUndefined();
   });
 
   it('discovers defenders by Python module name when none is declared', () => {
