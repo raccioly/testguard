@@ -23,6 +23,11 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-18T00:00:00Z"
+          },
+          "methodDetail": {
+            "code": "STR001",
+            "validator": "structure",
+            "location": "docs/ARCHITECTURE.md:42"
           }
         }
       ]
@@ -49,6 +54,11 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-18T00:00:00Z"
+          },
+          "methodDetail": {
+            "attackClass": "missing-auth",
+            "surface": "GET /api/users/:id",
+            "confidence": "high"
           }
         }
       ]
@@ -88,6 +98,10 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-18T00:00:00Z"
+          },
+          "methodDetail": {
+            "code": "TRC004",
+            "location": "docs/REQUIREMENTS.md#FR-02"
           }
         }
       ]

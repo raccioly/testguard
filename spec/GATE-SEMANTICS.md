@@ -167,6 +167,14 @@ Rules that follow from the table:
    under `fault-injection`, and the validator enforces them there in full: the
    relaxation is for a tool that injects nothing, never a licence for an
    injecting tool to stop showing its work.
+   A reserved method carries its own data in `methodDetail`, on the probe and
+   on the record: an object the spec deliberately does not constrain, so a tool
+   can say which rule it checked and where. Without it, "reserved" would mean a
+   probe that can declare it exists and nothing about it, which is not a
+   reservation but a dead end. It is **forbidden under `fault-injection`**,
+   whose shape is specified and must not acquire a junk drawer, and it is a
+   staging area rather than a permanent home: what the first consumer puts
+   there is the evidence for what the specified shape should become.
    `assertion` and `scan` are **reserved**. Their required fields are
    deliberately unspecified and will be defined by their first real consumer,
    with its own conformance examples written from the shape that tool actually

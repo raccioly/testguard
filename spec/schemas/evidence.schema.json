@@ -501,6 +501,12 @@
                 }
               },
               "additionalProperties": false
+            },
+            "methodDetail": {
+              "description": "Data belonging to a method the spec has not specified yet. `assertion` and `scan` are reserved names with no required fields, so a tool adopting one needs somewhere to put the rule it checked and the place it checked \u2014 without which it can declare that a probe exists and nothing about it. Deliberately unconstrained, deliberately namespaced, and **forbidden under `fault-injection`**, whose shape IS specified and must not acquire a junk drawer. What the first real consumer puts here is the evidence for what the specified shape should become; it is a staging area, not a permanent home.",
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": true
             }
           },
           "additionalProperties": false,

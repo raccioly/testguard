@@ -2894,6 +2894,36 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-SPECIFIED-METHOD-HAS-NO-JUNK-DRAWER",
+      "statement": "The escape hatch a reserved method needs is closed to the method that is specified: `methodDetail` is rejected on a fault-injection probe and on an injecting run, so the one shape the spec defines cannot quietly grow undocumented fields.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "spec/conformance/schemas.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An injecting run may carry methodDetail, so the specified shape acquires a junk drawer nothing validates and no reader can rely on.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (injection && r.detail.methodDetail) {",
+          "replace": "      if (false && r.detail.methodDetail) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
     }
   ]
 }

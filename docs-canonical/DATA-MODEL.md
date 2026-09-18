@@ -42,7 +42,9 @@ defaults to `fault-injection`, whose required fields — `file`, `find`,
 baseline and probe runs on evidence — are unchanged and are enforced by the
 validator rather than merely by the schema. `assertion` and `scan` are
 reserved names for tools that verify by reading or scanning; their fields are
-defined by their first consumer, not in advance.
+defined by their first consumer, not in advance. Until then a reserved-method
+probe and record carry `methodDetail`, an unconstrained object that is
+forbidden under `fault-injection`.
 `spec/lib/validate.mjs` applies the schema **and** the semantic rules a schema
 cannot express. `spec/lib/fingerprint.mjs` is the single fingerprint
 implementation every tool must use.
