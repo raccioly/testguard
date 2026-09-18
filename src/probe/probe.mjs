@@ -519,7 +519,7 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
  * reach is legitimate, and refusing would be the tool substituting its
  * judgement for the author's.
  */
-function checkProvenance({ claim, fault, provenance, isoReal, detail, onWarn }) {
+export function checkProvenance({ claim, fault, provenance, isoReal, detail, onWarn }) {
   if (!provenance || !(fault.file in provenance)) return;
   const loaded = provenance[fault.file];
   if (loaded === null) {
