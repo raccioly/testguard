@@ -134,6 +134,18 @@ jobs:
           git commit -m "release: v${NEW_VERSION} — automated weekly batch"
           git push origin "$BRANCH"
           printf 'Automated weekly release. Version bump + CHANGELOG entry + synced version surfaces. Merging tags and publishes to npm and PyPI via release.yml.\n\nCI does not start automatically on PRs opened by GITHUB_TOKEN. Run:\n\n    gh workflow run ci.yml --ref %s\n\nAuto-merge is armed; it completes once the required checks pass.\n' "$BRANCH" > /tmp/pr-body.md
-          PR=$(gh pr create --base main --head "$BRANCH" --title "release: v${NEW_VERSION} — automated weekly batch" --body-file /tmp/pr-body.md)
-          gh pr merge --auto --squash "$PR"
-          echo "Release PR: $PR"
+          # A bare `gh pr create` failure here reads as a GraphQL error with no
+          # hint of the cause, which is how v0.8.1 lost its release PR after
+          # everything else in the release had succeeded.
+          if PR=$(gh pr create --base main --head "$BRANCH" --title "release: v${NEW_VERSION} — automated weekly batch" --body-file /tmp/pr-body.md 2>/tmp/pr-err); then
+            gh pr merge --auto --squash "$PR"
+            echo "Release PR: $PR"
+          else
+            cat /tmp/pr-err
+            if grep -q 'not permitted to create or approve pull requests' /tmp/pr-err; then
+              echo "::error::GITHUB_TOKEN may not open a pull request: \"GitHub Actions is not permitted to create or approve pull requests\". The branch is pushed and correct; only the PR is missing. Fix it once, in Settings -> Actions -> General -> Workflow permissions, by ticking \"Allow GitHub Actions to create and approve pull requests\" (equivalently: gh api -X PUT repos/$GITHUB_REPOSITORY/actions/permissions/workflow -F default_workflow_permissions=read -F can_approve_pull_request_reviews=true), then re-run this workflow. Until then, open it by hand: gh pr create --base main --head $BRANCH"
+            else
+              echo "::error::gh pr create failed for $BRANCH — see the output above."
+            fi
+            exit 1
+          fi

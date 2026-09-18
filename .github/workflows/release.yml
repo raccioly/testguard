@@ -283,9 +283,18 @@ jobs:
               printf 'Computed by `.github/scripts/sync-release-version.mjs --sha256` in release.yml after `npm publish`, from the registry — never from a local `npm pack`. `--check --online` confirmed the value before this PR was opened.\n\n'
               printf 'Auto-merge is armed; CI was dispatched on this branch by the release workflow. If the checks never appear: `gh workflow run ci.yml --ref %s`.\n' "$BRANCH"
             } > /tmp/pr-body.md
-            PR=$(gh pr create --base main --head "$BRANCH" --title "chore(homebrew): sha256 for v${VERSION}" --body-file /tmp/pr-body.md)
-            gh pr merge --auto --squash "$PR"
-            echo "Opened $PR"
+            if PR=$(gh pr create --base main --head "$BRANCH" --title "chore(homebrew): sha256 for v${VERSION}" --body-file /tmp/pr-body.md 2>/tmp/pr-err); then
+              gh pr merge --auto --squash "$PR"
+              echo "Opened $PR"
+            else
+              cat /tmp/pr-err
+              if grep -q 'not permitted to create or approve pull requests' /tmp/pr-err; then
+                echo "::error::GITHUB_TOKEN may not open a pull request: \"GitHub Actions is not permitted to create or approve pull requests\". The branch is pushed and correct; only the PR is missing. Fix it once, in Settings -> Actions -> General -> Workflow permissions, by ticking \"Allow GitHub Actions to create and approve pull requests\" (equivalently: gh api -X PUT repos/$GITHUB_REPOSITORY/actions/permissions/workflow -F default_workflow_permissions=read -F can_approve_pull_request_reviews=true), then re-run this workflow. Until then, open it by hand: gh pr create --base main --head $BRANCH The formula on main still carries the previous release's hash until then, and detect-version will keep reporting it owed on every hourly sweep."
+              else
+                echo "::error::gh pr create failed for $BRANCH — see the output above."
+              fi
+              exit 1
+            fi
           else
             echo "✅ PR already open: $PR"
           fi

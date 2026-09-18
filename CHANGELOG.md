@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A release that cannot open its pull request says why.** `GITHUB_TOKEN`
+  cannot call `createPullRequest` unless "Allow GitHub Actions to create and
+  approve pull requests" is enabled, and v0.8.1 hit exactly that: the branch,
+  the bump and the diff were all correct and the run still ended in a bare
+  `GraphQL: GitHub Actions is not permitted to create or approve pull
+  requests`. Both `scheduled-release.yml` and `release.yml`'s `homebrew-sha`
+  job now name the setting, give the one-line `gh api` equivalent and the
+  manual `gh pr create` fallback, and say what stays stale until it is fixed.
+  The failure is still a failure: the branch exists without a PR, and for the
+  formula `detect-version` keeps reporting the hash owed on every sweep.
+
 ## [0.8.1] - 2026-09-18
 
 Automated weekly release — everything merged since `v0.8.0`.
