@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "DOC-001",
+      "statement": "Every statement in the architecture document names a module that exists.",
+      "source": {
+        "kind": "spec",
+        "ref": "docs/ARCHITECTURE.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "faults": [
+        {
+          "id": "P1",
+          "method": "assertion",
+          "description": "A documented module reference resolves to nothing in the tree.",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SEC-001",
+      "statement": "No route reachable without authentication reads from the user store.",
+      "source": {
+        "kind": "spec",
+        "ref": "docs/THREAT-MODEL.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "faults": [
+        {
+          "id": "P1",
+          "method": "scan",
+          "description": "An unauthenticated route reaches the user store.",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MIX-001",
+      "statement": "A claim may be falsified more than one way, and each probe says how.",
+      "source": {
+        "kind": "manual"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "faults": [
+        {
+          "id": "P1",
+          "method": "fault-injection",
+          "description": "The guard is removed.",
+          "faultClass": "guard-removed",
+          "file": "src/auth.mjs",
+          "find": "if (!user) throw",
+          "replace": "if (false) throw",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "P2",
+          "method": "assertion",
+          "description": "The documented rule and the code disagree.",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
+    }
+  ]
+}

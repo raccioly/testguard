@@ -1,23 +1,39 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:claimspec:v1:claims",
-  "title": "claimspec v1 — claims file",
+  "title": "claimspec v1 \u2014 claims file",
   "description": "What must be true, and how to try to falsify it. A claim is a statement the project makes; each fault is one concrete way that statement could be false, expressed as a deterministic source change. This file is code: its `replace` strings execute under the test runner. Treat it with the same review discipline as source.",
   "type": "object",
-  "required": ["schemaVersion", "claims"],
+  "required": [
+    "schemaVersion",
+    "claims"
+  ],
   "properties": {
-    "$schema": { "type": "string" },
-    "schemaVersion": { "const": 1 },
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
     "claims": {
       "type": "array",
-      "items": { "$ref": "#/$defs/claim" }
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
     }
   },
   "additionalProperties": false,
   "$defs": {
     "claim": {
       "type": "object",
-      "required": ["id", "statement", "source", "severity", "producedBy", "faults"],
+      "required": [
+        "id",
+        "statement",
+        "source",
+        "severity",
+        "producedBy",
+        "faults"
+      ],
       "properties": {
         "id": {
           "description": "Stable identifier. Renaming it changes every fingerprint derived from it.",
@@ -32,46 +48,82 @@
         "source": {
           "description": "Where the claim comes from. Spec- and ADR-sourced claims are human-governed; annotation- and comment-sourced claims may have been written by the same agent that wrote the tests, and should be ranked accordingly.",
           "type": "object",
-          "required": ["kind"],
+          "required": [
+            "kind"
+          ],
           "properties": {
-            "kind": { "enum": ["spec", "adr", "annotation", "comment", "manual"] },
-            "ref": { "type": "string", "maxLength": 512 }
+            "kind": {
+              "enum": [
+                "spec",
+                "adr",
+                "annotation",
+                "comment",
+                "manual"
+              ]
+            },
+            "ref": {
+              "type": "string",
+              "maxLength": 512
+            }
           },
           "additionalProperties": false
         },
-        "severity": { "$ref": "urn:claimspec:v1:common#/$defs/severity" },
-        "producedBy": { "$ref": "urn:claimspec:v1:common#/$defs/provenance" },
+        "severity": {
+          "$ref": "urn:claimspec:v1:common#/$defs/severity"
+        },
+        "producedBy": {
+          "$ref": "urn:claimspec:v1:common#/$defs/provenance"
+        },
         "defendedBy": {
           "description": "Globs (project-relative) for the test files that supposedly defend this claim. Empty or absent means: discover defenders as the test files that import each fault's target file (relative paths and resolved aliases). If nothing resolves, the verdict is `nocover`.",
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "uniqueItems": true
         },
         "faults": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/fault" }
+          "items": {
+            "$ref": "#/$defs/fault"
+          }
         },
         "tags": {
           "type": "array",
-          "items": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" },
+          "items": {
+            "$ref": "urn:claimspec:v1:common#/$defs/identifier"
+          },
           "uniqueItems": true
         }
       },
       "additionalProperties": false
     },
     "fault": {
-      "description": "One concrete way the claim could be false. Applied as an exact-string substitution; the schema is producer-agnostic — a human, an operator, an agent, or a derivation may all emit this shape.",
+      "description": "One concrete way the claim could be false, and how a tool would try to make it so. `method` says which; it defaults to `fault-injection`, whose shape is an exact-string substitution and is unchanged. Producer-agnostic: a human, an operator, an agent or a derivation may all emit this shape, and every artifact says which.",
       "type": "object",
-      "required": ["id", "description", "faultClass", "file", "find", "replace", "producedBy"],
+      "required": [
+        "id",
+        "description",
+        "producedBy"
+      ],
       "properties": {
         "id": {
           "description": "Unique within the claim.",
           "$ref": "urn:claimspec:v1:common#/$defs/identifier"
         },
-        "description": { "type": "string", "minLength": 1, "maxLength": 2000 },
-        "faultClass": { "$ref": "urn:claimspec:v1:common#/$defs/faultClass" },
-        "file": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "faultClass": {
+          "$ref": "urn:claimspec:v1:common#/$defs/faultClass"
+        },
+        "file": {
+          "$ref": "urn:claimspec:v1:common#/$defs/repoPath"
+        },
         "find": {
           "description": "Exact text to locate in `file`. Must occur exactly `expectHits` times or the fault is `unverifiable`.",
           "type": "string",
@@ -90,14 +142,59 @@
           "default": 1
         },
         "expectHits": {
-          "description": "How many times `find` must occur in `file`. Any other count means the anchor has rotted or is ambiguous → `unverifiable`, never a silent skip.",
+          "description": "How many times `find` must occur in `file`. Any other count means the anchor has rotted or is ambiguous \u2192 `unverifiable`, never a silent skip.",
           "type": "integer",
           "minimum": 1,
           "default": 1
         },
-        "producedBy": { "$ref": "urn:claimspec:v1:common#/$defs/provenance" }
+        "producedBy": {
+          "$ref": "urn:claimspec:v1:common#/$defs/provenance"
+        },
+        "method": {
+          "$ref": "urn:claimspec:v1:common#/$defs/method"
+        }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "properties": {
+                  "method": {
+                    "const": "fault-injection"
+                  }
+                },
+                "required": [
+                  "method"
+                ]
+              },
+              {
+                "not": {
+                  "required": [
+                    "method"
+                  ]
+                }
+              }
+            ]
+          },
+          "then": {
+            "$comment": "The default method. Absent `method` means fault-injection, so every claims file written before the field existed is held to exactly the same requirements as before. The property stubs are what ajv's strict mode needs to accept `required` here; the real definitions stay above.",
+            "properties": {
+              "faultClass": true,
+              "file": true,
+              "find": true,
+              "replace": true
+            },
+            "required": [
+              "faultClass",
+              "file",
+              "find",
+              "replace"
+            ]
+          }
+        }
+      ]
     }
   }
 }

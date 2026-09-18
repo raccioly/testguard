@@ -2834,6 +2834,66 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-METHOD-DEFAULTS-TO-INJECTION",
+      "statement": "A document that does not say which method produced it is fault injection, so every claims file, evidence file and baseline written before `method` existed is held to exactly the rules it was written against.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "spec/conformance/schemas.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An absent method is read as something other than fault injection, so every document written before the field existed silently stops being held to the requirements it was written against.",
+          "faultClass": "return-altered",
+          "file": "spec/lib/validate.mjs",
+          "find": "export const methodOf = (x) => x?.method ?? 'fault-injection';",
+          "replace": "export const methodOf = (x) => x?.method ?? 'assertion';",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-INJECTION-STILL-SHOWS-ITS-WORK",
+      "statement": "Relaxing the schema so a scanning tool can conform is never a licence for an injecting tool to stop showing its work: under fault injection every record must still carry its defenders, its inputs and its baseline and probe runs.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "spec/conformance/schemas.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The injection requirements move out of the schema and are not enforced anywhere, so a verdict with nothing behind it validates.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (injection) {\n        for (const k of ['defenders', 'inputs']) {",
+          "replace": "      if (false) {\n        for (const k of ['defenders', 'inputs']) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
     }
   ]
 }

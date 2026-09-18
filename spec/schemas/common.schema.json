@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:claimspec:v1:common",
-  "title": "claimspec v1 — shared definitions",
+  "title": "claimspec v1 \u2014 shared definitions",
   "description": "Definitions shared by every Guard-spec format. Referenced as urn:claimspec:v1:common#/$defs/<name>.",
   "$defs": {
     "sha256": {
@@ -28,7 +28,12 @@
       "pattern": "^(?![/\\\\])(?!\\.\\.(?:[/\\\\]|$))(?!.*[/\\\\]\\.\\.(?:[/\\\\]|$)).*$"
     },
     "severity": {
-      "enum": ["critical", "high", "medium", "low"]
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ]
     },
     "verdict": {
       "description": "Closed set. Only `killed` is a pass. Every other verdict gates by default (see GATE-SEMANTICS.md). `unverifiable` covers a fault that could not be applied (anchor missing/ambiguous) and a claim whose defenders failed to load (`defenders-failed-to-load`).",
@@ -43,7 +48,7 @@
       ]
     },
     "faultClass": {
-      "description": "Taxonomy of the injected change. Required on every fault so calibration (fault class → real-bug predictiveness) can be computed later. `field-dropped` = a field removed from a persisted/transmitted object, allow-list, schema or merge; `argument-swapped` = a call kept with a parameter-derived argument replaced by a trivial value; `element-removed` = a UI element no longer rendered; `handler-dropped` = an event handler no longer wired.",
+      "description": "Taxonomy of the injected change. Required on every fault so calibration (fault class \u2192 real-bug predictiveness) can be computed later. `field-dropped` = a field removed from a persisted/transmitted object, allow-list, schema or merge; `argument-swapped` = a call kept with a parameter-derived argument replaced by a trivial value; `element-removed` = a UI element no longer rendered; `handler-dropped` = an event handler no longer wired.",
       "enum": [
         "guard-removed",
         "condition-forced",
@@ -63,63 +68,156 @@
     "provenance": {
       "description": "Who or what produced an artifact. `human` = authored by a person; `agent` = proposed by an LLM agent; `operator` = emitted by a mechanical mutation operator; `derived` = computed from another artifact (e.g. a bug log).",
       "type": "object",
-      "required": ["producer"],
+      "required": [
+        "producer"
+      ],
       "properties": {
-        "producer": { "enum": ["human", "agent", "operator", "derived"] },
-        "by": { "type": "string", "maxLength": 256 },
-        "reviewedBy": { "type": "string", "maxLength": 256 },
-        "at": { "$ref": "#/$defs/isoDateTime" }
+        "producer": {
+          "enum": [
+            "human",
+            "agent",
+            "operator",
+            "derived"
+          ]
+        },
+        "by": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "reviewedBy": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "at": {
+          "$ref": "#/$defs/isoDateTime"
+        }
       },
       "additionalProperties": false
     },
     "tool": {
       "type": "object",
-      "required": ["name", "version"],
+      "required": [
+        "name",
+        "version"
+      ],
       "properties": {
-        "name": { "$ref": "#/$defs/identifier" },
-        "version": { "type": "string", "minLength": 1, "maxLength": 64 }
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
       },
       "additionalProperties": false
     },
     "uncoveredFile": {
       "description": "A changed source or test file that no claim covers and no unexpired ignore entry excuses. Shared by the gate and status documents.",
       "type": "object",
-      "required": ["file", "kind", "suggestion"],
+      "required": [
+        "file",
+        "kind",
+        "suggestion"
+      ],
       "properties": {
-        "file": { "$ref": "#/$defs/repoPath" },
-        "kind": { "enum": ["source", "test"] },
+        "file": {
+          "$ref": "#/$defs/repoPath"
+        },
+        "kind": {
+          "enum": [
+            "source",
+            "test"
+          ]
+        },
         "nearestClaimId": {
-          "description": "The claim whose fault files share the longest directory prefix with this file — where to attach, not a verdict.",
+          "description": "The claim whose fault files share the longest directory prefix with this file \u2014 where to attach, not a verdict.",
           "$ref": "#/$defs/identifier"
         },
-        "suggestion": { "type": "string", "minLength": 1, "maxLength": 1024 }
+        "suggestion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
       },
       "additionalProperties": false
     },
     "ignoreReliance": {
       "description": "An ignore entry the gate relied on (or would have, had it not expired), with the changed files it matched.",
       "type": "object",
-      "required": ["pattern", "reason", "files"],
+      "required": [
+        "pattern",
+        "reason",
+        "files"
+      ],
       "properties": {
-        "pattern": { "type": "string", "minLength": 1, "maxLength": 512 },
-        "reason": { "type": "string", "minLength": 8, "maxLength": 2000 },
-        "expires": { "$ref": "#/$defs/isoDateTime" },
-        "files": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/repoPath" } }
+        "pattern": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 2000
+        },
+        "expires": {
+          "$ref": "#/$defs/isoDateTime"
+        },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/repoPath"
+          }
+        }
       },
       "additionalProperties": false
     },
     "annotation": {
       "description": "Strictly additive. An annotation never changes, suppresses, or drops a finding; it only attaches context to it.",
       "type": "object",
-      "required": ["kind", "text"],
+      "required": [
+        "kind",
+        "text"
+      ],
       "properties": {
-        "kind": { "enum": ["note", "accepted-risk", "false-positive", "tracked", "wontfix"] },
-        "text": { "type": "string", "minLength": 1, "maxLength": 4000 },
-        "by": { "type": "string", "maxLength": 256 },
-        "at": { "$ref": "#/$defs/isoDateTime" },
-        "ref": { "type": "string", "maxLength": 512 }
+        "kind": {
+          "enum": [
+            "note",
+            "accepted-risk",
+            "false-positive",
+            "tracked",
+            "wontfix"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "by": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "at": {
+          "$ref": "#/$defs/isoDateTime"
+        },
+        "ref": {
+          "type": "string",
+          "maxLength": 512
+        }
       },
       "additionalProperties": false
+    },
+    "method": {
+      "description": "How a tool tries to falsify a claim. `fault-injection` mutates source and runs the claim's defenders; it is the only method fully specified in v1, and the default when the field is absent, so every document written before this field existed stays valid. `assertion` (a claim checked by reading code, as a documentation guard does) and `scan` (a surface checked by a scanner) are RESERVED: their required fields are deliberately not specified here and will be defined by their first real consumer. Inventing them for an absent tool is the mistake that made this discriminator necessary.",
+      "enum": [
+        "fault-injection",
+        "assertion",
+        "scan"
+      ],
+      "default": "fault-injection"
     }
   }
 }
