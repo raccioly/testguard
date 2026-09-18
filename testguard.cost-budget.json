@@ -1,6 +1,6 @@
 {
   "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine.",
-  "seconds": 950,
+  "seconds": 1100,
   "measured": {
     "seconds": 804,
     "at": "2026-09-18",
@@ -9,8 +9,29 @@
     "runs": 576,
     "how": "probe . --serial --no-escalate --cost, idle machine, from scratch"
   },
-  "headroom": "A CI runner is slower than the machine above, and reuse is cold on a release. 950 leaves ~18% over the measured figure — enough that an ordinary run never flaps, tight enough that another 59-to-91 style jump fails.",
+  "headroom": "The local figure (804 s) is what a developer sees; the CI figure (906 s before #82, 962 s after) is what the check runs against, and a CI runner is ~13% slower than the idle machine above. The first budget was 18% over the LOCAL figure and only 4.6% over the CI one, so the first PR to add any claim tripped it. 1100 is ~14% over the CI measurement: an ordinary run never flaps; a 59-to-91 style jump (+76%) still fails. Budget against the from-scratch CI number, never a run that reused verdicts — the release job probes from scratch.",
   "history": [
-    { "seconds": 950, "at": "2026-09-18", "why": "First budget. Set from the 804 s measurement after #73 cut the gate from 1414 s." }
-  ]
+    {
+      "seconds": 950,
+      "at": "2026-09-18",
+      "why": "First budget. Set from the 804 s measurement after #73 cut the gate from 1414 s."
+    },
+    {
+      "seconds": 1100,
+      "at": "2026-09-18",
+      "why": "#82 added eight unit-defended faults (~30 s in CI) and main went 906 -> 981 s from scratch, red against 950. Re-pointing the two replay-defended calibration claims onto pure tests took it to 962 s. The remaining overage was the budget itself: set 18% over a local 804 s, it was 4.6% over the 906 s CI already measured. Raised to 1100 against the CI figure. The heavy claims it names — TG-ADMIT-NEEDS-ALL-KILLED 87 s, TG-PROBE-NEVER-EDITS-THE-TREE-IT-MEASURES 70 s, the two TG-MCP-* at 42 s — are the next #73-style cut, tracked separately."
+    }
+  ],
+  "measuredInCI": {
+    "seconds": 962,
+    "at": "2026-09-18",
+    "run": "35365110820",
+    "commit": "393ac3a",
+    "how": "ci.yml test(22): probe . --budget 180000 --no-escalate --cost, from scratch (claims-file change misses the reuse cache)",
+    "before": {
+      "seconds": 906,
+      "commit": "3eb9d50",
+      "note": "main before #82 landed anything — 44 s under the 950 budget, not the ~146 s the local figure implied"
+    }
+  }
 }

@@ -50,6 +50,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+- **The cost budget is set against what CI measures.** 950 s was 18% over
+  the local 804 s figure and only 4.6% over the 906 s CI already measured on
+  `main`, so the first pull request to add any claim tripped it — #94 passed
+  its own leg only because the cache reused verdicts, and `main` went red at
+  981 s from scratch the moment it merged. Raised to 1100 s (~14% over the
+  962 s CI measures with #82's re-pointed defenders), with the CI figures
+  recorded beside the local one so the next person budgets against the
+  number the check actually sees. The heavy claims the failure now names are
+  the next #73-style cut.
 - **Calibration's pure tests moved off the replay fixture** (the #73 pattern).
   Three calibration claims were defended by `test/replay.test.mjs`, which
   builds a scripted git corpus on every run; their kills come from pure
