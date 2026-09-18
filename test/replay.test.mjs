@@ -7,35 +7,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { replay, calibrationFrom, findFixCommits, dedupeByPatch, classifyReplay } from '../src/replay/replay.mjs';
-import { labelDiff } from '../src/replay/label.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'fixtures', 'known-answer');
-
-describe('labelDiff — the join key between real bugs and the fault model', () => {
-  const cases = [
-    ['a guard put back', '+  if (!ctx || !ctx.scope) {', 'guard-removed'],
-    ['a security flag flipped', '-  httpOnly: false,\n+  httpOnly: true,', 'literal-changed'],
-    ['a dropped field restored', '+      content: redacted,', 'field-dropped'],
-    ['a verify call restored', '+  await verifyMembership(userId, orgId);', 'call-removed'],
-    ['a wrong return fixed', '-  return true;\n+  return rules.includes(id);', 'return-altered'],
-    ['a rethrow removed', '-  } catch (e) {\n-    throw e;', 'exception-swallowed'],
-    ['a state change restored', '+  total = total + delta;', 'statement-deleted'],
-  ];
-  for (const [name, diff, expected] of cases) {
-    it(`labels ${name} as ${expected}`, () => {
-      expect(labelDiff(diff)).toEqual({ faultClass: expected, confident: true });
-    });
-  }
-  it('refuses to guess: an unrecognisable diff is `other`, not a coin toss', () => {
-    expect(labelDiff('+  // a comment\n+\n')).toEqual({ faultClass: 'other', confident: false });
-    expect(labelDiff('')).toEqual({ faultClass: 'other', confident: false });
-  });
-  it('ignores the diff header so a filename never becomes the signal', () => {
-    expect(labelDiff('+++ b/src/timeout.js\n--- a/src/timeout.js\n+  // nothing\n').faultClass).toBe('other');
-  });
-});
 
 /**
  * The fixture as its own repository with a scripted history: one fix the
@@ -175,39 +150,6 @@ describe('replay on a scripted corpus', () => {
     const positives = Object.values(cal.buckets).reduce((n, b) => n + b.positives, 0);
     expect(total).toBe(2);      // both were measurable
     expect(positives).toBe(1);  // one was blind
-  });
-});
-
-describe('classifyReplay — the verdict, pure, every branch', () => {
-  const pass = { outcome: 'pass', assertionFailures: 0, durationMs: 1 };
-  const failed = { outcome: 'fail', assertionFailures: 1, durationMs: 1 };
-  const nonAssertion = { outcome: 'fail', assertionFailures: 0, durationMs: 1 };
-  const timeout = { outcome: 'timeout', durationMs: 1 };
-  const error = { outcome: 'error', durationMs: 1 };
-
-  it('caught only when EVERY run failed by assertion', () => {
-    expect(classifyReplay([failed, failed, failed])).toEqual({ verdict: 'caught' });
-  });
-
-  it('a mixed result is flaky, never caught — one flaky failure would otherwise read as detection', () => {
-    expect(classifyReplay([failed, pass, failed])).toEqual({ verdict: 'flaky', reason: 'runs-disagreed' });
-    expect(classifyReplay([pass, failed])).toEqual({ verdict: 'flaky', reason: 'runs-disagreed' });
-    // the optimistic reading is the one that hides a blind spot: refuse it
-    expect(classifyReplay([failed, pass, pass]).verdict).not.toBe('caught');
-  });
-
-  it('blind only when every run passed', () => {
-    expect(classifyReplay([pass, pass, pass])).toEqual({ verdict: 'blind' });
-  });
-
-  it('a failure that is not an assertion failure is not detection', () => {
-    expect(classifyReplay([nonAssertion, nonAssertion])).toEqual({ verdict: 'unverifiable', reason: 'failed-without-an-assertion' });
-  });
-
-  it('a timeout or a load failure concludes nothing', () => {
-    expect(classifyReplay([pass, timeout])).toEqual({ verdict: 'unverifiable', reason: 'timed-out' });
-    expect(classifyReplay([error])).toEqual({ verdict: 'unverifiable', reason: 'suite-failed-to-load' });
-    expect(classifyReplay([])).toEqual({ verdict: 'unverifiable', reason: 'no-runs' });
   });
 });
 

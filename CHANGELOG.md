@@ -16,9 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this budget raised the fault count 59 to 91 while per-fault cost barely
   moved, so an average would have reported everything fine.
 
-  `perClaimSeconds` is 75 s, just above today's worst claim
-  (`TG-ADMIT-NEEDS-ALL-KILLED`, 67 s for one fault), so the rule reads: no new
-  claim may be worse than the worst we already have. A breach names the claim
+  `perClaimSeconds` is 100 s, just above today's worst claim
+  (`TG-ADMIT-NEEDS-ALL-KILLED`, **87 s in CI** for one fault), so the rule
+  reads: no new claim may be worse than the worst we already have. Calibrated
+  against CI and not the local figure — 75 s, set from that claim's local
+  66.5 s, tripped on the first CI run. This file already warns about exactly
+  that for the total (950 s was 18% over local but 4.6% over CI, and the first
+  PR adding a claim tripped it); the same error applies one level down. A breach names the claim
   and its remedy — a cheaper defender, not a bigger budget. The field is
   optional and additive: a budget without one behaves exactly as before.
 - **The cost report goes to the CI job summary, not only the log.** The gate
@@ -26,6 +30,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   said a word, because `--cost` only ever printed into a log nobody opens
   while it is passing. The summary is read without opening anything, so the
   number is in front of a reviewer while the change is still a change.
+
+### Performance
+- **Three claims moved off expensive shared defenders: 65 s, ~30 s and ~30 s
+  down to under 2 s each.** All three faulted a *pure* function while naming
+  an integration test file, and a claim pays for every test in the file it
+  names. `TG-SURVIVOR-PROVES-THE-SUBJECT-RUNS` faults `classify()` but was
+  defended by `negative-control.test.mjs`, which spawns real runners against
+  fixture repositories; `TG-LABEL-NEVER-GUESSES` faults `labelDiff()` and
+  `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT` faults `classifyReplay()`, both defended
+  by `replay.test.mjs`, which builds a scripted git corpus.
+
+  Two were a straight move of an already-isolated `describe` block into
+  `test/label.test.mjs` and `test/replay-verdict.test.mjs`; only the `classify`
+  case needed a test written. Each was proved with `admit` — passes on HEAD and
+  fails on every fault, 3/3 — *before* the expensive defender was dropped, and
+  never the other way round. The integration files keep their remaining claims,
+  where the fixture is the point.
 
 ### Changed
 - **The cost budget is 1230 s, from 1350.** 1350 was set defensively against a

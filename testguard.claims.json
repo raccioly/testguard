@@ -1709,7 +1709,7 @@
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/replay.test.mjs"
+        "test/replay-verdict.test.mjs"
       ],
       "faults": [
         {
@@ -1940,7 +1940,7 @@
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/replay.test.mjs"
+        "test/label.test.mjs"
       ],
       "faults": [
         {
@@ -2866,7 +2866,7 @@
         "by": "maintainer"
       },
       "defendedBy": [
-        "test/negative-control.test.mjs"
+        "test/classify.test.mjs"
       ],
       "faults": [
         {
