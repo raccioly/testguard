@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SURFACES = ['package.json', 'pyproject.toml', 'action.yml', 'README.md', 'packaging/homebrew/testguard.rb', 'packaging/gitlab/testguard.gitlab-ci.yml'];
+const SURFACES = ['package.json', 'pyproject.toml', 'action.yml', 'README.md', 'packaging/homebrew/testguard.rb', 'packaging/gitlab/testguard.gitlab-ci.yml', 'docs/testguard-explained.html'];
 
 /**
  * Every textual form that pins a PUBLISHED release of this project, with the
@@ -281,7 +281,11 @@ describe('sync-release-version: the Homebrew sha256 is a release surface, comput
  */
 describe('sync-release-version: the release workflows allow exactly what a release writes', () => {
   /** What the bump step writes directly, beside the synced surfaces. */
-  const BUMP_WRITES = ['package.json', 'package-lock.json', 'CHANGELOG.md'];
+  // docs/testguard-explained.pdf is not a surface — it is RENDERED from one,
+  // by build-one-pager.mjs in the same release step — but the release commits
+  // it, so every allow-list has to admit it or the PR is held for a file the
+  // release itself wrote.
+  const BUMP_WRITES = ['package.json', 'package-lock.json', 'CHANGELOG.md', 'docs/testguard-explained.pdf'];
   const listed = () => {
     const r = spawnSync('node', [join(ROOT, '.github', 'scripts', 'sync-release-version.mjs'), '--list-surfaces'], { encoding: 'utf8' });
     expect(r.status, r.stderr).toBe(0);

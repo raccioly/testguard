@@ -228,6 +228,25 @@ Automated weekly release — everything merged since `v0.8.1`.
   refusal.
 - `--help` shows `gate --changed HEAD --include-dirty`. `--include-dirty` needs
   a reference, and that combination is the one form a pre-commit hook wants.
+- **The technical brief describes the tool that exists.** It was last rendered
+  when it covered one verb, `probe`, and said nothing about `replay` and its
+  calibration — the empirical answer to whether an injected fault resembles a
+  real bug, which is the question a document arguing "evidence, not output"
+  can least afford to omit. A new page covers the eleven verbs and the
+  calibration, carrying the README's own framing: the greenfield transfer is
+  unproven, and `replay` is the instrument rather than the answer. The verdict
+  table, the cost formula and the prior-art section were checked against the
+  code and left alone.
+- **The brief's PDF is rendered by the release instead of by memory.** Its
+  masthead read `v0.6` through three releases because nothing ever ran
+  `build-one-pager.mjs`. The HTML masthead is now a version surface and
+  `scheduled-release.yml` re-renders the PDF in the same step as the sync —
+  the same step, because an HTML and a PDF that disagree are worse than a
+  document uniformly out of date. `--require-chrome` makes a missing browser
+  fail the release rather than silently commit a stale PDF, and every render
+  must produce exactly one sheet per `.page` div: a section a few pixels too
+  tall spills onto a second sheet with no warning from Chrome, contradicting
+  the "Page N of M" footers the document prints about itself.
 
 ## [0.8.1] - 2026-09-18
 
