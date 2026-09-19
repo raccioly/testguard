@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "testguard-cli"
-version = "0.9.2"
+version = "0.9.3"
 description = "Breaks your code on purpose and reports every promise your tests did not notice breaking. Mutation testing bound to the claims a project makes — vitest, jest, Playwright, pytest and unittest. Ships the Node.js CLI (requires Node.js 20+)."
 readme = "README.md"
 license = { text = "MIT" }
