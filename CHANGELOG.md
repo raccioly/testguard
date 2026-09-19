@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-09-19
+
+Automated weekly release — everything merged since `v0.9.2`.
+
+### Changed
+
+- fix(release): clear held Homebrew PR runs (#129)
+- chore(homebrew): sha256 for v0.9.2 (#128)
+
+
 ### Fixed
 
 - Bot-created Homebrew checksum PRs now clear GitHub's first-time-contributor
