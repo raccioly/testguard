@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "tool": { "name": "testguard", "version": "0.10.0" },
+  "generatedAt": "2026-09-19T21:00:00Z",
+  "state": "no-claims",
+  "next": {
+    "action": "scaffold",
+    "command": "testguard scaffold src/a.mjs",
+    "why": "No claims yet.",
+    "file": "src/a.mjs"
+  },
+  "provisional": false,
+  "surface": {
+    "sourceModules": 2,
+    "claimedModules": 1,
+    "unclaimedModules": 0,
+    "history": { "available": true, "maxCommits": 200, "commitsRead": 12 },
+    "highChurn": { "modules": 2, "claimed": 1 },
+    "rankedUnclaimed": []
+  },
+  "counts": { "claims": 0, "faults": 0 },
+  "stale": [],
+  "invalidFaults": [],
+  "changedFaults": [],
+  "findings": [],
+  "notes": [],
+  "paths": {}
+}

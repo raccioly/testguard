@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `status` now makes the claim denominator visible: claimed versus current
+  source modules, coverage of the 20 highest-churn modules over a bounded
+  200-commit window, and specific unclaimed modules ranked by churn with
+  explicit path-risk signals. A clean project whose majority of modules are
+  still unclaimed is directed to scaffold the highest-churn gap. The existing
+  co-authorship caveat is also printed by both `status` and `probe`, rather
+  than remaining available only in JSON and the agent brief.
+
 ## [0.9.4] - 2026-09-19
 
 Automated weekly release — everything merged since `v0.9.3`.

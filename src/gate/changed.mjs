@@ -28,7 +28,7 @@ import { globToRegExp } from '../util/glob.mjs';
 export const SOURCE_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.jsx', '.tsx', '.py']);
 const TEST_RE = /\.(test|spec)\.[cm]?[jt]sx?$/;
 // Python names tests by file, not by a dotted suffix: `test_foo.py`, `foo_test.py`.
-const isTestFile = (f) => TEST_RE.test(f) || IS_PY_TEST.test(f);
+export const isTestFile = (f) => TEST_RE.test(f) || IS_PY_TEST.test(f);
 
 /** Files that are source by extension but never carry claims. Printed by --explain. */
 export const DEFAULT_EXCLUDES = Object.freeze([
@@ -42,6 +42,10 @@ export const DEFAULT_EXCLUDES = Object.freeze([
   '**/__snapshots__/**',
   '.testguard/**',
 ]);
+const DEFAULT_EXCLUDE_RES = DEFAULT_EXCLUDES.map(globToRegExp);
+
+/** Whether a source-shaped path is outside TestGuard's claimable module surface. */
+export const isDefaultExcluded = (file) => DEFAULT_EXCLUDE_RES.some((re) => re.test(file));
 
 export const defaultIgnorePath = (projectDir) => join(projectDir, 'testguard.ignore.json');
 
@@ -158,7 +162,7 @@ export function computeChangedGate({ projectDir, ref, includeDirty = false, excl
 
   const pathEntries = ignore.entries.filter((e) => e.kind === 'path').map((e) => ({ entry: e, re: globToRegExp(e.pattern), expired: isExpired(e, now), files: [] }));
   const userExcludes = exclude.map((g) => ({ glob: g, re: globToRegExp(g) }));
-  const defaultExcludes = DEFAULT_EXCLUDES.map((g) => ({ glob: g, re: globToRegExp(g) }));
+  const defaultExcludes = DEFAULT_EXCLUDES.map((g, i) => ({ glob: g, re: DEFAULT_EXCLUDE_RES[i] }));
 
   const excluded = [];
   const covered = [];

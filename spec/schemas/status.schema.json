@@ -102,6 +102,56 @@
     "provisional": {
       "type": "boolean"
     },
+    "surface": {
+      "description": "The current claim denominator. A source module is a non-test file with a supported source extension that is not covered by the documented default exclusions. Churn is bounded recent git history and remains separate from path-risk signals; neither is collapsed into a score.",
+      "type": "object",
+      "required": ["sourceModules", "claimedModules", "unclaimedModules", "history", "highChurn", "rankedUnclaimed"],
+      "properties": {
+        "sourceModules": { "type": "integer", "minimum": 0 },
+        "claimedModules": { "type": "integer", "minimum": 0 },
+        "unclaimedModules": { "type": "integer", "minimum": 0 },
+        "history": {
+          "type": "object",
+          "required": ["available", "maxCommits", "commitsRead"],
+          "properties": {
+            "available": { "type": "boolean" },
+            "maxCommits": { "type": "integer", "minimum": 1 },
+            "commitsRead": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "highChurn": {
+          "description": "How many of the up-to-20 most changed source modules carry a claim.",
+          "type": "object",
+          "required": ["modules", "claimed"],
+          "properties": {
+            "modules": { "type": "integer", "minimum": 0, "maximum": 20 },
+            "claimed": { "type": "integer", "minimum": 0, "maximum": 20 }
+          },
+          "additionalProperties": false
+        },
+        "rankedUnclaimed": {
+          "description": "Up to ten concrete unclaimed modules, ordered by changes in the bounded history window; path-risk signals break ties and are reported explicitly.",
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "required": ["file", "changes", "riskSignals"],
+            "properties": {
+              "file": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" },
+              "changes": { "type": "integer", "minimum": 0 },
+              "riskSignals": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": { "enum": ["security", "money"] }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "counts": {
       "type": "object",
       "required": [

@@ -3877,6 +3877,121 @@
         "worktrees",
         "isolation"
       ]
+    },
+    {
+      "id": "TG-STATUS-NAMES-CLAIMED-SURFACE",
+      "statement": "Status reports how many current source modules carry a claim, names concrete unclaimed modules ranked by bounded recent churn without collapsing churn and path risk into a score, and directs a clean project to expand the denominator while most modules remain unclaimed.",
+      "source": {
+        "kind": "manual",
+        "ref": "https://github.com/raccioly/testguard/issues/114"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-19T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/surface.test.mjs",
+        "test/status.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Test files replace source modules in the denominator, so claimed surface no longer describes production code.",
+          "faultClass": "condition-forced",
+          "file": "src/status/surface.mjs",
+          "find": "    !isTestFile(file) &&",
+          "replace": "    isTestFile(file) &&",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Unclaimed modules are ranked from least changed to most changed, pointing the next action away from the highest-churn gap.",
+          "faultClass": "condition-forced",
+          "file": "src/status/surface.mjs",
+          "find": "    b.changes - a.changes || b.riskSignals.length - a.riskSignals.length || a.file.localeCompare(b.file));",
+          "replace": "    a.changes - b.changes || b.riskSignals.length - a.riskSignals.length || a.file.localeCompare(b.file));",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A clean project expands its denominator only when fewer modules are unclaimed than claimed, preserving the misleading early-adoption green.",
+          "faultClass": "condition-forced",
+          "file": "src/status/surface.mjs",
+          "find": "export const needsClaimExpansion = (surface) => surface.unclaimedModules > surface.claimedModules && surface.rankedUnclaimed.length > 0;",
+          "replace": "export const needsClaimExpansion = (surface) => surface.unclaimedModules < surface.claimedModules && surface.rankedUnclaimed.length > 0;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "status",
+        "adoption",
+        "surface"
+      ]
+    },
+    {
+      "id": "TG-HUMAN-OUTPUT-NAMES-COAUTHORSHIP",
+      "statement": "The human-facing probe summary and status rendering both warn when killed faults were caught by tests co-authored with the code they defend; the evidence-quality caveat is never confined to JSON or the agent brief.",
+      "source": {
+        "kind": "manual",
+        "ref": "https://github.com/raccioly/testguard/issues/114#issuecomment-5738100371"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-19T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/brief.test.mjs",
+        "test/status.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Probe computes the co-authored count but drops the warning from its human summary.",
+          "faultClass": "statement-deleted",
+          "file": "src/render.mjs",
+          "find": "  const quality = coAuthored ? `\\n${coAuthorshipWarning(coAuthored, kills.length)}` : '';",
+          "replace": "  const quality = '';",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Status drops the co-authorship warning while retaining the count in its JSON document.",
+          "faultClass": "condition-forced",
+          "file": "src/status/status.mjs",
+          "find": "  if (coAuthored) lines.push(`evidence: ${coAuthorshipWarning(coAuthored, kills)}`);",
+          "replace": "  if (false) lines.push(`evidence: ${coAuthorshipWarning(coAuthored, kills)}`);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "status",
+        "probe",
+        "independence"
+      ]
     }
   ]
 }

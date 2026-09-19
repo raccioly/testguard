@@ -244,6 +244,12 @@ const semantic = {
     if (doc.invalidFaults?.length > 0 && doc.state !== 'invalid-anchors') errors.push({ path: '/state', message: 'invalid fault anchors are hidden behind a later state; invalid-anchors precedes every evidence state' });
     if (doc.evidenceSource && !doc.evidenceHead) errors.push({ path: '/evidenceHead', message: 'evidence was read, so the commit it describes must be recorded' });
     if (doc.changes && doc.changes.uncovered.length > 0 && !['no-claims', 'unclaimed-changes'].includes(doc.state)) errors.push({ path: '/state', message: 'uncovered changed files are hidden behind a later state; unclaimed-changes precedes every evidence state' });
+    if (doc.surface) {
+      if (doc.surface.claimedModules + doc.surface.unclaimedModules !== doc.surface.sourceModules) errors.push({ path: '/surface', message: 'claimedModules + unclaimedModules must equal sourceModules' });
+      if (doc.surface.highChurn.claimed > doc.surface.highChurn.modules) errors.push({ path: '/surface/highChurn/claimed', message: 'claimed high-churn modules cannot exceed the high-churn window' });
+      if (!doc.surface.history.available && doc.surface.history.commitsRead !== 0) errors.push({ path: '/surface/history/commitsRead', message: 'unavailable history must report zero commits read' });
+      if (new Set(doc.surface.rankedUnclaimed.map((item) => item.file)).size !== doc.surface.rankedUnclaimed.length) errors.push({ path: '/surface/rankedUnclaimed', message: 'ranked unclaimed modules must be unique' });
+    }
     return errors;
   },
 

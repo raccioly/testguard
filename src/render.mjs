@@ -5,6 +5,8 @@ export const formatVerdict = (v, provisional = false) => (v === 'killed' ? 'kill
 
 export const PROVISIONAL_WARNING = (n) => `PROVISIONAL — confirmRuns ${n} (< 3): nothing below is confirmed. Verdicts carry a "?"; this evidence cannot be frozen into a baseline. Re-run with --confirm 3 before trusting it.`;
 
+export const coAuthorshipWarning = (coAuthored, kills) => `${coAuthored} of ${kills} kills are co-authored with the code they defend — the test and the code were written in the same change, so those kills are not independent evidence.`;
+
 export function renderRecord(r, { provisional = false, showDiscovered = true } = {}) {
   const head = `${formatVerdict(r.verdict, provisional).padEnd(15)} ${r.claim.id}/${r.subject.id}`.padEnd(38);
   let why = '';
@@ -32,7 +34,10 @@ export function renderSummary(records, run) {
   const unproven = records.filter((r) => r.verdict !== 'killed');
   const claims = new Set(unproven.map((r) => r.claim.id)).size;
   const where = run ? ` Probed ${run.repo.snapshot ? `working tree (snapshot ${run.repo.snapshot.slice(0, 7)} of ${run.repo.head.slice(0, 7)})` : run.mode === 'in-place' ? `in place at ${run.repo.head.slice(0, 7)}${run.repo.dirty ? ' (dirty)' : ''}` : run.repo.head.slice(0, 7)}.` : '';
-  return `${run?.provisional ? 'PROVISIONAL: ' : ''}${records.length} faults probed: ${parts.join(', ')}. ${unproven.length} unproven fault${unproven.length === 1 ? '' : 's'} across ${claims} claim${claims === 1 ? '' : 's'}.${where}`;
+  const kills = records.filter((r) => r.verdict === 'killed');
+  const coAuthored = kills.filter((r) => r.detail.independence?.class === 'co-authored').length;
+  const quality = coAuthored ? `\n${coAuthorshipWarning(coAuthored, kills.length)}` : '';
+  return `${run?.provisional ? 'PROVISIONAL: ' : ''}${records.length} faults probed: ${parts.join(', ')}. ${unproven.length} unproven fault${unproven.length === 1 ? '' : 's'} across ${claims} claim${claims === 1 ? '' : 's'}.${where}${quality}`;
 }
 
 /** Survivors first, then by rank score; killed last. */

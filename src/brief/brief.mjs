@@ -1,5 +1,5 @@
 import { gate } from '../baseline/baseline.mjs';
-import { summarize, formatVerdict } from '../render.mjs';
+import { coAuthorshipWarning, summarize, formatVerdict } from '../render.mjs';
 
 export const HEADING = '## TEST BLINDSPOT CONTEXT';
 /** First line of every markdown brief, so a poster can find and update its own note instead of adding another. */
@@ -98,7 +98,7 @@ export function renderBriefText(brief, { hasBaseline, total, independence }) {
   }
   // L3: a kill written in the same change as the code it guards is not
   // independent evidence. One line, no per-item noise.
-  if (independence?.coAuthored) lines.push('', `${independence.coAuthored} of ${independence.kills} kills are co-authored with the code they defend — the test and the code were written in the same change, so those kills are not independent evidence.`);
+  if (independence?.coAuthored) lines.push('', coAuthorshipWarning(independence.coAuthored, independence.kills));
   if (brief.next) lines.push('', `NEXT [${brief.next.action}]: ${brief.next.command}`, `  why: ${brief.next.why}`);
   if (brief.items.length === 0) {
     lines.push('', 'Every probed claim is defended. Keep it that way: new claims need a fault and a test that fails on it.');
