@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-09-19
+
+Automated weekly release — everything merged since `v0.9.1`.
+
+### Changed
+
+- feat(claims): preflight fault anchors (#126)
+- chore(homebrew): sha256 for v0.9.1 (#125)
+
+
 ### Added
 
 - `claims --check-anchors` locates every exact fault anchor and syntax-checks
