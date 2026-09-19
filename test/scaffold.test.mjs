@@ -126,6 +126,9 @@ export async function handle(req, res) {
       expect(readFileSync(join(dir, 'testguard.claims.json'), 'utf8')).toContain('"AUTH-ADMIN"'); // untouched
       const b = capture();
       expect(await main(['scaffold', 'src/nope.ts'], b.io)).toBe(2);
+      const c = capture();
+      expect(await main(['scaffold', 'src/auth.ts', '--claim', 'AUTH-ADMIN', '--claim', 'AUTH-OTHER'], c.io)).toBe(3);
+      expect(c.lines.err.join('\n')).toContain('scaffold accepts exactly one --claim <ID>');
     } finally {
       process.chdir(cwd);
     }

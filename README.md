@@ -279,8 +279,12 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    because it fails when the claim is false.
 
    Practical loop: first pass `--no-escalate` (escalation re-runs the whole
-   suite N times per survivor); iterate on one claim with `--claim <ID>` and
-   either `--include-dirty` or `--in-place` (only fault target files must be
+   suite N times per survivor); iterate on one claim with `--claim <ID>`, or
+   select a batch with commas or repeated flags (`--claim A,B --claim C`).
+   Every occurrence is retained in first-seen order, duplicates are collapsed,
+   and partial human/JSON output names both the requested and probed counts, so
+   a green subset cannot masquerade as the selection the operator asked for.
+   Use either `--include-dirty` or `--in-place` (only fault target files must be
    clean there; test files may be dirty), optionally `--confirm 1` for a fast
    **provisional** signal — verdicts print with a `?`, evidence goes to
    `evidence-provisional.json`, and `baseline` refuses it; final pass with

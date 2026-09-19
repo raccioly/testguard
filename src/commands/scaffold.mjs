@@ -10,6 +10,15 @@ export async function scaffoldCommand({ projectDir, file, values, version }, io)
     io.err('usage: testguard scaffold <source-file> [--claim <ID>] [--out <path>] [--json]');
     return 3;
   }
+  if (values.claim?.length > 1 || values.claim?.[0]?.includes(',')) {
+    io.err('scaffold accepts exactly one --claim <ID>');
+    return 3;
+  }
+  const claimId = values.claim?.[0]?.trim();
+  if (values.claim && !claimId) {
+    io.err('--claim must name one claim id');
+    return 3;
+  }
   const abs = resolve(file);
   if (!existsSync(abs)) throw new PreconditionError(`no such file: ${file}`);
   const rel = relative(projectDir, abs);
@@ -17,7 +26,7 @@ export async function scaffoldCommand({ projectDir, file, values, version }, io)
 
   const claimsPath = values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir);
   const existingClaims = existsSync(claimsPath) ? loadClaims(claimsPath) : undefined;
-  const { doc, stats } = scaffoldFile({ projectDir, file: rel, claimId: values.claim, existingClaims, toolVersion: version });
+  const { doc, stats } = scaffoldFile({ projectDir, file: rel, claimId, existingClaims, toolVersion: version });
 
   if (values.json) {
     io.out(JSON.stringify(doc, null, 2));

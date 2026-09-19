@@ -250,6 +250,13 @@ const semantic = {
       if (!doc.surface.history.available && doc.surface.history.commitsRead !== 0) errors.push({ path: '/surface/history/commitsRead', message: 'unavailable history must report zero commits read' });
       if (new Set(doc.surface.rankedUnclaimed.map((item) => item.file)).size !== doc.surface.rankedUnclaimed.length) errors.push({ path: '/surface/rankedUnclaimed', message: 'ranked unclaimed modules must be unique' });
     }
+    if (doc.run?.scope) {
+      const scope = doc.run.scope;
+      if (scope.requestedCount !== scope.requestedClaims.length) errors.push({ path: '/run/scope/requestedCount', message: 'requestedCount must equal requestedClaims.length' });
+      if (scope.probedCount !== scope.probedClaims.length) errors.push({ path: '/run/scope/probedCount', message: 'probedCount must equal probedClaims.length' });
+      const requested = new Set(scope.requestedClaims);
+      if (scope.probedClaims.some((id) => !requested.has(id))) errors.push({ path: '/run/scope/probedClaims', message: 'every probed claim must have been requested' });
+    }
     return errors;
   },
 

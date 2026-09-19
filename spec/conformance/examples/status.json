@@ -18,6 +18,20 @@
     }
   },
   "provisional": false,
+  "run": {
+    "id": "run-20260917T020000",
+    "evidence": ".testguard/evidence-partial.json",
+    "provisional": false,
+    "records": 4,
+    "newSinceBaseline": 1,
+    "exitCode": 1,
+    "scope": {
+      "requestedClaims": ["REDACT-002", "REDACT-001"],
+      "requestedCount": 2,
+      "probedClaims": ["REDACT-002", "REDACT-001"],
+      "probedCount": 2
+    }
+  },
   "surface": {
     "sourceModules": 3,
     "claimedModules": 2,

@@ -152,6 +152,80 @@
       },
       "additionalProperties": false
     },
+    "run": {
+      "description": "Present on probe --json: the validated status document plus the completed invocation's result. scope is present only for a partial --claim run.",
+      "type": "object",
+      "required": ["id", "evidence", "provisional", "records", "newSinceBaseline", "exitCode"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "evidence": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "provisional": { "type": "boolean" },
+        "records": { "type": "integer", "minimum": 0 },
+        "newSinceBaseline": { "type": "integer", "minimum": 0 },
+        "exitCode": { "enum": [0, 1] },
+        "scope": {
+          "type": "object",
+          "required": ["requestedClaims", "requestedCount", "probedClaims", "probedCount"],
+          "properties": {
+            "requestedClaims": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" }
+            },
+            "requestedCount": { "type": "integer", "minimum": 1 },
+            "probedClaims": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" }
+            },
+            "probedCount": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "cost": {
+      "description": "Present when probe --json --cost is requested; derived only from the runs in the emitted evidence.",
+      "type": "object",
+      "required": ["totalMs", "totalRuns", "reusedRecords", "records", "claims", "defenders", "sharedDefenders"],
+      "properties": {
+        "totalMs": { "type": "number", "minimum": 0 },
+        "totalRuns": { "type": "integer", "minimum": 0 },
+        "reusedRecords": { "type": "integer", "minimum": 0 },
+        "records": { "type": "integer", "minimum": 0 },
+        "claims": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["claimId", "ms", "runs", "faults", "reused", "defenders"],
+            "properties": {
+              "claimId": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" },
+              "ms": { "type": "number", "minimum": 0 },
+              "runs": { "type": "integer", "minimum": 0 },
+              "faults": { "type": "integer", "minimum": 0 },
+              "reused": { "type": "integer", "minimum": 0 },
+              "defenders": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "defenders": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/costDefender" }
+        },
+        "sharedDefenders": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/costDefender" }
+        }
+      },
+      "additionalProperties": false
+    },
     "counts": {
       "type": "object",
       "required": [
@@ -399,5 +473,23 @@
       "$ref": "urn:claimspec:v1:common#/$defs/gitSha"
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "costDefender": {
+      "type": "object",
+      "required": ["file", "ms", "runs", "claims"],
+      "properties": {
+        "file": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" },
+        "ms": { "type": "number", "minimum": 0 },
+        "runs": { "type": "integer", "minimum": 0 },
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
 }

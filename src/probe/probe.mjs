@@ -40,6 +40,16 @@ function readRunnerVersion(projectDir, name = 'vitest') {
   }
 }
 
+/** Validate and order a partial claim selection without losing caller order. */
+export function selectClaims(claims, only) {
+  if (!only) return claims;
+  if (only.length === 0) throw new PreconditionError('--claim must name at least one claim id');
+  const byId = new Map(claims.map((claim) => [claim.id, claim]));
+  const unknown = only.filter((id) => !byId.has(id));
+  if (unknown.length) throw new PreconditionError(`--claim: unknown claim id(s) ${unknown.join(', ')}`);
+  return only.map((id) => byId.get(id));
+}
+
 /**
  * Probe every fault of every claim. Returns a spec-conformant evidence
  * document; writing it is the caller's job.
@@ -76,18 +86,13 @@ export async function probe({
   const head = headSha(root, ref);
   if (!head) throw new PreconditionError(ref === 'HEAD' ? 'repository has no commits; every verdict is tied to a commit' : `ref ${ref} does not resolve to a commit`);
 
-  const targets = [...new Set(claims.claims.flatMap((c) => c.faults.map((f) => relative(root, join(projectDir, f.file)))))];
+  const scopedClaims = selectClaims(claims.claims, only);
+  const targets = [...new Set(scopedClaims.flatMap((c) => c.faults.map((f) => relative(root, join(projectDir, f.file)))))];
   if (mode === 'in-place' && isDirty(root, targets)) {
     throw new PreconditionError(`uncommitted changes in fault target files (${targets.join(', ')}); commit or stash them, or drop --in-place. Only the files faults are applied to must be clean — test files may be dirty, which is what makes --in-place usable while writing tests.`);
   }
   if (includeDirty && mode !== 'worktree') throw new PreconditionError('--include-dirty applies to worktree mode; drop --in-place');
   if (includeDirty && ref !== 'HEAD') throw new PreconditionError('--include-dirty snapshots the working tree; it cannot be combined with --ref');
-  const selected = only ? new Set(only) : null;
-  if (selected) {
-    const known = new Set(claims.claims.map((c) => c.id));
-    const unknown = [...selected].filter((id) => !known.has(id));
-    if (unknown.length) throw new PreconditionError(`--claim: unknown claim id(s) ${unknown.join(', ')}`);
-  }
 
   // Worktree mode probes a commit, not the working tree. Uncommitted defender
   // or target edits would be silently absent — the same survivors, no hint why.
@@ -103,8 +108,7 @@ export async function probe({
       if (isDirty(root)) snapshot = snapshotWorkingTree(root);
     } else {
       const watched = new Set(targets);
-      for (const claim of claims.claims) {
-        if (selected && !selected.has(claim.id)) continue;
+      for (const claim of scopedClaims) {
         const declared = claim.defendedBy?.length ? resolveDefenders(projectDir, claim.defendedBy) : claim.faults.flatMap((f) => discoverDefenders(projectDir, f.file));
         for (const d of declared) watched.add(relative(root, join(projectDir, d)));
         for (const g of claim.defendedBy ?? []) if (!g.includes('*')) watched.add(relative(root, join(projectDir, g)));
@@ -193,8 +197,7 @@ export async function probe({
       return Object.fromEntries([...groups].map(([r, group]) => [labelOf(r), group]));
     };
 
-    for (const claim of claims.claims) {
-      if (selected && !selected.has(claim.id)) continue;
+    for (const claim of scopedClaims) {
       const declared = claim.defendedBy?.length ? resolveDefenders(iso.projectDir, claim.defendedBy) : null;
       for (const fault of claim.faults) {
         // Mock-awareness: a discovered file that mocks the target is not a

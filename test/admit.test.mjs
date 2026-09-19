@@ -58,10 +58,13 @@ describe('testguard admit on the known-answer fixture', () => {
     if (scratch) rmSync(scratch, { recursive: true, force: true });
   });
 
-  it('usage errors: no --claim → 3; unknown claim → 2; a test that is not a defender → 3 with the defendedBy line to add', async () => {
+  it('usage errors: no/repeated --claim → 3; unknown claim → 2; a test that is not a defender → 3 with the defendedBy line to add', async () => {
     const a = capture();
     expect(await main(['admit', testFile()], a.io)).toBe(3);
     expect(a.lines.err[0]).toMatch(/usage: testguard admit/);
+    const repeated = capture();
+    expect(await main(['admit', testFile(), '--claim', 'REDACT-001', '--claim', 'REDACT-002'], repeated.io)).toBe(3);
+    expect(repeated.lines.err.join('\n')).toContain('admit accepts exactly one --claim <ID>');
     const b = capture();
     expect(await main(['admit', testFile(), '--claim', 'NOPE-1'], b.io)).toBe(2);
     expect(b.lines.err.join('\n')).toMatch(/unknown claim id NOPE-1/);

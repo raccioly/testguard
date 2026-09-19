@@ -29,8 +29,17 @@ function findProjectDir(testAbs, claimsFlag) {
  * decision here can never disagree with the gate.
  */
 export async function admitCommand({ file, values, version }, io) {
-  if (!file || !values.claim) {
+  if (!file || !values.claim?.length) {
     io.err('usage: testguard admit <test-file> --claim <ID> [--fault <FID>] [--confirm <n>] [--json]');
+    return 3;
+  }
+  if (values.claim.length > 1 || values.claim[0].includes(',')) {
+    io.err('admit accepts exactly one --claim <ID>');
+    return 3;
+  }
+  const claimId = values.claim[0].trim();
+  if (!claimId) {
+    io.err('--claim must name one claim id');
     return 3;
   }
   const confirmRuns = Number(values.confirm);
@@ -46,7 +55,6 @@ export async function admitCommand({ file, values, version }, io) {
   if (testRel.startsWith('..')) throw new PreconditionError(`${file} is outside the project directory ${projectDir}`);
 
   const all = loadClaims(values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir));
-  const claimId = values.claim.trim();
   const claim = all.claims.find((c) => c.id === claimId);
   if (!claim) throw new PreconditionError(`--claim: unknown claim id ${claimId}`);
   const faults = values.fault ? claim.faults.filter((f) => f.id === values.fault) : claim.faults;

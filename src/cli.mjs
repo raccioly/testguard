@@ -46,7 +46,7 @@ probe
   --ref <commit>       probe this commit in the scratch worktree (default: HEAD). An explicit --ref is honoured even when
                        defender/target files are dirty: a warning names them, the evidence records them (repo.ignoredDirty)
   --ignore-dirty       probe HEAD as committed although defender/target files are dirty (same warning and record)
-  --claim <ID,ID>      probe only these claims; writes .testguard/evidence-partial.json
+  --claim <ID,ID>      probe only these claims; repeatable, order-preserving, and writes .testguard/evidence-partial.json
   --include-dirty      probe the working tree (a snapshot commit) instead of HEAD; uncommitted tests count
                        (without it, a dirty defender/target with the implicit HEAD is refused: the silent-mismatch trap)
   --verbose            also print each killed fault (default: only unproven ones, plus a count)
@@ -137,7 +137,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         ref: { type: 'string' },
         'ignore-dirty': { type: 'boolean', default: false },
         serial: { type: 'boolean', default: false },
-        claim: { type: 'string' },
+        claim: { type: 'string', multiple: true },
         fault: { type: 'string' },
         'include-dirty': { type: 'boolean', default: false },
         changed: { type: 'string' },
