@@ -236,8 +236,10 @@ jobs:
     # change lands as a bot PR with native auto-merge armed, and this job
     # dispatches ci.yml on the branch itself — a PR opened with GITHUB_TOKEN
     # gets no pull_request run, but workflow_dispatch is the documented
-    # exception. That also means the merge triggers nothing here; the hourly
-    # sweep observes the merged formula and finds brew_missing=false.
+    # exception. The PR's own runs may still appear held for first-time-
+    # contributor approval, so this job clears those holds before returning.
+    # That also means the merge triggers nothing here; the hourly sweep
+    # observes the merged formula and finds brew_missing=false.
     #
     # Idempotent: an existing branch is reused, an existing open PR is left
     # alone (CI re-dispatched only if its head has no check runs), a closed
@@ -334,3 +336,4 @@ jobs:
           else
             echo "✅ $HEAD_SHA already has $RUNS check run(s)"
           fi
+          .github/scripts/approve-held-runs.sh "$HEAD_SHA" "$PR"

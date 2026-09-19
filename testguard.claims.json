@@ -3777,6 +3777,69 @@
         "preflight",
         "cost"
       ]
+    },
+    {
+      "id": "TG-RELEASE-BOT-CLEARS-HELD-RUNS",
+      "statement": "Every GITHUB_TOKEN-authored release pull request clears first-time-contributor workflow holds before its creating workflow succeeds. Both the scheduled version PR and the post-publish Homebrew checksum PR use one fail-closed helper, so an API failure or a hold that remains visible is an error rather than a silently queued auto-merge.",
+      "source": {
+        "kind": "manual",
+        "ref": "v0.9.2 Homebrew release field report"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-19T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/release-approval.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The post-publish Homebrew PR skips the approval helper and can remain queued after the release workflow reports success.",
+          "faultClass": "statement-deleted",
+          "file": ".github/workflows/release.yml",
+          "find": "          .github/scripts/approve-held-runs.sh \"$HEAD_SHA\" \"$PR\"",
+          "replace": "          echo \"approval hold check skipped\"",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The scheduled release PR stops using the shared approval helper, allowing the two bot-created PR paths to drift again.",
+          "faultClass": "statement-deleted",
+          "file": ".github/workflows/scheduled-release.yml",
+          "find": "            .github/scripts/approve-held-runs.sh \"$HEAD_SHA\" \"$PR\"",
+          "replace": "            echo \"approval hold check skipped\"",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A failed GitHub API query is treated as an empty hold list, so the helper reports success without knowing whether auto-merge is blocked.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/approve-held-runs.sh",
+          "find": "  if ! HELD=$(held_ids); then",
+          "replace": "  if HELD=$(held_ids); then",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "release",
+        "automation",
+        "github-actions"
+      ]
     }
   ]
 }

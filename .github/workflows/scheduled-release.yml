@@ -170,56 +170,10 @@ jobs:
               echo "✅ $HEAD_SHA already has $RUNS check run(s)"
             fi
 
-            # ── The third GITHUB_TOKEN wall, and the last one. ──
-            # The `pull_request` runs this PR creates are held at
-            # `action_required`: the repository requires approval from
-            # first-time contributors, and `github-actions[bot]` is
-            # PERMANENTLY one — it never authors a merged commit, so it can
-            # never graduate. Those held runs leave check suites QUEUED on the
-            # head sha forever, the status rollup never reaches a terminal
-            # state, and auto-merge waits on it even though the required
-            # contexts (test 20/22/24) are already green from the dispatched
-            # run above. v0.9.0 sat here until a human clicked Approve.
-            #
-            # GITHUB_TOKEN may clear it: `actions: write` carries the approve
-            # permission, measured 201 on a bot PR's own held run. It may not
-            # approve a REVIEW, which is a different gate and still ours alone.
-            #
-            # Runs appear asynchronously, so poll. Approving an already-running
-            # run answers 403 "not waiting for approval" — success, not failure.
-            echo "Clearing held workflow runs on $HEAD_SHA"
-            approved=0
-            for attempt in 1 2 3 4 5 6; do
-              HELD=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}" \
-                --jq '[.workflow_runs[] | select(.status == "action_required" or .conclusion == "action_required") | .id] | .[]' 2>/dev/null || true)
-              for id in $HELD; do
-                if gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${id}/approve" >/dev/null 2>&1; then
-                  echo "  approved run $id"
-                  approved=$((approved + 1))
-                else
-                  echo "  run $id needed no approval"
-                fi
-              done
-              # Stop as soon as the picture is settled, rather than always
-              # paying the full poll: nothing held after something was
-              # approved means we are done, and nothing held by the third
-              # look means the gate is not applying to this run at all.
-              if [ -z "$HELD" ] && { [ "$approved" -gt 0 ] || [ "$attempt" -ge 3 ]; }; then
-                break
-              fi
-              sleep 10
-            done
-
-            # Never leave this silent: a run still held here means auto-merge
-            # will wait forever, which is the failure this whole block exists
-            # to remove. Say so, and name what to click.
-            STILL=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}" \
-              --jq '[.workflow_runs[] | select(.status == "action_required" or .conclusion == "action_required") | .html_url] | .[]' 2>/dev/null || true)
-            if [ -n "$STILL" ]; then
-              echo "::error::Workflow runs are still held for approval, so auto-merge on $PR will wait forever. Approve them, or re-run this workflow: $STILL"
-              exit 1
-            fi
-            echo "✅ no run is held for approval; auto-merge can complete"
+            # Clear the first-time-contributor holds on this bot-created PR's
+            # workflow runs. The Homebrew PR path uses the same helper so the
+            # two release automations cannot drift again.
+            .github/scripts/approve-held-runs.sh "$HEAD_SHA" "$PR"
           else
             cat /tmp/pr-err
             if grep -q 'not permitted to create or approve pull requests' /tmp/pr-err; then

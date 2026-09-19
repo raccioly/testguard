@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Bot-created Homebrew checksum PRs now clear GitHub's first-time-contributor
+  workflow holds themselves, using the same fail-closed helper as scheduled
+  release PRs. A release no longer finishes publishing while leaving its final
+  formula update waiting for a manual Approve click.
+
 ## [0.9.2] - 2026-09-19
 
 Automated weekly release — everything merged since `v0.9.1`.
