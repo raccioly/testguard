@@ -26,7 +26,7 @@ export const USAGE = `testguard ${VERSION} — proves a test suite defends the c
 
   testguard status [dir]     where the project is and the ONE next action; --json is the machine entry point
   testguard init [dir]       install the agent layer at the git root (skill, session-start hook, AGENTS.md section) and the .gitignore lines in [dir]
-  testguard claims [dir]     list the claims file and report drift against @claim annotations in code
+  testguard claims [dir]     list claims and drift; --check-anchors also verifies every exact anchor and replacement syntax
   testguard probe [dir]      inject each claim's faults, run its defenders, report what survived
   testguard baseline [dir]   freeze today's unproven findings so only new ones gate
   testguard brief [dir]      emit the blind-spot block for an agent's session-start context
@@ -95,7 +95,9 @@ gate       --changed <ref>   measure the change since merge-base(ref, HEAD); aut
            --strict          a non-empty change that evaluates nothing is a failure, not a note
            --ignore <path>   ignore file (default: <dir>/testguard.ignore.json; kind=path entries excuse files, with a reason)
            exit 0 every changed source file is claimed or excused · 1 unclaimed file · 2 cannot evaluate · 3 no reference
-status     --json (exit 0 clean · 1 unproven/stale/unclaimed · 2 nothing to probe yet)
+claims     --check-anchors   locate every fault without running tests; JS/MJS and Python replacements are syntax-checked in memory
+           --json includes anchorChecks; exit 1 when an anchor is missing/ambiguous or a supported replacement does not compile
+status     --json (exit 0 clean · 1 unproven/stale/unclaimed/invalid anchors · 2 nothing to probe yet)
            --evidence <path>  read this evidence instead of .testguard/evidence.json (e.g. CI's, fetched as an artifact); staleness is still computed from the recorded input hashes, and both commits are named
            --changed <ref>   also compute claim coverage of the change; unclaimed-changes then precedes every evidence state
 init       --force (replace an existing skill file)  --here (keep the agent layer in [dir] instead of the git root)  --json
@@ -163,6 +165,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         text: { type: 'boolean', default: false },
         markdown: { type: 'boolean', default: false },
         cost: { type: 'boolean', default: false },
+        'check-anchors': { type: 'boolean', default: false },
         progress: { type: 'string' },
         help: { type: 'boolean', short: 'h', default: false },
         version: { type: 'boolean', short: 'v', default: false },

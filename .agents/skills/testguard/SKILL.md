@@ -21,6 +21,7 @@ which files exist. `state` is one of:
 | state | meaning | you do |
 |---|---|---|
 | `no-claims` | no `testguard.claims.json` | `testguard scaffold <file>` for a file with guards; replace every `TODO:` statement with what the code guarantees; keep or drop each proposal; move the claims into `testguard.claims.json` |
+| `invalid-anchors` | an exact fault anchor moved or became ambiguous | run `testguard claims --check-anchors`; repair `next.target` in the claims file without changing what the fault means, then re-probe. Never guess or auto-fix an anchor. |
 | `unprobed` | claims never probed | `testguard probe` |
 | `evidence-stale` | code, tests or claims changed since the evidence | `testguard probe --include-dirty` (or `--claim <ID>` for one) |
 | `provisional-only` | only `--confirm 1` evidence exists | `testguard probe --confirm 3` |
@@ -44,6 +45,8 @@ Exit codes: `0` clean · `1` unproven claims (or drift) · `2` precondition fail
 ## The fix loop
 
 1. `testguard status --json` → take `next.target`.
+   After editing guarded code, run `testguard claims --check-anchors` before
+   any probe; repair a named fault definition without weakening its meaning.
 2. Write the test. It must **fail when the fault is applied and pass on HEAD**. To check the first half by hand: apply `find` → `replace` in the target file, run the defender, restore.
 3. `testguard probe --claim <ID> --include-dirty` — probes your uncommitted test without touching the tree. `--confirm 1` gives a fast **provisional** signal; a `?` on a verdict means unconfirmed.
 4. When it is `killed` at `--confirm 3`, commit the test.

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "tool": { "name": "testguard", "version": "0.9.1" },
+  "generatedAt": "2026-09-19T00:00:00Z",
+  "state": "unprobed",
+  "next": {
+    "action": "probe",
+    "command": "testguard probe",
+    "why": "Claims have not been probed."
+  },
+  "provisional": false,
+  "counts": { "claims": 1, "faults": 1 },
+  "stale": [],
+  "invalidFaults": [
+    {
+      "claimId": "C-1",
+      "subjectId": "F1",
+      "file": "src/a.mjs",
+      "reason": "anchor-missing",
+      "hits": 0,
+      "expected": 1
+    }
+  ],
+  "changedFaults": [],
+  "findings": [],
+  "paths": { "claims": "testguard.claims.json" }
+}

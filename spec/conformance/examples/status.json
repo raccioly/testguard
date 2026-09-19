@@ -32,6 +32,7 @@
     "baselined": 4
   },
   "stale": [],
+  "invalidFaults": [],
   "changedFaults": [
     {
       "claimId": "REDACT-002",

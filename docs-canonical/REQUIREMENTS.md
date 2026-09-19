@@ -2,7 +2,7 @@
 
 <!-- docguard:version 1.0.0 -->
 <!-- docguard:status approved -->
-<!-- docguard:last-reviewed 2026-09-18 -->
+<!-- docguard:last-reviewed 2026-09-19 -->
 <!-- docguard:owner @raccioly -->
 <!-- docguard:quality passive-voice off — requirements are written in the standard "the system shall ..." register, where the agent is the system throughout. -->
 
@@ -26,6 +26,7 @@
 | FR-12 | Answer whether one test satisfies the two-gate rule for a claim (`admit`) | P2 |
 | FR-13 | Replay historical fix commits to measure whether the suite would have caught them, and calibrate by fault class | P3 |
 | FR-14 | Serve the read-only operating loop over MCP so the loop survives a change of agent harness | P3 |
+| FR-15 | Validate every exact fault anchor and the syntax of supported in-memory replacements before starting a test runner (`claims --check-anchors`), without guessing repairs | P1 |
 
 ## Non-Functional Requirements
 
@@ -99,6 +100,7 @@ fails the pull request naming the unclaimed file, and `status` reports
 | FR-12 | `src/admit/admit.mjs` | `test/admit.test.mjs`, `TG-ADMIT-NEEDS-ALL-KILLED` |
 | FR-13 | `src/replay/` | `test/replay.test.mjs`, `test/calibration.test.mjs`, `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT`, `TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS`, `TG-CALIBRATION-COUNTS-ONLY-BUGS` |
 | FR-14 | `src/mcp/` | `test/mcp.test.mjs` |
+| FR-15 | `src/claims/anchors.mjs`, `src/commands/claims.mjs`, `src/status/status.mjs` | `test/claims-anchors.test.mjs`, `test/status.test.mjs`, `TG-ANCHOR-PREFLIGHT-FAILS-FAST` |
 | NFR-01 | `src/init/init.mjs`, runner resolution | `TG-INIT-HOOK-NO-NETWORK`, `TG-README-HOOK-MATCHES-THE-CODE` (every surface, not only the README), `TG-GITIGNORE-ADVICE-IS-ONE-LIST` |
 | NFR-02 | `package.json` | `npm run test:install` in CI |
 | NFR-03 | `src/probe/inject.mjs`, `src/probe/probe.mjs` | `TG-DIRTY-DEFENDERS-REFUSED`, `TG-IGNORED-DIRTY-RECORDED`, `TG-IN-PLACE-STILL-RAISES-A-MISSING-TARGET`, `TG-CONTROL-RESTORES-THE-SUBJECT` |

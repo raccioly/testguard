@@ -31,6 +31,16 @@ function project() {
   const dir = mkdtempSync(join(tmpdir(), 'tg-status-'));
   cpSync(FIXTURE, dir, { recursive: true, filter: (s) => !/node_modules|\.flake-counter|\.testguard/.test(s) });
   const claims = JSON.parse(readFileSync(join(dir, 'testguard.claims.json'), 'utf8'));
+  // The known-answer fixture deliberately carries one missing and one
+  // ambiguous anchor to exercise UNVERIFIABLE. Status tests need a healthy
+  // starting tree so each case can select the state it is actually testing.
+  const anchorCases = claims.claims.find((c) => c.id === 'REDACT-005').faults;
+  anchorCases[0].find = 'if (rule.id === id) return rule;';
+  anchorCases[0].replace = 'if (rule.id === id) return rules[0];';
+  anchorCases[1].find = '  return null;\n}\n\n/** Compile all rules.';
+  anchorCases[1].replace = '  return rules[0];\n}\n\n/** Compile all rules.';
+  delete anchorCases[1].expectHits;
+  writeFileSync(join(dir, 'testguard.claims.json'), JSON.stringify(claims, null, 2) + '\n');
   const pass = { outcome: 'pass', tests: { total: 4, passed: 4, failed: 0 }, assertionFailures: 0, durationMs: 1 };
   const fail = { outcome: 'fail', tests: { total: 4, passed: 3, failed: 1 }, assertionFailures: 1, durationMs: 1 };
   const evidence = (verdictOf) => ({
@@ -76,6 +86,22 @@ describe('computeStatus — every state, with a conforming document', () => {
     writeSpecDoc('evidence', join(dir, '.testguard', 'evidence-provisional.json'), ev);
     const s = computeStatus({ projectDir: dir });
     expect(s).toMatchObject({ state: 'provisional-only', provisional: true, next: { command: 'testguard probe --confirm 3' } });
+    expect(validate('status', s).errors).toEqual([]);
+  });
+  it('invalid-anchors precedes evidence states and points at the fault definition', () => {
+    const { dir, evidence } = project();
+    writeSpecDoc('evidence', join(dir, '.testguard', 'evidence.json'), evidence(() => 'killed'));
+    const path = join(dir, 'testguard.claims.json');
+    const claims = JSON.parse(readFileSync(path, 'utf8'));
+    claims.claims[0].faults[0].find = 'text that no longer exists';
+    writeFileSync(path, JSON.stringify(claims, null, 2) + '\n');
+    const s = computeStatus({ projectDir: dir });
+    expect(s).toMatchObject({
+      state: 'invalid-anchors',
+      next: { action: 'repair-fault', command: 'testguard claims --check-anchors', target: { claimId: 'REDACT-001', subjectId: 'F1' } },
+      invalidFaults: [{ claimId: 'REDACT-001', subjectId: 'F1', reason: 'anchor-missing', hits: 0, expected: 1 }],
+    });
+    expect(renderStatus(s)).toMatch(/INVALID\s+REDACT-001\/F1 anchor-missing: 0 hits, expected 1/);
     expect(validate('status', s).errors).toEqual([]);
   });
   it('unproven → write-test targeting the top NEW finding, with a concrete command', () => {

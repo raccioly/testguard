@@ -22,6 +22,7 @@ which files exist. `state` is one of:
 |---|---|---|
 | `no-claims` | no `testguard.claims.json` | `testguard scaffold <file>` for a file with guards; replace every `TODO:` statement with what the code guarantees; keep or drop each proposal; move the claims into `testguard.claims.json` |
 | `unclaimed-changes` | files you changed carry no claim (only when a reference is known: `--changed <ref>`, or CI's base branch) | `next.file` names the first; `testguard scaffold <file>` and state the claim, or add a `testguard.ignore.json` path entry with a reason a reviewer will accept. **Before** writing more code. |
+| `invalid-anchors` | an exact fault anchor moved or became ambiguous | run `testguard claims --check-anchors`; repair `next.target` in the claims file without changing what the fault means, then re-probe. Never guess or auto-fix an anchor. |
 | `unprobed` | claims never probed | `testguard probe` |
 | `evidence-stale` | code, tests or claims changed since the evidence | `testguard probe --include-dirty` (or `--claim <ID>` for one) |
 | `provisional-only` | only `--confirm 1` evidence exists | `testguard probe --confirm 3` |
@@ -45,7 +46,10 @@ code by construction. So, for every source file you create or change:
    thin wrapper whose logic is claimed elsewhere): a `path` entry in
    `testguard.ignore.json` with a reason and, where possible, an `expires`.
    The gate prints every entry it relied on; a reviewer reads them.
-4. Then `testguard admit <test-file> --claim <ID>` for the new claim's test (or `testguard probe --claim <ID> --include-dirty` for the full report).
+4. After editing guarded code, run `testguard claims --check-anchors`. Repair
+   any named fault definition without weakening its meaning; the check never
+   relocates an anchor for you.
+5. Then `testguard admit <test-file> --claim <ID>` for the new claim's test (or `testguard probe --claim <ID> --include-dirty` for the full report).
 
 ## Verdict → action
 

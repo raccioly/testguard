@@ -395,6 +395,26 @@ changed); `1` at least one uncovered file (or strict mode over an
 all-excluded change); `2` the change cannot be evaluated (unresolvable
 reference, invalid claims or ignore file, no repository); `3` no reference.
 
+## Anchor preflight
+
+`claims --check-anchors` answers what is knowable before a runner starts. For
+every fault-injection fault it reads the target, applies the same exact
+`locate()` arithmetic as a probe, and reports `ok`, `anchor-missing` or
+`anchor-ambiguous` with the observed and expected hit counts. When a language
+has a cheap parser, it also parses the in-memory replacement (`node --check`
+semantics for JavaScript modules, `compile()` for Python). Unsupported
+languages are anchor-checked and otherwise skipped without inference.
+
+One non-`ok` anchor or non-parsing supported replacement exits `1`. The check
+runs no tests, creates no worktree, reads no git state and writes no source.
+It is not evidence that a defender detects the fault; the self-probe still
+runs after it. There is no automatic repair or fuzzy relocation: choosing a
+new anchor is a semantic edit to the claim and must be reviewed and re-probed.
+
+`invalid-anchors` precedes every evidence state in the status document (after
+`unclaimed-changes`, when a change reference is known). Its next action is
+`repair-fault`, naming the first fault and `testguard claims --check-anchors`.
+
 ## Severity floor
 
 `--severity <level>` gates only findings whose claim severity is at or above

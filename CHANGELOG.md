@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `claims --check-anchors` locates every exact fault anchor and syntax-checks
+  supported in-memory JavaScript and Python replacements without starting a
+  runner or touching the tree. CI runs the sub-second preflight before the
+  self-probe, while `status` reports rotted anchors as `invalid-anchors` with
+  the precise fault to repair. Repairs remain a reviewed judgement call:
+  there is deliberately no fuzzy match or `--fix`.
+
 ## [0.9.1] - 2026-09-19
 
 Automated weekly release — everything merged since `v0.9.0`.

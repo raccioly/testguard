@@ -26,10 +26,11 @@
       "$ref": "urn:claimspec:v1:common#/$defs/isoDateTime"
     },
     "state": {
-      "description": "no-claims: no claims file. unclaimed-changes: the change measured against a reference touches source files that carry no claim and no excusing ignore entry (only computed when a reference is known; it precedes every evidence state because the claim is written before more code). unprobed: claims but no confirmed evidence. evidence-stale: evidence exists but a claim, fault, target or defender changed since. provisional-only: only sub-N evidence exists. unproven: current evidence has findings not covered by the baseline. clean: every finding is killed or baselined.",
+      "description": "no-claims: no claims file. unclaimed-changes: the change measured against a reference touches source files that carry no claim and no excusing ignore entry (only computed when a reference is known; it precedes every evidence state because the claim is written before more code). invalid-anchors: one or more exact fault anchors are missing or ambiguous, so probing would be unable to apply them. unprobed: claims but no confirmed evidence. evidence-stale: evidence exists but a claim, fault, target or defender changed since. provisional-only: only sub-N evidence exists. unproven: current evidence has findings not covered by the baseline. clean: every finding is killed or baselined.",
       "enum": [
         "no-claims",
         "unclaimed-changes",
+        "invalid-anchors",
         "unprobed",
         "evidence-stale",
         "provisional-only",
@@ -54,6 +55,7 @@
             "write-test",
             "baseline",
             "review-fault-change",
+            "repair-fault",
             "none"
           ]
         },
@@ -184,6 +186,23 @@
           "file": {
             "$ref": "urn:claimspec:v1:common#/$defs/repoPath"
           }
+        },
+        "additionalProperties": false
+      }
+    },
+    "invalidFaults": {
+      "description": "Faults whose exact text anchor does not locate in the current target. These precede every evidence state: a probe cannot learn anything from a fault it cannot apply.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claimId", "subjectId", "file", "reason", "hits", "expected"],
+        "properties": {
+          "claimId": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" },
+          "subjectId": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" },
+          "file": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" },
+          "reason": { "enum": ["anchor-missing", "anchor-ambiguous"] },
+          "hits": { "type": "integer", "minimum": 0 },
+          "expected": { "type": "integer", "minimum": 1 }
         },
         "additionalProperties": false
       }

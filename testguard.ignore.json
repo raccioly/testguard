@@ -39,6 +39,13 @@
     },
     {
       "kind": "path",
+      "pattern": "test/probe.fixture.test.mjs",
+      "reason": "Acceptance oracle for the full known-answer pipeline. It remains mandatory in npm test and CI, but naming this 40-second fixture as a self-claim defender previously made two pure tree-safety faults cost 444 seconds. Pure claims use focused defenders; the fixture independently proves the composed pipeline.",
+      "by": "maintainer",
+      "at": "2026-09-19T00:00:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "src/probe/runners/python/**",
       "reason": "The injected Python reporters. They are not JavaScript, so a claim here could only be probed by running TestGuard's Python runner against TestGuard itself — circular, and it would prove the runner with the runner. They are instead held to fixtures/known-answer-python, whose sixteen verdicts were verified by hand against `python -m unittest`'s own exit code and must reproduce under BOTH engines: any behaviour change in a reporter moves a verdict there, in CI, on every push. Re-evaluate if they gain logic the fixture cannot reach.",
       "by": "maintainer",

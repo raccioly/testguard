@@ -9,12 +9,16 @@ import { evidencePath } from './probe.mjs';
 import { costReport, renderCost } from '../probe/cost.mjs';
 import { readSpecDoc } from '../evidence/writer.mjs';
 import { existsSync } from 'node:fs';
+import { checkAnchors, renderAnchorChecks } from '../claims/anchors.mjs';
 
 export async function claimsCommand({ projectDir, values, version }, io) {
   const path = values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir);
   const claims = loadClaims(path);
   const annotations = scanAnnotations(projectDir);
   const drift = reconcile(claims, annotations);
+  const anchorChecks = values['check-anchors']
+    ? await checkAnchors(projectDir, claims, { python: values.python ? resolve(values.python) : undefined })
+    : undefined;
 
   // A claim that disappeared is invisible to every other command; compare
   // identities against a reference when one is given.
@@ -31,7 +35,7 @@ export async function claimsCommand({ projectDir, values, version }, io) {
   }
 
   if (values.json) {
-    io.out(JSON.stringify({ path, claims, annotations, drift, ...(removed ? { removed } : {}), ...(cost ? { cost } : {}) }, null, 2));
+    io.out(JSON.stringify({ path, claims, annotations, drift, ...(anchorChecks ? { anchorChecks } : {}), ...(removed ? { removed } : {}), ...(cost ? { cost } : {}) }, null, 2));
   } else {
     const annotated = new Set(drift.annotated);
     io.out(`${claims.claims.length} claims in ${path} — ${annotated.size} carry a @claim annotation in source (test files are not scanned)`);
@@ -74,6 +78,10 @@ export async function claimsCommand({ projectDir, values, version }, io) {
       io.out('');
       io.out(renderCost(cost));
     }
+    if (anchorChecks) {
+      io.out('');
+      io.out(renderAnchorChecks(anchorChecks));
+    }
   }
-  return drift.undeclared.length || drift.stale.length || (removed?.removed.length ?? 0) > 0 ? 1 : 0;
+  return drift.undeclared.length || drift.stale.length || (removed?.removed.length ?? 0) > 0 || (anchorChecks?.invalid ?? 0) > 0 ? 1 : 0;
 }
