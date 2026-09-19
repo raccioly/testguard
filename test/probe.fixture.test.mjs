@@ -1,3 +1,4 @@
+// @req FR-16
 // @req NFR-05
 // @req NFR-07
 // Requirements live in docs-canonical/REQUIREMENTS.md; the matrix there must agree with these.
@@ -210,16 +211,33 @@ describe('probe reproduces the known-answer fixture', () => {
       expect(validate('brief', (await import('../src/brief/brief.mjs')).buildBrief(evidence, readSpecDoc('baseline', join(scratch, '.testguard', 'baseline.json')))).ok).toBe(true);
     });
 
-    it('--claim probes only the named claims and writes PARTIAL evidence beside, not over, the canonical file', async () => {
+    it('repeated/comma-separated --claim probes every unique id in first-seen order and makes the partial scope explicit', async () => {
       const { lines, io } = capture();
       const before = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json')).records.length;
-      // the baseline frozen above already holds REDACT-001/F1, so nothing is new → exit 0
-      expect(await main(['probe', scratch, '--claim', 'REDACT-001', '--budget', '30000', '--quiet'], io)).toBe(0);
+      // REDACT-003 is deliberately repeated: it must be collapsed, not probed twice.
+      expect(await main(['probe', scratch, '--claim', 'REDACT-003', '--claim', 'REDACT-002,REDACT-003', '--budget', '30000', '--quiet'], io)).toBe(0);
       const partial = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence-partial.json'));
-      expect(partial.records.map((r) => r.claim.id)).toEqual(['REDACT-001', 'REDACT-001', 'REDACT-001']);
+      expect(partial.records.map((r) => r.claim.id)).toEqual(['REDACT-003', 'REDACT-002']);
       expect(readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json')).records).toHaveLength(before);
-      expect(lines.out.join('\n')).toContain('partial: --claim REDACT-001');
+      expect(lines.out.join('\n')).toContain('partial: 2 claims requested, 2 probed: --claim REDACT-003,REDACT-002');
       expect(validate('evidence', partial).ok).toBe(true);
+    }, 60_000);
+
+    it('partial --json names requested and probed counts and ids; an empty selection is a usage error', async () => {
+      const a = capture();
+      expect(await main(['probe', scratch, '--claim', 'REDACT-002', '--claim', 'REDACT-003,REDACT-002', '--budget', '30000', '--json', '--cost'], a.io)).toBe(0);
+      const out = JSON.parse(a.lines.out.join('\n'));
+      expect(out.run.scope).toEqual({
+        requestedClaims: ['REDACT-002', 'REDACT-003'],
+        requestedCount: 2,
+        probedClaims: ['REDACT-002', 'REDACT-003'],
+        probedCount: 2,
+      });
+      expect(out.cost.records).toBe(2);
+      expect(validate('status', out).errors).toEqual([]);
+      const b = capture();
+      expect(await main(['probe', scratch, '--claim', ' , ', '--quiet'], b.io)).toBe(3);
+      expect(b.lines.err.join('\n')).toContain('--claim must name at least one claim id');
     }, 60_000);
 
     it('--claim with an unknown id is a precondition failure', async () => {

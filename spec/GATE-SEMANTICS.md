@@ -436,6 +436,16 @@ new anchor is a semantic edit to the claim and must be reviewed and re-probed.
 `unclaimed-changes`, when a change reference is known). Its next action is
 `repair-fault`, naming the first fault and `testguard claims --check-anchors`.
 
+## Partial probe scope
+
+Every `--claim` occurrence contributes to the selection. Comma-separated ids
+inside each occurrence are flattened in first-seen order and duplicates are
+collapsed. An explicitly empty selection is a usage error, never a successful
+zero-record probe. Partial human output and the `probe --json` run wrapper name
+the requested and actually probed claim ids and counts. Commands whose
+`--claim` is singular (`scaffold` and `admit`) reject repeated or comma-separated
+values instead of silently choosing one.
+
 ## Severity floor
 
 `--severity <level>` gates only findings whose claim severity is at or above

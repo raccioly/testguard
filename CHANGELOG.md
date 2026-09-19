@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Repeated `probe --claim` flags no longer collapse silently to the last value.
+  Repeated and comma-separated ids are flattened in first-seen order,
+  duplicates are collapsed, empty selections fail, and both human and JSON
+  partial-run output show requested versus probed ids and counts. Probe JSON is
+  now validated against the published status schema before it is emitted. The
+  singular `scaffold` and `admit` forms reject ambiguous repeated values.
+
 ## [0.10.0] - 2026-09-19
 
 Automated weekly release — everything merged since `v0.9.4`.

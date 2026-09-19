@@ -9,10 +9,29 @@ import { computeStatus } from '../status/status.mjs';
 import { resolveChangedRef, withChangedRef } from '../gate/changed.mjs';
 import { costReport, renderCost } from '../probe/cost.mjs';
 import { progressMode, stageReporter, clearStageLine, recordEvent, isProgressMode, progressStream } from '../probe/progress.mjs';
+import { validate } from '../../spec/lib/validate.mjs';
 export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
 export const baselinePath = (projectDir) => join(projectDir, '.testguard', 'baseline.json');
+
+/** Every repeated/comma-separated --claim value, in first-seen order. */
+export function claimSelection(values) {
+  if (values === undefined) return undefined;
+  return [...new Set(values.flatMap((value) => value.split(',')).map((id) => id.trim()).filter(Boolean))];
+}
+
+/** Scope is invocation metadata, kept outside the evidence contract. */
+export function partialScope(only, records) {
+  if (!only) return undefined;
+  const probedClaims = [...new Set(records.map((record) => record.claim.id))];
+  return {
+    requestedClaims: only,
+    requestedCount: only.length,
+    probedClaims,
+    probedCount: probedClaims.length,
+  };
+}
 
 export async function probeCommand({ projectDir, values, version }, io) {
   const confirmRuns = Number(values.confirm);
@@ -34,7 +53,11 @@ export async function probeCommand({ projectDir, values, version }, io) {
     io.err('claims file declares no claims; nothing to verify');
     return 2;
   }
-  const only = values.claim ? values.claim.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+  const only = claimSelection(values.claim);
+  if (only?.length === 0) {
+    io.err('--claim must name at least one claim id');
+    return 3;
+  }
   // A --claim run is partial evidence; keep it away from the canonical file unless --out says otherwise.
   const provisional = confirmRuns < 3;
   // Provisional and partial runs never overwrite the canonical evidence: only confirmed, complete runs may feed a baseline.
@@ -81,9 +104,13 @@ export async function probeCommand({ projectDir, values, version }, io) {
   writeSpecDoc('evidence', outPath, evidence);
 
   const g = gate(evidence.records, baseline, { severityFloor: values.severity });
+  const scope = partialScope(only, evidence.records);
   if (values.json) {
     const status = withChangedRef(resolveChangedRef({ explicit: values.changed }), (changedRef) => computeStatus({ projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'], evidence: outPath }), io.err);
-    io.out(JSON.stringify({ ...status, run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode: g.new.length > 0 ? 1 : 0 }, ...(values.cost ? { cost: costReport(evidence.records) } : {}) }, null, 2));
+    const doc = { ...status, run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode: g.new.length > 0 ? 1 : 0, ...(scope ? { scope } : {}) }, ...(values.cost ? { cost: costReport(evidence.records) } : {}) };
+    const result = validate('status', doc);
+    if (!result.ok) throw new Error(`probe JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
+    io.out(JSON.stringify(doc, null, 2));
     return g.new.length > 0 ? 1 : 0;
   }
   if (!values.quiet && baseline) {
@@ -102,7 +129,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
     io.out(renderCost(costReport(evidence.records)));
     io.out('');
   }
-  io.out(`evidence: ${outPath}${only ? ` (partial: --claim ${only.join(',')}; not the canonical evidence file)` : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);
+  io.out(`evidence: ${outPath}${scope ? ` (partial: ${scope.requestedCount} claim${scope.requestedCount === 1 ? '' : 's'} requested, ${scope.probedCount} probed: --claim ${scope.requestedClaims.join(',')}; not the canonical evidence file)` : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
   return g.new.length > 0 ? 1 : 0;
 }

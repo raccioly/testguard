@@ -3992,6 +3992,134 @@
         "probe",
         "independence"
       ]
+    },
+    {
+      "id": "TG-REPEATED-CLAIMS-ARE-ALL-PROBED",
+      "statement": "Every repeated or comma-separated probe --claim value is retained in first-seen order, duplicates are collapsed, and partial output reports requested versus probed scope instead of silently presenting a smaller green run.",
+      "source": {
+        "kind": "manual",
+        "ref": "https://github.com/raccioly/testguard/issues/80"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-19T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/claim-selection.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The global parser returns to last-wins semantics, silently dropping every repeated claim selection before probe can see it.",
+          "faultClass": "field-dropped",
+          "file": "src/cli.mjs",
+          "find": "        claim: { type: 'string', multiple: true },",
+          "replace": "        claim: { type: 'string' },",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Normalized claim ids are sorted instead of retaining first-seen order.",
+          "faultClass": "argument-swapped",
+          "file": "src/commands/probe.mjs",
+          "find": "  return [...new Set(values.flatMap((value) => value.split(',')).map((id) => id.trim()).filter(Boolean))];",
+          "replace": "  return [...new Set(values.flatMap((value) => value.split(',')).map((id) => id.trim()).filter(Boolean))].sort();",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Partial scope claims everything requested was probed, hiding an incomplete run.",
+          "faultClass": "argument-swapped",
+          "file": "src/commands/probe.mjs",
+          "find": "    probedCount: probedClaims.length,",
+          "replace": "    probedCount: only.length,",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The engine restores claims-file order instead of the operator's requested order.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/probe.mjs",
+          "find": "  return only.map((id) => byId.get(id));",
+          "replace": "  return claims.filter((claim) => only.includes(claim.id));",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "Scaffold silently accepts repeated singular claim values.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/scaffold.mjs",
+          "find": "  if (values.claim?.length > 1 || values.claim?.[0]?.includes(',')) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "Admit silently accepts repeated singular claim values.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/admit.mjs",
+          "find": "  if (values.claim.length > 1 || values.claim[0].includes(',')) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "The published status schema stops accepting probe run metadata, returning probe JSON to an undocumented wrapper.",
+          "faultClass": "field-dropped",
+          "file": "spec/schemas/status.schema.json",
+          "find": "    \"run\": {",
+          "replace": "    \"probeRun\": {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F8",
+          "description": "The semantic validator stops checking requested counts against the ids they summarize.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (scope.requestedCount !== scope.requestedClaims.length) errors.push({ path: '/run/scope/requestedCount', message: 'requestedCount must equal requestedClaims.length' });",
+          "replace": "      if (false) errors.push({ path: '/run/scope/requestedCount', message: 'requestedCount must equal requestedClaims.length' });",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "cli",
+        "probe",
+        "scope"
+      ]
     }
   ]
 }
