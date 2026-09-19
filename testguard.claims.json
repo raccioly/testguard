@@ -3840,6 +3840,43 @@
         "automation",
         "github-actions"
       ]
+    },
+    {
+      "id": "TG-ROOT-TEST-IGNORES-NESTED-WORKTREES",
+      "statement": "The root Vitest gate describes only this checkout: it never collects fixtures or agent-managed nested worktrees under .claude, so parked unmerged work cannot create false failures in npm test.",
+      "source": {
+        "kind": "manual",
+        "ref": "https://github.com/raccioly/testguard/issues/132"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-19T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/vitest-config.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The root test boundary stops excluding agent-managed nested worktrees, so npm test can collect an unrelated checkout.",
+          "faultClass": "field-dropped",
+          "file": "vitest.config.mjs",
+          "find": "    exclude: [...configDefaults.exclude, 'fixtures/**', '.claude/**'],",
+          "replace": "    exclude: [...configDefaults.exclude, 'fixtures/**'],",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "tests",
+        "worktrees",
+        "isolation"
+      ]
     }
   ]
 }

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The canonical `npm test` command no longer collects suites from live nested
+  worktrees under `.claude/`. A parked checkout can remain safely available
+  without its unfinished tests or fixtures contaminating the main tree's gate.
+
 ## [0.9.3] - 2026-09-19
 
 Automated weekly release — everything merged since `v0.9.2`.
