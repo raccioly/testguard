@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-09-19
+
+Automated weekly release — everything merged since `v0.9.3`.
+
+### Changed
+
+- fix(test): ignore nested agent worktrees (#133)
+- chore(homebrew): sha256 for v0.9.3 (#131)
+
+
 ### Fixed
 
 - The canonical `npm test` command no longer collects suites from live nested
