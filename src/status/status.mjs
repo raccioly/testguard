@@ -9,6 +9,7 @@ import { discoverDefenders } from '../probe/discover.mjs';
 import { sortForReport } from '../render.mjs';
 import { computeChangedGate, defaultIgnorePath } from '../gate/changed.mjs';
 import { headSha, isAncestor } from '../git.mjs';
+import { checkAnchorLocations } from '../claims/anchors.mjs';
 
 export const faultContentHash = (fault) => sha256(`${fault.find}\n${fault.replace}`);
 
@@ -41,6 +42,7 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
     provisional: false,
     counts: { claims: 0, faults: 0 },
     stale: [],
+    invalidFaults: [],
     changedFaults: [],
     findings: [],
     notes: [],
@@ -84,6 +86,22 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
     const u = changes.uncovered[0];
     doc.state = 'unclaimed-changes';
     doc.next = { action: 'claim', command: u.suggestion, why: unclaimedWhy(), file: u.file };
+    return doc;
+  }
+
+  const anchors = checkAnchorLocations(projectDir, claims);
+  doc.invalidFaults = anchors.results
+    .filter((result) => result.status !== 'ok')
+    .map(({ claimId, faultId, file, status: reason, hits, expected }) => ({ claimId, subjectId: faultId, file, reason, hits, expected }));
+  if (doc.invalidFaults.length) {
+    const first = doc.invalidFaults[0];
+    doc.state = 'invalid-anchors';
+    doc.next = {
+      action: 'repair-fault',
+      command: 'testguard claims --check-anchors',
+      why: `${doc.invalidFaults.length} fault anchor${doc.invalidFaults.length === 1 ? '' : 's'} no longer locate exactly. Repair ${first.claimId}/${first.subjectId} in testguard.claims.json without changing what the fault means, then re-probe.`,
+      target: { claimId: first.claimId, subjectId: first.subjectId, file: first.file },
+    };
     return doc;
   }
 
@@ -236,6 +254,7 @@ export function renderStatus(doc) {
     for (const e of c.expired) lines.push(`EXPIRED   ignore "${e.pattern}" no longer excuses ${e.files.join(', ')}`);
   }
   for (const c of doc.changedFaults) lines.push(`CHANGED   ${c.claimId}/${c.subjectId} edited since it ${c.previousVerdict} (${c.file})`);
+  for (const f of doc.invalidFaults ?? []) lines.push(`INVALID   ${f.claimId}/${f.subjectId} ${f.reason}: ${f.hits} hits, expected ${f.expected} (${f.file})`);
   for (const s of doc.stale.slice(0, 8)) lines.push(`stale     ${s}`);
   for (const n of doc.notes ?? []) lines.push(`note      ${n}`);
   lines.push(`next:     [${doc.next.action}] ${doc.next.command}`);

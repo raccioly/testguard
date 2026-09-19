@@ -3713,6 +3713,70 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-ANCHOR-PREFLIGHT-FAILS-FAST",
+      "statement": "Every exact fault anchor and every supported replacement is validated before the long self-probe starts. A missing or ambiguous anchor, or a JavaScript/Python replacement that does not parse, exits 1 with the claim, fault, file and hit counts; status points at the fault definition to repair, and CI cannot continue to self-probe past a failed preflight.",
+      "source": {
+        "kind": "manual",
+        "ref": "GitHub issue #83"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-19T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/claims-anchors.test.mjs",
+        "test/status.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Invalid anchors are counted as valid, so the command exits 0 over a fault it could not apply.",
+          "faultClass": "condition-forced",
+          "file": "src/claims/anchors.mjs",
+          "find": "  invalid: results.filter((r) => r.status !== 'ok').length,",
+          "replace": "  invalid: 0,",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Status ignores invalid anchors and falls through to an evidence state instead of directing repair.",
+          "faultClass": "condition-forced",
+          "file": "src/status/status.mjs",
+          "find": "  if (doc.invalidFaults.length) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "CI replaces the anchor preflight with a harmless command, so a rotted fault spends the self-probe budget before failing.",
+          "faultClass": "statement-deleted",
+          "file": ".github/workflows/ci.yml",
+          "find": "        run: node cli/testguard.mjs claims . --check-anchors",
+          "replace": "        run: node --version",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "claims",
+        "preflight",
+        "cost"
+      ]
     }
   ]
 }

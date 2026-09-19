@@ -321,7 +321,7 @@ it('fails closed on a missing scope (uncommitted)', async () => {
       const code = await main(['status', scratch, '--json'], a.io);
       const status = JSON.parse(a.lines.out.join('\n'));
       expect(validate('status', status).errors).toEqual([]);
-      expect(['clean', 'unproven', 'evidence-stale']).toContain(status.state);
+      expect(['clean', 'unproven', 'evidence-stale', 'invalid-anchors']).toContain(status.state);
       expect([0, 1]).toContain(code);
       expect(status.next.action).toBeDefined();
       const b = capture();

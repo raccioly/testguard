@@ -2,7 +2,7 @@
 
 <!-- docguard:version 1.0.0 -->
 <!-- docguard:status approved -->
-<!-- docguard:last-reviewed 2026-09-18 -->
+<!-- docguard:last-reviewed 2026-09-19 -->
 <!-- docguard:owner @raccioly -->
 <!-- docguard:quality negation-load off — the data model is largely a set of prohibitions (no database, no server state, fingerprints never derived from fault text). -->
 <!-- docguard:quality passive-voice off — this document describes what happens to documents as they flow through validation, where the artifact is the subject and the actor is irrelevant. -->
@@ -85,6 +85,11 @@ baseline.json ──suppresses by fingerprint───────────�
 status.json ◀── derived from claims + evidence + baseline + working tree
 brief.json  ◀── derived from evidence + baseline + status
 ```
+
+Status also carries `invalidFaults`, the current exact-anchor failures with
+their observed and expected hit counts. When it is non-empty, the state is
+`invalid-anchors` and the next action is `repair-fault`; evidence cannot make a
+fault that no longer applies trustworthy.
 
 A fingerprint is `sha256(claimId \n subjectId \n file \n verdict)`. It is
 derived from identity and outcome, never from the fault's text, so repairing a

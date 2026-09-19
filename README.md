@@ -141,6 +141,7 @@ less than that many days ago (`ENOVERSIONS`); install that one with
 npx testguard-cli init                      # install the agent layer at the git root
 npx testguard-cli status --json             # where the project is, and the ONE next action
 npx testguard-cli claims                    # what does this project claim, and is each claim probeable?
+npx testguard-cli claims --check-anchors    # fail fast if an exact anchor moved or a replacement no longer parses
 npx testguard-cli scaffold src/auth.ts      # propose faults for a file, as a draft to keep or drop
 npx testguard-cli probe                     # try to falsify each claim; report what the tests missed
 npx testguard-cli admit test/auth.test.ts --claim AUTH-ADMIN   # does this test satisfy the two-gate rule?
@@ -151,8 +152,9 @@ npx testguard-cli replay --since v1.0..HEAD # would this suite have caught the b
 npx testguard-cli mcp                       # serve the read-only loop over MCP, on stdio
 ```
 
-Exit codes are the contract: `0` nothing new to prove, `1` unproven claims or
-unclaimed changes, `2` a precondition failed and nothing was probed, `3` usage.
+Exit codes are the contract: `0` nothing new to prove, `1` unproven claims,
+unclaimed changes or invalid fault anchors, `2` a precondition failed and
+nothing was probed, `3` usage.
 Every command accepts `--json`.
 
 ## How it works
@@ -177,6 +179,10 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    claim and every fault records who produced it. `testguard claims`
    validates the file and reports drift against `@claim <ID>` annotations in
    source. Test files are deliberately not scanned — a claim asserted by a test is the authorship trap the tool exists for — and annotation ids must contain a hyphen so prose is never mistaken for one.
+   `claims --check-anchors` additionally locates every exact anchor and parses
+   each in-memory JavaScript or Python replacement. It runs no tests, creates
+   no worktree and changes no file, so a moved anchor is reported before an
+   expensive probe. It reports and stops; it never guesses a new anchor.
 2. **Probe** confirms the defenders are green N times unmodified, applies
    each fault in a scratch git worktree (your tree is never touched), runs
    the defenders N times, re-runs survivors against the whole suite with
@@ -445,6 +451,10 @@ is reported as `EXPIRED`.
 With a reference known, `status --changed <ref>` reports `unclaimed-changes`
 **before** any evidence state and makes the claim the next action; the brief
 lists the unclaimed files first. The claim is written before more code.
+After claim coverage, `status` reports `invalid-anchors` before any evidence
+state when an exact fault anchor is missing or ambiguous, and points at the
+fault definition to repair. Repair preserves the fault's meaning and requires
+a re-probe; there is deliberately no `--fix`.
 
 **In CI the base is detected** — GitHub Actions (`GITHUB_BASE_REF`) and GitLab
 merge request pipelines (`CI_MERGE_REQUEST_DIFF_BASE_SHA`, then

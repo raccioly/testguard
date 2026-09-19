@@ -2,7 +2,7 @@
 
 <!-- docguard:version 1.0.0 -->
 <!-- docguard:status approved -->
-<!-- docguard:last-reviewed 2026-09-18 -->
+<!-- docguard:last-reviewed 2026-09-19 -->
 <!-- docguard:owner @raccioly -->
 <!-- docguard:quality negation-load off — the governing rule is a prohibition (a test that would pass with the behaviour broken is not a test), and the verdict rules are defined by what does not count as detection. -->
 
@@ -19,6 +19,7 @@ the test that defends it, and CI fails if any injected fault survives.
 |---|---|---|---|
 | Unit | `test/*.test.mjs` | One pure function's branches, without a runner | milliseconds |
 | Conformance | `spec/conformance/` | Every valid example validates; every must-reject document is rejected for the defect its filename names | ~1 s |
+| Anchor preflight | `test/claims-anchors.test.mjs` | Exact anchors still locate, supported replacements parse, the check stays below one second, and CI reaches it before self-probe | <1 s |
 | Fixture acceptance | `test/probe.fixture.test.mjs`, `test/probe.jest.test.mjs`, `test/probe.playwright.test.mjs` | The whole pipeline reproduces a known-answer oracle, one per runner | 10–50 s each |
 | Self-verification | `testguard.claims.json`, run by `npm run self:probe` | The tool's own invariants survive fault injection | **13.4 min** cold (measured 2026-09-18 at `cf5a083`: 96 faults, 576 defender runs, 804 s, `--serial`, idle machine); seconds when verdicts are reused, which is why CI restores the previous evidence from cache. Budgeted at 950 s in `testguard.cost-budget.json` and **gated** in CI — the figure above went 9.6 → 23.6 min across one merged change while `--cost` printed it into a log nobody read |
 | Install smoke | `.github/scripts/install-smoke.mjs` | The **packed tarball** runs with production dependencies only | ~20 s |
@@ -57,6 +58,9 @@ What is gated instead:
 4. **Every spec change ships its conformance case** — schema, semantic rule,
    valid example and must-reject document, in the same pull request.
 5. **A new fault shape needs a synthetic-file test and a README row.**
+6. **Every fault must pass the cheap preflight before self-verification.** A
+   missing or ambiguous anchor, or a supported replacement that does not
+   parse, fails CI before the long self-probe starts.
 
 ## Service-to-Test Map
 
@@ -64,6 +68,7 @@ What is gated instead:
 |---|---|
 | `src/probe/classify.mjs` | `test/classify.test.mjs`, `test/negative-control.test.mjs` |
 | `src/probe/inject.mjs` | `test/inject.test.mjs` |
+| `src/claims/anchors.mjs` | `test/claims-anchors.test.mjs` |
 | `src/probe/probe.mjs` | `test/probe.fixture.test.mjs`, `test/probe-preconditions.test.mjs`, `test/probe-error.test.mjs` |
 | `src/probe/discover.mjs`, `src/probe/mocks.mjs` | `test/discover.test.mjs`, `test/mocks.test.mjs` |
 | `src/probe/rank.mjs` | `test/rank-aliases.test.mjs`, `test/discover.test.mjs` |

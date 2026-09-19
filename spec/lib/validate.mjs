@@ -233,12 +233,15 @@ const semantic = {
 
   status(doc) {
     const errors = [];
-    if (['write-test', 'review-fault-change'].includes(doc.next.action) && !doc.next.target) errors.push({ path: '/next/target', message: `${doc.next.action} requires a target` });
+    if (['write-test', 'review-fault-change', 'repair-fault'].includes(doc.next.action) && !doc.next.target) errors.push({ path: '/next/target', message: `${doc.next.action} requires a target` });
     if (doc.next.action === 'claim' && !doc.next.file) errors.push({ path: '/next/file', message: 'claim requires the file the claim is about' });
     if (doc.state === 'no-claims' && doc.counts.claims !== 0) errors.push({ path: '/counts/claims', message: 'no-claims with a non-zero claim count' });
     if (doc.state === 'clean' && (doc.counts.new ?? 0) > 0) errors.push({ path: '/state', message: 'clean with new findings' });
     if (doc.state === 'unclaimed-changes' && !(doc.changes && doc.changes.uncovered.length > 0)) errors.push({ path: '/changes/uncovered', message: 'unclaimed-changes requires at least one uncovered changed file' });
     if (doc.state === 'unclaimed-changes' && doc.next.action !== 'claim') errors.push({ path: '/next/action', message: 'unclaimed-changes requires next.action = claim' });
+    if (doc.state === 'invalid-anchors' && !(doc.invalidFaults?.length > 0)) errors.push({ path: '/invalidFaults', message: 'invalid-anchors requires at least one invalid fault' });
+    if (doc.state === 'invalid-anchors' && doc.next.action !== 'repair-fault') errors.push({ path: '/next/action', message: 'invalid-anchors requires next.action = repair-fault' });
+    if (doc.invalidFaults?.length > 0 && doc.state !== 'invalid-anchors') errors.push({ path: '/state', message: 'invalid fault anchors are hidden behind a later state; invalid-anchors precedes every evidence state' });
     if (doc.evidenceSource && !doc.evidenceHead) errors.push({ path: '/evidenceHead', message: 'evidence was read, so the commit it describes must be recorded' });
     if (doc.changes && doc.changes.uncovered.length > 0 && !['no-claims', 'unclaimed-changes'].includes(doc.state)) errors.push({ path: '/state', message: 'uncovered changed files are hidden behind a later state; unclaimed-changes precedes every evidence state' });
     return errors;

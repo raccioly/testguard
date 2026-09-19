@@ -185,6 +185,13 @@ jobs:
         if: github.event_name == 'pull_request'
         run: node cli/testguard.mjs gate . --changed "origin/${{ github.base_ref }}"
 
+      # Exact anchors and parseable replacements are knowable without a test
+      # runner. Fail here instead of spending the long self-probe merely to
+      # discover that a fault could never be applied.
+      - name: claims — fault anchors and replacements are valid
+        if: matrix.node-version == 22
+        run: node cli/testguard.mjs claims . --check-anchors
+
       # ── Self-verification: TestGuard is governed by the standard it defines.
       #    testguard.claims.json states invariants of the tool itself; every
       #    fault must be killed by the tool's own tests. Exit 0 = all defended. ──

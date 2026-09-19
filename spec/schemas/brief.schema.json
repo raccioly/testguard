@@ -39,7 +39,7 @@
       "type": "object",
       "required": ["action", "command", "why"],
       "properties": {
-        "action": { "enum": ["scaffold", "claim", "probe", "write-test", "baseline", "review-fault-change", "none"] },
+        "action": { "enum": ["scaffold", "claim", "probe", "write-test", "baseline", "repair-fault", "review-fault-change", "none"] },
         "command": { "type": "string", "minLength": 1, "maxLength": 1024 },
         "why": { "type": "string", "minLength": 1, "maxLength": 2000 }
       },

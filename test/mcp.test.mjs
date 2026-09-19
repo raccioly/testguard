@@ -126,6 +126,17 @@ describe('the tools agree with the CLI, on a real project', () => {
   beforeAll(async () => {
     scratch = mkdtempSync(join(tmpdir(), 'tg-mcp-'));
     cpSync(FIXTURE, scratch, { recursive: true, filter: (s) => !/node_modules|\.flake-counter|\.testguard/.test(s) });
+    // MCP protocol tests need the unprobed state; the known-answer fixture's
+    // intentional bad anchors belong to probe acceptance, not this scenario.
+    const claimsPath = join(scratch, 'testguard.claims.json');
+    const claims = JSON.parse(readFileSync(claimsPath, 'utf8'));
+    const anchors = claims.claims.find((claim) => claim.id === 'REDACT-005').faults;
+    anchors[0].find = 'if (rule.id === id) return rule;';
+    anchors[0].replace = 'if (rule.id === id) return rules[0];';
+    anchors[1].find = '  return null;\n}\n\n/** Compile all rules.';
+    anchors[1].replace = '  return rules[0];\n}\n\n/** Compile all rules.';
+    delete anchors[1].expectHits;
+    writeFileSync(claimsPath, JSON.stringify(claims, null, 2) + '\n');
     symlinkSync(join(ROOT, 'node_modules'), join(scratch, 'node_modules'), 'dir');
     const g = (...args) => {
       const r = spawnSync('git', ['-c', 'user.email=m@example.invalid', '-c', 'user.name=m', ...args], { cwd: scratch, encoding: 'utf8' });

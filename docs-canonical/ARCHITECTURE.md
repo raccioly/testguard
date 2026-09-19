@@ -2,7 +2,7 @@
 
 <!-- docguard:version 1.0.0 -->
 <!-- docguard:status approved -->
-<!-- docguard:last-reviewed 2026-09-18 -->
+<!-- docguard:last-reviewed 2026-09-19 -->
 <!-- docguard:owner @raccioly -->
 <!-- docguard:quality negation-load off — this tool is defined by what must not happen: no network, no telemetry, never optimistic under uncertainty. Stating those positively would misdescribe them. -->
 
@@ -35,7 +35,7 @@ code were wrong, would anything fail?*
 |---|---|---|
 | CLI dispatch | Parse argv, select a command, map errors to exit codes | `src/cli.mjs`, `cli/testguard.mjs` |
 | Commands | Thin wrappers: read flags, call a module, render output | `src/commands/*.mjs` |
-| Claims | Load and validate the claims file; reconcile `@claim` annotations; detect removed claims | `src/claims/` |
+| Claims | Load and validate the claims file; reconcile `@claim` annotations; detect removed claims; preflight exact anchors and supported replacement syntax | `src/claims/` |
 | Probe engine | Isolate, inject, run, escalate, restore, classify, rank | `src/probe/probe.mjs` |
 | Verdict function | The pure decision: runs in, verdict out | `src/probe/classify.mjs` |
 | Injector | Apply and restore a fault; anchor location | `src/probe/inject.mjs` |
@@ -131,7 +131,7 @@ to every other surface and `--check` fails the build on drift.
 
 | Stage | Where | Gate |
 |---|---|---|
-| Pull request | `ci.yml` | Suite on Node 20/22/24, syntax check of every source, install-from-tarball smoke, Python wrapper import, fixture oracles for vitest and jest, Playwright job, change gate, removed-claim check |
+| Pull request | `ci.yml` | Suite on Node 20/22/24, syntax check of every source, install-from-tarball smoke, Python wrapper import, fixture oracles for vitest and jest, Playwright job, change gate, removed-claim check, anchor/replacement preflight before self-probe |
 | Release gate | `ci.yml` | TestGuard probes its own claims; every fault must be killed |
 | Merge to main | `release.yml` | A version with no tag is tagged, released, and published to npm and PyPI over OIDC |
 | Recovery | `release.yml` | Hourly sweep; each registry is gated on its own state, so a partial publish is fixed by re-running |
@@ -140,6 +140,9 @@ to every other surface and `--check` fails the build on drift.
 
 ```
                     testguard.claims.json          (what must be true)
+                              │
+               claims --check-anchors
+            (exact anchors + syntax, no tests)
                               │
                               ▼
    ┌─────────── probe ────────────────────────────────────────────┐
