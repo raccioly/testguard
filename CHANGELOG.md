@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-19
+
+Automated weekly release — everything merged since `v0.9.4`.
+
+### Changed
+
+- feat(status): expose claimed source surface (#135)
+- chore(homebrew): sha256 for v0.9.4 (#136)
+
+
 ### Added
 
 - `status` now makes the claim denominator visible: claimed versus current
