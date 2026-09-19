@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-09-19
+
+Automated weekly release — everything merged since `v0.10.0`.
+
+### Changed
+
+- fix(probe): preserve repeated claim selections (#139)
+- chore(homebrew): sha256 for v0.10.0 (#138)
+
+
 ### Fixed
 
 - Repeated `probe --claim` flags no longer collapse silently to the last value.
