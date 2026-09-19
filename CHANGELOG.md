@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Releases now publish the registry-verified Homebrew formula to the live
+  `raccioly/tap` repository with a dedicated, tap-scoped deploy key. The
+  release fails closed if that copy cannot be made, instead of updating only
+  the staging formula in this repository while users remain on an old version.
+
 ## [0.10.1] - 2026-09-19
 
 Automated weekly release — everything merged since `v0.10.0`.

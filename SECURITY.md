@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---------|-----------|
-| 0.1.x   | ✅ current |
+| 0.10.x  | ✅ current |
 
 ## Reporting a vulnerability
 
@@ -27,9 +27,11 @@ TestGuard is a local CLI with a deliberately small surface:
   scratch git worktrees under the system temp directory, which are removed
   after each run. With `--in-place`, the mutated files are restored — on
   success, on failure, and on `SIGINT`/`SIGTERM`.
-- **Publishing uses OIDC Trusted Publishing** to npm and PyPI. The release
-  pipeline holds no long-lived tokens; npm provenance attestations are
-  generated automatically.
+- **Publishing uses OIDC Trusted Publishing** to npm and PyPI, so the release
+  pipeline holds no registry tokens and npm provenance attestations are
+  generated automatically. Homebrew publishing uses a dedicated SSH deploy
+  key scoped only to `raccioly/homebrew-tap`; it cannot access this repository
+  or any other repository.
 
 ## The claims file is code
 
