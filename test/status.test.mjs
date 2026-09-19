@@ -135,6 +135,23 @@ describe('computeStatus — every state, with a conforming document', () => {
     rmSync(join(dir, '.testguard', 'baseline.json'));
     expect(computeStatus({ projectDir: dir }).next.why).toMatch(/Every claim is defended/);
   });
+  it('clean evidence does not hide a mostly unclaimed source tree', () => {
+    const { dir, evidence } = project();
+    for (const file of ['src/a.mjs', 'src/b.mjs', 'src/c.mjs']) writeFileSync(join(dir, file), 'export const value = 1;\n');
+    const ev = evidence(() => 'killed');
+    ev.records[0].detail.independence = { class: 'co-authored', defenderCommit: 'a'.repeat(40), targetCommit: 'a'.repeat(40), sameAuthor: true };
+    writeSpecDoc('evidence', join(dir, '.testguard', 'evidence.json'), ev);
+    const s = computeStatus({ projectDir: dir });
+    expect(s.state).toBe('clean');
+    expect(s.surface).toMatchObject({ sourceModules: 5, claimedModules: 2, unclaimedModules: 3 });
+    expect(s.next).toMatchObject({ action: 'claim', command: 'testguard scaffold src/a.mjs', file: 'src/a.mjs' });
+    expect(s.next.why).toContain('git history is unavailable');
+    expect(s.next.why).not.toContain('last 0 commits');
+    expect(renderStatus(s)).toMatch(/surface:\s+2 of 5 source modules carry a claim/);
+    expect(renderStatus(s)).toContain('UNCLAIMED src/a.mjs');
+    expect(renderStatus(s)).toContain('1 of 14 kills are co-authored');
+    expect(validate('status', s).errors).toEqual([]);
+  });
   it('evidence-stale when a target or defender changed; changedFaults when a fault was edited after it survived', () => {
     const { dir, evidence } = project();
     writeSpecDoc('evidence', join(dir, '.testguard', 'evidence.json'), evidence((c, f) => (c.id === 'REDACT-003' ? 'survived' : 'killed')));

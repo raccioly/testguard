@@ -633,9 +633,17 @@ things make that safe:
   *should* ship with its regression test — but a repository where every kill
   is co-authored has no independent verification, whatever its claim
   verification rate says. It is a **signal**: ranking reads it, verdicts never
-  do, and the brief says it in one line. Nothing else in this category
+  do, and `probe`, `status` and the brief all say it in one line. Nothing else in this category
   measures it, and agents saturate the tests they can see
   ([SpecBench](https://arxiv.org/abs/2605.21384)).
+- **Claimed surface is visible.** A clean probe is only about claims that
+  exist. `status` therefore reports claimed source modules over the current
+  module denominator, how many of the 20 highest-churn modules are claimed,
+  and the concrete unclaimed modules worth examining next over a bounded
+  200-commit window. Churn and path-risk signals stay separate; there is no
+  synthetic health score. When most modules remain unclaimed and the existing
+  evidence is clean, the next action expands the denominator instead of
+  congratulating the same small set of claims again.
 - **Gaming is visible.** The cheapest way to make a survivor disappear is to
   weaken its fault, not to write a test. Evidence records every fault's
   content hash; `status` lists any fault edited after it survived, with its

@@ -6,12 +6,17 @@ import { gate } from '../baseline/baseline.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
-import { sortForReport } from '../render.mjs';
+import { coAuthorshipWarning, sortForReport } from '../render.mjs';
 import { computeChangedGate, defaultIgnorePath } from '../gate/changed.mjs';
 import { headSha, isAncestor } from '../git.mjs';
 import { checkAnchorLocations } from '../claims/anchors.mjs';
+import { computeClaimedSurface, needsClaimExpansion } from './surface.mjs';
 
 export const faultContentHash = (fault) => sha256(`${fault.find}\n${fault.replace}`);
+
+const candidateReason = (surface, candidate) => surface.history.available
+  ? `${candidate.file}, the highest-churn unclaimed module in the last ${surface.history.commitsRead} commit${surface.history.commitsRead === 1 ? '' : 's'}`
+  : `${candidate.file}, the first unclaimed module by path because git history is unavailable`;
 
 const P = (projectDir) => ({
   claims: defaultClaimsPath(projectDir),
@@ -68,6 +73,11 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   };
 
   if (!existsSync(paths.claims)) {
+    doc.surface = computeClaimedSurface({ projectDir });
+    const candidate = doc.surface.rankedUnclaimed[0];
+    if (candidate && !changes?.uncovered.length) {
+      doc.next = { action: 'scaffold', command: `testguard scaffold ${candidate.file}`, why: `${doc.surface.sourceModules} source module${doc.surface.sourceModules === 1 ? '' : 's'} exist and none carries a claim. Start with ${candidateReason(doc.surface, candidate)}.`, file: candidate.file };
+    }
     if (changes?.uncovered.length) {
       const u = changes.uncovered[0];
       doc.next = { action: 'scaffold', command: `testguard scaffold ${u.file}`, why: `No testguard.claims.json in this project, and ${unclaimedWhy()}`, file: u.file };
@@ -79,6 +89,7 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   const claims = loadClaims(paths.claims);
   doc.counts.claims = claims.claims.length;
   doc.counts.faults = claims.claims.reduce((n, c) => n + c.faults.length, 0);
+  doc.surface = computeClaimedSurface({ projectDir, claims });
   const faultIndex = new Map();
   for (const c of claims.claims) for (const f of c.faults) faultIndex.set(`${c.id}/${f.id}`, { claim: c, fault: f });
 
@@ -236,6 +247,15 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   } else {
     doc.next = { action: 'none', command: 'testguard probe', why: unprovenTotal ? `${unprovenTotal} baselined finding${unprovenTotal === 1 ? '' : 's'} remain; nothing new. Re-probe after changing code, tests or claims.` : 'Every claim is defended. Re-probe after changing code, tests or claims; add a claim for every new invariant.' };
   }
+  if (needsClaimExpansion(doc.surface)) {
+    const candidate = doc.surface.rankedUnclaimed[0];
+    doc.next = {
+      action: 'claim',
+      command: `testguard scaffold ${candidate.file}`,
+      why: `The existing claims are defended, but only ${doc.surface.claimedModules} of ${doc.surface.sourceModules} source modules carry a claim. Expand the denominator at ${candidateReason(doc.surface, candidate)}.`,
+      file: candidate.file,
+    };
+  }
   return doc;
 }
 
@@ -246,6 +266,15 @@ export function renderStatus(doc) {
   }
   lines.push(`state: ${doc.state}${doc.provisional ? ' (provisional)' : ''} — ${doc.counts.claims} claims / ${doc.counts.faults} faults` + (doc.counts.byVerdict ? `; ${Object.entries(doc.counts.byVerdict).map(([k, v]) => `${v} ${k}`).join(', ')}; ${doc.counts.new ?? 0} new, ${doc.counts.baselined ?? 0} baselined` : '')
   );
+  if (doc.surface) {
+    const s = doc.surface;
+    const history = s.history.available ? `last ${s.history.commitsRead} commit${s.history.commitsRead === 1 ? '' : 's'}` : 'git history unavailable';
+    lines.push(`surface:  ${s.claimedModules} of ${s.sourceModules} source modules carry a claim; ${s.highChurn.claimed} of ${s.highChurn.modules} highest-churn modules claimed (${history})`);
+    for (const item of s.rankedUnclaimed.slice(0, 3)) lines.push(`UNCLAIMED ${item.file} — ${item.changes} change${item.changes === 1 ? '' : 's'} in history window${item.riskSignals.length ? `; path risk: ${item.riskSignals.join(', ')}` : ''}`);
+  }
+  const coAuthored = doc.counts.killedCoAuthored ?? 0;
+  const kills = doc.counts.byVerdict?.killed ?? 0;
+  if (coAuthored) lines.push(`evidence: ${coAuthorshipWarning(coAuthored, kills)}`);
   if (doc.changes) {
     const c = doc.changes;
     lines.push(`changes:  ${c.changed} file${c.changed === 1 ? '' : 's'} since ${c.ref}; ${c.evaluated} evaluated, ${c.excluded} excluded, ${c.uncovered.length} unclaimed`);

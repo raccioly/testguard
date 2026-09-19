@@ -18,6 +18,27 @@
     }
   },
   "provisional": false,
+  "surface": {
+    "sourceModules": 3,
+    "claimedModules": 2,
+    "unclaimedModules": 1,
+    "history": {
+      "available": true,
+      "maxCommits": 200,
+      "commitsRead": 40
+    },
+    "highChurn": {
+      "modules": 3,
+      "claimed": 2
+    },
+    "rankedUnclaimed": [
+      {
+        "file": "src/session.mjs",
+        "changes": 8,
+        "riskSignals": ["security"]
+      }
+    ]
+  },
   "counts": {
     "claims": 2,
     "faults": 6,

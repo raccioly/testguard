@@ -344,6 +344,27 @@ the suppress-up-to-count semantics are identical.
   hidden. A file that mocks the subject is never a discovered defender: a
   mock cannot detect a fault in what it replaced.
 
+## Claimed source surface
+
+`status` reports the denominator that `probe` cannot: current, non-test source
+modules with a supported extension and outside the change gate's documented
+default exclusions. A module is claimed when at least one fault anchors to it.
+The document carries the claimed, unclaimed and total module counts.
+
+The report also names concrete unclaimed modules. It counts touches over at
+most the latest 200 commits, reports how many of the 20 highest-churn modules
+are claimed, and lists up to ten unclaimed modules in descending churn order.
+Security- and money-shaped path names are explicit tie-breaking signals, never
+semantic claims about a file. Churn, path risk and claim coverage remain raw
+facts: they are never collapsed into one health score.
+
+When existing evidence is clean but more source modules are unclaimed than
+claimed, the next action is to scaffold the highest-churn unclaimed module.
+Earlier correctness states still win: invalid anchors, stale evidence and
+unproven faults are repaired before expanding the denominator. Without git
+history the counts and concrete files remain available, while the document
+says history is unavailable and reports zero commits read.
+
 ## Claim coverage of a change
 
 `probe` asks whether the tests defend the claims that exist. It says nothing

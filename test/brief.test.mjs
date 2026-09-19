@@ -58,6 +58,11 @@ describe('renderSummary', () => {
     expect(line).toContain(`${unproven.length} unproven fault`);
     expect(line).toContain(`across ${new Set(unproven.map((r) => r.claim.id)).size} claim`);
   });
+  it('prints the co-authorship caveat on the human probe surface', () => {
+    const records = structuredClone(evidence.records.filter((r) => r.verdict === 'killed'));
+    records[0].detail.independence = { class: 'co-authored', defenderCommit: 'a'.repeat(40), targetCommit: 'a'.repeat(40), sameAuthor: true };
+    expect(renderSummary(records)).toContain(`1 of ${records.length} kills are co-authored with the code they defend`);
+  });
 });
 
 describe('renderRecord', () => {
