@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-09-19
+
+Automated weekly release — everything merged since `v0.9.0`.
+
+### Changed
+
+- docs: the brief catches up with the tool, and stops falling behind (#112)
+- chore(homebrew): sha256 for v0.9.0 (#110)
+- feat(cost): two ceilings, the report where it is read, and three claims off expensive defenders (#113)
+- fix(release): approve the runs GITHUB_TOKEN's own PR leaves held (#111)
+
+
 ### Added
 - **A second cost ceiling, on the claim.** The total alone cannot see the
   failure it was meant to catch: a new calibration claim cost 51 s for two
