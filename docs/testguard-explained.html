@@ -144,7 +144,7 @@
 <div class="page">
   <div class="masthead">
     <div class="wordmark">Test<span class="mark">Guard</span></div>
-    <div class="meta">Technical Brief · v0.6 · MIT</div>
+    <div class="meta">Technical Brief · v0.9.0 · MIT</div>
   </div>
 
   <h1>Your tests pass. That is not the same as your tests working.</h1>
@@ -209,7 +209,7 @@
     <div class="attrib">The design constraint everything else follows from</div>
   </div>
 
-  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 1 of 5 · The idea</span></div>
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 1 of 6 · The idea</span></div>
 </div>
 
 <!-- ═══════════════ PAGE — THE EVIDENCE ═══════════════ -->
@@ -368,7 +368,7 @@
     <div class="attrib">Why the question has to be asked adversarially</div>
   </div>
 
-  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 2 of 5 · Evidence</span></div>
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 2 of 6 · Evidence</span></div>
 </div>
 
 <!-- ═══════════════ PAGE 2 — HOW A RUN WORKS ═══════════════ -->
@@ -527,6 +527,9 @@
 <pre>(baseline runs + faults × N) × cost of the
                        claim's defender set</pre>
         </div>
+        <p class="note" style="margin-top:8px;margin-bottom:0">Measured, not estimated:
+        <code>testguard.cost-budget.json</code> records what each set actually cost in CI, and
+        <code>--cost</code> reports the bill per claim and per file.</p>
       </div>
       <div>
         <p class="note">The defender <em>set</em> is the unit, not the file — a run executes all of a claim's
@@ -538,7 +541,7 @@
     </div>
   </section>
 
-  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 3 of 5 · Anatomy</span></div>
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 3 of 6 · Anatomy</span></div>
 </div>
 
 <!-- ═══════════════ PAGE 3 — VERDICTS & ARCHITECTURE ═══════════════ -->
@@ -655,14 +658,84 @@
     </div>
   </section>
 
-  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 4 of 5 · Verdicts &amp; architecture</span></div>
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 4 of 6 · Verdicts &amp; architecture</span></div>
+</div>
+
+<!-- ═══════════════ PAGE 5 — THE LOOP & CALIBRATION ═══════════════ -->
+<div class="page">
+  <div class="masthead">
+    <div class="wordmark">Test<span class="mark">Guard</span></div>
+    <div class="meta">05 — The loop &amp; calibration</div>
+  </div>
+
+  <section style="margin-top:17px">
+    <h2>The engine is one verb. The loop is the product.</h2>
+    <p class="note" style="margin-bottom:5px">Probing proves a claim. It does not tell you which claim to
+    write next, whether a new test earns its place, or whether the agent editing your code knows any of it.</p>
+    <table>
+      <tr><th>Verb</th><th>Why it exists</th></tr>
+      <tr><td><code>status</code></td><td>Where the project is and the <em>one</em> next action. <code>--json</code> is the machine entry point.</td></tr>
+      <tr><td><code>init</code></td><td>Installs the agent layer — skill, session-start hook, AGENTS.md section — at the git root.</td></tr>
+      <tr><td><code>claims</code></td><td>Lists the claims and reports drift against the <code>@claim</code> annotations in the code.</td></tr>
+      <tr><td><code>scaffold</code></td><td>Proposes faults mechanically for one file, as a draft claims document. A starting point, not an answer.</td></tr>
+      <tr><td class="v-good"><code>probe</code></td><td>The engine. Inject each fault, run its defenders, report what survived.</td></tr>
+      <tr><td><code>admit</code></td><td>The two-gate rule as one verb: green on HEAD <em>and</em> failing on every fault of the claim. Otherwise the test is not a defender.</td></tr>
+      <tr><td><code>baseline</code></td><td>Freezes today's unproven findings so only new ones gate.</td></tr>
+      <tr><td><code>gate</code></td><td>Fails when a changed source file carries no claim and no excusing entry. Unclaimed code is the blind spot before the blind test is.</td></tr>
+      <tr><td><code>brief</code></td><td>Emits the blind-spot block for an agent's session-start context.</td></tr>
+      <tr><td><code>mcp</code></td><td>Serves status, brief, claims and evidence read-only over MCP, so the loop works in any agent harness.</td></tr>
+      <tr><td><code>replay</code></td><td>Would this suite have caught the bugs that already escaped? <em>Reports, never gates.</em></td></tr>
+    </table>
+  </section>
+
+  <section class="rule-top">
+    <h2>The honest question: does an injected fault resemble a real bug?</h2>
+    <p class="note" style="margin-bottom:9px">Every mutation tool has to answer this and most decline to.
+    <code>replay</code> answers it empirically: it walks real fix commits out of your history, reverts each
+    fix, runs the tests that exist <em>now</em>, and records whether they notice.</p>
+
+    <div class="cols-2">
+      <div>
+        <div class="exhibit" style="margin:0">
+          <div class="cap">Calibration — a miss rate, so a high p is bad</div>
+<pre style="font-size:7.1pt">guard-removed  missed 7/9  p=0.78  ci [0.45, 0.94]
+field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
+        </div>
+        <p class="note" style="margin-top:8px;margin-bottom:0">Read as: <em>when a real bug of this class
+        escapes, how often does the suite miss it?</em> Each bug is labelled with the fault class its diff
+        most resembles — the join key that turns an uninterpretable score into a statement with a sample
+        size. Every <code>p</code> and interval is recomputable from <code>n</code>, and the validator
+        recomputes them.</p>
+      </div>
+      <div>
+        <ul class="ticks">
+          <li><strong>Measurements enter the ratio:</strong> <code>caught</code>, <code>blind</code>, and
+          <code>nocover</code> — the last as a miss, because no tests at all must not score better than weak ones.</li>
+          <li><strong>Failed measurements enter neither side:</strong> <code>flaky</code> and
+          <code>unverifiable</code> conclude nothing, and are not allowed to flatter the number.</li>
+          <li><strong>Flake is biased pessimistically:</strong> a flaky failure would read as detection,
+          so mixed runs are never <code>caught</code>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="exhibit" style="margin-top:9px;border-left-color:var(--slate)">
+      <div class="cap">The open question this instrument exists to answer</div>
+      <p class="note" style="margin:0">Does a calibration learned on a repository <em>with</em> history
+      transfer to a greenfield one that has none? AI-authored code has no history, so calibration is the only
+      bridge. <strong>That transfer is unproven.</strong> It is the core product bet, and this is the
+      instrument for testing it — not the answer.</p>
+    </div>
+  </section>
+
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 5 of 6 · The loop &amp; calibration</span></div>
 </div>
 
 <!-- ═══════════════ PAGE 4 — DIFFERENCE ═══════════════ -->
 <div class="page">
   <div class="masthead">
     <div class="wordmark">Test<span class="mark">Guard</span></div>
-    <div class="meta">05 — Prior art &amp; difference</div>
+    <div class="meta">06 — Prior art &amp; difference</div>
   </div>
 
   <section style="margin-top:17px">
@@ -767,7 +840,7 @@
     <div class="attrib">github.com/raccioly/testguard · npm testguard-cli · MIT</div>
   </div>
 
-  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 5 of 5 · Difference</span></div>
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 6 of 6 · Difference</span></div>
 </div>
 
 </body>

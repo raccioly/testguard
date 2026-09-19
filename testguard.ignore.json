@@ -47,7 +47,7 @@
     {
       "kind": "path",
       "pattern": ".github/scripts/**",
-      "reason": "Build and release scripts that run only in CI and are proven by CI failing: the install smoke, the version sync (claimed as TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT where its logic lives), the fixture verdict check and the PDF build. None ships in the package.",
+      "reason": "Build and release scripts that run only in CI and are proven by CI failing: the install smoke, the version sync (claimed as TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT where its logic lives), the fixture verdict check, and the PDF build (its --require-chrome and page-count guards are claimed as TG-BRIEF-PDF-MATCHES-ITS-SOURCE). None ships in the package.",
       "by": "maintainer",
       "at": "2026-09-18T00:00:00Z"
     },

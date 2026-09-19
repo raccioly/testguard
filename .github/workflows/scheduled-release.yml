@@ -92,6 +92,11 @@ jobs:
           } > /tmp/entry.md
           awk '/^## \[Unreleased\]/ { print; print ""; while ((getline line < "/tmp/entry.md") > 0) print line; next } { print }' CHANGELOG.md > /tmp/CHANGELOG.new && mv /tmp/CHANGELOG.new CHANGELOG.md
           node .github/scripts/sync-release-version.mjs
+          # The sync just wrote the brief's masthead; the committed PDF still
+          # shows the old one. --require-chrome because a skipped render here
+          # would ship an HTML and a PDF that disagree, silently and at exit 0.
+          # ubuntu-latest carries /usr/bin/google-chrome.
+          node .github/scripts/build-one-pager.mjs --require-chrome
           echo "NEW_VERSION=$NEW" >> "$GITHUB_ENV"
 
       - name: Verify the tree is still green
@@ -124,9 +129,11 @@ jobs:
           # DERIVED from the sync script, never retyped here: when the GitLab
           # template became a surface it was left out of the hand-written list,
           # so the first release to reach this guard would have been rejected
-          # for writing a file the release is supposed to write. The three
-          # extras are the ones the bump step writes directly.
-          ALLOWED=$(node .github/scripts/sync-release-version.mjs --list-surfaces; printf 'package.json\npackage-lock.json\nCHANGELOG.md\n')
+          # for writing a file the release is supposed to write. The four
+          # extras are the ones the bump step writes directly: three from the
+          # bump itself, plus the brief's PDF, which is rendered from a surface
+          # rather than being one.
+          ALLOWED=$(node .github/scripts/sync-release-version.mjs --list-surfaces; printf 'package.json\npackage-lock.json\nCHANGELOG.md\ndocs/testguard-explained.pdf\n')
           echo "Release surfaces allowed in this diff:"; printf '%s\n' "$ALLOWED" | sed 's/^/  /'
           CHANGED=$(git diff --name-only HEAD --)
           for f in $CHANGED; do

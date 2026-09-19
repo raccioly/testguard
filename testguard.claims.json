@@ -3668,6 +3668,51 @@
         "budget",
         "field-report"
       ]
+    },
+    {
+      "id": "TG-BRIEF-PDF-MATCHES-ITS-SOURCE",
+      "statement": "The technical brief's PDF is rendered from its HTML and can never silently disagree with it: the release runs build-one-pager.mjs with --require-chrome, so a machine without a browser fails the release instead of leaving the committed PDF stale at exit 0, and every render is rejected unless it produced exactly one sheet per `.page` div — a section that overflows its sheet spills onto a second one with no warning from Chrome, contradicting the \"Page N of M\" footers the document prints about itself.",
+      "source": {
+        "kind": "spec",
+        "ref": "CONTRIBUTING.md#releases"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-18T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/one-pager.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A render that spilled onto extra sheets is accepted; the brief ships with pages its own footers do not number.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/build-one-pager.mjs",
+          "find": "if (sheets !== intended) {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "--require-chrome stops requiring Chrome; a release on a runner without one skips the render at exit 0 and commits a PDF whose masthead names the previous version.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/build-one-pager.mjs",
+          "find": "  if (requireChrome) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-18T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

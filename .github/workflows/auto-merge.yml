@@ -53,7 +53,7 @@ jobs:
             // three files the bump writes — test/release-sync.test.mjs fails if
             // a surface is missing, which is how the GitLab template's absence
             // (it would have held every release PR for review) was found.
-            const RELEASE_SURFACES = new Set(['package.json', 'package-lock.json', 'pyproject.toml', 'CHANGELOG.md', 'action.yml', 'packaging/homebrew/testguard.rb', 'README.md', 'packaging/gitlab/testguard.gitlab-ci.yml']);
+            const RELEASE_SURFACES = new Set(['package.json', 'package-lock.json', 'pyproject.toml', 'CHANGELOG.md', 'action.yml', 'packaging/homebrew/testguard.rb', 'README.md', 'packaging/gitlab/testguard.gitlab-ci.yml', 'docs/testguard-explained.html', 'docs/testguard-explained.pdf']);
 
             if (author === 'dependabot[bot]') {
               const m = /from (\d+)\.(\d+)\.\S+ to (\d+)\.(\d+)\./.exec(pr.title || '');

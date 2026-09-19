@@ -95,6 +95,13 @@ const surfaces = [
   ['README.md', /testguard\/v\d+\.\d+\.\d+\/packaging/g, `testguard/v${version}/packaging`],
   ['packaging/gitlab/testguard.gitlab-ci.yml', /testguard\/v\d+\.\d+\.\d+\/packaging/g, `testguard/v${version}/packaging`],
   ['packaging/gitlab/testguard.gitlab-ci.yml', /(\n    version:\n      description: [^\n]*\n      default: ")\d+\.\d+\.\d+(")/, `$1${version}$2`],
+  // The technical brief's masthead. Nothing rendered it for three releases, so
+  // it still read v0.6 while the tool shipped 0.8.1. The HTML is the surface;
+  // the PDF beside it is a build artifact of this file, which is why the
+  // release runs build-one-pager.mjs --require-chrome straight after the sync.
+  // Sync the two separately and they disagree — the failure that is worse than
+  // being stale, because the document then contradicts itself.
+  ['docs/testguard-explained.html', /(Technical Brief · v)\d+\.\d+\.\d+( · MIT)/, `$1${version}$2`],
 ];
 
 if (listSurfaces) {
