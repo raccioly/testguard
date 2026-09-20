@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-09-20
+
+Automated weekly release — everything merged since `v0.10.1`.
+
+### Changed
+
+- fix(release): publish the live Homebrew tap (#142)
+- chore(homebrew): sha256 for v0.10.1 (#141)
+
+
 ### Fixed
 
 - Releases now publish the registry-verified Homebrew formula to the live
