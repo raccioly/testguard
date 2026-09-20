@@ -127,9 +127,9 @@ raises coverage. TestGuard admits it because it fails when the claim is false.
 | npm | `npm i -D testguard-cli` then `npx testguard probe` |
 | pip | `pip install testguard-cli` then `testguard probe` (needs Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.10.1` — see [`action.yml`](./action.yml) |
+| GitHub Action | `uses: raccioly/testguard@v0.10.2` — see [`action.yml`](./action.yml) |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
-| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.10.1/packaging/gitlab/testguard.gitlab-ci.yml` with `inputs:` — see [`packaging/gitlab/`](./packaging/gitlab/testguard.gitlab-ci.yml) |
+| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.10.2/packaging/gitlab/testguard.gitlab-ci.yml` with `inputs:` — see [`packaging/gitlab/`](./packaging/gitlab/testguard.gitlab-ci.yml) |
 
 Projects that set `min-release-age` in `.npmrc` cannot see a version published
 less than that many days ago (`ENOVERSIONS`); install that one with
@@ -473,12 +473,12 @@ detected base that does not resolve is a warning for `status` and `brief`
 # GitHub Actions
 - uses: actions/checkout@v4
   with: { fetch-depth: 0 }
-- uses: raccioly/testguard@v0.10.1
+- uses: raccioly/testguard@v0.10.2
   with: { command: gate }
 
 # GitLab CI — the component-shaped template: gate + probe, brief as an artifact and, opted in, as a merge-request note
 include:
-  - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.10.1/packaging/gitlab/testguard.gitlab-ci.yml'
+  - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.10.2/packaging/gitlab/testguard.gitlab-ci.yml'
     inputs: { dir: backend, post_note: true }   # post_note needs TESTGUARD_GITLAB_TOKEN (api scope); one note, updated in place
 ```
 
