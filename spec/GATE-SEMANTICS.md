@@ -402,9 +402,14 @@ Rules:
 4. **Never a silent pass on nothing.** A non-empty change whose files were
    all excluded passes with an explicit "0 evaluated" line; a tool offers a
    strict mode that fails it instead. An empty change is an honest `0`.
-5. **The reference is never guessed.** An explicit flag, or a CI-provided base
-   branch, or an error. An upstream that already contains the change has an
-   empty diff and would pass trivially.
+5. **The reference is inferred only from recorded intent.** Resolution stops
+   at the first available source: an explicit flag, `TESTGUARD_CHANGED_REF`, a
+   CI-provided base, the configured remote's symbolic default branch, then a
+   configured upstream whose branch name differs from the current branch.
+   Local discovery never compares a branch to its same-name remote-tracking
+   ref: that ref may already contain the whole change and yield a false empty
+   diff. It also declines to compare the default branch to itself. When Git
+   records no safe local base, the gate exits `3` and asks for `--changed`.
 6. **Unclaimed changes precede every evidence state.** When the status
    document knows a reference and finds uncovered files, its state is
    `unclaimed-changes` and its next action is to write the claim, before any

@@ -16,14 +16,14 @@ export async function gateCommand({ projectDir, values, version }, io) {
     io.out('Non-source files (anything but .js .mjs .cjs .ts .mts .cts .jsx .tsx) are excluded before these patterns apply.');
     return 0;
   }
-  const resolved = resolveChangedRef({ explicit: values.changed });
+  const resolved = resolveChangedRef({ explicit: values.changed, projectDir });
   if (!resolved) {
-    io.err('gate needs a reference to measure the change against: --changed <ref> (e.g. origin/main), or set TESTGUARD_CHANGED_REF. In GitHub Actions and GitLab CI the base branch is detected automatically.');
+    io.err('gate needs a reference to measure the change against: --changed <ref> (e.g. origin/main), or set TESTGUARD_CHANGED_REF. CI bases and a safe local remote default or differently named upstream are detected automatically.');
     return 3;
   }
   const ref = resolved.ref;
   // The gate itself never degrades: a detected reference that does not resolve is exit 2 here, because the gate's whole job is the measurement.
-  if (!resolved.required && !values.json && !values.quiet) io.err(`--changed not given; using ${ref} from ${resolved.from}`);
+  if (!resolved.required && !values.json && !values.quiet) io.err(`gate: comparing against ${ref} (${resolved.from})`);
   const doc = computeChangedGate({
     projectDir,
     ref,

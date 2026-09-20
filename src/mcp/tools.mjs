@@ -29,7 +29,7 @@ const CHANGED = { type: 'string', description: 'A git reference to measure the c
 
 const statusFor = (args) => {
   const projectDir = projectOf(args);
-  return withChangedRef(resolveChangedRef({ explicit: args?.changed }), (changedRef) =>
+  return withChangedRef(resolveChangedRef({ explicit: args?.changed, projectDir }), (changedRef) =>
     computeStatus({ projectDir, toolVersion: args?.__version ?? '0.0.0', changedRef, evidence: evidenceOf(args) }));
 };
 

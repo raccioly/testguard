@@ -50,10 +50,10 @@ export const isDefaultExcluded = (file) => DEFAULT_EXCLUDE_RES.some((re) => re.t
 export const defaultIgnorePath = (projectDir) => join(projectDir, 'testguard.ignore.json');
 
 /**
- * The reference the change is measured against. Explicit flag first, then the
- * environments CI sets, then nothing: a wrong default would make the gate pass
- * trivially (an upstream that already contains the change has an empty diff),
- * so no ref is an error the caller reports, never a silent guess.
+ * The reference the change is measured against. Environment overrides and CI
+ * bases are handled here; local Git discovery is separate because it needs a
+ * project directory and must distinguish a base branch from a feature branch's
+ * same-name tracking ref.
  */
 export function detectChangedRef(env = process.env) {
   if (env.TESTGUARD_CHANGED_REF) return { ref: env.TESTGUARD_CHANGED_REF, from: 'TESTGUARD_CHANGED_REF' };
@@ -68,18 +68,63 @@ export function detectChangedRef(env = process.env) {
   return null;
 }
 
+const tryGit = (args, cwd) => {
+  try {
+    return git(args, cwd) || null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Infer a local change base only when Git records enough intent to do so
+ * without turning an empty feature-branch tracking diff into a false pass.
+ *
+ * The configured upstream selects the remote whose symbolic HEAD we inspect.
+ * Without one, exactly one remote HEAD is unambiguous. A branch never compares
+ * against that remote's same-named branch: on the default branch that asks no
+ * useful question, and on a feature branch its tracking ref may already contain
+ * the entire change. An upstream is a safe fallback only when its branch name
+ * differs from the local branch name (for example topic -> origin/main).
+ */
+export function detectLocalChangedRef(projectDir) {
+  if (!projectDir) return null;
+  const root = tryGit(['rev-parse', '--show-toplevel'], projectDir);
+  if (!root) return null;
+  const branch = tryGit(['symbolic-ref', '--quiet', '--short', 'HEAD'], root);
+  if (!branch) return null;
+
+  const tracking = tryGit(['for-each-ref', '--format=%(upstream:short)%00%(upstream:remotename)', `refs/heads/${branch}`], root);
+  const [upstream, upstreamRemote] = tracking?.split('\0') ?? [];
+  let remote = upstreamRemote && upstreamRemote !== '.' ? upstreamRemote : null;
+
+  const remoteHeads = (tryGit(['for-each-ref', '--format=%(refname)', 'refs/remotes'], root) ?? '')
+    .split('\n')
+    .filter((ref) => ref.endsWith('/HEAD'));
+  if (!remote && remoteHeads.length === 1) remote = remoteHeads[0].slice('refs/remotes/'.length, -'/HEAD'.length);
+
+  const defaultRef = remote
+    ? tryGit(['symbolic-ref', '--quiet', '--short', `refs/remotes/${remote}/HEAD`], root)
+    : null;
+  if (defaultRef && headSha(root, defaultRef) && defaultRef !== `${remote}/${branch}`) return { ref: defaultRef, from: 'remote default branch' };
+  if (upstream && headSha(root, upstream) && upstream !== `${upstreamRemote}/${branch}`) return { ref: upstream, from: 'branch upstream' };
+  return null;
+}
+
 /**
  * Resolve the reference a command should measure against, and whether it may
  * be dropped on failure. An explicit `--changed` is the user's word: if it
- * does not resolve, that is an error. A reference detected from CI variables
- * is a convenience: if it does not resolve (shallow clone, temp directory,
- * no remote) the command says so on stderr and continues without a change
- * measurement, because `status` and `brief` must keep working everywhere.
+ * does not resolve, that is an error. An automatically detected reference is
+ * a convenience: if it does not resolve (shallow clone, stale local metadata,
+ * or a temp directory) the command says so on stderr and continues without a
+ * change measurement, because `status` and `brief` must keep working everywhere.
  */
-export function resolveChangedRef({ explicit, env = process.env } = {}) {
+export function resolveChangedRef({ explicit, env = process.env, projectDir } = {}) {
   if (explicit) return { ref: explicit, from: '--changed', required: true };
   const d = detectChangedRef(env);
-  return d ? { ...d, required: false } : null;
+  if (d) return { ...d, required: false };
+  const local = detectLocalChangedRef(projectDir);
+  return local ? { ...local, required: false } : null;
 }
 
 /**

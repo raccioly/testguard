@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { computeChangedGate, changedFiles, detectChangedRef, DEFAULT_EXCLUDES } from '../src/gate/changed.mjs';
+import { computeChangedGate, changedFiles, detectChangedRef, detectLocalChangedRef, DEFAULT_EXCLUDES } from '../src/gate/changed.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { readSpecDoc } from '../src/evidence/writer.mjs';
 import { main } from '../src/cli.mjs';
@@ -170,7 +170,7 @@ describe('gate --changed: claim coverage of a change', () => {
     expect(c.lines.err.join('\n')).toMatch(/cannot resolve --changed no-such-ref/);
 
     const saved = { ...process.env };
-    delete process.env.TESTGUARD_CHANGED_REF; delete process.env.GITHUB_BASE_REF; delete process.env.CI_MERGE_REQUEST_TARGET_BRANCH_NAME;
+    delete process.env.TESTGUARD_CHANGED_REF; delete process.env.GITHUB_BASE_REF; delete process.env.CI_MERGE_REQUEST_DIFF_BASE_SHA; delete process.env.CI_MERGE_REQUEST_TARGET_BRANCH_NAME;
     try {
       const d = capture();
       expect(await main(['gate', r.project], d.io)).toBe(3);
@@ -200,6 +200,56 @@ describe('detectChangedRef', () => {
     expect(detectChangedRef({ CI_MERGE_REQUEST_DIFF_BASE_SHA: 'a'.repeat(40), CI_MERGE_REQUEST_TARGET_BRANCH_NAME: 'release' })).toEqual({ ref: 'a'.repeat(40), from: 'CI_MERGE_REQUEST_DIFF_BASE_SHA' });
     expect(detectChangedRef({ CI_MERGE_REQUEST_DIFF_BASE_SHA: '0'.repeat(40), CI_MERGE_REQUEST_TARGET_BRANCH_NAME: 'release' })).toEqual({ ref: 'origin/release', from: 'CI_MERGE_REQUEST_TARGET_BRANCH_NAME' });
     expect(detectChangedRef({})).toBeNull();
+  });
+});
+
+describe('detectLocalChangedRef', () => {
+  it('uses a remote default from a feature branch, but never the current branch\'s same-name remote', () => {
+    const r = repo();
+    try {
+      r.g('branch', '-M', 'main');
+      r.g('remote', 'add', 'origin', 'https://example.invalid/repo.git');
+      r.g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+      r.g('symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main');
+      expect(detectLocalChangedRef(r.project)).toBeNull();
+
+      r.g('switch', '-q', '-c', 'feature');
+      r.g('update-ref', 'refs/remotes/origin/feature', 'HEAD');
+      r.g('branch', '--set-upstream-to', 'origin/feature');
+      expect(detectLocalChangedRef(r.project)).toEqual({ ref: 'origin/main', from: 'remote default branch' });
+
+      r.g('update-ref', '-d', 'refs/remotes/origin/main');
+      expect(detectLocalChangedRef(r.project)).toBeNull();
+      r.g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+      r.g('symbolic-ref', '--delete', 'refs/remotes/origin/HEAD');
+      expect(detectLocalChangedRef(r.project)).toBeNull();
+      r.g('branch', '--set-upstream-to', 'origin/main');
+      expect(detectLocalChangedRef(r.project)).toEqual({ ref: 'origin/main', from: 'branch upstream' });
+    } finally {
+      rmSync(r.root, { recursive: true, force: true });
+    }
+  });
+
+  it('makes a bare gate work in an ordinary clone and says how the base was chosen', async () => {
+    const r = repo();
+    const saved = { ...process.env };
+    try {
+      delete process.env.TESTGUARD_CHANGED_REF; delete process.env.GITHUB_BASE_REF; delete process.env.CI_MERGE_REQUEST_DIFF_BASE_SHA; delete process.env.CI_MERGE_REQUEST_TARGET_BRANCH_NAME;
+      r.g('branch', '-M', 'main');
+      r.g('remote', 'add', 'origin', 'https://example.invalid/repo.git');
+      r.g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+      r.g('symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main');
+      r.g('switch', '-q', '-c', 'feature');
+      r.write('src/newfeature.mjs', 'export const f = () => 1;\n');
+      const a = capture();
+      expect(await main(['gate', r.project, '--include-dirty'], a.io)).toBe(1);
+      expect(a.lines.err).toEqual(['gate: comparing against origin/main (remote default branch)']);
+      expect(a.lines.out.join('\n')).toMatch(/UNCLAIMED\s+src\/newfeature\.mjs/);
+    } finally {
+      for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
+      Object.assign(process.env, saved);
+      rmSync(r.root, { recursive: true, force: true });
+    }
   });
 });
 

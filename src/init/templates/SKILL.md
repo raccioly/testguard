@@ -21,7 +21,7 @@ which files exist. `state` is one of:
 | state | meaning | you do |
 |---|---|---|
 | `no-claims` | no `testguard.claims.json` | `testguard scaffold <file>` for a file with guards; replace every `TODO:` statement with what the code guarantees; keep or drop each proposal; move the claims into `testguard.claims.json` |
-| `unclaimed-changes` | files you changed carry no claim (only when a reference is known: `--changed <ref>`, or CI's base branch) | `next.file` names the first; `testguard scaffold <file>` and state the claim, or add a `testguard.ignore.json` path entry with a reason a reviewer will accept. **Before** writing more code. |
+| `unclaimed-changes` | files you changed carry no claim (when a reference is explicit, supplied by CI, or safely inferred from local Git's remote default/upstream metadata) | `next.file` names the first; `testguard scaffold <file>` and state the claim, or add a `testguard.ignore.json` path entry with a reason a reviewer will accept. **Before** writing more code. |
 | `invalid-anchors` | an exact fault anchor moved or became ambiguous | run `testguard claims --check-anchors`; repair `next.target` in the claims file without changing what the fault means, then re-probe. Never guess or auto-fix an anchor. |
 | `unprobed` | claims never probed | `testguard probe` |
 | `evidence-stale` | code, tests or claims changed since the evidence | `testguard probe --include-dirty` (or `--claim <ID>` for one) |

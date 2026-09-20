@@ -671,7 +671,7 @@
     },
     {
       "id": "TG-CHANGED-REF-EXPLICIT-IS-REQUIRED",
-      "statement": "An explicit --changed reference that does not resolve is an error; only a reference detected from CI variables may be dropped, with a warning.",
+      "statement": "An explicit --changed reference that does not resolve is an error; only an automatically detected reference may be dropped, with a warning.",
       "source": {
         "kind": "spec",
         "ref": "spec/GATE-SEMANTICS.md#claim-coverage-of-a-change"
@@ -697,6 +697,64 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CHANGED-REF-LOCAL-IS-SAFE",
+      "statement": "Without an explicit, environment or CI base, change coverage uses a configured remote's default branch or a differently named upstream, but never the current branch's same-name tracking ref.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#claim-coverage-of-a-change"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-20T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/gate.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The default branch is allowed to compare against its own remote-tracking ref, producing an empty diff.",
+          "faultClass": "condition-forced",
+          "file": "src/gate/changed.mjs",
+          "find": "if (defaultRef && headSha(root, defaultRef) && defaultRef !== `${remote}/${branch}`) return { ref: defaultRef, from: 'remote default branch' };",
+          "replace": "if (defaultRef && headSha(root, defaultRef)) return { ref: defaultRef, from: 'remote default branch' };",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-20T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A feature branch's same-name tracking ref is accepted as its base, hiding the whole pushed change.",
+          "faultClass": "condition-forced",
+          "file": "src/gate/changed.mjs",
+          "find": "if (upstream && headSha(root, upstream) && upstream !== `${upstreamRemote}/${branch}`) return { ref: upstream, from: 'branch upstream' };",
+          "replace": "if (upstream && headSha(root, upstream)) return { ref: upstream, from: 'branch upstream' };",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-20T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Local Git discovery is bypassed, restoring the bare gate's usage failure in ordinary feature-branch clones.",
+          "faultClass": "return-altered",
+          "file": "src/gate/changed.mjs",
+          "find": "  const local = detectLocalChangedRef(projectDir);",
+          "replace": "  const local = null;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-20T00:00:00Z"
           }
         }
       ]
