@@ -460,9 +460,17 @@ state when an exact fault anchor is missing or ambiguous, and points at the
 fault definition to repair. Repair preserves the fault's meaning and requires
 a re-probe; there is deliberately no `--fix`.
 
-**In CI the base is detected** — GitHub Actions (`GITHUB_BASE_REF`) and GitLab
+**The base is detected when Git records it.** An explicit `--changed` wins,
+then `TESTGUARD_CHANGED_REF`, GitHub Actions (`GITHUB_BASE_REF`) and GitLab
 merge request pipelines (`CI_MERGE_REQUEST_DIFF_BASE_SHA`, then
-`CI_MERGE_REQUEST_TARGET_BRANCH_NAME`); `TESTGUARD_CHANGED_REF` overrides both.
+`CI_MERGE_REQUEST_TARGET_BRANCH_NAME`). In an ordinary clone on a feature
+branch, bare `testguard gate` uses the configured remote's symbolic default
+branch (normally `origin/main`) and says how it chose it. If that symbolic ref
+is absent, a configured upstream is used only when its branch name differs
+from the current branch. A feature branch's same-name tracking ref and the
+default branch itself are never selected: either could produce a misleading
+empty diff. In those ambiguous cases, pass `--changed` explicitly.
+
 The base must exist locally: GitHub — `actions/checkout` with `fetch-depth: 0`;
 GitLab — the diff base sha needs nothing extra on a merge request pipeline,
 the branch name needs `GIT_DEPTH: 0` or a `git fetch origin <target>`. A

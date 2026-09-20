@@ -106,7 +106,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
   const g = gate(evidence.records, baseline, { severityFloor: values.severity });
   const scope = partialScope(only, evidence.records);
   if (values.json) {
-    const status = withChangedRef(resolveChangedRef({ explicit: values.changed }), (changedRef) => computeStatus({ projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'], evidence: outPath }), io.err);
+    const status = withChangedRef(resolveChangedRef({ explicit: values.changed, projectDir }), (changedRef) => computeStatus({ projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'], evidence: outPath }), io.err);
     const doc = { ...status, run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode: g.new.length > 0 ? 1 : 0, ...(scope ? { scope } : {}) }, ...(values.cost ? { cost: costReport(evidence.records) } : {}) };
     const result = validate('status', doc);
     if (!result.ok) throw new Error(`probe JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);

@@ -2,7 +2,7 @@
 
 <!-- docguard:version 1.0.0 -->
 <!-- docguard:status approved -->
-<!-- docguard:last-reviewed 2026-09-18 -->
+<!-- docguard:last-reviewed 2026-09-20 -->
 <!-- docguard:owner @raccioly -->
 <!-- docguard:quality negation-load off — the environment is defined by absences: no required variables, no secrets, no network, no service. -->
 <!-- docguard:quality passive-voice off — setup steps describe what is read and written, not who reads and writes it. -->
@@ -28,7 +28,7 @@ None are required. All are optional overrides.
 | Variable | Read by | Effect |
 |---|---|---|
 | `TESTGUARD_NODE_MODULES` | `probe` | `node_modules` to link into the scratch worktree; same as `--node-modules` |
-| `TESTGUARD_CHANGED_REF` | `gate`, `status --changed` | The reference a change is measured against; overrides CI detection |
+| `TESTGUARD_CHANGED_REF` | `gate`, `status --changed` | The reference a change is measured against; overrides CI and local Git detection |
 | `GITHUB_BASE_REF` | `gate` | GitHub Actions pull requests: the base branch |
 | `CI_MERGE_REQUEST_DIFF_BASE_SHA` | `gate` | GitLab merge request pipelines: exact diff base, needs no fetch |
 | `CI_MERGE_REQUEST_TARGET_BRANCH_NAME` | `gate` | GitLab fallback when the diff base sha is absent |
@@ -36,6 +36,16 @@ None are required. All are optional overrides.
 
 The tool sets `PLAYWRIGHT_JSON_OUTPUT_FILE` and `FORCE_COLOR=0` on the
 processes it spawns. It reads no secret, no token and no credential.
+
+## Local Git Discovery
+
+Without an explicit, environment or CI reference, TestGuard reads only local
+Git metadata. On a feature branch it prefers the configured remote's symbolic
+default branch, such as `origin/main`. If that ref is absent, it accepts the
+branch's configured upstream only when the upstream branch name differs from
+the current branch name. It never contacts the remote, never compares the
+default branch to itself, and never treats `origin/feature` as the base of a
+local `feature` branch; those ambiguous cases require `--changed`.
 
 ## Configuration Files
 

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Bare `testguard gate` now discovers an ordinary clone's remote default
+  branch and reports how it chose the comparison. It still fails closed on
+  ambiguous Git state: the default branch is not compared to itself, and a
+  feature branch's same-name tracking ref is never accepted as its base.
+
 ## [0.10.2] - 2026-09-20
 
 Automated weekly release — everything merged since `v0.10.1`.
