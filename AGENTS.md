@@ -1,6 +1,6 @@
 # AI Agent Instructions — TestGuard
 
-<!-- docguard:last-reviewed 2026-09-18 -->
+<!-- docguard:last-reviewed 2026-09-19 -->
 
 Read this before changing anything. It is short on purpose.
 
@@ -63,7 +63,9 @@ node cli/testguard.mjs scaffold src/probe/classify.mjs --json   # what the produ
 
 Dependabot minor/patch PRs and automated release PRs auto-merge when the exact
 CI run is green on all three Node legs. Majors and anything else wait for a
-human. Release publishing is OIDC-only; there are no tokens in this repo.
+human. npm and PyPI publishing is OIDC-only; Homebrew uses a dedicated SSH
+deploy key scoped only to `raccioly/homebrew-tap`. There are no personal or
+registry tokens in this repo.
 
 <!-- testguard:begin -->
 ## TestGuard

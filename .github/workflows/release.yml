@@ -1,8 +1,9 @@
-name: Auto Release — Tag, GitHub Release, npm, PyPI
+name: Auto Release — GitHub, npm, PyPI, Homebrew
 
 # TAG-DRIVEN and idempotent: a version needs releasing iff no tag v<version>
-# exists. Re-runs never double-publish. No long-lived secrets anywhere —
-# npm and PyPI both authenticate with OIDC Trusted Publishing.
+# exists. Re-runs never double-publish. npm and PyPI authenticate with OIDC
+# Trusted Publishing. Homebrew uses one long-lived SSH deploy key scoped only
+# to the distribution tap; it cannot access this repository or any other one.
 #
 # ONE-TIME SETUP (maintainer, cannot be automated):
 #   npm:  the first `npm publish` of testguard-cli is manual (Trusted Publishing
@@ -12,6 +13,9 @@ name: Auto Release — Tag, GitHub Release, npm, PyPI
 #   PyPI: pypi.org → Your account → Publishing → add a PENDING publisher for
 #         project testguard-cli: owner raccioly, repo testguard, workflow
 #         release.yml, environment pypi. The first release creates the project.
+#   Brew: add a write deploy key named testguard-release-homebrew-tap to
+#         raccioly/homebrew-tap and store its private half here as the Actions
+#         secret HOMEBREW_TAP_DEPLOY_KEY.
 
 on:
   workflow_dispatch: # manual recovery
@@ -231,15 +235,17 @@ jobs:
     # for byte from `npm pack` — after npm serves it (a publish is `PUT 202`;
     # the file can take minutes to appear, so the script polls, bounded).
     #
-    # It cannot commit to main: branch protection requires the three CI legs
-    # on every commit and github-actions[bot] is no admin. So the one-line
-    # change lands as a bot PR with native auto-merge armed, and this job
-    # dispatches ci.yml on the branch itself — a PR opened with GITHUB_TOKEN
-    # gets no pull_request run, but workflow_dispatch is the documented
-    # exception. The PR's own runs may still appear held for first-time-
-    # contributor approval, so this job clears those holds before returning.
-    # That also means the merge triggers nothing here; the hourly sweep
-    # observes the merged formula and finds brew_missing=false.
+    # The validated formula is also copied to the live raccioly/homebrew-tap
+    # repository with a write deploy key scoped only to that tap. The source
+    # copy cannot commit to main directly: branch protection requires the
+    # three CI legs on every commit and github-actions[bot] is no admin. So
+    # that one-line change lands as a bot PR with native auto-merge armed, and
+    # this job dispatches ci.yml on the branch itself — a PR opened with
+    # GITHUB_TOKEN gets no pull_request run, but workflow_dispatch is the
+    # documented exception. The PR's own runs may still appear held for
+    # first-time-contributor approval, so this job clears those holds before
+    # returning. That also means the merge triggers nothing here; the hourly
+    # sweep observes the merged source formula and finds brew_missing=false.
     #
     # Idempotent: an existing branch is reused, an existing open PR is left
     # alone (CI re-dispatched only if its head has no check runs), a closed
@@ -265,9 +271,10 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-      - name: Set sha256 from the published tarball; land it as an auto-merging PR
+      - name: Set sha256, publish the live tap, and land the source formula PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
         run: |
           set -euo pipefail
           VERSION="${{ needs.detect-version.outputs.version }}"
@@ -289,6 +296,11 @@ jobs:
           # Post-condition: the file now on disk matches the tarball, and no
           # other surface drifted. Nothing is pushed unless this passes.
           node .github/scripts/sync-release-version.mjs --check --online
+
+          # Homebrew users install from raccioly/homebrew-tap, not this staged
+          # copy. Publish the exact formula that passed the online check. The
+          # helper is idempotent and fails closed if the tap cannot be updated.
+          .github/scripts/publish-homebrew-tap.sh "$VERSION"
 
           if git diff --quiet -- packaging/homebrew/testguard.rb; then
             echo "✅ $BRANCH already carries the published sha256"

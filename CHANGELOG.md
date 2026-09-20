@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Releases now publish the registry-verified Homebrew formula to the live
+  `raccioly/tap` repository with a dedicated, tap-scoped deploy key. The
+  release fails closed if that copy cannot be made, instead of updating only
+  the staging formula in this repository while users remain on an old version.
+
+### Changed
+
+- The self-probe cost budget is 1440 s, from 1230. The cold v0.10.1 release
+  measured 1210 s before the four-fault live-tap claim added about 53 s; 1440
+  restores the established ~14% CI headroom. The 100 s per-claim ceiling is
+  unchanged, so an individually expensive claim still fails the gate.
+
 ## [0.10.1] - 2026-09-19
 
 Automated weekly release — everything merged since `v0.10.0`.

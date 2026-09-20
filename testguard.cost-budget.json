@@ -1,6 +1,6 @@
 {
   "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine.",
-  "seconds": 1230,
+  "seconds": 1440,
   "measured": {
     "seconds": 816,
     "at": "2026-09-18",
@@ -10,7 +10,7 @@
     "how": "probe . --include-dirty --budget 180000 --cost, from scratch, idle developer machine, after the shared-defender cut",
     "note": "LOCAL. Not comparable with measuredInCI and not what this budget is set from. The previous local from-scratch figure (1168 s, 129 faults) was taken on a contended machine, so 1168 -> 816 overstates the cut."
   },
-  "headroom": "The local figure (804 s) is what a developer sees; the CI figure (906 s before #82, 962 s after) is what the check runs against, and a CI runner is ~13% slower than the idle machine above. The first budget was 18% over the LOCAL figure and only 4.6% over the CI one, so the first PR to add any claim tripped it. 1100 is ~14% over the CI measurement: an ordinary run never flaps; a 59-to-91 style jump (+76%) still fails. Budget against the from-scratch CI number, never a run that reused verdicts — the release job probes from scratch.",
+  "headroom": "The v0.10.1 release job measured 1210 s from scratch at 154 faults. TG-HOMEBREW-TAP-IS-PUBLISHED deliberately adds four integration-defended faults measured at 53 s on the Node 22 PR leg, for an expected cold total near 1263 s. 1440 is ~14% above that figure: enough for normal CI variance, while a 59-to-91 style jump (+76%) still fails. Budget against the from-scratch release job, never a pull-request run that may reuse verdicts.",
   "history": [
     {
       "seconds": 950,
@@ -31,21 +31,26 @@
       "seconds": 1230,
       "at": "2026-09-18",
       "why": "Tightened from 1350 once a FROM-SCRATCH figure existed. 1350 was set defensively against a reuse-affected 1123 s, because this budget is defined against a from-scratch probe and none had run yet. release.yml then measured 1081 s at 129 faults / 774 runs on the v0.9.0 release commit with no reuse: 129 faults cost 1081 s against 115 faults at 999 s, so +82 s for +14 faults. 1230 is ~14% over 1081, the same headroom rule that set 1100 against 962. Leaving 1350 in place would have let a 25% regression pass unnoticed, which is the opposite of what this file is for."
+    },
+    {
+      "seconds": 1440,
+      "at": "2026-09-19",
+      "why": "The v0.10.1 release job supplied the next from-scratch measurement: 1210 s at 154 faults / 924 runs on 70e9d61. The old 1230 s ceiling therefore had only 1.7% headroom before this PR. The live-Homebrew-tap field fix adds one integration-defended claim, four faults and 24 runs; the Node 22 PR leg measured that claim at 53 s and the total at 1243 s with verdict reuse. Adding the deliberate 53 s to the cold release baseline projects ~1263 s. 1440 restores the established ~14% CI headroom without changing the 100 s per-claim ceiling."
     }
   ],
   "measuredInCI": {
-    "seconds": 1081,
-    "at": "2026-09-18",
-    "run": "35400415299",
-    "commit": "3780e6e",
-    "faults": 129,
-    "runs": 774,
-    "how": "release.yml test: probe . --budget 180000 --cost, from scratch on the v0.9.0 release commit. No verdict reuse, which is what this budget is defined against.",
+    "seconds": 1210,
+    "at": "2026-09-19",
+    "run": "35475285844",
+    "commit": "70e9d61",
+    "faults": 154,
+    "runs": 924,
+    "how": "release.yml test: probe . --budget 180000 --cost, from scratch on the v0.10.1 release commit. No verdict reuse, which is what this budget is defined against.",
     "before": {
-      "seconds": 999,
-      "commit": "8ddad99",
-      "faults": 115,
-      "note": "the same job at 115 faults, before the six field-report claims"
+      "seconds": 1081,
+      "commit": "3780e6e",
+      "faults": 129,
+      "note": "the v0.9.0 release job, before the v0.10 adoption claims"
     },
     "reuseAffected": {
       "observed": [
@@ -76,7 +81,7 @@
         "why": "faults classifyReplay(), pure; same file"
       }
     ],
-    "expectedInCI": "~145 s off the CI figure, so ~935 s against the 1081 s measured at 129 faults — with three MORE faults. Confirm against the next release job, which probes from scratch, and tighten `seconds` to ~14% over it then. Do not tighten from a local run.",
+    "expectedInCI": "The projected ~145 s cut was real, but later behavior coverage spent the savings: v0.10.1 measured 1210 s from scratch at 154 faults. Future cuts must be confirmed against a release job and must not trade end-to-end coverage for seconds.",
     "remaining": "The eight claims still on negative-control.test.mjs and replay.test.mjs fault probe.mjs, the runners and git-walking code, where the expensive fixture is the point. Forcing those onto unit tests would trade real end-to-end coverage for seconds.",
     "rule": "A claim whose fault lands in a pure module should have a pure defender. All three cuts above fit that shape, and so did the 51 s calibration claim before them. This is mechanically checkable — compare the imports of the faulted file against those of its defenders — and is the shape of a future `claims --lint`."
   },

@@ -786,6 +786,82 @@
       ]
     },
     {
+      "id": "TG-HOMEBREW-TAP-IS-PUBLISHED",
+      "statement": "A release publishes the exact registry-verified Homebrew formula to the live raccioly/tap repository before the source-formula PR can complete. The publisher rejects a release/formula version mismatch, pushes the validated file with a tap-scoped deploy key, verifies the remote copy, and is idempotent on retry; staging a formula only inside this repository is never considered a completed Homebrew release.",
+      "source": {
+        "kind": "manual",
+        "ref": "v0.10.1 Homebrew tap field report"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-19T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/release-sync.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The release workflow stops invoking the live-tap publisher and once again updates only its staged source formula.",
+          "faultClass": "statement-deleted",
+          "file": ".github/workflows/release.yml",
+          "find": "          .github/scripts/publish-homebrew-tap.sh \"$VERSION\"",
+          "replace": "          echo \"live tap publish skipped\"",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The publisher treats every tap as already current, so a stale live formula is never copied or pushed.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/publish-homebrew-tap.sh",
+          "find": "if cmp -s \"$SOURCE_FORMULA\" \"$TAP_FORMULA\"; then",
+          "replace": "if true; then",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The release/formula version agreement check is bypassed, allowing one release to overwrite the tap with another version.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/publish-homebrew-tap.sh",
+          "find": "[[ \"$FORMULA_VERSION\" = \"$VERSION\" ]] || fail \"formula version $FORMULA_VERSION does not match release $VERSION\"",
+          "replace": "true || fail \"formula version $FORMULA_VERSION does not match release $VERSION\"",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The publisher prepares and commits the formula locally but never pushes it to the live tap.",
+          "faultClass": "statement-deleted",
+          "file": ".github/scripts/publish-homebrew-tap.sh",
+          "find": "git -C \"$TAP_DIR\" push --quiet origin HEAD:main",
+          "replace": "echo \"live tap push skipped\"",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-19T00:00:00Z"
+          }
+        }
+      ],
+      "tags": [
+        "release",
+        "homebrew",
+        "automation"
+      ]
+    },
+    {
       "id": "TG-SCAFFOLD-FIELD-DROP-COMPLETE-LINE",
       "statement": "scaffold proposes field-dropped only for a line that can be removed on its own: balanced brackets, and comma-terminated or followed by the closer. A multi-line property is never proposed.",
       "source": {

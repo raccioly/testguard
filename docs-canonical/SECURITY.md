@@ -2,9 +2,9 @@
 
 <!-- docguard:version 1.0.0 -->
 <!-- docguard:status approved -->
-<!-- docguard:last-reviewed 2026-09-18 -->
+<!-- docguard:last-reviewed 2026-09-19 -->
 <!-- docguard:owner @raccioly -->
-<!-- docguard:quality negation-load off — a security posture is a list of things that must not happen: no network, no secrets, no tokens, no telemetry. Stating them positively would weaken them. -->
+<!-- docguard:quality negation-load off — a security posture is a list of things that must not happen: no runtime network, no CLI secrets, no registry tokens, no telemetry. Stating them positively would weaken them. -->
 <!-- docguard:quality passive-voice off — threat and control statements name what is protected, not who protects it; the actor is the system throughout. -->
 
 > Canonical. Code that contradicts this document is drift.
@@ -27,8 +27,14 @@ happens in CI, never on a developer machine:
 | npm | OIDC Trusted Publishing | none |
 | PyPI | OIDC Trusted Publishing (environment `pypi`) | none |
 | GitHub releases | `GITHUB_TOKEN`, scoped to the run | none stored |
+| Homebrew tap | SSH deploy key scoped to `raccioly/homebrew-tap` | `HOMEBREW_TAP_DEPLOY_KEY` |
 
-There are no tokens in this repository to rotate or leak.
+npm and PyPI have no registry tokens to rotate or leak. Homebrew publishing
+uses one stored credential: a dedicated Ed25519 deploy key whose public half
+has write access only to `raccioly/homebrew-tap` and whose private half is the
+`HOMEBREW_TAP_DEPLOY_KEY` Actions secret in this repository. It is not a
+personal key and cannot access another repository. Rotate it by replacing both
+the tap deploy key and the Actions secret.
 
 ## Authorization
 
@@ -53,8 +59,11 @@ guarantees are about **what the tool is allowed to touch**:
 
 ## Secrets Management
 
-TestGuard neither reads nor stores secrets. It has no credential file, no
-keychain access and no environment variable holding a secret.
+The TestGuard CLI neither reads nor stores secrets. It has no credential file,
+no keychain access and no environment variable holding a secret. The release
+workflow is the deliberate exception: its Homebrew step receives the
+tap-scoped deploy key only while it copies a registry-verified formula to the
+distribution repository. npm and PyPI publishing remain OIDC-only.
 
 Two consequences worth stating for reviewers:
 

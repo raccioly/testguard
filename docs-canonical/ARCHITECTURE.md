@@ -85,7 +85,7 @@ other tools, and it must remain portable out of this repository.
 | Supported runners | vitest, jest (project runners); Playwright (per file) | They share a JSON report shape; Playwright is selected per file, not per project |
 | Schemas | JSON Schema 2020-12 | Readable without the tool; portable to other languages |
 | Distribution | npm, PyPI, Homebrew, GitHub Action, pre-commit, GitLab component | Meet teams in the pipeline they already run |
-| Publishing | OIDC Trusted Publishing | No long-lived tokens exist to leak or rotate |
+| Publishing | OIDC for npm/PyPI; tap-scoped SSH deploy key for Homebrew | Registry credentials remain tokenless; the only stored publishing secret cannot access any repository except the tap |
 
 ## Configuration Files
 
@@ -101,7 +101,7 @@ appears here but not on disk, or on disk but not here, is drift.
 | `.pre-commit-hooks.yaml` | Hook definitions **we publish for consumers** of TestGuard — a different file for a different audience | consumers' `.pre-commit-config.yaml` |
 | `action.yml` | The GitHub Action surface; `version` input synced from `package.json` | consumers' workflows |
 | `packaging/gitlab/testguard.gitlab-ci.yml` | The GitLab component; tag and `TESTGUARD_VERSION` synced | consumers' pipelines |
-| `packaging/homebrew/testguard.rb` | The Homebrew formula; tarball URL synced | `raccioly/homebrew-tap` |
+| `packaging/homebrew/testguard.rb` | The staged Homebrew formula; tarball URL and registry-derived hash synced, then copied byte-for-byte | `raccioly/homebrew-tap` |
 | `.docguard.json`, `.docguardignore` | Which canonical documents exist and which validators run | DocGuard, in CI and pre-commit |
 | `.npmrc`, `.npmignore`, `.gitattributes` | Packaging and line-ending hygiene | npm, git |
 
@@ -115,7 +115,7 @@ and no license server.
 | `ajv` (npm, bundled) | Validate every document against the spec | none — local | Install-time only; the install smoke gate catches a missing runtime dep |
 | `git` (system binary) | Worktree isolation, diffs, snapshots, patch ids | none — local | Precondition failure with a stated reason, exit 2 |
 | The project's test runner | Runs the defenders | none — local | Precondition failure, exit 2; never a verdict about a claim |
-| npm / PyPI registries | Distribution only | build time | A publish fails; the tool itself never calls them at run time |
+| npm / PyPI registries and Homebrew tap | Distribution only | build time | A publish fails; the tool itself never calls them at run time |
 
 ## Infrastructure (IaC)
 
@@ -133,8 +133,8 @@ to every other surface and `--check` fails the build on drift.
 |---|---|---|
 | Pull request | `ci.yml` | Suite on Node 20/22/24, syntax check of every source, install-from-tarball smoke, Python wrapper import, fixture oracles for vitest and jest, Playwright job, change gate, removed-claim check, anchor/replacement preflight before self-probe |
 | Release gate | `ci.yml` | TestGuard probes its own claims; every fault must be killed |
-| Merge to main | `release.yml` | A version with no tag is tagged, released, and published to npm and PyPI over OIDC |
-| Recovery | `release.yml` | Hourly sweep; each registry is gated on its own state, so a partial publish is fixed by re-running |
+| Merge to main | `release.yml` | A version with no tag is tagged, released, and published to npm and PyPI over OIDC; the verified formula is pushed to the live Homebrew tap with its repository-scoped deploy key |
+| Recovery | `release.yml` | Hourly sweep; each registry and the formula hash are gated on their own state, so a partial publish is fixed by re-running |
 
 ## Diagrams
 

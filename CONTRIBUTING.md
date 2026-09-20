@@ -79,12 +79,16 @@ on the fault.
 `package.json` is the single source of truth for the version;
 `.github/scripts/sync-release-version.mjs` propagates it. A weekly workflow
 opens a release PR; merging it tags and publishes to npm and PyPI via OIDC
-Trusted Publishing. There are no tokens to rotate.
+Trusted Publishing. There are no npm or PyPI tokens to rotate. Homebrew uses a
+dedicated SSH deploy key that can write only to `raccioly/homebrew-tap`; its
+private half is stored as the `HOMEBREW_TAP_DEPLOY_KEY` Actions secret.
 
 The Homebrew formula's `sha256` is the one surface that cannot be known before
 publishing: `release.yml` sets it after `npm publish`, from the registry
-tarball (`sync-release-version.mjs --sha256`), and lands it as a bot PR with
-auto-merge armed — `main` is protected, so no job commits to it directly.
+tarball (`sync-release-version.mjs --sha256`), copies that verified formula
+byte-for-byte to the live tap, and lands the source copy as a bot PR with
+auto-merge armed — this repository's `main` is protected, so no job commits to
+it directly.
 `--check` (offline) refuses a placeholder hash; `--check --online` compares
 against the tarball and is what decides, on every hourly sweep, whether the
 formula is still owed.
