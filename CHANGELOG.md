@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-09-20
+
+Automated weekly release — everything merged since `v0.10.2`.
+
+### Changed
+
+- fix(gate): infer safe local change base (#145)
+- chore(homebrew): sha256 for v0.10.2 (#144)
+
+
 ### Fixed
 
 - Bare `testguard gate` now discovers an ordinary clone's remote default
