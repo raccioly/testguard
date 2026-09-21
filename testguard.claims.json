@@ -4402,6 +4402,49 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-PERSISTENCE-SIGNAL-READS-ONE-CALL",
+      "statement": "The persistence signal reads one assertion's own arguments: a partial matcher in a LATER assertion never makes an earlier exact one count as partial, and the signal is silent about a defender that mocks no persistence layer.",
+      "source": {
+        "kind": "manual",
+        "ref": "src/supply/persistence.mjs payloadAssertions"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-21T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/supply-persistence.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A fixed-width window reads past the assertion, so the next assertion's expect.objectContaining makes this one partial — the measured bug this scan was rewritten to remove.",
+          "faultClass": "return-altered",
+          "file": "src/supply/persistence.mjs",
+          "find": "    if (depth === 0) return source.slice(open + 1, i);",
+          "replace": "    if (depth === 0) return source.slice(open + 1, open + 601);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Every defender is reported, including one that mocks no persistence layer at all.",
+          "faultClass": "statement-deleted",
+          "file": "src/supply/persistence.mjs",
+          "find": "  if (mocks.length === 0) return null;",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
     }
   ]
 }

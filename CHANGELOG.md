@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`src/supply/persistence.mjs`).
 - `urn:claimspec:v1:sweep` — the sweep document, with semantic rules that check
   a cap never hides its own remainder.
+- Five self-claims (8 faults) covering the cap arithmetic, the exit-code rule,
+  where the persistence signal may be attached, per-file cap fairness, and that
+  one assertion's arguments are read without reading the next one's.
 
 ## [0.10.4] - 2026-09-21
 

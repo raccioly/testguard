@@ -46,6 +46,13 @@
     },
     {
       "kind": "path",
+      "pattern": "test/sweep.fixture.test.mjs",
+      "reason": "Acceptance oracle for the sweep verb end to end: a real repository, a real change and a real runner. It remains mandatory in npm test and CI, but naming it as a self-claim defender would add roughly twenty seconds per fault to claims whose logic is already probed through focused unit defenders, and it would not detect the faults those claims carry. Same trade as test/probe.fixture.test.mjs.",
+      "by": "maintainer",
+      "at": "2026-09-21T00:00:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "src/probe/runners/python/**",
       "reason": "The injected Python reporters. They are not JavaScript, so a claim here could only be probed by running TestGuard's Python runner against TestGuard itself — circular, and it would prove the runner with the runner. They are instead held to fixtures/known-answer-python, whose sixteen verdicts were verified by hand against `python -m unittest`'s own exit code and must reproduce under BOTH engines: any behaviour change in a reporter moves a verdict there, in CI, on every push. Re-evaluate if they gain logic the fixture cannot reach.",
       "by": "maintainer",
