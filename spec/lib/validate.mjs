@@ -7,7 +7,7 @@ import { reproduces, decimals, MAX_PLACES } from './wilson.mjs';
 
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 
-export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate', 'replay']);
+export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate', 'replay', 'sweep']);
 /**
  * How a document says it tried to falsify its claims. Absent means
  * `fault-injection`, so every document written before the field existed is
@@ -302,6 +302,48 @@ const semantic = {
       if (c.by !== 'ignore' && !c.claimIds?.length) errors.push({ path: `/covered/${i}/claimIds`, message: `a file covered by a ${c.by} must name the claim(s)` });
     });
     for (const e of doc.expired) if (!e.expires) errors.push({ path: '/expired', message: `expired entry "${e.pattern}" has no expires instant` });
+    return errors;
+  },
+
+  sweep(doc) {
+    const errors = [];
+    const s = doc.selection;
+    // A cap that hides its remainder is a coverage claim nobody made, so the
+    // arithmetic that proves nothing was dropped is checked, not trusted.
+    if (s.proposed !== s.selected + s.deferred) errors.push({ path: '/selection/proposed', message: `proposed (${s.proposed}) must equal selected (${s.selected}) + deferred (${s.deferred})` });
+    if (s.selected > s.cap) errors.push({ path: '/selection/selected', message: `selected (${s.selected}) exceeds the cap (${s.cap})` });
+    if (doc.scope.swept > doc.scope.targets) errors.push({ path: '/scope/swept', message: `swept (${doc.scope.swept}) cannot exceed targets (${doc.scope.targets})` });
+
+    const byClass = Object.values(s.byClass);
+    const proposedByClass = byClass.reduce((a, c) => a + c.proposed, 0);
+    const selectedByClass = byClass.reduce((a, c) => a + c.selected, 0);
+    if (proposedByClass !== s.proposed) errors.push({ path: '/selection/byClass', message: `byClass proposed sums to ${proposedByClass}; selection.proposed is ${s.proposed}` });
+    if (selectedByClass !== s.selected) errors.push({ path: '/selection/byClass', message: `byClass selected sums to ${selectedByClass}; selection.selected is ${s.selected}` });
+    for (const [k, c] of Object.entries(s.byClass)) {
+      if (c.selected > c.proposed) errors.push({ path: `/selection/byClass/${k}`, message: `selected (${c.selected}) exceeds proposed (${c.proposed})` });
+      if (c.writePath > c.proposed) errors.push({ path: `/selection/byClass/${k}`, message: `writePath (${c.writePath}) exceeds proposed (${c.proposed})` });
+    }
+
+    const probed = Object.values(doc.counts).reduce((a, n) => a + n, 0);
+    if (probed > s.selected) errors.push({ path: '/counts', message: `${probed} verdicts recorded for ${s.selected} selected faults` });
+    // Findings are every record that was not killed. Stating that here keeps a
+    // document from quietly reporting fewer findings than it reached verdicts.
+    const notKilled = probed - (doc.counts.killed ?? 0);
+    if (doc.findings.length !== notKilled) errors.push({ path: '/findings', message: `${doc.findings.length} findings for ${notKilled} records that were not killed; findings are every non-killed record` });
+
+    const gating = doc.findings.filter((f) => f.verdict === 'survived' || f.verdict === 'nocover').length;
+    if (gating > 0 && doc.exitCode !== 1) errors.push({ path: '/exitCode', message: 'a survived or nocover finding must exit 1; a sweep never passes over a deliberate break nothing noticed' });
+    if (gating === 0 && doc.exitCode !== 0) errors.push({ path: '/exitCode', message: 'exit 1 requires a survived or nocover finding; a sweep does not fail on its own unanchorable proposal' });
+
+    doc.findings.forEach((f, i) => {
+      if (f.verdict === 'killed') errors.push({ path: `/findings/${i}/verdict`, message: 'a killed fault is not a finding' });
+      // The signal explains why a defender could not notice a changed payload.
+      // On any other verdict, or off the write path, it explains nothing and
+      // would be exactly the non-actionable noise that gets a check ignored.
+      if (f.signals && !(f.verdict === 'survived' && f.writePath)) {
+        errors.push({ path: `/findings/${i}/signals`, message: 'signals belong to a survived finding on the write path' });
+      }
+    });
     return errors;
   },
 

@@ -1,0 +1,274 @@
+/**
+ * The cold start: findings on a repository that has no claims yet.
+ *
+ * `gate --changed` already says which changed source files carry no claim, and
+ * stops there — correctly, because stating a claim is a human act. But a
+ * project adopting this tool reads that list, has nothing to compare it
+ * against, and closes the tab. Every escaped defect reported from the field so
+ * far was a claim gap, not a probe miss, so the bottleneck was never
+ * verification. It is oracle SUPPLY.
+ *
+ * Sweep is the lowest rung of that supply: no concern, no statement, nothing
+ * written by anybody. It takes the files the gate just called uncovered,
+ * proposes faults mechanically with the existing scaffold producers, probes a
+ * bounded selection of them, and reports what survived. A fault that survives
+ * needs no claim to be alarming: the code changed, something was deliberately
+ * broken, and not one test noticed.
+ *
+ * WHAT IT IS NOT. It does not write `testguard.claims.json`, and it never
+ * will — a claim is a sentence a human is willing to stand behind, and a
+ * sentence nobody wrote is not one. Its drafts land beside the evidence for a
+ * human to keep or drop, exactly as `scaffold` already works. It does not
+ * overwrite the canonical `.testguard/evidence.json` either: a sweep probes
+ * machine-proposed faults under TODO statements, and folding that into the
+ * document `status` and `baseline` read from would corrupt the record of what
+ * the project actually claims.
+ *
+ * The cap and the ordering come from Google's mutation service, which surfaces
+ * at most 7 x |files| mutants per change and orders candidates on the measured
+ * productivity of their operator, taking their productive rate from 15% to 89%
+ * ("Practical Mutation Testing at Scale", Petrovic et al., 2021). See
+ * `src/supply/select.mjs`.
+ */
+import { existsSync } from 'node:fs';
+import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
+import { computeChangedGate } from '../gate/changed.mjs';
+import { scaffoldFile } from '../scaffold/scaffold.mjs';
+import { selectFaults, onWritePath, capFor } from '../supply/select.mjs';
+import { persistenceSignals, persistenceHint } from '../supply/persistence.mjs';
+import { probe } from '../probe/probe.mjs';
+import { hintFor } from '../brief/brief.mjs';
+
+/**
+ * Findings first, in the order a reader should act on them. The same order
+ * `brief` uses, minus the verdicts a sweep does not gate on.
+ */
+const FINDING_ORDER = ['survived', 'nocover', 'timeout', 'flaky-defender', 'unverifiable', 'fault-invalid'];
+
+/**
+ * Which verdicts are a finding ABOUT THE PROJECT, and so decide the exit code.
+ *
+ * `survived` and `nocover` are statements about the test suite: something was
+ * broken and nothing failed, or nothing imports the file at all. The rest are
+ * statements about the PROPOSAL — an anchor that did not locate, a replacement
+ * that does not compile — and a sweep's proposals are machine-made and thrown
+ * away. Gating on them would make the tool fail because its own guess was bad,
+ * which is the fastest way to get a check switched off. They are still
+ * reported; they just do not gate.
+ */
+export const GATING = new Set(['survived', 'nocover']);
+
+/**
+ * Turn one evidence record into a finding, or null when it is not one.
+ *
+ * Pure, and exported, for the reason `classify.mjs` gives about itself: the
+ * only thing that could otherwise falsify these rules is a full fixture sweep,
+ * which is a minutes-long acceptance test standing in for a decision you can
+ * state in four lines. Self-probing this file found exactly that gap — the
+ * schema was guarded and the engine that fills it was not.
+ *
+ * `signalsFor` is injected so the rule about WHEN a signal applies can be
+ * tested without a filesystem; the default in `sweep()` reads the defenders.
+ */
+export function findingFrom(record, fault, signalsFor = () => []) {
+  if (record.verdict === 'killed') return null;
+  const writePath = fault ? onWritePath(fault) : false;
+  // The persistence signal explains a survivor on the write path and nothing
+  // else. On a kill it explains nothing, and on any other line a loose mock
+  // assertion is not evidence — reporting it everywhere is the
+  // non-actionable noise that gets a check switched off.
+  const signals = record.verdict === 'survived' && writePath ? signalsFor(record) : [];
+  return {
+    file: record.subject.file,
+    ...(fault?.line ? { line: fault.line } : {}),
+    claimId: record.claim.id,
+    faultId: record.subject.id,
+    faultClass: record.subject.faultClass,
+    verdict: record.verdict,
+    ...(record.detail?.reason ? { reason: record.detail.reason } : {}),
+    description: record.subject.description,
+    writePath,
+    hint: signals.length ? persistenceHint(signals[0], fault?.find) : hintFor(record),
+    ...(signals.length ? { signals } : {}),
+  };
+}
+
+/** Findings in the order a reader should act on them. Pure; deterministic to the last tie. */
+export function sortFindings(findings) {
+  return [...findings].sort((a, b) =>
+    FINDING_ORDER.indexOf(a.verdict) - FINDING_ORDER.indexOf(b.verdict)
+    || Number(b.writePath) - Number(a.writePath)
+    || a.file.localeCompare(b.file)
+    || (a.line ?? 0) - (b.line ?? 0));
+}
+
+/** How many findings a sweep is willing to fail on. */
+export const gatingCount = (findings) => findings.filter((f) => GATING.has(f.verdict)).length;
+
+/** Rebuild claim documents from a flat selection, keeping each claim's own faults together. */
+function claimsFromSelection(selected) {
+  const byClaim = new Map();
+  for (const { claim, fault } of selected) {
+    if (!byClaim.has(claim.id)) byClaim.set(claim.id, { ...claim, faults: [] });
+    byClaim.get(claim.id).faults.push(fault);
+  }
+  // Deterministic: the probe's own ordering, and the evidence it writes, must
+  // not depend on the order a Map happened to be filled in.
+  return [...byClaim.values()]
+    .map((c) => ({ ...c, faults: [...c.faults].sort((a, b) => a.id.localeCompare(b.id)) }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * Run a sweep. Returns the sweep document; the caller owns writing and exit
+ * codes, as every other engine module in this tool does.
+ */
+export async function sweep({
+  projectDir,
+  ref,
+  includeDirty = false,
+  exclude = [],
+  cap,
+  confirmRuns = 3,
+  budgetMs = 120_000,
+  runnerCommand,
+  runnerName,
+  nodeModules,
+  toolVersion = '0.0.0',
+  generatedAt = new Date().toISOString(),
+  claimsPath,
+  ignorePath,
+  onStage,
+  onWarn = () => {},
+}) {
+  const gate = computeChangedGate({ projectDir, ref, includeDirty, exclude, toolVersion, claimsPath, ignorePath });
+  // A test file with no claim is a different problem — it has nothing to
+  // falsify — and the gate already names it. Sweep proposes against source.
+  const targets = gate.uncovered.filter((u) => u.kind === 'source').map((u) => u.file);
+
+  const cPath = claimsPath ?? defaultClaimsPath(projectDir);
+  const existingClaims = existsSync(cPath) ? loadClaims(cPath) : { claims: [] };
+
+  const candidates = [];
+  const skipped = [];
+  const drafts = [];
+  for (const file of targets) {
+    let result;
+    try {
+      result = scaffoldFile({ projectDir, file, existingClaims, toolVersion });
+    } catch (e) {
+      // One unscaffoldable file must not take the sweep with it: the other
+      // files' findings are still true, and a reader needs to know which file
+      // produced nothing and why.
+      skipped.push({ file, reason: e.message.split('\n')[0].slice(0, 200) });
+      continue;
+    }
+    if (result.stats.proposals === 0) {
+      skipped.push({ file, reason: 'no line in this file matches a fault producer' });
+      continue;
+    }
+    drafts.push(result.doc);
+    for (const claim of result.doc.claims) for (const fault of claim.faults) candidates.push({ claim, fault });
+  }
+
+  const limit = cap ?? capFor(targets.length);
+  const selection = selectFaults(candidates, { cap: limit });
+  const claims = claimsFromSelection(selection.selected);
+
+  let evidence = { records: [] };
+  if (claims.length > 0) {
+    evidence = await probe({
+      projectDir,
+      claims: { schemaVersion: 1, claims },
+      confirmRuns,
+      budgetMs,
+      mode: 'worktree',
+      includeDirty,
+      // A proposed fault has no declared defenders to be missing from, so the
+      // question escalation answers — "did something UNDECLARED catch it?" —
+      // has no meaning here, and it is the most expensive thing the probe does.
+      escalate: false,
+      runnerCommand,
+      runnerName,
+      nodeModules,
+      toolVersion,
+      onStage,
+      onWarn,
+    });
+  }
+
+  // Index the selection so a record can find the fault it came from without a
+  // second scan; `line` and `find` live on the draft, not on the evidence.
+  const draftOf = new Map(selection.selected.map(({ claim, fault }) => [`${claim.id}/${fault.id}`, fault]));
+
+  const signalsFor = (r) => persistenceSignals(projectDir, r.defenders?.resolved ?? []);
+  const counts = {};
+  const findings = [];
+  for (const r of evidence.records) {
+    counts[r.verdict] = (counts[r.verdict] ?? 0) + 1;
+    const f = findingFrom(r, draftOf.get(`${r.claim.id}/${r.subject.id}`), signalsFor);
+    if (f) findings.push(f);
+  }
+  const ordered = sortFindings(findings);
+  const gating = gatingCount(ordered);
+  return {
+    schemaVersion: 1,
+    tool: { name: 'testguard', version: toolVersion },
+    generatedAt,
+    ref,
+    base: gate.base,
+    head: gate.head,
+    includeDirty,
+    scope: {
+      changed: gate.changed,
+      targets: targets.length,
+      swept: drafts.length,
+      ...(skipped.length ? { skipped } : {}),
+    },
+    selection: {
+      proposed: candidates.length,
+      selected: selection.selected.length,
+      deferred: selection.deferred.length,
+      cap: selection.cap,
+      byClass: selection.byClass,
+    },
+    counts,
+    findings: ordered,
+    exitCode: gating > 0 ? 1 : 0,
+    drafts,
+  };
+}
+
+/** The sweep as text, for someone who ran it in a terminal or reads it in a CI log. */
+export function renderSweep(doc, { limit = 20 } = {}) {
+  const out = [];
+  const { scope, selection } = doc;
+  if (scope.targets === 0) {
+    out.push(`sweep: no changed source file is without a claim against ${doc.ref}. Nothing to propose.`);
+    return out.join('\n');
+  }
+  out.push(`swept ${scope.swept} of ${scope.targets} unclaimed changed file${scope.targets === 1 ? '' : 's'} against ${doc.ref}.`);
+  out.push(`proposed ${selection.proposed} fault${selection.proposed === 1 ? '' : 's'}, probed ${selection.selected} (cap ${selection.cap})${selection.deferred ? `, deferred ${selection.deferred}` : ''}.`);
+  if (selection.deferred) out.push(`  The ${selection.deferred} deferred are not a verdict: raise --cap, or sweep a smaller change.`);
+  for (const s of scope.skipped ?? []) out.push(`  skipped ${s.file}: ${s.reason}`);
+  out.push('');
+
+  const gating = doc.findings.filter((f) => GATING.has(f.verdict));
+  if (gating.length === 0) {
+    out.push(`No fault survived. ${doc.counts.killed ?? 0} of ${selection.selected} probed faults were caught.`);
+  } else {
+    out.push(`${gating.length} finding${gating.length === 1 ? '' : 's'} — a deliberate break that no test noticed:`);
+    out.push('');
+    for (const f of doc.findings.slice(0, limit)) {
+      const where = f.line ? `${f.file}:${f.line}` : f.file;
+      out.push(`  ${f.verdict.toUpperCase().padEnd(13)} ${where}${f.writePath ? '  [write path]' : ''}`);
+      out.push(`    ${f.description}`);
+      out.push(`    ${f.hint}`);
+      out.push('');
+    }
+    if (doc.findings.length > limit) out.push(`  … ${doc.findings.length - limit} more in the sweep document`);
+  }
+  out.push('These are PROPOSALS, not claims. Keep the ones worth defending: state the');
+  out.push('claim, copy its fault into testguard.claims.json, and probe it from then on.');
+  return out.join('\n');
+}

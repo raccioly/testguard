@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `testguard sweep [dir] --changed <ref>` — the cold start. Proposes faults for
+  the changed source files that carry no claim, probes a bounded selection, and
+  reports what a green suite did not notice. Never writes
+  `testguard.claims.json`; its evidence never replaces
+  `.testguard/evidence.json`; only `survived` and `nocover` exit 1, so a
+  proposal the tool could not anchor or compile is reported and never gates.
+  Offline, like every other verifying command.
+- Selection follows Google's mutation service: at most 7 × |files| candidates,
+  spread round-robin across files, ordered on the measured productivity of the
+  fault class and shrunk toward a neutral prior so one observation never
+  dominates (`src/supply/select.mjs`).
+- `persistence-payload-unasserted` — why a survivor on a write path was missed:
+  the defender mocks the persistence layer and the file's call assertions never
+  name an exact payload, so a field dropped from a write cannot fail them.
+  Descriptive, never predictive; attached only to a survivor on a write path
+  (`src/supply/persistence.mjs`).
+- `urn:claimspec:v1:sweep` — the sweep document, with semantic rules that check
+  a cap never hides its own remainder.
+
 ## [0.10.4] - 2026-09-21
 
 Automated weekly release — everything merged since `v0.10.3`.

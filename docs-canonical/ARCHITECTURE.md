@@ -49,6 +49,8 @@ code were wrong, would anything fail?*
 | Cost | What a probe spent, per claim and per defender file, derived from evidence | `src/probe/cost.mjs` |
 | Progress | How a running probe reports itself, per reader: tty, plain, ndjson | `src/probe/progress.mjs` |
 | Change gate | Claim coverage of a diff | `src/gate/changed.mjs` |
+| Sweep | The cold start: propose faults for changed files that carry no claim, probe a bounded selection, report what nothing noticed | `src/sweep/sweep.mjs` |
+| Claim supply | Which proposals are worth probing, and why a survivor on a write path was missed | `src/supply/select.mjs`, `src/supply/persistence.mjs` |
 | Baseline | Freeze debt; gate the delta; re-stamp | `src/baseline/baseline.mjs` |
 | Status | The single state machine every rendering derives from | `src/status/status.mjs` |
 | Brief | The agent's session-start blind-spot block | `src/brief/brief.mjs` |
@@ -68,7 +70,8 @@ never the layers above.
 |---|---|---|
 | `cli.mjs` | commands | engine modules directly |
 | `src/commands/` | engine modules, `spec/lib` | other commands |
-| Engine (`probe`, `gate`, `baseline`, `status`, `brief`, `admit`, `replay`) | `spec/lib`, `src/util`, `src/git.mjs`, runners | commands, `cli.mjs` |
+| Engine (`probe`, `gate`, `baseline`, `status`, `brief`, `admit`, `replay`, `sweep`) | `spec/lib`, `src/util`, `src/git.mjs`, runners, `src/supply` | commands, `cli.mjs` |
+| Claim supply (`src/supply/`) | `src/util` | the probe orchestrator, commands, `cli.mjs` |
 | `src/probe/runners/` | `src/util`, `shared.mjs` | the probe orchestrator |
 | `spec/lib/` | nothing in `src/` | all of `src/` |
 
