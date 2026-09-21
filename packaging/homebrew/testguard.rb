@@ -16,7 +16,7 @@ class Testguard < Formula
   desc "Proves a test suite defends the claims a project makes"
   homepage "https://github.com/raccioly/testguard"
   url "https://registry.npmjs.org/testguard-cli/-/testguard-cli-0.10.4.tgz"
-  sha256 "b0b73956e7d5c51b0ad40dcb1333a5e18b599e990e707d7ac90a87ce66156178"
+  sha256 "c2e36e07108e8d40197aa37cf8d23589c38dc265fddd589a4c890e4c6377cac4"
   license "MIT"
 
   depends_on "node"
