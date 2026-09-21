@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-21
+
+Automated weekly release — everything merged since `v0.10.4`.
+
+### Changed
+
+- feat(sweep): findings on a repository that has no claims yet (#151)
+- chore(homebrew): sha256 for v0.10.4 (#149)
+
+
 ### Added
 
 - `testguard sweep [dir] --changed <ref>` — the cold start. Proposes faults for
