@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `docs-canonical/PRIOR-ART.md` — the canonical record of what was taken from
+  Google's and Meta's mutation-testing programmes, what was deliberately not
+  taken, the measured reason no model decides a verdict, and the known gaps in
+  what was borrowed. Registered with DocGuard.
+- README prior-art section pointing at it.
+
+### Changed
+
+- The technical brief now describes what the tool actually does. A new
+  *Starting from zero* page carries Field report C (the persistence-path
+  measurement: 12 of 26 faults survived a green suite, all of them a dropped
+  payload field) and the claim-supply ladder; prior art names Google and Meta
+  and what each solved; the decision-model result is stated as a measurement
+  rather than a design assertion; and a *what it deliberately is not* section
+  closes it. `sweep` added to the verb table. Six pages to eight, re-rendered.
+
 ## [0.11.0] - 2026-09-21
 
 Automated weekly release — everything merged since `v0.10.4`.
