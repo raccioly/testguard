@@ -4254,6 +4254,197 @@
         "probe",
         "scope"
       ]
+    },
+    {
+      "id": "TG-SWEEP-NEVER-HIDES-DEFERRED",
+      "statement": "A sweep accounts for every fault it proposed: the ones it probed plus the ones it deferred equal the proposals, and a selection never exceeds its cap.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/sweep.schema.json#selection"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-21T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/sweep.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The remainder arithmetic is not checked, so a cap that silently drops proposals conforms.",
+          "faultClass": "statement-deleted",
+          "file": "spec/lib/validate.mjs",
+          "find": "    if (s.proposed !== s.selected + s.deferred) errors.push({ path: '/selection/proposed', message: `proposed (${s.proposed}) must equal selected (${s.selected}) + deferred (${s.deferred})` });",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A selection larger than its own cap conforms.",
+          "faultClass": "statement-deleted",
+          "file": "spec/lib/validate.mjs",
+          "find": "    if (s.selected > s.cap) errors.push({ path: '/selection/selected', message: `selected (${s.selected}) exceeds the cap (${s.cap})` });",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SWEEP-DOES-NOT-FAIL-ON-ITS-OWN-GUESS",
+      "statement": "A sweep exits 1 only for a survivor or an untested file; a proposal it could not anchor or compile is reported and never fails the run.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/sweep.schema.json#findings"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-21T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/sweep.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Machine-made proposals that do not compile start failing the sweep, so the tool fails because its own guess was bad.",
+          "faultClass": "literal-changed",
+          "file": "src/sweep/sweep.mjs",
+          "find": "const GATING = new Set(['survived', 'nocover']);",
+          "replace": "const GATING = new Set(['survived', 'nocover', 'fault-invalid', 'unverifiable']);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SWEEP-SIGNAL-ONLY-EXPLAINS-A-SURVIVOR",
+      "statement": "The persistence signal is attached only to a fault that survived on a write path; it never annotates a kill or a line that is not a write.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/sweep.schema.json#findings/signals"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-21T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/sweep.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The signal is attached to every record, so a kill and an unrelated line carry a mock complaint that explains nothing.",
+          "faultClass": "condition-forced",
+          "file": "src/sweep/sweep.mjs",
+          "find": "  const signals = record.verdict === 'survived' && writePath ? signalsFor(record) : [];",
+          "replace": "  const signals = signalsFor(record);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A killed fault is reported as a finding.",
+          "faultClass": "statement-deleted",
+          "file": "src/sweep/sweep.mjs",
+          "find": "  if (record.verdict === 'killed') return null;",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SWEEP-SPREADS-ITS-CAP-ACROSS-FILES",
+      "statement": "A sweep spends its cap across every changed file it swept, so one file with many candidates cannot make the others look clean.",
+      "source": {
+        "kind": "manual",
+        "ref": "src/supply/select.mjs selectFaults"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-21T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/supply-select.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The round-robin serves one file to exhaustion, so a single file takes the whole budget.",
+          "faultClass": "statement-deleted",
+          "file": "src/supply/select.mjs",
+          "find": "      if (q.length <= round) continue;",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PERSISTENCE-SIGNAL-READS-ONE-CALL",
+      "statement": "The persistence signal reads one assertion's own arguments: a partial matcher in a LATER assertion never makes an earlier exact one count as partial, and the signal is silent about a defender that mocks no persistence layer.",
+      "source": {
+        "kind": "manual",
+        "ref": "src/supply/persistence.mjs payloadAssertions"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-21T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/supply-persistence.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A fixed-width window reads past the assertion, so the next assertion's expect.objectContaining makes this one partial — the measured bug this scan was rewritten to remove.",
+          "faultClass": "return-altered",
+          "file": "src/supply/persistence.mjs",
+          "find": "    if (depth === 0) return source.slice(open + 1, i);",
+          "replace": "    if (depth === 0) return source.slice(open + 1, open + 601);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Every defender is reported, including one that mocks no persistence layer at all.",
+          "faultClass": "statement-deleted",
+          "file": "src/supply/persistence.mjs",
+          "find": "  if (mocks.length === 0) return null;",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
     }
   ]
 }

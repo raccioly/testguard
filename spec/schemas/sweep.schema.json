@@ -1,0 +1,127 @@
+{
+  "$id": "urn:claimspec:v1:sweep",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "claimspec v1 — sweep",
+  "description": "What a sweep proposed and what survived it. A sweep probes faults NOBODY STATED: it takes the changed source files that carry no claim, proposes faults with the mechanical producers, and reports the ones a green suite did not notice. Its findings are therefore weaker evidence than a probe's — no human said the behaviour mattered — and stronger than nothing, which is what a repository with no claims has. The drafts it carries are proposals for a human to keep or drop; they are not claims, and nothing here belongs in a claims file until someone states the sentence it defends.",
+  "type": "object",
+  "required": ["schemaVersion", "tool", "generatedAt", "ref", "base", "head", "includeDirty", "scope", "selection", "counts", "findings", "exitCode"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "tool": { "$ref": "urn:claimspec:v1:common#/$defs/tool" },
+    "generatedAt": { "$ref": "urn:claimspec:v1:common#/$defs/isoDateTime" },
+    "ref": { "type": "string", "description": "The reference the change was measured against." },
+    "base": { "$ref": "urn:claimspec:v1:common#/$defs/gitSha" },
+    "head": { "$ref": "urn:claimspec:v1:common#/$defs/gitSha" },
+    "includeDirty": { "type": "boolean" },
+    "scope": {
+      "type": "object",
+      "required": ["changed", "targets", "swept"],
+      "additionalProperties": false,
+      "properties": {
+        "changed": { "type": "integer", "minimum": 0, "description": "Files in the change, before any filter." },
+        "targets": { "type": "integer", "minimum": 0, "description": "Changed SOURCE files carrying no claim — what the gate calls uncovered. A sweep proposes against these and nothing else." },
+        "swept": { "type": "integer", "minimum": 0, "description": "Targets that yielded at least one proposal. Never more than `targets`: a file the producers cannot touch is skipped, not swept." },
+        "skipped": {
+          "type": "array",
+          "description": "Targets that produced nothing, and why. Recorded rather than dropped: a file that silently yielded no proposal reads as a file with no findings.",
+          "items": {
+            "type": "object",
+            "required": ["file", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "file": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "description": "What was proposed and what was probed. A sweep is capped — past a few findings per file nobody reads them, and the runner is spent either way — so the count NOT probed is reported beside the count that was. A cap that hides its own remainder is a coverage claim nobody made.",
+      "required": ["proposed", "selected", "deferred", "cap", "byClass"],
+      "additionalProperties": false,
+      "properties": {
+        "proposed": { "type": "integer", "minimum": 0 },
+        "selected": { "type": "integer", "minimum": 0 },
+        "deferred": { "type": "integer", "minimum": 0, "description": "Proposed and not probed. Not a verdict of any kind." },
+        "cap": { "type": "integer", "minimum": 1 },
+        "byClass": {
+          "type": "object",
+          "description": "Per fault class: how many were proposed, how many probed, and how many sat on a write payload.",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["proposed", "selected", "writePath"],
+            "additionalProperties": false,
+            "properties": {
+              "proposed": { "type": "integer", "minimum": 0 },
+              "selected": { "type": "integer", "minimum": 0 },
+              "writePath": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "description": "Every verdict the probe reached, including `killed`. A sweep whose faults were all caught is a real result and must be readable as one.",
+      "additionalProperties": { "type": "integer", "minimum": 0 },
+      "propertyNames": { "$ref": "urn:claimspec:v1:common#/$defs/verdict" }
+    },
+    "findings": {
+      "type": "array",
+      "description": "Every record that was not killed, most actionable first. `survived` and `nocover` are statements about the test suite; the rest are statements about the PROPOSAL and do not gate, because a sweep's faults are machine-made and a tool that fails on its own bad guess gets switched off.",
+      "items": {
+        "type": "object",
+        "required": ["file", "claimId", "faultId", "faultClass", "verdict", "description", "writePath", "hint"],
+        "additionalProperties": false,
+        "properties": {
+          "file": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" },
+          "line": { "type": "integer", "minimum": 1 },
+          "claimId": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" },
+          "faultId": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" },
+          "faultClass": { "$ref": "urn:claimspec:v1:common#/$defs/faultClass" },
+          "verdict": { "$ref": "urn:claimspec:v1:common#/$defs/verdict" },
+          "reason": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 },
+          "writePath": { "type": "boolean", "description": "The fault sits on a database write or the payload of one. Every surviving fault in the measurement that prompted this field was such a line." },
+          "hint": { "type": "string", "minLength": 1, "description": "One line naming the mechanism, never only the verdict." },
+          "signals": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Static, annotation-grade signals about the defenders of a SURVIVOR on the write path. They never change a verdict. `persistence-payload-unasserted`: the defender mocks the persistence layer and the file's call assertions never name an exact payload, so a field dropped from a write cannot fail them. Descriptive, never predictive: no threshold on the assertion mix separates the files whose payload faults survive from the files whose do not.",
+            "items": {
+              "type": "object",
+              "required": ["file", "signal", "reason"],
+              "additionalProperties": false,
+              "properties": {
+                "file": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" },
+                "signal": { "enum": ["persistence-payload-unasserted"] },
+                "reason": { "type": "string", "minLength": 1 },
+                "specifiers": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+                "counts": {
+                  "type": "object",
+                  "required": ["exact", "partial", "argless"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "exact": { "type": "integer", "minimum": 0 },
+                    "partial": { "type": "integer", "minimum": 0 },
+                    "argless": { "type": "integer", "minimum": 0 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "exitCode": { "enum": [0, 1] },
+    "drafts": {
+      "type": "array",
+      "description": "The draft claims documents the proposals came from, carried so a human can keep one without re-running the sweep. Drafts, never claims: every statement is a TODO nobody has written yet.",
+      "items": { "type": "object" }
+    }
+  }
+}

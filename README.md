@@ -147,6 +147,7 @@ npx testguard-cli probe                     # try to falsify each claim; report 
 npx testguard-cli admit test/auth.test.ts --claim AUTH-ADMIN   # does this test satisfy the two-gate rule?
 npx testguard-cli baseline                  # freeze today's unproven findings; only new ones gate
 npx testguard-cli gate --changed origin/main # fail when a changed source file carries no claim
+npx testguard-cli sweep --changed origin/main # no claims yet? propose faults for the changed files and report what nothing noticed
 npx testguard-cli brief --text              # tell the agent where the suite is blind, before it writes
 npx testguard-cli replay --since v1.0..HEAD # would this suite have caught the bugs that escaped?
 npx testguard-cli mcp                       # serve the read-only loop over MCP, on stdio
@@ -399,6 +400,71 @@ with the platform CLI you already have and then briefs from it. **It is an
 on-demand helper, not a hook**: the session-start hook never touches the
 network, and the helper exits 0 with a message when the CLI or the artifact
 is missing. TestGuard itself still makes no network calls.
+
+### Starting from zero claims
+
+`gate` names the changed files that carry no claim, and stops there —
+correctly, because stating a claim is a human act. But a project adopting this
+tool reads that list, has nothing to compare it against, and closes the tab.
+The bottleneck was never verification; it is **oracle supply**.
+
+`sweep` is the lowest rung of that supply. No claim, no concern, nothing
+written by anybody:
+
+```bash
+npx testguard-cli sweep --changed origin/main          # propose, probe a bounded selection, report
+npx testguard-cli sweep --changed HEAD --include-dirty --cap 20
+```
+
+It takes the files `gate` just called uncovered, proposes faults with the same
+mechanical producers `scaffold` uses, probes a bounded selection, and reports
+what a green suite did not notice. A fault that survives needs no claim to be
+alarming: something was deliberately broken and not one test failed.
+
+```
+swept 13 of 14 unclaimed changed files against origin/main.
+proposed 510 faults, probed 10 (cap 10), deferred 500.
+  The 500 deferred are not a verdict: raise --cap, or sweep a smaller change.
+
+9 findings — a deliberate break that no test noticed:
+
+  SURVIVED      src/app/actions/register.ts:118  [write path]
+    [line 118] Field dropped: `password_hash` is no longer written.
+    src/tests/actions/register.test.ts mocks @/lib/prisma; 1 exact, 8 partial,
+    31 argument-free call assertions in the file. A field dropped from the write
+    payload fails only against an assertion that names that field exactly.
+    Assert the whole object written by the call this fault changes, including
+    `password_hash` — or read the record back and assert on what was stored.
+```
+
+Three rules make it safe to run on a repository that has never seen this tool:
+
+- **It never writes `testguard.claims.json`**, and never will. A claim is a
+  sentence someone is willing to stand behind; a sentence nobody wrote is not
+  one. Its drafts land beside the evidence to keep or drop.
+- **Its evidence never replaces `.testguard/evidence.json`.** A sweep probes
+  faults nobody stated, under TODO statements; folding that into the document
+  `status` and `baseline` read would corrupt the record of what the project
+  actually claims.
+- **It does not fail on its own bad guess.** Only `survived` and `nocover`
+  exit 1. A proposal that would not compile, or an anchor that did not locate,
+  is reported and never gates — a tool that fails because its own guess was bad
+  is a tool people switch off.
+
+The cap and the ordering are Google's: their mutation service surfaces at most
+7 × |files| mutants per change and orders candidates on the measured
+productivity of their operator in similar context, which took their productive
+rate from 15% to 89%
+([Petrović et al., *Practical Mutation Testing at Scale*, 2021](https://arxiv.org/abs/2102.11378)).
+TestGuard's ordering prior is measured the same way — from probed faults on a
+real AI-authored codebase — and shrunk toward a neutral value, so one
+observation of a class surviving never dominates a sweep. The cap is spread
+across files: a single file with many candidates cannot make the others look
+clean.
+
+A sweep is weaker evidence than a probe, and says so. Nobody stated that the
+behaviour mattered. It is stronger than nothing, which is what a repository
+with no claims has — and the survivors worth defending become the first claims.
 
 ### Every change needs a claim
 
@@ -824,7 +890,7 @@ verdicts.
 ## Status
 
 **v0.5.** Eleven commands (`status`, `init`, `claims`, `probe`, `admit`,
-`replay`, `baseline`, `brief`, `gate`, `scaffold`, `mcp`), vitest, jest,
+`replay`, `baseline`, `brief`, `gate`, `scaffold`, `sweep`, `mcp`), vitest, jest,
 Playwright and Python (pytest / stdlib unittest) runners, hand-authored faults
 plus a mechanical scaffold for JavaScript and Python, an agent operating layer
 (`status`, `init`) and a change gate (`gate`). The contract spine — eight JSON

@@ -18,6 +18,7 @@ import { gateCommand } from './commands/gate.mjs';
 import { replayCommand } from './commands/replay.mjs';
 import { mcpCommand } from './commands/mcp.mjs';
 import { admitCommand } from './commands/admit.mjs';
+import { sweepCommand } from './commands/sweep.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
 const ISSUES = 'https://github.com/raccioly/testguard/issues';
@@ -32,6 +33,7 @@ export const USAGE = `testguard ${VERSION} — proves a test suite defends the c
   testguard brief [dir]      emit the blind-spot block for an agent's session-start context
   testguard gate [dir]       fail when a changed source file carries no claim and no excusing ignore entry
   testguard scaffold <file>  propose faults mechanically for one source file, as a draft claims document
+  testguard sweep [dir]      propose faults for the changed source files that carry no claim, probe a bounded selection, and report what nothing noticed
   testguard mcp              serve the read-only status/brief/claims/evidence tools over MCP on stdio, so the loop works in any agent harness
   testguard replay [dir]     would this suite have caught the bugs that already escaped? Replays real fix commits and calibrates fault classes against them
   testguard admit <test> --claim <ID>   the two-gate rule as one verb: is this test green on HEAD and does it fail on every fault of the claim?
@@ -74,6 +76,10 @@ probe
   --json               the status document plus this run's result (records, newSinceBaseline, exitCode)
 
 scaffold   --claim <ID> (put every proposal under this claim; copies it if it exists)  --out <path>  --json
+sweep      --changed <ref> (required; CI bases and a safe local default are detected)  --cap <n> (default 7 x unclaimed files)
+           --include-dirty  --exclude <glob>  --confirm <n>  --budget <ms>  --max <n>  --out <path>  --json
+           the cold start: no claim and no concern needed. Everything it proposes is a DRAFT — it never writes testguard.claims.json,
+           and its evidence never replaces .testguard/evidence.json. exit 1 on a fault that survived, or a file no test imports
            shapes: if-guard → if (false) · single-line guard/mutation removed · return <check> → return true
                    · security flag/window/cost literal weakened · verify/validate/check call removed
                    · field dropped from a payload/allow-list/schema/merge · parameter-derived argument swapped for undefined/{}
@@ -117,7 +123,7 @@ brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; 
 exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift, or unclaimed changes) · 2 precondition failed · 3 usage
 `;
 
-const COMMANDS = { mcp: mcpCommand, replay: replayCommand, probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand, admit: admitCommand };
+const COMMANDS = { mcp: mcpCommand, replay: replayCommand, probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand, admit: admitCommand, sweep: sweepCommand };
 
 export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') }) {
   let parsed;
@@ -143,6 +149,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         changed: { type: 'string' },
         since: { type: 'string' },
         exclude: { type: 'string', multiple: true },
+        cap: { type: 'string' },
         strict: { type: 'boolean', default: false },
         explain: { type: 'boolean', default: false },
         ignore: { type: 'string' },
