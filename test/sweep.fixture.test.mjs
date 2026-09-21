@@ -111,8 +111,19 @@ describe('sweep: findings on changed code that carries no claim', () => {
   }, 120_000);
 
   it('without a reference it refuses with usage, rather than guessing at a base', async () => {
-    const { code, err } = await run(r.root, ['--quiet']);
-    expect(code).toBe(3);
-    expect(err).toMatch(/needs a reference/);
+    // CI sets GITHUB_BASE_REF on a pull_request event, and the resolver is
+    // right to use it — but then this asserts CI's environment instead of the
+    // no-reference path, and passes locally while failing in CI. Clear every
+    // base the resolver knows, the way the gate suite does.
+    const saved = { ...process.env };
+    delete process.env.TESTGUARD_CHANGED_REF; delete process.env.GITHUB_BASE_REF; delete process.env.CI_MERGE_REQUEST_DIFF_BASE_SHA; delete process.env.CI_MERGE_REQUEST_TARGET_BRANCH_NAME;
+    try {
+      const { code, err } = await run(r.root, ['--quiet']);
+      expect(code).toBe(3);
+      expect(err).toMatch(/needs a reference/);
+    } finally {
+      for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
+      Object.assign(process.env, saved);
+    }
   });
 });
