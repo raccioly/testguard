@@ -17,7 +17,8 @@
       "docs-canonical/SECURITY.md",
       "docs-canonical/TEST-SPEC.md",
       "docs-canonical/ENVIRONMENT.md",
-      "docs-canonical/REQUIREMENTS.md"
+      "docs-canonical/REQUIREMENTS.md",
+      "docs-canonical/PRIOR-ART.md"
     ]
   },
   "validators": {

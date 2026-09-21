@@ -209,7 +209,7 @@
     <div class="attrib">The design constraint everything else follows from</div>
   </div>
 
-  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 1 of 6 · The idea</span></div>
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 1 of 8 · The idea</span></div>
 </div>
 
 <!-- ═══════════════ PAGE — THE EVIDENCE ═══════════════ -->
@@ -368,7 +368,7 @@
     <div class="attrib">Why the question has to be asked adversarially</div>
   </div>
 
-  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 2 of 6 · Evidence</span></div>
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 2 of 8 · Evidence</span></div>
 </div>
 
 <!-- ═══════════════ PAGE 2 — HOW A RUN WORKS ═══════════════ -->
@@ -541,7 +541,7 @@
     </div>
   </section>
 
-  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 3 of 6 · Anatomy</span></div>
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 3 of 8 · Anatomy</span></div>
 </div>
 
 <!-- ═══════════════ PAGE 3 — VERDICTS & ARCHITECTURE ═══════════════ -->
@@ -658,7 +658,7 @@
     </div>
   </section>
 
-  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 4 of 6 · Verdicts &amp; architecture</span></div>
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 4 of 8 · Verdicts &amp; architecture</span></div>
 </div>
 
 <!-- ═══════════════ PAGE 5 — THE LOOP & CALIBRATION ═══════════════ -->
@@ -678,6 +678,7 @@
       <tr><td><code>init</code></td><td>Installs the agent layer — skill, session-start hook, AGENTS.md section — at the git root.</td></tr>
       <tr><td><code>claims</code></td><td>Lists the claims and reports drift against the <code>@claim</code> annotations in the code.</td></tr>
       <tr><td><code>scaffold</code></td><td>Proposes faults mechanically for one file, as a draft claims document. A starting point, not an answer.</td></tr>
+      <tr><td><code>sweep</code></td><td>The cold start: propose and probe faults for changed files that carry <em>no</em> claim.</td></tr>
       <tr><td class="v-good"><code>probe</code></td><td>The engine. Inject each fault, run its defenders, report what survived.</td></tr>
       <tr><td><code>admit</code></td><td>The two-gate rule as one verb: green on HEAD <em>and</em> failing on every fault of the claim. Otherwise the test is not a defender.</td></tr>
       <tr><td><code>baseline</code></td><td>Freezes today's unproven findings so only new ones gate.</td></tr>
@@ -728,20 +729,135 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
     </div>
   </section>
 
-  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 5 of 6 · The loop &amp; calibration</span></div>
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 5 of 8 · The loop &amp; calibration</span></div>
 </div>
 
-<!-- ═══════════════ PAGE 4 — DIFFERENCE ═══════════════ -->
+
+<!-- ═══════════════ PAGE 6 — STARTING FROM ZERO ═══════════════ -->
 <div class="page">
   <div class="masthead">
     <div class="wordmark">Test<span class="mark">Guard</span></div>
-    <div class="meta">06 — Prior art &amp; difference</div>
+    <div class="meta">06 — Starting from zero</div>
   </div>
 
   <section style="margin-top:17px">
-    <h2>What is not new</h2>
+    <h2>The bottleneck was never verification</h2>
+    <p class="lede">A verifier with no claim about a feature is silent about it by construction. Every
+    escaped defect in the field reports was a <strong>claim gap</strong> — not a probe that missed.</p>
+    <p>So the scarce thing is not the engine. It is the <em>oracle</em>: a sentence about what must be
+    true, written by someone who is not the code. <code>gate</code> names the changed files that carry no
+    claim and stops there, correctly — stating a claim is a human act. But a team adopting this reads
+    that list, has nothing to compare it against, and closes the tab.</p>
+  </section>
+
+  <section class="rule-top">
+    <h2>Field report C — where a save button actually fails</h2>
+    <p>Twenty-six faults injected on the persistence path of seven server actions in a real
+    AI-authored application: the database write itself, and the fields of the payload it carries.</p>
+    <figure style="margin-top:11px">
+      <svg viewBox="0 0 760 150" role="img" aria-label="Save-path measurement: 12 of 26 faults survived, all of them a dropped payload field; 10 of 10 tests mock the database and none read back">
+        <rect x="0" y="0" width="243" height="74" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
+        <text x="18" y="38" style="font-family:var(--sans);font-size:27px;font-weight:700;letter-spacing:-0.03em;fill:#b85636">12 of 26</text>
+        <text class="s-sub" x="18" y="56" style="font-size:8px">survived a fully green suite</text>
+        <text class="s-sub" x="18" y="68" style="font-size:8px">46% of the persistence path</text>
+
+        <rect x="258" y="0" width="243" height="74" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
+        <text x="276" y="38" style="font-family:var(--sans);font-size:27px;font-weight:700;letter-spacing:-0.03em;fill:#191917">12 of 12</text>
+        <text class="s-sub" x="276" y="56" style="font-size:8px">survivors were a dropped payload</text>
+        <text class="s-sub" x="276" y="68" style="font-size:8px">field — not one was anything else</text>
+
+        <rect x="516" y="0" width="244" height="74" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
+        <text x="534" y="38" style="font-family:var(--sans);font-size:27px;font-weight:700;letter-spacing:-0.03em;fill:#191917">10 of 10</text>
+        <text class="s-sub" x="534" y="56" style="font-size:8px">tests mock the database; none</text>
+        <text class="s-sub" x="534" y="68" style="font-size:8px">read the record back</text>
+
+        <rect x="0" y="86" width="760" height="58" rx="4" fill="#fbf1ec" stroke="#e8d5cc"/>
+        <text class="s-tiny" x="16" y="104" style="fill:#b85636">The worst case — user registration</text>
+        <text class="s-sub" x="16" y="120" style="font-size:7.8px">Each of email, username, password_hash, terms_accepted_at and terms_version can be removed from the row that is</text>
+        <text class="s-sub" x="16" y="133" style="font-size:7.8px">written, and no test fails. The tests assert that the write was called. They never assert what it was called with.</text>
+      </svg>
+      <p class="figcap">Fig. 7 — The save button reports success. The suite agrees. The column is empty.</p>
+    </figure>
+    <p class="note">This is the page-one exhibit again, measured rather than recounted: an assertion that
+    names the call but not the payload cannot fail when a field goes missing. It is invisible to coverage,
+    invisible to a mutation score, and invisible to the test's own author.</p>
+  </section>
+
+  <section class="rule-top">
+    <h2>A ladder, so a repository with no claims is not stuck</h2>
+    <div class="cols-3">
+      <div>
+        <h3>Nothing written</h3>
+        <p class="note"><code>sweep</code> takes the changed files the gate just called uncovered,
+        proposes faults with the mechanical producers, probes a bounded selection, and reports what
+        nothing noticed. A fault that survives needs no claim to be alarming.</p>
+      </div>
+      <div>
+        <h3>A sentence or ten</h3>
+        <p class="note">A <em>concern</em> — “every save persists its data” — is one sentence that applies
+        across two hundred screens. It is human-anchored and machine-instantiated, and every proposal it
+        produces still has to survive an execution gate.</p>
+      </div>
+      <div>
+        <h3>A claim</h3>
+        <p class="note">The survivors worth defending become the first claims: a statement, its faults,
+        and a reproducer already in hand. The ladder ends where the rest of this brief begins.</p>
+      </div>
+    </div>
+    <p class="note" style="margin-top:9px">Three rules keep the bottom rung safe on a repository that has
+    never seen this tool. A sweep <strong>never writes the claims file</strong> — a sentence nobody wrote
+    is not a claim. Its evidence <strong>never replaces</strong> the canonical evidence, which is the
+    record of what the project actually claims. And it <strong>does not fail on its own bad guess</strong>:
+    only a survivor or an untested file exits non-zero, because a proposal that would not compile is the
+    tool’s mistake, and a tool that fails on its own mistakes gets switched off.</p>
+  </section>
+
+  <div class="pull">
+    <p>A sweep is weaker evidence than a probe, and says so. Nobody stated that the behaviour mattered.
+    It is stronger than nothing, which is what a repository with no claims has.</p>
+    <div class="attrib">Why the ladder has a bottom rung</div>
+  </div>
+
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 6 of 8 · Starting from zero</span></div>
+</div>
+
+<!-- ═══════════════ PAGE 7 — PRIOR ART & DIFFERENCE ═══════════════ -->
+<div class="page">
+  <div class="masthead">
+    <div class="wordmark">Test<span class="mark">Guard</span></div>
+    <div class="meta">07 — Prior art</div>
+  </div>
+
+  <section style="margin-top:17px">
+    <h2>What is not new, and who solved which part</h2>
     <p>Breaking code to test your tests is <strong>mutation testing</strong>, and it dates to the 1970s.
-    Stryker, PIT, mutmut and Cosmic Ray all do it. Anyone claiming that part is novel is selling something.</p>
+    Stryker, PIT, mutmut and Cosmic Ray all do it. Anyone claiming that part is novel is selling something.
+    Two industrial programmes solved the parts that make it usable, and this tool takes both.</p>
+    <div class="cols-2" style="margin-top:11px">
+      <div>
+        <h3>Google — making it affordable</h3>
+        <p class="note">Mutating two billion lines is infeasible, so Petrović et al. mutate only
+        <em>changed</em> lines, suppress “arid” nodes nobody would test, cap what is surfaced at seven
+        per file, and order candidates by the measured productivity of the operator in similar context.
+        Developer feedback over six years took their productive rate from <strong>15% to 89%</strong>.
+        A later study found reported mutants are coupled to real faults: the bugs they analysed would
+        have been caught had a mutant been surfaced.</p>
+        <p class="note"><em>Taken here:</em> the diff scope, the cap, and a productivity-ordered
+        selection — measured on real probed faults rather than assumed.</p>
+      </div>
+      <div>
+        <h3>Meta — making it specific</h3>
+        <p class="note">ACH inverts the generator: an engineer writes a <em>concern</em> in plain text,
+        an LLM drafts faults for that concern, and each one must build, survive the existing suite, and
+        not be equivalent before a test is generated to kill it. Engineers accepted <strong>73%</strong>
+        of the resulting tests. Nothing is trusted because a model said it — every step is gated by
+        execution, and the mutant is shown to the reviewer as proof the test catches something real.</p>
+        <p class="note"><em>Taken here:</em> the concern as the unit a human writes, and an execution
+        gate between every model step and the record.</p>
+      </div>
+    </div>
+    <p class="note" style="margin-top:9px">What neither does is bind a fault to a <em>stated promise</em>.
+    That is the remaining gap, and it is the next section.</p>
   </section>
 
   <section class="rule-top">
@@ -812,6 +928,51 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
     <strong>audit</strong>, and it is the whole design.</p>
   </section>
 
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 7 of 8 · Prior art</span></div>
+</div>
+
+<!-- ═══════════════ PAGE 8 — DIFFERENCE ═══════════════ -->
+<div class="page">
+  <div class="masthead">
+    <div class="wordmark">Test<span class="mark">Guard</span></div>
+    <div class="meta">08 — Difference</div>
+  </div>
+
+  <section style="margin-top:17px">
+    <h2>And one thing that was measured, not assumed</h2>
+    <p class="note">“No model decides a verdict” is a design rule elsewhere in this brief. It is also a
+    result. A calibrated commercial decision model was shadow-evaluated against real probed verdicts on
+    an AI-authored codebase: asked whether a given test would catch a given fault, it scored
+    <strong>AUC 0.813</strong> — and its errors ran in the forbidden direction, confidently reporting
+    that a test would catch a fault that in fact survived. On hand-built fixtures the same model looked
+    far better, which is the second finding: a synthetic fixture flatters any judge, because its blind
+    spots were authored to be legible. Execution remains the only thing permitted to say
+    <code>killed</code>.</p>
+  </section>
+
+  <section class="rule-top">
+    <h2>What it deliberately is not</h2>
+    <div class="cols-2">
+      <div><ul class="ticks">
+        <li><strong>Not a test generator.</strong> It judges a test the agent wrote; the generating half
+        stays with the agent, where the market is putting it.</li>
+        <li><strong>Not a coverage tool.</strong> A line executed says nothing about whether an assertion
+        would notice.</li>
+      </ul></div>
+      <div><ul class="ticks">
+        <li><strong>Not a mutation-score dashboard.</strong> No blanket mutants, no single number, no
+        threshold to game.</li>
+        <li><strong>Not a self-healing runner.</strong> A defender that adapts itself to a change is a
+        defender that did not observe it.</li>
+      </ul></div>
+    </div>
+    <p class="note" style="margin-top:9px">And one gap it names rather than hides: a claim that
+    <em>disappeared</em> is invisible to all of the above — <code>probe</code> verifies the claims that
+    exist, and deleting one is cheaper than weakening it. So removal is reported too, against any
+    reference, with the verdict the claim last had. Removal is allowed; claims can be wrong, superseded
+    or split. It is never silent.</p>
+  </section>
+
   <section class="rule-top">
     <h2>Three more things that follow from it</h2>
     <div class="cols-3">
@@ -840,7 +1001,7 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
     <div class="attrib">github.com/raccioly/testguard · npm testguard-cli · MIT</div>
   </div>
 
-  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 6 of 6 · Difference</span></div>
+  <div class="footer"><span>TestGuard — Technical Brief</span><span>Page 8 of 8 · Difference</span></div>
 </div>
 
 </body>

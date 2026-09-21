@@ -580,6 +580,32 @@ talks to the network; only the job posts, and only when told to.
   toward green. The one pass is `killed`; everything else gates.
 - **One exact-pinned runtime dependency** (`ajv`), Node ≥ 20, MIT.
 
+### Prior art, and what was taken from where
+
+Breaking code to test the tests is mutation testing, and it dates to the 1970s.
+Two industrial programmes solved the parts that make it usable, and this tool
+takes from both.
+
+**Google** made it affordable: mutate only *changed* lines, cap what is
+surfaced at seven per file, and order candidates by the measured productivity
+of the operator in similar context — developer feedback took their productive
+rate from 15% to 89%
+([Petrović et al., 2021](https://arxiv.org/abs/2102.11378)). `sweep`'s diff
+scope, its cap and its ordering are theirs; the productivity prior here is
+measured on real probed faults rather than assumed.
+
+**Meta** made it specific: an engineer writes a *concern* in plain text, a
+model drafts faults for it, and every step is gated by execution before a
+human ever sees it — 73% of the resulting tests were accepted
+([Foster et al., FSE 2025](https://arxiv.org/abs/2501.12862)). The rule that
+nothing a model proposes reaches the claims file without passing `probe` and a
+human keep is theirs.
+
+What neither does is bind a fault to a **stated promise**, which is what this
+tool is for. The full record — including what was deliberately *not* taken, the
+measured reason no model decides a verdict, and the gaps in what we borrowed —
+is in [`docs-canonical/PRIOR-ART.md`](docs-canonical/PRIOR-ART.md).
+
 ### What TestGuard is not
 
 - **Not a test generator.** It judges a test the agent wrote (`admit`); the
