@@ -451,6 +451,14 @@ Three rules make it safe to run on a repository that has never seen this tool:
   is reported and never gates — a tool that fails because its own guess was bad
   is a tool people switch off.
 
+The ordering **learns from your own runs**. Every evidence record already
+carries a fault class and a verdict, so "how often does a fault of this class
+survive here" is a tally, not a new thing to collect — a sweep persists its
+evidence and the next one reads it. A project with no evidence falls back to
+the shipped prior and says so; one with its own records overrides it in
+proportion to how many it has. The report names which, because an ordering
+nobody can trace is a number nobody should trust.
+
 The cap and the ordering are Google's: their mutation service surfaces at most
 7 × |files| mutants per change and orders candidates on the measured
 productivity of their operator in similar context, which took their productive

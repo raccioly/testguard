@@ -329,6 +329,29 @@
       "items": {
         "type": "object"
       }
+    },
+    "ordering": {
+      "type": "object",
+      "required": [
+        "observed",
+        "sources"
+      ],
+      "additionalProperties": false,
+      "description": "Where the candidate ordering came from. `observed` is how many of this project's OWN probed faults informed it; 0 means the shipped productivity prior was used unchanged. An ordering nobody can trace is a number nobody should trust.",
+      "properties": {
+        "observed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "The evidence documents the counts were read from."
+        }
+      }
     }
   }
 }

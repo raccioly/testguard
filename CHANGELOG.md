@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mocking tests.
 - `scope.provability` on the sweep document, with a validator rule that every
   target is classified exactly once.
+- The candidate ordering now **learns from this project's own probed verdicts**
+  instead of only the shipped productivity prior. Every evidence record already
+  carries a `faultClass` and a `verdict`, so "how often does a fault of this
+  class survive *here*" is a tally rather than a new thing to capture. A sweep
+  persists its own evidence to `.testguard/sweep-evidence.json` — beside the
+  canonical one, never replacing it — so the next run learns from
+  machine-proposed faults, the same distribution the ranker orders. The sweep
+  document records `ordering.observed` and `ordering.sources`, because an
+  ordering nobody can trace is a number nobody should trust.
 
 ### Added
 

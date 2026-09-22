@@ -35,6 +35,7 @@ import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
 import { computeChangedGate } from '../gate/changed.mjs';
 import { scaffoldFile } from '../scaffold/scaffold.mjs';
 import { selectFaults, onWritePath, capFor } from '../supply/select.mjs';
+import { learnedProductivity } from '../supply/feedback.mjs';
 import { saveSurface } from '../supply/savepath.mjs';
 import { persistenceSignals, persistenceHint, provabilitySummary } from '../supply/persistence.mjs';
 import { probe } from '../probe/probe.mjs';
@@ -194,8 +195,14 @@ export async function sweep({
     ? provabilitySummary(projectDir, targets, (f) => discoverDefenders(projectDir, f))
     : null;
 
+  // Order by what THIS project's own runs have shown, not only by what was
+  // measured elsewhere. A project that has probed nothing falls back to the
+  // shipped prior; one with its own records overrides it in proportion to how
+  // many it has. This is the feedback half of Google's 15%-to-89%, using data
+  // the project already produced rather than a new thing to collect.
+  const learned = learnedProductivity(projectDir);
   const limit = cap ?? capFor(targets.length);
-  const selection = selectFaults(candidates, { cap: limit });
+  const selection = selectFaults(candidates, { cap: limit, table: learned.table });
   const claims = claimsFromSelection(selection.selected);
 
   let evidence = { records: [] };
@@ -258,6 +265,12 @@ export async function sweep({
       byClass: selection.byClass,
     },
     counts,
+    ordering: { observed: learned.observed, sources: learned.sources },
+    // Carried, not written here: the caller owns I/O. Persisting it is what
+    // closes the feedback loop — the next sweep learns from these verdicts,
+    // which are MACHINE-proposed faults and so the closest observation of the
+    // distribution the ranker orders.
+    evidence,
     findings: ordered,
     exitCode: gating > 0 ? 1 : 0,
     drafts,
@@ -295,6 +308,12 @@ export function renderSweep(doc, { limit = 20 } = {}) {
   }
   out.push(`proposed ${selection.proposed} fault${selection.proposed === 1 ? '' : 's'}, probed ${selection.selected} (cap ${selection.cap})${selection.deferred ? `, deferred ${selection.deferred}` : ''}.`);
   if (selection.deferred) out.push(`  The ${selection.deferred} deferred are not a verdict: raise --cap${saves ? '.' : ', or sweep a smaller change.'}`);
+  // An ordering nobody can trace is a number nobody should trust.
+  if (doc.ordering) {
+    out.push(doc.ordering.observed === 0
+      ? '  ordering: the shipped productivity prior — this project has no probed evidence yet.'
+      : `  ordering: ${doc.ordering.observed} probed fault${doc.ordering.observed === 1 ? '' : 's'} of this project's own (${doc.ordering.sources.join(', ')}), shrunk toward the shipped prior.`);
+  }
   for (const s of scope.skipped ?? []) out.push(`  skipped ${s.file}: ${s.reason}`);
   out.push('');
 

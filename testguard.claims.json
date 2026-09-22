@@ -4587,6 +4587,49 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-ORDERING-LEARNS-HONESTLY-OR-NOT-AT-ALL",
+      "statement": "The candidate ordering is learned from this project's own probed verdicts as a posterior mean over combined counts, counting only killed and survived; a verdict that says the question could not be asked never becomes evidence about a fault class.",
+      "source": {
+        "kind": "manual",
+        "ref": "src/supply/feedback.mjs"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-21T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/supply-feedback.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "nocover, unverifiable, fault-invalid, timeout and flaky-defender are counted as observations, so a class the tool could not measure is ranked as if it had been.",
+          "faultClass": "statement-deleted",
+          "file": "src/supply/feedback.mjs",
+          "find": "    if (r.verdict !== 'killed' && r.verdict !== 'survived') continue;",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The posterior mean is replaced by the raw local rate, so three observations of a class override a measured prior outright and the number stops being calibrated.",
+          "faultClass": "variable-swap",
+          "file": "src/supply/feedback.mjs",
+          "find": "    out[cls] = { p: survived / n, n, observed: l?.n ?? 0 };",
+          "replace": "    out[cls] = { p: l ? l.survived / l.n : s.p, n, observed: l?.n ?? 0 };",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
     }
   ]
 }

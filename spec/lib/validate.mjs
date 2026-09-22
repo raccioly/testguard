@@ -350,6 +350,12 @@ const semantic = {
     const notKilled = probed - (doc.counts.killed ?? 0);
     if (doc.findings.length !== notKilled) errors.push({ path: '/findings', message: `${doc.findings.length} findings for ${notKilled} records that were not killed; findings are every non-killed record` });
 
+    // An ordering that claims to have learned from something must name it.
+    if (doc.ordering) {
+      if (doc.ordering.observed > 0 && doc.ordering.sources.length === 0) errors.push({ path: '/ordering/sources', message: 'an ordering learned from evidence must name the documents it was learned from' });
+      if (doc.ordering.observed === 0 && doc.ordering.sources.length > 0) errors.push({ path: '/ordering/observed', message: 'sources are named but nothing was observed; the ordering used the shipped prior' });
+    }
+
     const gating = doc.findings.filter((f) => f.verdict === 'survived' || f.verdict === 'nocover').length;
     if (gating > 0 && doc.exitCode !== 1) errors.push({ path: '/exitCode', message: 'a survived or nocover finding must exit 1; a sweep never passes over a deliberate break nothing noticed' });
     if (gating === 0 && doc.exitCode !== 0) errors.push({ path: '/exitCode', message: 'exit 1 requires a survived or nocover finding; a sweep does not fail on its own unanchorable proposal' });

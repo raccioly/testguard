@@ -4,6 +4,14 @@ import { resolveChangedRef } from '../gate/changed.mjs';
 import { writeSpecDoc } from '../evidence/writer.mjs';
 
 export const sweepPath = (projectDir) => join(projectDir, '.testguard', 'sweep.json');
+/**
+ * A sweep's own evidence, beside the canonical one and never replacing it.
+ * The next sweep reads it to learn which fault classes are productive HERE,
+ * which is the feedback half of the selection Google reports taking from 15%
+ * to 89% productive. Machine-proposed faults, so it is the closest observation
+ * of the distribution the ranker actually orders.
+ */
+export const sweepEvidencePath = (projectDir) => join(projectDir, '.testguard', 'sweep-evidence.json');
 
 /**
  * `testguard sweep [dir] --changed <ref>`: propose faults for the changed
@@ -68,12 +76,16 @@ export async function sweepCommand({ projectDir, values, version }, io) {
   });
   if (process.stderr.isTTY && !values.quiet && !values.json) process.stderr.write('\r\x1b[K');
 
+  const { evidence, ...document } = doc;
   const outPath = values.out ? resolve(values.out) : sweepPath(projectDir);
-  writeSpecDoc('sweep', outPath, doc);
+  writeSpecDoc('sweep', outPath, document);
+  // Written only when something was actually probed: an empty document would
+  // teach the next run that every class is unproductive.
+  if (evidence?.records?.length) writeSpecDoc('evidence', sweepEvidencePath(projectDir), evidence);
   if (values.json) {
-    io.out(JSON.stringify(doc, null, 2));
+    io.out(JSON.stringify(document, null, 2));
   } else {
-    io.out(renderSweep(doc, { limit: Number(values.max) || 20 }));
+    io.out(renderSweep(document, { limit: Number(values.max) || 20 }));
     if (!values.quiet) io.out(`\nsweep: ${outPath}`);
   }
   return doc.exitCode;
