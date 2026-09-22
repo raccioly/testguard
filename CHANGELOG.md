@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-22
+
+Automated weekly release — everything merged since `v0.11.0`.
+
+### Changed
+
+- feat(sweep): --save-paths, and the denominator a save report is read against (#156)
+- docs: make the brief describe what the tool actually does, and record the prior art (#155)
+- chore(homebrew): sha256 for v0.11.0 (#153)
+
+
 ### Added
 
 - `sweep --save-paths` — sweep every file that writes to storage instead of the
