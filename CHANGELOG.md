@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   forced to `false` with no test failing) rather than a description of intent;
   and the first rung says its ordering learns from the project's own runs.
   Re-rendered; still eight sheets from eight pages.
+- `docs-canonical/PRIOR-ART.md` records the arid-node measurement instead of
+  a promise: every proposal from four sweeps over two of the maintainer's
+  repositories was classified by hand against Google's five arid categories,
+  and they account for under 1% of what the producers propose. No suppressor
+  is built for them. The same pass found what IS material — presentational
+  JSX taking 29 of 30 probe slots on a UI diff, and 13.5% of Python proposals
+  that cannot compile — and lists both as open, with numbers.
 - `docs-canonical/PRIOR-ART.md` no longer lists the feedback loop and concerns
   as unbuilt. The two gaps that remain are restated precisely: the loop learns
   from verdicts rather than explicit developer clicks, and concerns have no

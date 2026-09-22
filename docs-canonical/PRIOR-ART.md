@@ -49,7 +49,7 @@ numbers are the reason several of our defaults are what they are.
 | **Diff scoping** — mutate only changed lines, surfaced during code review. | `gate --changed`, and `sweep`, which proposes only for changed files. |
 | **A hard cap on what is surfaced** — at most 7 × the number of files in the change, because past that the reader stops reading. | `capFor()` in `src/supply/select.mjs`; the remainder is reported as `deferred`, never dropped. |
 | **Productivity-ordered selection** — order candidates by how often that operator produced a useful mutant in similar context. Developer feedback over six years took their productive rate from **15% to 89%**. | `MEASURED_PRODUCTIVITY` and `scoreOf()` in `src/supply/select.mjs`. Ours is measured on 56 probed faults from a real AI-authored codebase and shrunk toward a neutral prior, so one observation cannot dominate. |
-| **Arid-node suppression** — do not mutate code nobody would write a test for (logging, timeouts, config flags). | Partially: our producers are line-oriented and never propose on comments or blank lines, and `testguard.ignore.json` carries path exclusions with reasons. We have no AST-level arid heuristic. |
+| **Arid-node suppression** — do not mutate code nobody would write a test for (logging, timeouts, config flags). | **Measured, not built.** On 2026-09-22 every fault the producers proposed on two of the maintainer's repositories (`sweep --changed` and `sweep --save-paths`, cap 30, 510 + 581 proposals on a Next.js app and 600 on a Python CLI) was classified by hand against Google's five categories — logging, time/sleep/deadline, config flag, memoisation, monitoring counter. They account for **2 of 510, 0 of 581 and about 4 of 600** proposals: under 1% everywhere, against the ~10% that would have justified a suppressor. The reason is structural: the producers are already shape-targeted (a guard, a payload field, a security literal), so they rarely land on a log line in the first place. What the same measurement found instead is recorded under *Known gaps*. |
 | **Fault coupling as the justification** — their 2021 study found reported mutants are coupled to real faults: bugs they analysed would have been caught had a mutant been surfaced. | The premise behind `replay`, which calibrates fault classes against real fix commits rather than assuming the coupling. |
 
 **Not taken.** Their mutation score, their exhaustive per-line generation, and
@@ -159,7 +159,25 @@ Recorded so they are not mistaken for decisions.
 - **Concerns have no model-backed producer.** The unit shipped; the ACH
   generator that drafts intent-level faults for a concern did not, and is the
   one piece of the rung that would touch the network.
-- **No arid-node heuristic.** We suppress by path, not by AST shape.
+- **No arid-node heuristic, and the measurement says none is needed for
+  Google's categories** (under 1% of proposals; see the Google table). Two
+  different things ARE material, measured on the same runs:
+  - **Presentational JSX.** On a 14-file UI diff, 147 of 510 proposals (29%)
+    were `element-removed` on an icon (`<X />`, `<ChevronLeft />`) or a static
+    wrapper (`<div>`, `<span>`, `<p>` with no expression and no handler). The
+    ranker spent 29 of 30 probe slots on that class and 7 of the 10 survivors
+    were of this shape — findings nobody will write a test for, which is
+    Google's definition of arid, in a syntax Google never mutated. Because the
+    ordering learns from survival, these survivors also teach it to rank the
+    class higher. A line-oriented demotion is designed; it is not built.
+  - **Python continuation lines.** 81 of 600 proposals on a Python CLI
+    (13.5%) did not compile, 77 of them a `statement-deleted` on a line that
+    sits inside a bracket opened on an earlier line. `isIncomplete()` in
+    `src/scaffold/producers.python.mjs` checks only whether the line itself
+    leaves a bracket open. Measured with the tokenizer's exact depth, a
+    running-depth guard on that class catches 74 of the 77 and drops no
+    valid proposal. Not arid — a producer that spends probe runs saying
+    nothing — but found by the same pass.
 - **The persistence signal is confined to the sweep document.** It is not yet
   in `evidence.defenders.signals`, which is a closed enum in the shared
   claimspec contract and needs a coordinated bump.
