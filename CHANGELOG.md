@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `sweep` sets aside a purely presentational JSX element — an icon, or a
+  static wrapper with no expression and no handler — instead of spending a
+  probe run on it, and says so: `selection.presentational` in the document, a
+  line in the report, and the remainder arithmetic now proves
+  proposed = probed + deferred + set aside. Measured on a 14-file UI diff:
+  150 of 510 proposals, 29 of 30 probe slots and 7 of 10 survivors were of
+  this shape — Google's definition of an arid node, in a syntax Google never
+  mutated. Because the ordering learns from survival, those survivors were
+  also teaching it to rank the class higher; set-aside proposals never enter
+  the evidence, so they no longer can. Google's own five arid categories were
+  measured at under 1% of proposals and are not suppressed.
+
+### Fixed
+
+- Python defender discovery lost the last name on an import line that ends in
+  a comment: `from pkg import cli, demo  # noqa: E402` found only `cli`, and
+  `import pkg.demo  # noqa` found nothing. On a real suite where `# noqa` is
+  the idiom of every src-layout test, 12 of 30 probed faults were reported
+  NOCOVER for modules whose tests import them — a gating verdict in the
+  forbidden direction. Comments are now stripped before names are read.
+- File walking descended into `.claude/`, so a nested agent worktree under
+  `.claude/worktrees/` contributed another branch's tests as defenders of this
+  tree — files the scratch worktree cannot even contain, because the directory
+  is gitignored. `.claude` joins the tool-directory skip list, and the claim
+  that promised this now names it.
+- The Python `statement-deleted` producer proposed on lines inside a bracket
+  opened earlier — `help="…")` inside an `add_argument(` — and none of those
+  faults compiled: 81 of 600 proposals on a real CLI (13.5%). The producer now
+  tracks bracket depth across lines (triple-quoted strings included, so a
+  docstring's parentheses cannot leave the rest of the file "inside") and
+  refuses the `pass` shapes there; dict entries and call arguments keep their
+  own producers. Re-measured: 7 of 526 (1.3%).
+
 ### Changed
 
 - The technical brief carries the 0.12 and 0.13 results it was missing: the

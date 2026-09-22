@@ -60,6 +60,54 @@ function isIncomplete(line) {
   return depth > 0;
 }
 
+/**
+ * The bracket depth at the START of every line, for the whole file.
+ *
+ * `isIncomplete()` answers "does this line leave a bracket open"; this answers
+ * the other half, "does this line sit inside one opened above it". Measured on
+ * a real Python CLI: 77 of 600 proposals were a `statement-deleted` on a
+ * continuation line — `help="...")` inside an `add_argument(` — and none of
+ * them compiled. The tokenizer's exact depth agreed on 74 of the 77 and
+ * flagged no valid proposal: a dict entry or a call argument is inside a
+ * bracket by definition and keeps its own producer.
+ *
+ * Line-oriented, no AST: triple-quoted strings are tracked across lines so a
+ * docstring's parentheses cannot leave the rest of the file "inside" forever,
+ * and single-line strings and comments are skipped. Memoised per `lines`
+ * array because the scaffold calls the producer once per line.
+ */
+const DEPTHS = new WeakMap();
+export function depthBefore(lines) {
+  if (DEPTHS.has(lines)) return DEPTHS.get(lines);
+  const out = new Array(lines.length);
+  let depth = 0;
+  let triple = null;
+  for (let i = 0; i < lines.length; i++) {
+    out[i] = depth;
+    const line = lines[i];
+    for (let j = 0; j < line.length;) {
+      if (triple) {
+        if (line.startsWith(triple, j)) { triple = null; j += 3; } else j += line[j] === '\\' ? 2 : 1;
+        continue;
+      }
+      const ch = line[j];
+      if (ch === '#') break;
+      if (line.startsWith('"""', j) || line.startsWith("'''", j)) { triple = line.slice(j, j + 3); j += 3; continue; }
+      if (ch === '"' || ch === "'") {
+        let k = j + 1;
+        while (k < line.length && line[k] !== ch) k += line[k] === '\\' ? 2 : 1;
+        j = k + 1; // an unterminated string runs to the end of the line
+        continue;
+      }
+      if (ch === '(' || ch === '[' || ch === '{') depth++;
+      else if (ch === ')' || ch === ']' || ch === '}') depth = Math.max(0, depth - 1);
+      j++;
+    }
+  }
+  DEPTHS.set(lines, out);
+  return out;
+}
+
 /** The function a `def` line opens, or null. */
 export function functionHead(line) {
   const m = DEF_LINE.exec(line);
@@ -166,9 +214,13 @@ export function proposalsForLine(lines, i, ctx = {}) {
   if (!line.trim() || COMMENT.test(line) || DEFINITION.test(line)) return out;
   const params = ctx.params ?? new Set();
   const indent = ' '.repeat(indentOf(line) ?? 0);
+  // A line inside a bracket opened above it is an argument or an entry, never
+  // a statement: `pass` there does not parse. The shapes that keep their own
+  // producers on such a line (a dropped field, a swapped argument) are below.
+  const inside = depthBefore(lines)[i] > 0;
 
   const ifm = IF_LINE.exec(line);
-  if (ifm && isGuard(ifm[4], lines, i)) {
+  if (!inside && ifm && isGuard(ifm[4], lines, i)) {
     if (ifm[4]) {
       // `if not allowed: raise …` — the whole guard is this one line.
       out.push({ faultClass: 'statement-deleted', description: `Guard removed: \`${line.trim()}\` no longer runs.`, replace: `${indent}pass` });
@@ -183,7 +235,7 @@ export function proposalsForLine(lines, i, ctx = {}) {
     out.push({ faultClass: 'return-altered', description: `Check always passes: \`return ${rm[2]}\` becomes \`return True\`.`, replace: `${rm[1]}return True` });
   }
 
-  const complete = !isIncomplete(line);
+  const complete = !inside && !isIncomplete(line);
   if (complete && CHECK_CALL.test(line)) {
     out.push({ faultClass: 'call-removed', description: `Check call removed: \`${line.trim()}\` no longer runs.`, replace: `${indent}pass` });
   } else if (complete && MUTATION.test(line)) {

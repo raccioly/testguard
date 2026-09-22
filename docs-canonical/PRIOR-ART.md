@@ -162,7 +162,7 @@ Recorded so they are not mistaken for decisions.
 - **No arid-node heuristic, and the measurement says none is needed for
   Google's categories** (under 1% of proposals; see the Google table). Two
   different things ARE material, measured on the same runs:
-  - **Presentational JSX.** On a 14-file UI diff, 147 of 510 proposals (29%)
+  - **Presentational JSX.** On a 14-file UI diff, 150 of 510 proposals (29%)
     were `element-removed` on an icon (`<X />`, `<ChevronLeft />`) or a static
     wrapper (`<div>`, `<span>`, `<p>` with no expression and no handler). The
     ranker spent 29 of 30 probe slots on that class and 7 of the 10 survivors

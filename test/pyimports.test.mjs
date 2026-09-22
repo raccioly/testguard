@@ -54,6 +54,16 @@ describe('import forms', () => {
     expect(found).toEqual(expect.arrayContaining(['pkg', 'pkg.mod']));
   });
 
+  it('a trailing comment never swallows the last name — `# noqa: E402` is the src-layout idiom', () => {
+    // Measured on a real suite: 72 import lines carried `# noqa`, and every
+    // module named LAST on such a line was reported as having no defender.
+    expect(pyImports('from pkg import cli, demo  # noqa: E402\n')).toContain('pkg.demo');
+    expect(pyImports('from pkg import cli, demo  # noqa: E402\n')).toContain('pkg.cli');
+    expect(pyImports('import pkg.demo  # noqa\n')).toContain('pkg.demo');
+    expect(pyImports('import pkg.demo as d  # noqa\n')).toContain('pkg.demo');
+    expect(pyImports('from pkg.mod import (\n    a,  # first\n    b,  # second\n)\n')).toEqual(expect.arrayContaining(['pkg.mod.a', 'pkg.mod.b']));
+  });
+
   it('joins a parenthesised list and a backslash continuation, and skips comments', () => {
     expect(pyImports('from pkg.mod import (\n    a,\n    b,\n)\n')).toContain('pkg.mod.b');
     expect(pyImports('from pkg.mod import a, \\\n    b\n')).toContain('pkg.mod.b');

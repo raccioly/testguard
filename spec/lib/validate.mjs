@@ -333,7 +333,8 @@ const semantic = {
     const s = doc.selection;
     // A cap that hides its remainder is a coverage claim nobody made, so the
     // arithmetic that proves nothing was dropped is checked, not trusted.
-    if (s.proposed !== s.selected + s.deferred) errors.push({ path: '/selection/proposed', message: `proposed (${s.proposed}) must equal selected (${s.selected}) + deferred (${s.deferred})` });
+    const setAside = s.presentational ?? 0;
+    if (s.proposed !== s.selected + s.deferred + setAside) errors.push({ path: '/selection/proposed', message: `proposed (${s.proposed}) must equal selected (${s.selected}) + deferred (${s.deferred})${setAside ? ` + presentational (${setAside})` : ''}` });
     if (s.selected > s.cap) errors.push({ path: '/selection/selected', message: `selected (${s.selected}) exceeds the cap (${s.cap})` });
     if (doc.scope.swept > doc.scope.targets) errors.push({ path: '/scope/swept', message: `swept (${doc.scope.swept}) cannot exceed targets (${doc.scope.targets})` });
     // The counters that only mean something in one mode must not appear in the

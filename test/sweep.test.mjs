@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validate } from '../spec/lib/validate.mjs';
-import { renderSweep, findingFrom, sortFindings, gatingCount, GATING } from '../src/sweep/sweep.mjs';
+import { renderSweep, findingFrom, sortFindings, gatingCount, summarizeSelection, GATING } from '../src/sweep/sweep.mjs';
 
 const finding = (over = {}) => ({
   file: 'src/a.ts',
@@ -38,6 +38,13 @@ describe('sweep document — the arithmetic that proves nothing was hidden', () 
   it('selected + deferred must account for every proposal', () => {
     // A cap that hides its own remainder is a coverage claim nobody made.
     expect(errs(doc({ selection: { ...doc().selection, deferred: 2 } }))[0]).toMatch(/proposed \(5\) must equal selected \(2\) \+ deferred \(2\)/);
+  });
+
+  it('proposals set aside as presentational are part of the remainder arithmetic, never outside it', () => {
+    const withAside = { ...doc().selection, deferred: 2, presentational: 1 };
+    expect(validate('sweep', doc({ selection: withAside }))).toEqual({ ok: true, errors: [] });
+    // Hiding one behind the count is exactly what the rule exists to refuse.
+    expect(errs(doc({ selection: { ...withAside, deferred: 3 } }))[0]).toMatch(/proposed \(5\) must equal selected \(2\) \+ deferred \(3\) \+ presentational \(1\)/);
   });
 
   it('a selection cannot exceed its own cap', () =>
@@ -103,6 +110,12 @@ describe('renderSweep — says what it did not do, as well as what it did', () =
     expect(text).toMatch(/not a verdict/);
   });
 
+  it('names the presentational elements it set aside, and why', () => {
+    const text = renderSweep(doc({ selection: { ...doc().selection, deferred: 2, presentational: 1 } }));
+    expect(text).toMatch(/1 presentational element \(icons, static wrappers\) set aside/);
+    expect(text).toMatch(/wrong lesson/);
+  });
+
   it('a file that yielded nothing is reported, not dropped', () =>
     expect(renderSweep(doc({ scope: { mode: 'changed', changed: 3, targets: 2, swept: 1, skipped: [{ file: 'src/b.ts', reason: 'no line in this file matches a fault producer' }] } })))
       .toMatch(/skipped src\/b\.ts/));
@@ -117,6 +130,19 @@ describe('renderSweep — says what it did not do, as well as what it did', () =
 
   it('nothing to propose is a sentence, not an empty report', () =>
     expect(renderSweep(doc({ scope: { mode: 'changed', changed: 3, targets: 0, swept: 0 } }))).toMatch(/Nothing to propose/));
+});
+
+describe('summarizeSelection — the engine writes the count the validator checks', () => {
+  const sel = (n) => ({ selected: [1, 2], deferred: [3], presentational: new Array(n).fill(0), cap: 14, byClass: {} });
+  it('carries the set-aside count into the document', () =>
+    expect(summarizeSelection(sel(4), { proposed: 7 })).toMatchObject({ proposed: 7, selected: 2, deferred: 1, presentational: 4 }));
+  it('omits the field when nothing was set aside, as it omits outOfScope', () => {
+    const s = summarizeSelection(sel(0), { proposed: 3 });
+    expect(s).not.toHaveProperty('presentational');
+    expect(s).not.toHaveProperty('outOfScope');
+  });
+  it('reports what a concern excluded beside what was set aside', () =>
+    expect(summarizeSelection(sel(1), { proposed: 4, outOfScope: 9 })).toMatchObject({ outOfScope: 9, presentational: 1 }));
 });
 
 const record = (over = {}) => ({

@@ -63,6 +63,22 @@ describe('Python producers propose the shapes the spec already closes over', () 
     expect(classes('    render_page(t)\n')).toEqual([]);
   });
 
+  it('never removes a line that sits inside a bracket opened above it, however statement-like it looks', () => {
+    // Measured on a real CLI: `help="..."` continuation lines of add_argument(
+    // matched the mutation shape, and every proposal on them failed to parse.
+    const cli = 'parser.add_argument(\n    "--fail-on",\n    help="exit 1 at this severity",\n    default=None)\nready = True\n';
+    const deleted = propose(cli).filter((p) => p.faultClass === 'statement-deleted');
+    expect(deleted).toHaveLength(1);
+    expect(deleted[0].description).toContain('ready = True');
+    // A docstring's brackets are text, not structure: the file must not stay
+    // "inside" for the rest of its length.
+    const doc = 'def f():\n    """Calls g(x\n    and h(y.\n    """\n    state.ready = True\n';
+    expect(classes(doc)).toContain('statement-deleted');
+    // A one-line guard and a check call are statements too, and get the same refusal.
+    expect(classes('run(\n    if not ok: raise ValueError(x),\n)\n')).not.toContain('statement-deleted');
+    expect(classes('run(\n    validate(x),\n)\n')).not.toContain('call-removed');
+  });
+
   it('drops a field from a payload dict, and never from a class or an unrelated literal', () => {
     const payload = 'def f():\n    store.write_audit({\n        "action": "MASK",\n        "content": redacted,\n    })\n';
     const dropped = propose(payload).filter((p) => p.faultClass === 'field-dropped');
