@@ -22,7 +22,7 @@ const doc = (over = {}) => ({
   base: '0'.repeat(40),
   head: '1'.repeat(40),
   includeDirty: false,
-  scope: { changed: 3, targets: 2, swept: 2 },
+  scope: { mode: 'changed', changed: 3, targets: 2, swept: 2 },
   selection: { proposed: 5, selected: 2, deferred: 3, cap: 14, byClass: { 'field-dropped': { proposed: 5, selected: 2, writePath: 5 } } },
   counts: { survived: 1, killed: 1 },
   findings: [finding()],
@@ -104,7 +104,7 @@ describe('renderSweep — says what it did not do, as well as what it did', () =
   });
 
   it('a file that yielded nothing is reported, not dropped', () =>
-    expect(renderSweep(doc({ scope: { changed: 3, targets: 2, swept: 1, skipped: [{ file: 'src/b.ts', reason: 'no line in this file matches a fault producer' }] } })))
+    expect(renderSweep(doc({ scope: { mode: 'changed', changed: 3, targets: 2, swept: 1, skipped: [{ file: 'src/b.ts', reason: 'no line in this file matches a fault producer' }] } })))
       .toMatch(/skipped src\/b\.ts/));
 
   it('always says the findings are proposals, never claims', () =>
@@ -116,7 +116,7 @@ describe('renderSweep — says what it did not do, as well as what it did', () =
   });
 
   it('nothing to propose is a sentence, not an empty report', () =>
-    expect(renderSweep(doc({ scope: { changed: 3, targets: 0, swept: 0 } }))).toMatch(/Nothing to propose/));
+    expect(renderSweep(doc({ scope: { mode: 'changed', changed: 3, targets: 0, swept: 0 } }))).toMatch(/Nothing to propose/));
 });
 
 const record = (over = {}) => ({
@@ -187,4 +187,41 @@ describe('sortFindings — survivors first, write path before the rest', () => {
     sortFindings(input);
     expect(input[0].verdict).toBe('nocover');
   });
+});
+
+describe('save-paths mode — the denominator is the point', () => {
+  const saveDoc = (over = {}) => doc({
+    scope: { mode: 'save-paths', changed: 0, writeSites: 120, payloadFields: 226, targets: 38, swept: 37 },
+    ...over,
+  });
+
+  it('a conforming save-paths document validates', () =>
+    expect(validate('sweep', saveDoc())).toEqual({ ok: true, errors: [] }));
+
+  it('a save-paths sweep MUST report the surface it sampled', () => {
+    // Findings without a denominator invite the reader to assume the rest is
+    // fine, which is the assumption this mode exists to remove.
+    const { writeSites, ...noSurface } = saveDoc().scope;
+    expect(errs(saveDoc({ scope: noSurface })).join()).toMatch(/must report writeSites/);
+  });
+
+  it('a changed sweep must NOT report a surface it never measured', () =>
+    expect(errs(doc({ scope: { mode: 'changed', changed: 3, targets: 2, swept: 2, writeSites: 9 } })).join())
+      .toMatch(/writeSites belongs to a save-paths sweep/));
+
+  it('every target is a file with at least one write', () =>
+    expect(errs(saveDoc({ scope: { ...saveDoc().scope, targets: 200 } })).join())
+      .toMatch(/targets \(200\) exceeds writeSites \(120\)/));
+
+  it('renders the denominator before the findings, and never advises a smaller change', () => {
+    const text = renderSweep(saveDoc());
+    expect(text.split('\n')[0]).toMatch(/120 writes to storage across 38 files, carrying 226 payload fields\. Swept 37\./);
+    expect(text).toMatch(/a clean sweep says nothing about the ones nobody pointed a fault at/);
+    // "sweep a smaller change" is advice for a diff. There is no change here.
+    expect(text).not.toMatch(/smaller change/);
+  });
+
+  it('a project that writes nothing says so, rather than reporting an empty diff', () =>
+    expect(renderSweep(saveDoc({ scope: { mode: 'save-paths', changed: 0, writeSites: 0, payloadFields: 0, targets: 0, swept: 0 } })))
+      .toMatch(/no write to storage found/));
 });

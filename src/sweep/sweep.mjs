@@ -35,6 +35,7 @@ import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
 import { computeChangedGate } from '../gate/changed.mjs';
 import { scaffoldFile } from '../scaffold/scaffold.mjs';
 import { selectFaults, onWritePath, capFor } from '../supply/select.mjs';
+import { saveSurface } from '../supply/savepath.mjs';
 import { persistenceSignals, persistenceHint } from '../supply/persistence.mjs';
 import { probe } from '../probe/probe.mjs';
 import { hintFor } from '../brief/brief.mjs';
@@ -126,6 +127,7 @@ function claimsFromSelection(selected) {
 export async function sweep({
   projectDir,
   ref,
+  mode = 'changed',
   includeDirty = false,
   exclude = [],
   cap,
@@ -142,9 +144,20 @@ export async function sweep({
   onWarn = () => {},
 }) {
   const gate = computeChangedGate({ projectDir, ref, includeDirty, exclude, toolVersion, claimsPath, ignorePath });
+
+  // ── What the sweep is pointed at. ──
+  // `changed` asks "what did this change leave unclaimed". `save-paths` asks a
+  // question the diff cannot: "of every place this project writes to storage,
+  // how many would notice if the write stopped carrying a field". The second
+  // needs the whole surface, because a clean report over an unstated
+  // denominator is a sample of unknown size, not a guarantee.
+  //
   // A test file with no claim is a different problem — it has nothing to
   // falsify — and the gate already names it. Sweep proposes against source.
-  const targets = gate.uncovered.filter((u) => u.kind === 'source').map((u) => u.file);
+  const surface = mode === 'save-paths' ? saveSurface(projectDir) : null;
+  const targets = surface
+    ? surface.files.map((f) => f.file)
+    : gate.uncovered.filter((u) => u.kind === 'source').map((u) => u.file);
 
   const cPath = claimsPath ?? defaultClaimsPath(projectDir);
   const existingClaims = existsSync(cPath) ? loadClaims(cPath) : { claims: [] };
@@ -220,7 +233,9 @@ export async function sweep({
     head: gate.head,
     includeDirty,
     scope: {
+      mode,
       changed: gate.changed,
+      ...(surface ? { writeSites: surface.siteCount, payloadFields: surface.keyCount } : {}),
       targets: targets.length,
       swept: drafts.length,
       ...(skipped.length ? { skipped } : {}),
@@ -243,13 +258,20 @@ export async function sweep({
 export function renderSweep(doc, { limit = 20 } = {}) {
   const out = [];
   const { scope, selection } = doc;
+  const saves = scope.mode === 'save-paths';
   if (scope.targets === 0) {
-    out.push(`sweep: no changed source file is without a claim against ${doc.ref}. Nothing to propose.`);
+    out.push(saves
+      ? 'sweep: no write to storage found in this project. Nothing to propose.'
+      : `sweep: no changed source file is without a claim against ${doc.ref}. Nothing to propose.`);
     return out.join('\n');
   }
-  out.push(`swept ${scope.swept} of ${scope.targets} unclaimed changed file${scope.targets === 1 ? '' : 's'} against ${doc.ref}.`);
+  // The denominator first. A report that lists findings without saying how much
+  // was looked at invites the reader to assume the rest is fine.
+  out.push(saves
+    ? `${scope.writeSites} write${scope.writeSites === 1 ? '' : 's'} to storage across ${scope.targets} file${scope.targets === 1 ? '' : 's'}, carrying ${scope.payloadFields} payload field${scope.payloadFields === 1 ? '' : 's'}. Swept ${scope.swept}.`
+    : `swept ${scope.swept} of ${scope.targets} unclaimed changed file${scope.targets === 1 ? '' : 's'} against ${doc.ref}.`);
   out.push(`proposed ${selection.proposed} fault${selection.proposed === 1 ? '' : 's'}, probed ${selection.selected} (cap ${selection.cap})${selection.deferred ? `, deferred ${selection.deferred}` : ''}.`);
-  if (selection.deferred) out.push(`  The ${selection.deferred} deferred are not a verdict: raise --cap, or sweep a smaller change.`);
+  if (selection.deferred) out.push(`  The ${selection.deferred} deferred are not a verdict: raise --cap${saves ? '.' : ', or sweep a smaller change.'}`);
   for (const s of scope.skipped ?? []) out.push(`  skipped ${s.file}: ${s.reason}`);
   out.push('');
 
@@ -267,6 +289,12 @@ export function renderSweep(doc, { limit = 20 } = {}) {
       out.push('');
     }
     if (doc.findings.length > limit) out.push(`  … ${doc.findings.length - limit} more in the sweep document`);
+  }
+  if (saves) {
+    out.push('');
+    out.push(`This is a sample of the write surface, not a verdict over it: ${selection.selected} of`);
+    out.push(`${selection.proposed} proposed faults were probed. The ${scope.writeSites} writes above are the`);
+    out.push('denominator — a clean sweep says nothing about the ones nobody pointed a fault at.');
   }
   out.push('These are PROPOSALS, not claims. Keep the ones worth defending: state the');
   out.push('claim, copy its fault into testguard.claims.json, and probe it from then on.');

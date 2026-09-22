@@ -5,7 +5,15 @@ import { join } from 'node:path';
 // virtualenv inside the project holds thousands of `test_*.py` files belonging
 // to installed packages, and without skipping it every one of them would be
 // collected as a test file of the project under probe.
+// `dist` and `coverage` were here from the start; the framework build outputs
+// were not, and the claim above them already promised that "a build's test
+// files" are not this project's. A Next.js `.next/` carries compiled copies of
+// the application — including its writes and its tests — so a surface scan of a
+// real app counted the same code twice and a defender glob could match a
+// compiled chunk. The promise was right and the list was short.
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'coverage', '.testguard',
+  '.next', '.nuxt', '.svelte-kit', '.output', '.turbo', '.parcel-cache', '.angular', '.astro',
+  'build', 'out', '.cache', '.vercel', '.netlify',
   '__pycache__', '.venv', 'venv', 'site-packages', '.tox', '.nox',
   '.pytest_cache', '.mypy_cache', '.ruff_cache', '.eggs']);
 
