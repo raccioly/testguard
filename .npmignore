@@ -3,6 +3,7 @@
 .github/
 .wolf/
 .claude/
+.codex/
 graphify-out/
 test/
 fixtures/

@@ -2,7 +2,7 @@
 
 <!-- docguard:version 1.0.0 -->
 <!-- docguard:status approved -->
-<!-- docguard:last-reviewed 2026-09-19 -->
+<!-- docguard:last-reviewed 2026-09-22 -->
 <!-- docguard:owner @raccioly -->
 <!-- docguard:quality negation-load off — the governing rule is a prohibition (a test that would pass with the behaviour broken is not a test), and the verdict rules are defined by what does not count as detection. -->
 
@@ -20,7 +20,7 @@ the test that defends it, and CI fails if any injected fault survives.
 | Unit | `test/*.test.mjs` | One pure function's branches, without a runner | milliseconds |
 | Conformance | `spec/conformance/` | Every valid example validates; every must-reject document is rejected for the defect its filename names | ~1 s |
 | Anchor preflight | `test/claims-anchors.test.mjs` | Exact anchors still locate, supported replacements parse, the check stays below one second, and CI reaches it before self-probe | <1 s |
-| Fixture acceptance | `test/probe.fixture.test.mjs`, `test/probe.jest.test.mjs`, `test/probe.playwright.test.mjs` | The whole pipeline reproduces a known-answer oracle, one per runner | 10–50 s each |
+| Fixture acceptance | `test/probe.fixture.test.mjs`, `test/probe.jest.test.mjs`, `test/probe.playwright.test.mjs` | The whole pipeline reproduces a known-answer oracle, one per runner. The Playwright fixture carries its own dependencies: without `npm ci --prefix fixtures/known-answer-playwright` that file skips, and a skipped acceptance is not a passing one | 10–50 s each |
 | Self-verification | `testguard.claims.json`, run by `npm run self:probe` | The tool's own invariants survive fault injection | **20.2 min** cold (measured by the v0.10.1 release job on 2026-09-19 at `70e9d61`: 154 faults, 924 defender runs, 1210 s); seconds when verdicts are reused, which is why PR CI restores previous evidence from cache. Budgeted at 1440 s in `testguard.cost-budget.json` for the additional four-fault live-tap claim and **gated** in CI — cost growth is reviewed instead of disappearing into a passing log |
 | Install smoke | `.github/scripts/install-smoke.mjs` | The **packed tarball** runs with production dependencies only | ~20 s |
 | Runtime budget | `ci.yml` | The suite has not silently started walking the wrong tree | gate, not a test |
