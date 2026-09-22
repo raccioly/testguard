@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-22
+
+Automated weekly release — everything merged since `v0.13.0`.
+
+### Changed
+
+- fix: three defects the arid measurement found, presentational JSX set aside, and the claimspec signal bump (#164)
+- docs: carry the 0.12 and 0.13 results into the brief and the prior-art record (#162)
+- chore(homebrew): sha256 for v0.13.0 (#161)
+
+
 ### Added
 
 - **claimspec v1 evidence admits `persistence-payload-unasserted`** to
