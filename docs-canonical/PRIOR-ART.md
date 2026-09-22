@@ -2,7 +2,7 @@
 
 <!-- docguard:version 1.0.0 -->
 <!-- docguard:status approved -->
-<!-- docguard:last-reviewed 2026-09-21 -->
+<!-- docguard:last-reviewed 2026-09-22 -->
 <!-- docguard:owner @raccioly -->
 <!-- docguard:quality passive-voice off — the subject of this document is what was taken from other people's work. "Diff scoping was taken from Google" is the true sentence; rewriting every one to name us as the actor would put the borrower in the foreground of a document about the lender. -->
 <!-- docguard:quality negation-load off — half the value here is what was deliberately NOT taken: not their mutation score, not their equivalence auto-drop, not a model judging a verdict. A record of borrowings that only lists borrowings is the half that misleads. -->
@@ -54,9 +54,11 @@ numbers are the reason several of our defaults are what they are.
 
 **Not taken.** Their mutation score, their exhaustive per-line generation, and
 their AST-based arid heuristics (ours is a different scale and a different
-language surface). Their selection learns continuously from developer
-feedback; **ours does not yet** — see
-[Known gaps](#known-gaps-in-what-we-borrowed).
+language surface). Their selection learns from explicit developer feedback;
+**ours learns from the project's own probed verdicts** (v0.13.0) — every
+evidence record already carries a fault class and a verdict, so the feedback
+is a tally rather than a thing to collect. The combination is a Beta-Binomial
+posterior mean, which is strictly proper; see the Laya section.
 
 ## Meta — making it specific
 
@@ -75,7 +77,7 @@ concern, and every step is gated by execution.
 
 | Taken | Where it lives here |
 |---|---|
-| **The concern as the unit a human writes.** One plain-text sentence generates faults across a whole surface. | The planned Level 1 `testguard.concerns.json`. Not yet implemented — see [Known gaps](#known-gaps-in-what-we-borrowed). |
+| **The concern as the unit a human writes.** One plain-text sentence generates faults across a whole surface. | `testguard.concerns.json` and `sweep --concern` (v0.13.0). Taken WITHOUT the generator: a concern's core is a named scope plus a producer selection, which the mechanical producers already satisfy, so it ships offline. On a real application a five-line concern found an admin route whose owner/manager check can be forced to `false` with no test failing. |
 | **An execution gate between every model step and the record.** A drafted fault must build, must survive the existing suite, and must not be equivalent before a test is generated for it; the generated test must build, pass on the original N times, and kill the fault. | The rule that nothing a model proposes enters `testguard.claims.json` without passing `probe` and a human keep — already how `scaffold` drafts work. |
 | **Show the reviewer the fault as proof.** The engineer sees the concrete fault the test catches, so the model's output is independently checkable rather than self-referential. | Every finding names its fault, its anchor and its reproducer; `admit` reports which fault a candidate test kills. |
 | **Learned, realistic faults rather than syntactic ones** (Beller 2021: operators learned from a corpus of real Java errors and from changes that caused operational anomalies; **>50% of 15,000 generated mutants survived** their suite). | The premise behind `replay`'s fault-class calibration, and behind the planned intent-based producer. Our built-in producers remain deterministic and line-oriented. |
@@ -148,12 +150,15 @@ difference between a metric and an audit.
 
 Recorded so they are not mistaken for decisions.
 
-- **The feedback loop is not built.** Google's 15% → 89% gain came from
-  developer feedback refining suppression and selection over six years. Ours
-  ships a static measured prior. Until keep/drop decisions feed back,
-  `MEASURED_PRODUCTIVITY` is a snapshot of one repository.
-- **Concerns are not implemented.** ACH's central idea — the plain-text concern
-  as the unit a human writes — is planned, not shipped.
+- **The feedback loop learns from verdicts, not from explicit developer
+  clicks.** Google's gain came from "Please fix" / "Not useful" feedback on
+  surfaced mutants. Ours reads survival per fault class from the project's own
+  evidence — the same signal, but it cannot yet distinguish a survivor the
+  developer *acted on* from one they ignored. A keep/drop record would close
+  that.
+- **Concerns have no model-backed producer.** The unit shipped; the ACH
+  generator that drafts intent-level faults for a concern did not, and is the
+  one piece of the rung that would touch the network.
 - **No arid-node heuristic.** We suppress by path, not by AST shape.
 - **The persistence signal is confined to the sweep document.** It is not yet
   in `evidence.defenders.signals`, which is a closed enum in the shared
