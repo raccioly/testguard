@@ -57,6 +57,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The self-probe cost budget is 1650 s, from 1440. Six new claims (85 s on
+  the Node 22 PR leg, worst 22 s, all under the 100 s per-claim ceiling) took
+  that leg from 1367 s to 1457 s, over by 17 s. The v0.13.0 release job
+  measured 1113 s from scratch, but the PR leg runs the same claims 25-30%
+  slower and is where the ceiling is checked, so 1650 restores ~13% headroom
+  over the leg that binds. The per-claim ceiling is unchanged.
 - The technical brief carries the 0.12 and 0.13 results it was missing: the
   whole-surface provability measurement (32 of 37 files that write are defended
   only by tests that mock the database) replaces the sample-level number in
