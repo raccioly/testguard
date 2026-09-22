@@ -76,7 +76,10 @@ probe
   --json               the status document plus this run's result (records, newSinceBaseline, exitCode)
 
 scaffold   --claim <ID> (put every proposal under this claim; copies it if it exists)  --out <path>  --json
-sweep      --changed <ref> (required; CI bases and a safe local default are detected)  --cap <n> (default 7 x unclaimed files)
+sweep      --changed <ref> (required unless --save-paths; CI bases and a safe local default are detected)  --cap <n>
+           --save-paths      sweep every file that WRITES TO STORAGE instead of the diff, and report the surface as the
+                             denominator: "120 writes across 38 files, swept 12". A clean sweep over an unstated
+                             denominator is a sample of unknown size, not a guarantee that saving works
            --include-dirty  --exclude <glob>  --confirm <n>  --budget <ms>  --max <n>  --out <path>  --json
            the cold start: no claim and no concern needed. Everything it proposes is a DRAFT — it never writes testguard.claims.json,
            and its evidence never replaces .testguard/evidence.json. exit 1 on a fault that survived, or a file no test imports
@@ -150,6 +153,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         since: { type: 'string' },
         exclude: { type: 'string', multiple: true },
         cap: { type: 'string' },
+        'save-paths': { type: 'boolean', default: false },
         strict: { type: 'boolean', default: false },
         explain: { type: 'boolean', default: false },
         ignore: { type: 'string' },

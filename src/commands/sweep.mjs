@@ -20,9 +20,14 @@ export const sweepPath = (projectDir) => join(projectDir, '.testguard', 'sweep.j
  * read.
  */
 export async function sweepCommand({ projectDir, values, version }, io) {
-  const resolved = resolveChangedRef({ explicit: values.changed, projectDir });
+  const mode = values['save-paths'] ? 'save-paths' : 'changed';
+  // `--save-paths` scans the whole write surface, so it needs no diff. The gate
+  // is still computed underneath (the document reports `changed`), and HEAD is
+  // a reference every repository has.
+  const resolved = resolveChangedRef({ explicit: values.changed, projectDir })
+    ?? (mode === 'save-paths' ? { ref: 'HEAD', from: 'save-paths', required: false } : null);
   if (!resolved) {
-    io.err('sweep needs a reference to measure the change against: --changed <ref> (e.g. origin/main), or set TESTGUARD_CHANGED_REF. CI bases and a safe local remote default or differently named upstream are detected automatically.');
+    io.err('sweep needs a reference to measure the change against: --changed <ref> (e.g. origin/main), or set TESTGUARD_CHANGED_REF. CI bases and a safe local remote default or differently named upstream are detected automatically. Or sweep the write surface instead with --save-paths.');
     return 3;
   }
   const confirmRuns = Number(values.confirm);
@@ -39,11 +44,12 @@ export async function sweepCommand({ projectDir, values, version }, io) {
       return 3;
     }
   }
-  if (!resolved.required && !values.json && !values.quiet) io.err(`sweep: comparing against ${resolved.ref} (${resolved.from})`);
+  if (mode === 'changed' && !resolved.required && !values.json && !values.quiet) io.err(`sweep: comparing against ${resolved.ref} (${resolved.from})`);
 
   const doc = await sweep({
     projectDir,
     ref: resolved.ref,
+    mode,
     includeDirty: values['include-dirty'],
     exclude: values.exclude ?? [],
     cap,

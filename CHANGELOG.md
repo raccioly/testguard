@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `sweep --save-paths` — sweep every file that writes to storage instead of the
+  diff, and report the surface as the denominator the findings are read
+  against. A diff cannot answer how many save paths exist, and a clean report
+  over an unstated denominator is a sample of unknown size. The sweep document
+  gains `scope.mode`, `scope.writeSites` and `scope.payloadFields`, and the
+  validator refuses a save-paths sweep that omits its surface.
+- `src/supply/savepath.mjs` — the write-site enumerator: which calls put data
+  into storage, and which payload keys sit on their own line (the ones a
+  `field-dropped` fault can anchor to). Measured on a real AI-authored
+  application: 119 writes across 37 files carrying 226 payload fields.
+
+### Fixed
+
+- `walk()` skipped `dist` and `coverage` but not `.next`, `build`, `out`,
+  `.svelte-kit`, `.turbo` and their siblings, while the claim above it already
+  promised that a build's test files cannot be picked up. A scan of a real
+  Next.js application counted 104 files instead of 32, because `.next/` carries
+  compiled copies of the application — its writes and its tests. The claim was
+  right; the list was short.
+
+### Added
+
 - `docs-canonical/PRIOR-ART.md` — the canonical record of what was taken from
   Google's and Meta's mutation-testing programmes, what was deliberately not
   taken, the measured reason no model decides a verdict, and the known gaps in

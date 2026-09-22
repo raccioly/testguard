@@ -313,6 +313,18 @@ const semantic = {
     if (s.proposed !== s.selected + s.deferred) errors.push({ path: '/selection/proposed', message: `proposed (${s.proposed}) must equal selected (${s.selected}) + deferred (${s.deferred})` });
     if (s.selected > s.cap) errors.push({ path: '/selection/selected', message: `selected (${s.selected}) exceeds the cap (${s.cap})` });
     if (doc.scope.swept > doc.scope.targets) errors.push({ path: '/scope/swept', message: `swept (${doc.scope.swept}) cannot exceed targets (${doc.scope.targets})` });
+    // The counters that only mean something in one mode must not appear in the
+    // other: `writeSites` on a diff sweep would be a denominator nobody
+    // measured, and its absence on a save-paths sweep hides the denominator
+    // entirely — which is the whole reason that mode exists.
+    const saves = doc.scope.mode === 'save-paths';
+    for (const k of ['writeSites', 'payloadFields']) {
+      if (saves && doc.scope[k] === undefined) errors.push({ path: `/scope/${k}`, message: `a save-paths sweep must report ${k}: the surface is the denominator its findings are read against` });
+      if (!saves && doc.scope[k] !== undefined) errors.push({ path: `/scope/${k}`, message: `${k} belongs to a save-paths sweep; a changed sweep did not measure the write surface` });
+    }
+    if (saves && doc.scope.writeSites !== undefined && doc.scope.targets > doc.scope.writeSites) {
+      errors.push({ path: '/scope/targets', message: `targets (${doc.scope.targets}) exceeds writeSites (${doc.scope.writeSites}); every target is a file with at least one write` });
+    }
 
     const byClass = Object.values(s.byClass);
     const proposedByClass = byClass.reduce((a, c) => a + c.proposed, 0);

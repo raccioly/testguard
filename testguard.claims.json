@@ -1146,7 +1146,7 @@
     },
     {
       "id": "TG-WALK-SKIPS-TOOL-DIRS",
-      "statement": "File walking never descends into node_modules, .git, dist, coverage or .testguard; test discovery and defender globs cannot pick up a dependency's or a build's test files.",
+      "statement": "File walking never descends into a dependency or a build directory — node_modules, .git, dist, build, out, coverage, .next, .svelte-kit, .turbo and their siblings — so test discovery and defender globs cannot pick up a dependency's or a build's test files, and a surface scan cannot count compiled copies of the application twice.",
       "source": {
         "kind": "spec",
         "ref": "README.md#how-it-works"
@@ -1172,6 +1172,18 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The framework build outputs are dropped from the skip list, so a compiled copy of the application is scanned as if it were source.",
+          "faultClass": "literal-changed",
+          "file": "src/util/glob.mjs",
+          "find": "  '.next', '.nuxt', '.svelte-kit', '.output', '.turbo', '.parcel-cache', '.angular', '.astro',",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
           }
         }
       ]
@@ -4439,6 +4451,92 @@
           "file": "src/supply/persistence.mjs",
           "find": "  if (mocks.length === 0) return null;",
           "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SAVE-SWEEP-STATES-ITS-DENOMINATOR",
+      "statement": "A sweep of the write surface reports how much surface there was, not only what it probed; a changed sweep never reports a surface it did not measure.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/sweep.schema.json#scope"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-21T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/sweep.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A save-paths sweep may omit its denominator, so findings are read against a surface nobody stated.",
+          "faultClass": "statement-deleted",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (saves && doc.scope[k] === undefined) errors.push({ path: `/scope/${k}`, message: `a save-paths sweep must report ${k}: the surface is the denominator its findings are read against` });",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "More targets than write sites conforms, so a surface smaller than the files swept from it passes.",
+          "faultClass": "statement-deleted",
+          "file": "spec/lib/validate.mjs",
+          "find": "      errors.push({ path: '/scope/targets', message: `targets (${doc.scope.targets}) exceeds writeSites (${doc.scope.writeSites}); every target is a file with at least one write` });",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-WRITE-SURFACE-DOES-NOT-DEPEND-ON-FILE-ORDER",
+      "statement": "The write surface is the same whichever order the files are read in, and a file whose only write is a ...Many or ...One call is still on it.",
+      "source": {
+        "kind": "manual",
+        "ref": "src/supply/savepath.mjs saveSurface"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-21T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/supply-savepath.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The stateless SQL test is replaced by the g-flagged pattern, so lastIndex persists and the answer depends on which file was read first.",
+          "faultClass": "variable-swap",
+          "file": "src/supply/savepath.mjs",
+          "find": "const HAS_SQL = new RegExp(WRITE_SQL.source, 'i');",
+          "replace": "const HAS_SQL = WRITE_SQL;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The cheap reject lists only the short operation names again, so a deleteMany-only file is dropped before it is scanned.",
+          "faultClass": "variable-swap",
+          "file": "src/supply/savepath.mjs",
+          "find": "const HAS_WRITE_CALL = new RegExp(`\\\\b(?:${OPERATIONS})\\\\s*\\\\(`);",
+          "replace": "const HAS_WRITE_CALL = /\\b(?:create|update|delete)\\s*\\(/;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"

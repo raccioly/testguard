@@ -26,9 +26,12 @@ describe('glob', () => {
     expect(files).toEqual(['test/export-mocked.test.mjs', 'test/flaky.test.mjs', 'test/redact.test.mjs']);
   });
 
-  it('never descends into node_modules, .git, dist, coverage or .testguard — a dependency\'s or a build\'s test files are not this project\'s', () => {
+  it('never descends into a dependency or a build directory — node_modules, .git, dist, build, out, coverage, .next and friends', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-walk-'));
-    for (const f of ['test/real.test.mjs', 'node_modules/pkg/inner.test.mjs', 'dist/built.test.mjs', 'coverage/lcov.test.mjs', '.testguard/scratch.test.mjs', '.git/hooks/x.test.mjs']) {
+    for (const f of ['test/real.test.mjs', 'node_modules/pkg/inner.test.mjs', 'dist/built.test.mjs', 'coverage/lcov.test.mjs', '.testguard/scratch.test.mjs', '.git/hooks/x.test.mjs',
+      // Framework build output carries compiled copies of the application: its
+      // writes, and its tests. Scanning it counts the same code twice.
+      '.next/server/chunk.test.mjs', 'build/bundle.test.mjs', 'out/static.test.mjs', '.svelte-kit/generated.test.mjs', '.turbo/cache.test.mjs']) {
       mkdirSync(dirname(join(dir, f)), { recursive: true });
       writeFileSync(join(dir, f), '');
     }

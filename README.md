@@ -466,6 +466,39 @@ A sweep is weaker evidence than a probe, and says so. Nobody stated that the
 behaviour mattered. It is stronger than nothing, which is what a repository
 with no claims has — and the survivors worth defending become the first claims.
 
+#### Sweeping the save surface instead of the diff
+
+A diff cannot answer *"when the user clicks save, does it actually save?"* — it
+only knows what changed today. `--save-paths` points the same sweep at every
+file that writes to storage:
+
+```bash
+npx testguard-cli sweep --save-paths --cap 20
+```
+
+```
+119 writes to storage across 37 files, carrying 226 payload fields. Swept 36.
+proposed 762 faults, probed 20 (cap 20), deferred 742.
+
+SURVIVED   src/app/actions/register.ts  [write path]
+  [line 59] Field dropped: `password_hash` is no longer written.
+  src/tests/actions/register.test.ts mocks @/lib/prisma; 1 exact, 8 partial,
+  31 argument-free call assertions in the file. A field dropped from the write
+  payload fails only against an assertion that names that field exactly.
+```
+
+The first line is the point. A report that lists findings without saying how
+much surface it looked at invites you to assume the rest is fine, so the
+denominator comes first and the document carries `writeSites` and
+`payloadFields` whether or not anything survived. Measured on a real
+AI-authored application: **12 of 26 probed persistence faults survived a fully
+green suite, and all 12 were a dropped payload field.**
+
+This is a *sample* of the surface, and says so. It does not yet prove a write
+reached storage — only that a test would notice if the payload changed.
+Read-back oracles are the next rung
+([#154](https://github.com/raccioly/testguard/issues/154)).
+
 ### Every change needs a claim
 
 `probe` can only verify claims that exist. Every escaped defect in the field
