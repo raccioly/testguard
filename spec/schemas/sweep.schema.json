@@ -62,6 +62,10 @@
           ],
           "description": "What the sweep was pointed at. `changed` proposes for the changed source files that carry no claim. `save-paths` proposes for every file that writes to storage, because a diff cannot answer how many save paths exist — and a clean report over an unstated denominator is a sample of unknown size, not a guarantee."
         },
+        "concern": {
+          "$ref": "urn:claimspec:v1:common#/$defs/identifier",
+          "description": "The concern this sweep was aimed by, when one was. A concern narrows both the targets and the fault classes, so the same surface swept under two concerns is two different questions."
+        },
         "changed": {
           "type": "integer",
           "minimum": 0,
@@ -189,6 +193,11 @@
               }
             }
           }
+        },
+        "outOfScope": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Proposals the concern's fault classes excluded. Reported so a narrow concern cannot look like a quiet one: the producers found these, and this concern is not about them."
         }
       }
     },

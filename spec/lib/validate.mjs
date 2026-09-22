@@ -7,7 +7,7 @@ import { reproduces, decimals, MAX_PLACES } from './wilson.mjs';
 
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 
-export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate', 'replay', 'sweep']);
+export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate', 'replay', 'sweep', 'concerns']);
 /**
  * How a document says it tried to falsify its claims. Absent means
  * `fault-injection`, so every document written before the field existed is
@@ -302,6 +302,29 @@ const semantic = {
       if (c.by !== 'ignore' && !c.claimIds?.length) errors.push({ path: `/covered/${i}/claimIds`, message: `a file covered by a ${c.by} must name the claim(s)` });
     });
     for (const e of doc.expired) if (!e.expires) errors.push({ path: '/expired', message: `expired entry "${e.pattern}" has no expires instant` });
+    return errors;
+  },
+
+  concerns(doc) {
+    const errors = [];
+    const seen = new Set();
+    doc.concerns.forEach((c, i) => {
+      if (seen.has(c.id)) errors.push({ path: `/concerns/${i}/id`, message: `duplicate concern id "${c.id}"` });
+      seen.add(c.id);
+      // A glob target with no globs matches nothing, which reads as "this
+      // concern found no problems" rather than "this concern was never aimed".
+      if (c.targets?.kind === 'glob' && !(c.targets.globs?.length > 0)) {
+        errors.push({ path: `/concerns/${i}/targets/globs`, message: `concern "${c.id}" targets a glob but names none; it would match nothing and report clean` });
+      }
+      if (c.targets?.kind !== 'glob' && c.targets?.globs) {
+        errors.push({ path: `/concerns/${i}/targets/globs`, message: `concern "${c.id}" names globs but does not target them` });
+      }
+      // An empty list is not "every class"; it is a concern that can never
+      // propose anything, which is a typo for `null` every time.
+      if (Array.isArray(c.faultClasses) && c.faultClasses.length === 0) {
+        errors.push({ path: `/concerns/${i}/faultClasses`, message: `concern "${c.id}" allows no fault class; omit the field for every class` });
+      }
+    });
     return errors;
   },
 

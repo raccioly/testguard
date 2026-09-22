@@ -1,5 +1,5 @@
 import { join, resolve } from 'node:path';
-import { sweep, renderSweep } from '../sweep/sweep.mjs';
+import { sweep, renderSweep, ConcernError } from '../sweep/sweep.mjs';
 import { resolveChangedRef } from '../gate/changed.mjs';
 import { writeSpecDoc } from '../evidence/writer.mjs';
 
@@ -29,11 +29,14 @@ export const sweepEvidencePath = (projectDir) => join(projectDir, '.testguard', 
  */
 export async function sweepCommand({ projectDir, values, version }, io) {
   const mode = values['save-paths'] ? 'save-paths' : 'changed';
+  // A concern that aims at the write surface or at a glob needs no diff, the
+  // same as --save-paths. Only a concern that defers to the gate does.
+  const aimed = Boolean(values.concern) || mode === 'save-paths';
   // `--save-paths` scans the whole write surface, so it needs no diff. The gate
   // is still computed underneath (the document reports `changed`), and HEAD is
   // a reference every repository has.
   const resolved = resolveChangedRef({ explicit: values.changed, projectDir })
-    ?? (mode === 'save-paths' ? { ref: 'HEAD', from: 'save-paths', required: false } : null);
+    ?? (aimed ? { ref: 'HEAD', from: values.concern ? `concern ${values.concern}` : 'save-paths', required: false } : null);
   if (!resolved) {
     io.err('sweep needs a reference to measure the change against: --changed <ref> (e.g. origin/main), or set TESTGUARD_CHANGED_REF. CI bases and a safe local remote default or differently named upstream are detected automatically. Or sweep the write surface instead with --save-paths.');
     return 3;
@@ -54,26 +57,40 @@ export async function sweepCommand({ projectDir, values, version }, io) {
   }
   if (mode === 'changed' && !resolved.required && !values.json && !values.quiet) io.err(`sweep: comparing against ${resolved.ref} (${resolved.from})`);
 
-  const doc = await sweep({
-    projectDir,
-    ref: resolved.ref,
-    mode,
-    includeDirty: values['include-dirty'],
-    exclude: values.exclude ?? [],
-    cap,
-    confirmRuns,
-    budgetMs,
-    runnerCommand: values['runner-cmd'],
-    runnerName: values.runner,
-    nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
-    toolVersion: version,
-    claimsPath: values.claims ? resolve(values.claims) : undefined,
-    ignorePath: values.ignore ? resolve(values.ignore) : undefined,
-    onStage: !values.quiet && !values.json && process.stderr.isTTY
+  let doc;
+  try {
+    doc = await sweep({
+      projectDir,
+      ref: resolved.ref,
+      mode,
+      concern: values.concern,
+      concernsPath: values.concerns ? resolve(values.concerns) : undefined,
+      includeDirty: values['include-dirty'],
+      exclude: values.exclude ?? [],
+      cap,
+      confirmRuns,
+      budgetMs,
+      runnerCommand: values['runner-cmd'],
+      runnerName: values.runner,
+      nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
+      toolVersion: version,
+      claimsPath: values.claims ? resolve(values.claims) : undefined,
+      ignorePath: values.ignore ? resolve(values.ignore) : undefined,
+      onStage: !values.quiet && !values.json && process.stderr.isTTY
       ? ({ claimId, faultId, stage, i, n }) => process.stderr.write(`\r\x1b[K  … ${claimId}/${faultId} ${stage} ${i}/${n}`)
       : undefined,
-    onWarn: (m) => { if (!values.quiet) io.err(`warning: ${m}`); },
-  });
+      onWarn: (m) => { if (!values.quiet) io.err(`warning: ${m}`); },
+    });
+  } catch (e) {
+    // A concern named on the command line that this project does not declare
+    // is a usage error, not a precondition failure: nothing about the
+    // repository is wrong.
+    if (e instanceof ConcernError) {
+      io.err(e.message);
+      return 3;
+    }
+    throw e;
+  }
   if (process.stderr.isTTY && !values.quiet && !values.json) process.stderr.write('\r\x1b[K');
 
   const { evidence, ...document } = doc;

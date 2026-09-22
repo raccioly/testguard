@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Concerns** — one sentence a human writes that generates faults across a
+  whole surface, the rung between writing nothing and writing a claim per
+  behaviour. A concern says *where* to look and *which shapes of break* are
+  relevant: `"every write persists the data it was given"` targets the write
+  sites and applies the payload producers. `testguard concerns` lists them,
+  `sweep --concern <ID>` aims a sweep by one, and `--save-paths` is now sugar
+  for the built-in `SAVE-PERSISTS`.
+  - Two built-ins ship, and only two: an authorization concern would need a
+    heuristic for "which files check permissions", and a guess there is the
+    non-actionable noise that gets a check switched off. A project that knows
+    its own auth layer says so with a `glob` target in three lines.
+  - A project concern with the same id **replaces** a built-in, so a team can
+    retune `SAVE-PERSISTS` for an ORM this tool does not recognise without
+    forking anything. The replacement is reported, never silent.
+  - `urn:claimspec:v1:concerns`, with rules that refuse a glob target naming no
+    globs (it would match nothing and report clean) and an empty fault-class
+    list (a typo for "every class", every time).
+  - **No model is required, deliberately.** A concern's useful core is a named
+    scope plus a producer selection, which the mechanical producers already
+    satisfy — so every verifying command stays offline and NFR-01 is unchanged.
+    An LLM can later propose faults a line-oriented producer cannot see, as an
+    additional source for a concern that already works.
+
+### Added
+
 - A save-path sweep now reports **what its defenders could prove**, before it
   reports what they did: per file, whether every defender mocks the persistence
   layer (call shape only), at least one does not (a real write is possible), or

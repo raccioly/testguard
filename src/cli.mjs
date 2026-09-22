@@ -19,6 +19,7 @@ import { replayCommand } from './commands/replay.mjs';
 import { mcpCommand } from './commands/mcp.mjs';
 import { admitCommand } from './commands/admit.mjs';
 import { sweepCommand } from './commands/sweep.mjs';
+import { concernsCommand } from './commands/concerns.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
 const ISSUES = 'https://github.com/raccioly/testguard/issues';
@@ -34,6 +35,7 @@ export const USAGE = `testguard ${VERSION} — proves a test suite defends the c
   testguard gate [dir]       fail when a changed source file carries no claim and no excusing ignore entry
   testguard scaffold <file>  propose faults mechanically for one source file, as a draft claims document
   testguard sweep [dir]      propose faults for the changed source files that carry no claim, probe a bounded selection, and report what nothing noticed
+  testguard concerns [dir]   the one-sentence scopes a sweep can be aimed by: where to look, and which shapes of break are relevant
   testguard mcp              serve the read-only status/brief/claims/evidence tools over MCP on stdio, so the loop works in any agent harness
   testguard replay [dir]     would this suite have caught the bugs that already escaped? Replays real fix commits and calibrates fault classes against them
   testguard admit <test> --claim <ID>   the two-gate rule as one verb: is this test green on HEAD and does it fail on every fault of the claim?
@@ -77,6 +79,8 @@ probe
 
 scaffold   --claim <ID> (put every proposal under this claim; copies it if it exists)  --out <path>  --json
 sweep      --changed <ref> (required unless --save-paths; CI bases and a safe local default are detected)  --cap <n>
+           --concern <ID>    aim the sweep by one of this project's concerns: its targets and its fault classes.
+                             testguard concerns lists them. --save-paths is sugar for the built-in SAVE-PERSISTS
            --save-paths      sweep every file that WRITES TO STORAGE instead of the diff, and report the surface as the
                              denominator: "120 writes across 38 files, swept 12". A clean sweep over an unstated
                              denominator is a sample of unknown size, not a guarantee that saving works
@@ -126,7 +130,7 @@ brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; 
 exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift, or unclaimed changes) · 2 precondition failed · 3 usage
 `;
 
-const COMMANDS = { mcp: mcpCommand, replay: replayCommand, probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand, admit: admitCommand, sweep: sweepCommand };
+const COMMANDS = { mcp: mcpCommand, replay: replayCommand, probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand, admit: admitCommand, sweep: sweepCommand, concerns: concernsCommand };
 
 export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') }) {
   let parsed;
@@ -154,6 +158,8 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         exclude: { type: 'string', multiple: true },
         cap: { type: 'string' },
         'save-paths': { type: 'boolean', default: false },
+        concern: { type: 'string' },
+        concerns: { type: 'string' },
         strict: { type: 'boolean', default: false },
         explain: { type: 'boolean', default: false },
         ignore: { type: 'string' },

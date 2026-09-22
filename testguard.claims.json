@@ -4630,6 +4630,49 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-CONCERN-LOOKS-WHERE-IT-SAYS",
+      "statement": "A concern aims at what it declares: a glob is matched against the whole project rather than the diff, and a concern that names fault classes proposes only those.",
+      "source": {
+        "kind": "manual",
+        "ref": "src/supply/concerns.mjs targetsFor"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-21T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/supply-concerns.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A glob concern is pooled from the diff, so on a clean branch it matches nothing and reports clean — the false reassurance a concern exists to prevent.",
+          "faultClass": "variable-swap",
+          "file": "src/supply/concerns.mjs",
+          "find": "    return walk(projectDir).filter((f) => res.some((re) => re.test(f)));",
+          "replace": "    return (changedFiles ?? []).filter((f) => res.some((re) => re.test(f)));",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The fault-class narrowing is dropped, so a persistence concern also reports every altered return value and buries what it exists to surface.",
+          "faultClass": "return-altered",
+          "file": "src/supply/concerns.mjs",
+          "find": "  if (!concern?.faultClasses) return candidates;",
+          "replace": "  return candidates;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
     }
   ]
 }

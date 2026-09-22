@@ -474,6 +474,60 @@ A sweep is weaker evidence than a probe, and says so. Nobody stated that the
 behaviour mattered. It is stronger than nothing, which is what a repository
 with no claims has — and the survivors worth defending become the first claims.
 
+#### Concerns: one sentence, two hundred screens
+
+A claim names one promise precisely, which is why a repository with two hundred
+screens never finishes writing them. A **concern** names a *kind* of promise and
+says where to look for it:
+
+```bash
+npx testguard-cli concerns                      # what this project can be swept by
+npx testguard-cli sweep --concern ADMIN-GUARDS  # aim a sweep at one
+```
+
+```json
+{
+  "schemaVersion": 1,
+  "concerns": [
+    {
+      "id": "ADMIN-GUARDS",
+      "statement": "Every admin route refuses a caller without the admin role.",
+      "severity": "critical",
+      "targets": { "kind": "glob", "globs": ["src/app/api/admin/**"] },
+      "faultClasses": ["guard-removed", "condition-forced", "return-altered"]
+    }
+  ]
+}
+```
+
+Five lines, and the sweep reports:
+
+```
+concern ADMIN-GUARDS matches 24 files. Swept 23.
+  158 further proposals were outside this concern's fault classes.
+
+SURVIVED   src/app/api/admin/claims/[id]/route.ts
+  [line 41] Guard never triggers: `if (!membership || (membership.role !== 'owner'
+  && membership.role !== 'manager'))` becomes `if (false)`.
+```
+
+The idea is Meta's: ACH has an engineer describe an area of concern in plain
+text and gates every generated step by execution. What is taken here is the
+**unit** — the concern as the thing a human writes — not their generator, and
+**no model is required**. A concern's useful core is a named scope plus a
+producer selection, which the mechanical producers already satisfy, so every
+verifying command stays offline.
+
+Two concerns ship built in, and only two. An authorization concern would need a
+heuristic for *"which files check permissions"*, and a guess there is exactly
+the noise that gets a check switched off — so `SAVE-PERSISTS` and
+`CHANGED-CODE` are the defaults, and a project that knows its own auth layer
+says so in three lines. Declaring a concern with a built-in's id replaces it,
+and the replacement is reported rather than silent.
+
+A concern is **not** a claim and never becomes one by itself. It says where to
+look; the probe says what it found; a human states the sentence worth defending.
+
 #### Sweeping the save surface instead of the diff
 
 A diff cannot answer *"when the user clicks save, does it actually save?"* — it

@@ -36,6 +36,7 @@ import { computeChangedGate } from '../gate/changed.mjs';
 import { scaffoldFile } from '../scaffold/scaffold.mjs';
 import { selectFaults, onWritePath, capFor } from '../supply/select.mjs';
 import { learnedProductivity } from '../supply/feedback.mjs';
+import { loadConcerns, concernById, targetsFor, filterByConcern } from '../supply/concerns.mjs';
 import { saveSurface } from '../supply/savepath.mjs';
 import { persistenceSignals, persistenceHint, provabilitySummary } from '../supply/persistence.mjs';
 import { probe } from '../probe/probe.mjs';
@@ -108,6 +109,9 @@ export function sortFindings(findings) {
 /** How many findings a sweep is willing to fail on. */
 export const gatingCount = (findings) => findings.filter((f) => GATING.has(f.verdict)).length;
 
+/** A concern named on the command line that this project does not declare. */
+export class ConcernError extends Error {}
+
 /** Rebuild claim documents from a flat selection, keeping each claim's own faults together. */
 function claimsFromSelection(selected) {
   const byClaim = new Map();
@@ -130,6 +134,8 @@ export async function sweep({
   projectDir,
   ref,
   mode = 'changed',
+  concern: concernId,
+  concernsPath,
   includeDirty = false,
   exclude = [],
   cap,
@@ -156,10 +162,23 @@ export async function sweep({
   //
   // A test file with no claim is a different problem — it has nothing to
   // falsify — and the gate already names it. Sweep proposes against source.
-  const surface = mode === 'save-paths' ? saveSurface(projectDir) : null;
-  const targets = surface
-    ? surface.files.map((f) => f.file)
-    : gate.uncovered.filter((u) => u.kind === 'source').map((u) => u.file);
+  // `--save-paths` is sugar for the built-in SAVE-PERSISTS concern: the same
+  // targets and the same producer selection, named so a project can retune it
+  // for an ORM this tool does not recognise without forking anything.
+  const loaded = loadConcerns(projectDir, { path: concernsPath });
+  const concern = concernId
+    ? concernById(loaded.concerns, concernId)
+    : mode === 'save-paths' ? concernById(loaded.concerns, 'SAVE-PERSISTS') : null;
+  if (concernId && !concern) {
+    throw new ConcernError(`unknown concern ${concernId}. Declared: ${loaded.concerns.map((c) => c.id).join(', ')}`);
+  }
+  const changedTargets = gate.uncovered.filter((u) => u.kind === 'source').map((u) => u.file);
+  // A concern whose targets are the diff defers to the gate rather than
+  // re-deriving what it already computed.
+  const concernTargets = concern ? targetsFor(projectDir, concern, { changedFiles: changedTargets }) : null;
+  const usesSurface = concern?.targets?.kind === 'write-sites' || mode === 'save-paths';
+  const surface = usesSurface ? saveSurface(projectDir) : null;
+  const targets = concernTargets ?? changedTargets;
 
   const cPath = claimsPath ?? defaultClaimsPath(projectDir);
   const existingClaims = existsSync(cPath) ? loadClaims(cPath) : { claims: [] };
@@ -201,8 +220,12 @@ export async function sweep({
   // many it has. This is the feedback half of Google's 15%-to-89%, using data
   // the project already produced rather than a new thing to collect.
   const learned = learnedProductivity(projectDir);
+  // Narrowing is what makes one sentence useful across two hundred files: a
+  // persistence concern that also reported every altered return value would
+  // bury the payload findings it exists to surface.
+  const relevant = filterByConcern(candidates, concern);
   const limit = cap ?? capFor(targets.length);
-  const selection = selectFaults(candidates, { cap: limit, table: learned.table });
+  const selection = selectFaults(relevant, { cap: limit, table: learned.table });
   const claims = claimsFromSelection(selection.selected);
 
   let evidence = { records: [] };
@@ -251,6 +274,7 @@ export async function sweep({
     includeDirty,
     scope: {
       mode,
+      ...(concern ? { concern: concern.id } : {}),
       changed: gate.changed,
       ...(surface ? { writeSites: surface.siteCount, payloadFields: surface.keyCount, provability } : {}),
       targets: targets.length,
@@ -258,7 +282,8 @@ export async function sweep({
       ...(skipped.length ? { skipped } : {}),
     },
     selection: {
-      proposed: candidates.length,
+      proposed: relevant.length,
+      ...(candidates.length !== relevant.length ? { outOfScope: candidates.length - relevant.length } : {}),
       selected: selection.selected.length,
       deferred: selection.deferred.length,
       cap: selection.cap,
@@ -285,14 +310,20 @@ export function renderSweep(doc, { limit = 20 } = {}) {
   if (scope.targets === 0) {
     out.push(saves
       ? 'sweep: no write to storage found in this project. Nothing to propose.'
-      : `sweep: no changed source file is without a claim against ${doc.ref}. Nothing to propose.`);
+      : scope.concern
+        ? `sweep: concern ${scope.concern} matches no file in this project. Nothing to propose.`
+        : `sweep: no changed source file is without a claim against ${doc.ref}. Nothing to propose.`);
     return out.join('\n');
   }
   // The denominator first. A report that lists findings without saying how much
   // was looked at invites the reader to assume the rest is fine.
+  // Say how the sweep was aimed. A glob concern that reports "unclaimed changed
+  // files" is describing a diff it never looked at.
   out.push(saves
     ? `${scope.writeSites} write${scope.writeSites === 1 ? '' : 's'} to storage across ${scope.targets} file${scope.targets === 1 ? '' : 's'}, carrying ${scope.payloadFields} payload field${scope.payloadFields === 1 ? '' : 's'}. Swept ${scope.swept}.`
-    : `swept ${scope.swept} of ${scope.targets} unclaimed changed file${scope.targets === 1 ? '' : 's'} against ${doc.ref}.`);
+    : scope.concern
+      ? `concern ${scope.concern} matches ${scope.targets} file${scope.targets === 1 ? '' : 's'}. Swept ${scope.swept}.`
+      : `swept ${scope.swept} of ${scope.targets} unclaimed changed file${scope.targets === 1 ? '' : 's'} against ${doc.ref}.`);
   if (saves && scope.provability) {
     // The limit, before any verdict. A test that replaced the database can
     // prove the call shape and never that the row landed, so on a surface
@@ -307,7 +338,10 @@ export function renderSweep(doc, { limit = 20 } = {}) {
     }
   }
   out.push(`proposed ${selection.proposed} fault${selection.proposed === 1 ? '' : 's'}, probed ${selection.selected} (cap ${selection.cap})${selection.deferred ? `, deferred ${selection.deferred}` : ''}.`);
-  if (selection.deferred) out.push(`  The ${selection.deferred} deferred are not a verdict: raise --cap${saves ? '.' : ', or sweep a smaller change.'}`);
+  if (selection.deferred) out.push(`  The ${selection.deferred} deferred are not a verdict: raise --cap${saves || scope.concern ? '.' : ', or sweep a smaller change.'}`);
+  // A narrow concern must not look like a quiet one: the producers found these,
+  // and this concern is not about them.
+  if (selection.outOfScope) out.push(`  ${selection.outOfScope} further proposal${selection.outOfScope === 1 ? ' was' : 's were'} outside this concern's fault classes.`);
   // An ordering nobody can trace is a number nobody should trust.
   if (doc.ordering) {
     out.push(doc.ordering.observed === 0
