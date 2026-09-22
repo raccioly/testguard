@@ -107,6 +107,30 @@
           "type": "integer",
           "minimum": 0,
           "description": "save-paths only: payload keys sitting on their own line, which is what a field-dropped fault can anchor to."
+        },
+        "provability": {
+          "type": "object",
+          "required": [
+            "mocked",
+            "unmocked",
+            "none"
+          ],
+          "additionalProperties": false,
+          "description": "save-paths only: what the defenders of this surface are CAPABLE of proving, before anything is probed. `mocked` — every defender replaces the persistence layer, so it can prove the call shape and never that the row landed. `unmocked` — at least one does not, so a real write is at least possible (not a promise that one happens). `none` — no defender at all. On a surface that is entirely `mocked`, a clean probe is not evidence of persistence; it is evidence that nothing could have measured it.",
+          "properties": {
+            "mocked": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unmocked": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "none": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
         }
       }
     },

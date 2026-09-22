@@ -36,8 +36,9 @@ import { computeChangedGate } from '../gate/changed.mjs';
 import { scaffoldFile } from '../scaffold/scaffold.mjs';
 import { selectFaults, onWritePath, capFor } from '../supply/select.mjs';
 import { saveSurface } from '../supply/savepath.mjs';
-import { persistenceSignals, persistenceHint } from '../supply/persistence.mjs';
+import { persistenceSignals, persistenceHint, provabilitySummary } from '../supply/persistence.mjs';
 import { probe } from '../probe/probe.mjs';
+import { discoverDefenders } from '../probe/discover.mjs';
 import { hintFor } from '../brief/brief.mjs';
 
 /**
@@ -184,6 +185,15 @@ export async function sweep({
     for (const claim of result.doc.claims) for (const fault of claim.faults) candidates.push({ claim, fault });
   }
 
+  // What the defenders of this surface are CAPABLE of proving, before anything
+  // is probed. A test that replaced the database can prove the call shape and
+  // never that the row landed, and that limit is a property of the suite rather
+  // than of any verdict — so it is measured once, over the whole surface, and
+  // reported whether or not a single fault survives.
+  const provability = surface
+    ? provabilitySummary(projectDir, targets, (f) => discoverDefenders(projectDir, f))
+    : null;
+
   const limit = cap ?? capFor(targets.length);
   const selection = selectFaults(candidates, { cap: limit });
   const claims = claimsFromSelection(selection.selected);
@@ -235,7 +245,7 @@ export async function sweep({
     scope: {
       mode,
       changed: gate.changed,
-      ...(surface ? { writeSites: surface.siteCount, payloadFields: surface.keyCount } : {}),
+      ...(surface ? { writeSites: surface.siteCount, payloadFields: surface.keyCount, provability } : {}),
       targets: targets.length,
       swept: drafts.length,
       ...(skipped.length ? { skipped } : {}),
@@ -270,6 +280,19 @@ export function renderSweep(doc, { limit = 20 } = {}) {
   out.push(saves
     ? `${scope.writeSites} write${scope.writeSites === 1 ? '' : 's'} to storage across ${scope.targets} file${scope.targets === 1 ? '' : 's'}, carrying ${scope.payloadFields} payload field${scope.payloadFields === 1 ? '' : 's'}. Swept ${scope.swept}.`
     : `swept ${scope.swept} of ${scope.targets} unclaimed changed file${scope.targets === 1 ? '' : 's'} against ${doc.ref}.`);
+  if (saves && scope.provability) {
+    // The limit, before any verdict. A test that replaced the database can
+    // prove the call shape and never that the row landed, so on a surface
+    // defended entirely by such tests a clean probe is not evidence of
+    // persistence — it is evidence that nothing could have measured it.
+    const { mocked, unmocked, none } = scope.provability;
+    out.push(`  of those ${scope.targets} file${scope.targets === 1 ? '' : 's'}: ${mocked} defended only by tests that mock the persistence layer, ${unmocked} with an unmocked defender, ${none} with no defender at all.`);
+    if (unmocked === 0 && mocked > 0) {
+      out.push('  Nothing in this suite can prove a write reached storage. A mocked test proves the');
+      out.push('  call shape; a where-clause that matches nothing, a rolled-back transaction and a');
+      out.push('  rejected constraint all pass against it.');
+    }
+  }
   out.push(`proposed ${selection.proposed} fault${selection.proposed === 1 ? '' : 's'}, probed ${selection.selected} (cap ${selection.cap})${selection.deferred ? `, deferred ${selection.deferred}` : ''}.`);
   if (selection.deferred) out.push(`  The ${selection.deferred} deferred are not a verdict: raise --cap${saves ? '.' : ', or sweep a smaller change.'}`);
   for (const s of scope.skipped ?? []) out.push(`  skipped ${s.file}: ${s.reason}`);

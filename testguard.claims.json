@@ -4543,6 +4543,50 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-PERSISTENCE-PROVABILITY-IS-STATED-NOT-GUESSED",
+      "statement": "A save-path sweep states what its defenders could prove before it states what they did: a file whose every defender mocks the persistence layer is classified as mocked, one unmocked defender is enough to say a real write is possible, and every target is classified exactly once.",
+      "source": {
+        "kind": "manual",
+        "ref": "src/supply/persistence.mjs persistenceProvability"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-21T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/supply-persistence.test.mjs",
+        "test/sweep.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A surface defended entirely by mocking tests is reported as unmocked, so a clean probe reads as evidence of persistence it never measured.",
+          "faultClass": "condition-forced",
+          "file": "src/supply/persistence.mjs",
+          "find": "  return { class: unmocked.length ? 'unmocked' : 'mocked', mocking, unmocked };",
+          "replace": "  return { class: 'unmocked', mocking, unmocked };",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The classification need not account for every target, so a bucket nobody looked in conforms.",
+          "faultClass": "statement-deleted",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (total !== doc.scope.targets) errors.push({ path: '/scope/provability', message: `provability accounts for ${total} files; targets is ${doc.scope.targets}` });",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer"
+          }
+        }
+      ]
     }
   ]
 }

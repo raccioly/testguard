@@ -494,10 +494,26 @@ denominator comes first and the document carries `writeSites` and
 AI-authored application: **12 of 26 probed persistence faults survived a fully
 green suite, and all 12 were a dropped payload field.**
 
-This is a *sample* of the surface, and says so. It does not yet prove a write
-reached storage — only that a test would notice if the payload changed.
-Read-back oracles are the next rung
-([#154](https://github.com/raccioly/testguard/issues/154)).
+It also states, before any verdict, **what the defenders could prove at all**:
+
+```
+of those 37 files: 32 defended only by tests that mock the persistence layer,
+1 with an unmocked defender, 4 with no defender at all.
+```
+
+That line is the read-back answer. A test that replaced the database can prove
+the *call shape* and nothing beyond it — a `where` that matches no rows, a
+rolled-back transaction and a rejected constraint all pass against a mock that
+recorded the arguments and returned a plausible object. So rather than pretend
+to measure persistence, TestGuard states the limit, the same way `nocover` says
+"no test imports this" instead of guessing.
+
+When every defender mocks the layer, the report says so outright: *nothing in
+this suite can prove a write reached storage*. A clean probe there is not
+evidence of persistence — it is evidence that nothing could have measured it.
+
+`unmocked` is deliberately weaker than "proves persistence": a test that does
+not replace the database may simply never reach it. Possible is the honest word.
 
 ### Every change needs a claim
 

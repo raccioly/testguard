@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { persistenceMocks, payloadAssertions, analyzePersistence, persistenceSignals, persistenceHint } from '../src/supply/persistence.mjs';
+import { persistenceMocks, payloadAssertions, analyzePersistence, persistenceSignals, persistenceHint, persistenceProvability, provabilitySummary } from '../src/supply/persistence.mjs';
 
 const project = (files) => {
   const dir = mkdtempSync(join(tmpdir(), 'tg-persist-'));
@@ -104,5 +104,45 @@ describe('persistenceSignals and the hint', () => {
     expect(hint).toContain('password_hash');
     expect(hint).toContain('read the record back');
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('persistenceProvability — the limit, stated instead of guessed at', () => {
+  const mocking = `vi.mock('@/lib/prisma');\nexpect(m.create).toHaveBeenCalled();\n`;
+  const plain = `import { thing } from '../src/thing.ts';\nexpect(thing()).toBe(1);\n`;
+
+  it('every defender mocking the database means call shape only', () => {
+    const dir = project({ 'a.test.ts': mocking, 'b.test.ts': mocking });
+    const p = persistenceProvability(dir, ['a.test.ts', 'b.test.ts']);
+    expect(p.class).toBe('mocked');
+    expect(p.mocking).toEqual(['a.test.ts', 'b.test.ts']);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('one unmocked defender makes a real write POSSIBLE — not certain', () => {
+    // "unmocked" is deliberately weaker than "proves persistence": a test that
+    // does not replace the database may simply never reach it.
+    const dir = project({ 'a.test.ts': mocking, 'b.test.ts': plain });
+    const p = persistenceProvability(dir, ['a.test.ts', 'b.test.ts']);
+    expect(p.class).toBe('unmocked');
+    expect(p.unmocked).toEqual(['b.test.ts']);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('no defender is its own class, not a mocked one', () =>
+    expect(persistenceProvability('/nowhere', []).class).toBe('none'));
+
+  it('summarises a surface, classifying every file exactly once', () => {
+    const dir = project({ 'a.test.ts': mocking, 'b.test.ts': plain });
+    const counts = provabilitySummary(dir, ['x.ts', 'y.ts', 'z.ts'], (f) => ({
+      'x.ts': ['a.test.ts'], 'y.ts': ['b.test.ts'], 'z.ts': [],
+    }[f]));
+    expect(counts).toEqual({ mocked: 1, unmocked: 1, none: 1 });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('a defender lookup that throws is a file with no defender, never a crash', () => {
+    // A sweep must not die because one file confused discovery.
+    expect(provabilitySummary('/nowhere', ['x.ts'], () => { throw new Error('boom'); })).toEqual({ mocked: 0, unmocked: 0, none: 1 });
   });
 });

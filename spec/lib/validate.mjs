@@ -318,9 +318,16 @@ const semantic = {
     // measured, and its absence on a save-paths sweep hides the denominator
     // entirely — which is the whole reason that mode exists.
     const saves = doc.scope.mode === 'save-paths';
-    for (const k of ['writeSites', 'payloadFields']) {
+    for (const k of ['writeSites', 'payloadFields', 'provability']) {
       if (saves && doc.scope[k] === undefined) errors.push({ path: `/scope/${k}`, message: `a save-paths sweep must report ${k}: the surface is the denominator its findings are read against` });
       if (!saves && doc.scope[k] !== undefined) errors.push({ path: `/scope/${k}`, message: `${k} belongs to a save-paths sweep; a changed sweep did not measure the write surface` });
+    }
+    if (saves && doc.scope.provability) {
+      const pv = doc.scope.provability;
+      const total = pv.mocked + pv.unmocked + pv.none;
+      // Every target is classified exactly once. A surface whose provability
+      // does not account for all of it has a bucket nobody looked in.
+      if (total !== doc.scope.targets) errors.push({ path: '/scope/provability', message: `provability accounts for ${total} files; targets is ${doc.scope.targets}` });
     }
     if (saves && doc.scope.writeSites !== undefined && doc.scope.targets > doc.scope.writeSites) {
       errors.push({ path: '/scope/targets', message: `targets (${doc.scope.targets}) exceeds writeSites (${doc.scope.writeSites}); every target is a file with at least one write` });

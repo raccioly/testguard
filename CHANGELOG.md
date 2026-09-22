@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A save-path sweep now reports **what its defenders could prove**, before it
+  reports what they did: per file, whether every defender mocks the persistence
+  layer (call shape only), at least one does not (a real write is possible), or
+  there is no defender at all. When nothing is unmocked the report says so
+  outright — a clean probe there is not evidence of persistence, it is evidence
+  that nothing could have measured it. Measured on a real AI-authored
+  application: of 37 files that write to storage, 32 were defended only by
+  mocking tests.
+- `scope.provability` on the sweep document, with a validator rule that every
+  target is classified exactly once.
+
+### Added
+
 - `sweep --save-paths` — sweep every file that writes to storage instead of the
   diff, and report the surface as the denominator the findings are read
   against. A diff cannot answer how many save paths exist, and a clean report
