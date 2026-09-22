@@ -1,0 +1,41 @@
+{
+  "$id": "urn:claimspec:v1:concerns",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "claimspec v1 — concerns",
+  "description": "A concern is one sentence a human writes that generates faults across a whole surface: it says WHERE to look and WHICH shapes of break are relevant. It is the rung between writing nothing and writing a claim per behaviour. A concern is never a claim and never becomes one by itself — it says where to look, the probe says what it found, and a human states the sentence worth defending. Nothing in this document is a promise about the code; only a claim is that.",
+  "type": "object",
+  "required": ["schemaVersion", "concerns"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "concerns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "statement"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "urn:claimspec:v1:common#/$defs/identifier", "description": "Declaring an id that matches a built-in REPLACES it, which is how a project retunes a default for an ORM or a layout this tool does not recognise. The replacement is reported, never silent." },
+          "statement": { "type": "string", "minLength": 1, "description": "The sentence, in plain language. It describes a KIND of promise, not one behaviour: \"every write persists the data it was given\", not \"the register action stores password_hash\". The second is a claim." },
+          "severity": { "$ref": "urn:claimspec:v1:common#/$defs/severity" },
+          "targets": {
+            "type": "object",
+            "required": ["kind"],
+            "additionalProperties": false,
+            "description": "Where this concern applies. `write-sites` asks the write enumerator. `glob` matches paths. `changed` defers to whatever diff the caller is already measuring — a concern does not re-derive what the gate computed.",
+            "properties": {
+              "kind": { "enum": ["write-sites", "glob", "changed"] },
+              "globs": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+            }
+          },
+          "faultClasses": {
+            "type": ["array", "null"],
+            "items": { "$ref": "urn:claimspec:v1:common#/$defs/faultClass" },
+            "description": "Which producers are relevant. `null` or absent means every class, the honest default for a concern with no shape to narrow by. Narrowing is what makes one sentence useful across two hundred files: a persistence concern that also reported every altered return value would bury the payload findings it exists to surface."
+          }
+        }
+      }
+    }
+  }
+}

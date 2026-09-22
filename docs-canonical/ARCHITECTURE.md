@@ -50,7 +50,7 @@ code were wrong, would anything fail?*
 | Progress | How a running probe reports itself, per reader: tty, plain, ndjson | `src/probe/progress.mjs` |
 | Change gate | Claim coverage of a diff | `src/gate/changed.mjs` |
 | Sweep | The cold start: propose faults for changed files that carry no claim, probe a bounded selection, report what nothing noticed | `src/sweep/sweep.mjs` |
-| Claim supply | Which proposals are worth probing, where this project writes to storage, and why a survivor on a write path was missed | `src/supply/select.mjs`, `src/supply/savepath.mjs`, `src/supply/persistence.mjs` |
+| Claim supply | The concerns a sweep can be aimed by, which proposals are worth probing, what this project's own runs say about that, where it writes to storage, and why a survivor on a write path was missed | `src/supply/concerns.mjs`, `src/supply/select.mjs`, `src/supply/feedback.mjs`, `src/supply/savepath.mjs`, `src/supply/persistence.mjs` |
 | Baseline | Freeze debt; gate the delta; re-stamp | `src/baseline/baseline.mjs` |
 | Status | The single state machine every rendering derives from | `src/status/status.mjs` |
 | Brief | The agent's session-start blind-spot block | `src/brief/brief.mjs` |
@@ -105,6 +105,7 @@ appears here but not on disk, or on disk but not here, is drift.
 | `action.yml` | The GitHub Action surface; `version` input synced from `package.json` | consumers' workflows |
 | `packaging/gitlab/testguard.gitlab-ci.yml` | The GitLab component; tag and `TESTGUARD_VERSION` synced | consumers' pipelines |
 | `packaging/homebrew/testguard.rb` | The staged Homebrew formula; tarball URL and registry-derived hash synced, then copied byte-for-byte | `raccioly/homebrew-tap` |
+| `testguard.concerns.json` | The one-sentence scopes a sweep can be aimed by; optional, with two built-ins behind it | `testguard concerns`, `sweep --concern` |
 | `.docguard.json`, `.docguardignore` | Which canonical documents exist and which validators run | DocGuard, in CI and pre-commit |
 | `.npmrc`, `.npmignore`, `.gitattributes` | Packaging and line-ending hygiene | npm, git |
 

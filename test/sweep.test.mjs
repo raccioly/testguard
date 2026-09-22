@@ -191,7 +191,7 @@ describe('sortFindings — survivors first, write path before the rest', () => {
 
 describe('save-paths mode — the denominator is the point', () => {
   const saveDoc = (over = {}) => doc({
-    scope: { mode: 'save-paths', changed: 0, writeSites: 120, payloadFields: 226, targets: 38, swept: 37 },
+    scope: { mode: 'save-paths', changed: 0, writeSites: 120, payloadFields: 226, provability: { mocked: 33, unmocked: 1, none: 4 }, targets: 38, swept: 37 },
     ...over,
   });
 
@@ -224,4 +224,32 @@ describe('save-paths mode — the denominator is the point', () => {
   it('a project that writes nothing says so, rather than reporting an empty diff', () =>
     expect(renderSweep(saveDoc({ scope: { mode: 'save-paths', changed: 0, writeSites: 0, payloadFields: 0, targets: 0, swept: 0 } })))
       .toMatch(/no write to storage found/));
+});
+
+describe('provability — what the defenders could prove, before anything is probed', () => {
+  const saveScope = { mode: 'save-paths', changed: 0, writeSites: 120, payloadFields: 226, provability: { mocked: 33, unmocked: 1, none: 4 }, targets: 38, swept: 37 };
+  const d = (over = {}) => doc({ scope: { ...saveScope, ...over } });
+
+  it('every target is classified exactly once', () =>
+    expect(errs(d({ provability: { mocked: 10, unmocked: 1, none: 4 } })).join())
+      .toMatch(/provability accounts for 15 files; targets is 38/));
+
+  it('a save-paths sweep must report it', () => {
+    const { provability, ...without } = saveScope;
+    expect(errs(doc({ scope: without })).join()).toMatch(/must report provability/);
+  });
+
+  it('says the limit in the report, above any finding', () => {
+    const text = renderSweep(d());
+    expect(text).toMatch(/33 defended only by tests that mock the persistence layer, 1 with an unmocked defender, 4 with no defender at all/);
+  });
+
+  it('when NOTHING is unmocked it says so plainly, because a clean probe then measures nothing', () => {
+    const text = renderSweep(d({ provability: { mocked: 34, unmocked: 0, none: 4 } }));
+    expect(text).toMatch(/Nothing in this suite can prove a write reached storage/);
+    expect(text).toMatch(/a where-clause that matches nothing, a rolled-back transaction/);
+  });
+
+  it('with an unmocked defender present it does not overclaim', () =>
+    expect(renderSweep(d())).not.toMatch(/Nothing in this suite can prove/));
 });

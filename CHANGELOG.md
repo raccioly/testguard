@@ -20,6 +20,53 @@ Automated weekly release — everything merged since `v0.11.0`.
 
 ### Added
 
+- **Concerns** — one sentence a human writes that generates faults across a
+  whole surface, the rung between writing nothing and writing a claim per
+  behaviour. A concern says *where* to look and *which shapes of break* are
+  relevant: `"every write persists the data it was given"` targets the write
+  sites and applies the payload producers. `testguard concerns` lists them,
+  `sweep --concern <ID>` aims a sweep by one, and `--save-paths` is now sugar
+  for the built-in `SAVE-PERSISTS`.
+  - Two built-ins ship, and only two: an authorization concern would need a
+    heuristic for "which files check permissions", and a guess there is the
+    non-actionable noise that gets a check switched off. A project that knows
+    its own auth layer says so with a `glob` target in three lines.
+  - A project concern with the same id **replaces** a built-in, so a team can
+    retune `SAVE-PERSISTS` for an ORM this tool does not recognise without
+    forking anything. The replacement is reported, never silent.
+  - `urn:claimspec:v1:concerns`, with rules that refuse a glob target naming no
+    globs (it would match nothing and report clean) and an empty fault-class
+    list (a typo for "every class", every time).
+  - **No model is required, deliberately.** A concern's useful core is a named
+    scope plus a producer selection, which the mechanical producers already
+    satisfy — so every verifying command stays offline and NFR-01 is unchanged.
+    An LLM can later propose faults a line-oriented producer cannot see, as an
+    additional source for a concern that already works.
+
+### Added
+
+- A save-path sweep now reports **what its defenders could prove**, before it
+  reports what they did: per file, whether every defender mocks the persistence
+  layer (call shape only), at least one does not (a real write is possible), or
+  there is no defender at all. When nothing is unmocked the report says so
+  outright — a clean probe there is not evidence of persistence, it is evidence
+  that nothing could have measured it. Measured on a real AI-authored
+  application: of 37 files that write to storage, 32 were defended only by
+  mocking tests.
+- `scope.provability` on the sweep document, with a validator rule that every
+  target is classified exactly once.
+- The candidate ordering now **learns from this project's own probed verdicts**
+  instead of only the shipped productivity prior. Every evidence record already
+  carries a `faultClass` and a `verdict`, so "how often does a fault of this
+  class survive *here*" is a tally rather than a new thing to capture. A sweep
+  persists its own evidence to `.testguard/sweep-evidence.json` — beside the
+  canonical one, never replacing it — so the next run learns from
+  machine-proposed faults, the same distribution the ranker orders. The sweep
+  document records `ordering.observed` and `ordering.sources`, because an
+  ordering nobody can trace is a number nobody should trust.
+
+### Added
+
 - `sweep --save-paths` — sweep every file that writes to storage instead of the
   diff, and report the surface as the denominator the findings are read
   against. A diff cannot answer how many save paths exist, and a clean report

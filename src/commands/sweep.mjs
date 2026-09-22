@@ -1,9 +1,17 @@
 import { join, resolve } from 'node:path';
-import { sweep, renderSweep } from '../sweep/sweep.mjs';
+import { sweep, renderSweep, ConcernError } from '../sweep/sweep.mjs';
 import { resolveChangedRef } from '../gate/changed.mjs';
 import { writeSpecDoc } from '../evidence/writer.mjs';
 
 export const sweepPath = (projectDir) => join(projectDir, '.testguard', 'sweep.json');
+/**
+ * A sweep's own evidence, beside the canonical one and never replacing it.
+ * The next sweep reads it to learn which fault classes are productive HERE,
+ * which is the feedback half of the selection Google reports taking from 15%
+ * to 89% productive. Machine-proposed faults, so it is the closest observation
+ * of the distribution the ranker actually orders.
+ */
+export const sweepEvidencePath = (projectDir) => join(projectDir, '.testguard', 'sweep-evidence.json');
 
 /**
  * `testguard sweep [dir] --changed <ref>`: propose faults for the changed
@@ -21,11 +29,14 @@ export const sweepPath = (projectDir) => join(projectDir, '.testguard', 'sweep.j
  */
 export async function sweepCommand({ projectDir, values, version }, io) {
   const mode = values['save-paths'] ? 'save-paths' : 'changed';
+  // A concern that aims at the write surface or at a glob needs no diff, the
+  // same as --save-paths. Only a concern that defers to the gate does.
+  const aimed = Boolean(values.concern) || mode === 'save-paths';
   // `--save-paths` scans the whole write surface, so it needs no diff. The gate
   // is still computed underneath (the document reports `changed`), and HEAD is
   // a reference every repository has.
   const resolved = resolveChangedRef({ explicit: values.changed, projectDir })
-    ?? (mode === 'save-paths' ? { ref: 'HEAD', from: 'save-paths', required: false } : null);
+    ?? (aimed ? { ref: 'HEAD', from: values.concern ? `concern ${values.concern}` : 'save-paths', required: false } : null);
   if (!resolved) {
     io.err('sweep needs a reference to measure the change against: --changed <ref> (e.g. origin/main), or set TESTGUARD_CHANGED_REF. CI bases and a safe local remote default or differently named upstream are detected automatically. Or sweep the write surface instead with --save-paths.');
     return 3;
@@ -46,34 +57,52 @@ export async function sweepCommand({ projectDir, values, version }, io) {
   }
   if (mode === 'changed' && !resolved.required && !values.json && !values.quiet) io.err(`sweep: comparing against ${resolved.ref} (${resolved.from})`);
 
-  const doc = await sweep({
-    projectDir,
-    ref: resolved.ref,
-    mode,
-    includeDirty: values['include-dirty'],
-    exclude: values.exclude ?? [],
-    cap,
-    confirmRuns,
-    budgetMs,
-    runnerCommand: values['runner-cmd'],
-    runnerName: values.runner,
-    nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
-    toolVersion: version,
-    claimsPath: values.claims ? resolve(values.claims) : undefined,
-    ignorePath: values.ignore ? resolve(values.ignore) : undefined,
-    onStage: !values.quiet && !values.json && process.stderr.isTTY
+  let doc;
+  try {
+    doc = await sweep({
+      projectDir,
+      ref: resolved.ref,
+      mode,
+      concern: values.concern,
+      concernsPath: values.concerns ? resolve(values.concerns) : undefined,
+      includeDirty: values['include-dirty'],
+      exclude: values.exclude ?? [],
+      cap,
+      confirmRuns,
+      budgetMs,
+      runnerCommand: values['runner-cmd'],
+      runnerName: values.runner,
+      nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
+      toolVersion: version,
+      claimsPath: values.claims ? resolve(values.claims) : undefined,
+      ignorePath: values.ignore ? resolve(values.ignore) : undefined,
+      onStage: !values.quiet && !values.json && process.stderr.isTTY
       ? ({ claimId, faultId, stage, i, n }) => process.stderr.write(`\r\x1b[K  … ${claimId}/${faultId} ${stage} ${i}/${n}`)
       : undefined,
-    onWarn: (m) => { if (!values.quiet) io.err(`warning: ${m}`); },
-  });
+      onWarn: (m) => { if (!values.quiet) io.err(`warning: ${m}`); },
+    });
+  } catch (e) {
+    // A concern named on the command line that this project does not declare
+    // is a usage error, not a precondition failure: nothing about the
+    // repository is wrong.
+    if (e instanceof ConcernError) {
+      io.err(e.message);
+      return 3;
+    }
+    throw e;
+  }
   if (process.stderr.isTTY && !values.quiet && !values.json) process.stderr.write('\r\x1b[K');
 
+  const { evidence, ...document } = doc;
   const outPath = values.out ? resolve(values.out) : sweepPath(projectDir);
-  writeSpecDoc('sweep', outPath, doc);
+  writeSpecDoc('sweep', outPath, document);
+  // Written only when something was actually probed: an empty document would
+  // teach the next run that every class is unproductive.
+  if (evidence?.records?.length) writeSpecDoc('evidence', sweepEvidencePath(projectDir), evidence);
   if (values.json) {
-    io.out(JSON.stringify(doc, null, 2));
+    io.out(JSON.stringify(document, null, 2));
   } else {
-    io.out(renderSweep(doc, { limit: Number(values.max) || 20 }));
+    io.out(renderSweep(document, { limit: Number(values.max) || 20 }));
     if (!values.quiet) io.out(`\nsweep: ${outPath}`);
   }
   return doc.exitCode;

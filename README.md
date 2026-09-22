@@ -451,6 +451,14 @@ Three rules make it safe to run on a repository that has never seen this tool:
   is reported and never gates — a tool that fails because its own guess was bad
   is a tool people switch off.
 
+The ordering **learns from your own runs**. Every evidence record already
+carries a fault class and a verdict, so "how often does a fault of this class
+survive here" is a tally, not a new thing to collect — a sweep persists its
+evidence and the next one reads it. A project with no evidence falls back to
+the shipped prior and says so; one with its own records overrides it in
+proportion to how many it has. The report names which, because an ordering
+nobody can trace is a number nobody should trust.
+
 The cap and the ordering are Google's: their mutation service surfaces at most
 7 × |files| mutants per change and orders candidates on the measured
 productivity of their operator in similar context, which took their productive
@@ -465,6 +473,60 @@ clean.
 A sweep is weaker evidence than a probe, and says so. Nobody stated that the
 behaviour mattered. It is stronger than nothing, which is what a repository
 with no claims has — and the survivors worth defending become the first claims.
+
+#### Concerns: one sentence, two hundred screens
+
+A claim names one promise precisely, which is why a repository with two hundred
+screens never finishes writing them. A **concern** names a *kind* of promise and
+says where to look for it:
+
+```bash
+npx testguard-cli concerns                      # what this project can be swept by
+npx testguard-cli sweep --concern ADMIN-GUARDS  # aim a sweep at one
+```
+
+```json
+{
+  "schemaVersion": 1,
+  "concerns": [
+    {
+      "id": "ADMIN-GUARDS",
+      "statement": "Every admin route refuses a caller without the admin role.",
+      "severity": "critical",
+      "targets": { "kind": "glob", "globs": ["src/app/api/admin/**"] },
+      "faultClasses": ["guard-removed", "condition-forced", "return-altered"]
+    }
+  ]
+}
+```
+
+Five lines, and the sweep reports:
+
+```
+concern ADMIN-GUARDS matches 24 files. Swept 23.
+  158 further proposals were outside this concern's fault classes.
+
+SURVIVED   src/app/api/admin/claims/[id]/route.ts
+  [line 41] Guard never triggers: `if (!membership || (membership.role !== 'owner'
+  && membership.role !== 'manager'))` becomes `if (false)`.
+```
+
+The idea is Meta's: ACH has an engineer describe an area of concern in plain
+text and gates every generated step by execution. What is taken here is the
+**unit** — the concern as the thing a human writes — not their generator, and
+**no model is required**. A concern's useful core is a named scope plus a
+producer selection, which the mechanical producers already satisfy, so every
+verifying command stays offline.
+
+Two concerns ship built in, and only two. An authorization concern would need a
+heuristic for *"which files check permissions"*, and a guess there is exactly
+the noise that gets a check switched off — so `SAVE-PERSISTS` and
+`CHANGED-CODE` are the defaults, and a project that knows its own auth layer
+says so in three lines. Declaring a concern with a built-in's id replaces it,
+and the replacement is reported rather than silent.
+
+A concern is **not** a claim and never becomes one by itself. It says where to
+look; the probe says what it found; a human states the sentence worth defending.
 
 #### Sweeping the save surface instead of the diff
 
@@ -494,10 +556,26 @@ denominator comes first and the document carries `writeSites` and
 AI-authored application: **12 of 26 probed persistence faults survived a fully
 green suite, and all 12 were a dropped payload field.**
 
-This is a *sample* of the surface, and says so. It does not yet prove a write
-reached storage — only that a test would notice if the payload changed.
-Read-back oracles are the next rung
-([#154](https://github.com/raccioly/testguard/issues/154)).
+It also states, before any verdict, **what the defenders could prove at all**:
+
+```
+of those 37 files: 32 defended only by tests that mock the persistence layer,
+1 with an unmocked defender, 4 with no defender at all.
+```
+
+That line is the read-back answer. A test that replaced the database can prove
+the *call shape* and nothing beyond it — a `where` that matches no rows, a
+rolled-back transaction and a rejected constraint all pass against a mock that
+recorded the arguments and returned a plausible object. So rather than pretend
+to measure persistence, TestGuard states the limit, the same way `nocover` says
+"no test imports this" instead of guessing.
+
+When every defender mocks the layer, the report says so outright: *nothing in
+this suite can prove a write reached storage*. A clean probe there is not
+evidence of persistence — it is evidence that nothing could have measured it.
+
+`unmocked` is deliberately weaker than "proves persistence": a test that does
+not replace the database may simply never reach it. Possible is the honest word.
 
 ### Every change needs a claim
 

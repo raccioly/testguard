@@ -7,7 +7,7 @@ import { reproduces, decimals, MAX_PLACES } from './wilson.mjs';
 
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 
-export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate', 'replay', 'sweep']);
+export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate', 'replay', 'sweep', 'concerns']);
 /**
  * How a document says it tried to falsify its claims. Absent means
  * `fault-injection`, so every document written before the field existed is
@@ -305,6 +305,29 @@ const semantic = {
     return errors;
   },
 
+  concerns(doc) {
+    const errors = [];
+    const seen = new Set();
+    doc.concerns.forEach((c, i) => {
+      if (seen.has(c.id)) errors.push({ path: `/concerns/${i}/id`, message: `duplicate concern id "${c.id}"` });
+      seen.add(c.id);
+      // A glob target with no globs matches nothing, which reads as "this
+      // concern found no problems" rather than "this concern was never aimed".
+      if (c.targets?.kind === 'glob' && !(c.targets.globs?.length > 0)) {
+        errors.push({ path: `/concerns/${i}/targets/globs`, message: `concern "${c.id}" targets a glob but names none; it would match nothing and report clean` });
+      }
+      if (c.targets?.kind !== 'glob' && c.targets?.globs) {
+        errors.push({ path: `/concerns/${i}/targets/globs`, message: `concern "${c.id}" names globs but does not target them` });
+      }
+      // An empty list is not "every class"; it is a concern that can never
+      // propose anything, which is a typo for `null` every time.
+      if (Array.isArray(c.faultClasses) && c.faultClasses.length === 0) {
+        errors.push({ path: `/concerns/${i}/faultClasses`, message: `concern "${c.id}" allows no fault class; omit the field for every class` });
+      }
+    });
+    return errors;
+  },
+
   sweep(doc) {
     const errors = [];
     const s = doc.selection;
@@ -318,9 +341,16 @@ const semantic = {
     // measured, and its absence on a save-paths sweep hides the denominator
     // entirely — which is the whole reason that mode exists.
     const saves = doc.scope.mode === 'save-paths';
-    for (const k of ['writeSites', 'payloadFields']) {
+    for (const k of ['writeSites', 'payloadFields', 'provability']) {
       if (saves && doc.scope[k] === undefined) errors.push({ path: `/scope/${k}`, message: `a save-paths sweep must report ${k}: the surface is the denominator its findings are read against` });
       if (!saves && doc.scope[k] !== undefined) errors.push({ path: `/scope/${k}`, message: `${k} belongs to a save-paths sweep; a changed sweep did not measure the write surface` });
+    }
+    if (saves && doc.scope.provability) {
+      const pv = doc.scope.provability;
+      const total = pv.mocked + pv.unmocked + pv.none;
+      // Every target is classified exactly once. A surface whose provability
+      // does not account for all of it has a bucket nobody looked in.
+      if (total !== doc.scope.targets) errors.push({ path: '/scope/provability', message: `provability accounts for ${total} files; targets is ${doc.scope.targets}` });
     }
     if (saves && doc.scope.writeSites !== undefined && doc.scope.targets > doc.scope.writeSites) {
       errors.push({ path: '/scope/targets', message: `targets (${doc.scope.targets}) exceeds writeSites (${doc.scope.writeSites}); every target is a file with at least one write` });
@@ -342,6 +372,12 @@ const semantic = {
     // document from quietly reporting fewer findings than it reached verdicts.
     const notKilled = probed - (doc.counts.killed ?? 0);
     if (doc.findings.length !== notKilled) errors.push({ path: '/findings', message: `${doc.findings.length} findings for ${notKilled} records that were not killed; findings are every non-killed record` });
+
+    // An ordering that claims to have learned from something must name it.
+    if (doc.ordering) {
+      if (doc.ordering.observed > 0 && doc.ordering.sources.length === 0) errors.push({ path: '/ordering/sources', message: 'an ordering learned from evidence must name the documents it was learned from' });
+      if (doc.ordering.observed === 0 && doc.ordering.sources.length > 0) errors.push({ path: '/ordering/observed', message: 'sources are named but nothing was observed; the ordering used the shipped prior' });
+    }
 
     const gating = doc.findings.filter((f) => f.verdict === 'survived' || f.verdict === 'nocover').length;
     if (gating > 0 && doc.exitCode !== 1) errors.push({ path: '/exitCode', message: 'a survived or nocover finding must exit 1; a sweep never passes over a deliberate break nothing noticed' });

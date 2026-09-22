@@ -171,3 +171,56 @@ export function persistenceHint(signal, faultLine) {
   const field = /^\s*([A-Za-z_$][\w$]*)\s*(?::|,\s*$)/.exec(faultLine ?? '')?.[1];
   return `${signal.file} ${signal.reason} Assert the whole object written by the call this fault changes${field ? `, including \`${field}\`` : ''} — or read the record back and assert on what was stored.`;
 }
+
+/**
+ * What this claim's defenders are CAPABLE of proving about a write.
+ *
+ * The read-back question — "did the row actually land?" — cannot be answered by
+ * a test that replaced the database with a mock. Such a test can prove the call
+ * shape and nothing beyond it: the `where` may match no rows, the transaction
+ * may roll back, a constraint may reject the write, and every one of those
+ * passes against a mock that recorded the arguments and returned a plausible
+ * object.
+ *
+ * So rather than pretend to measure persistence, this states the LIMIT. It is
+ * the same discipline as `nocover` — which says "no test imports this" instead
+ * of guessing — one level finer: these tests exist, they run, and there is a
+ * class of failure they structurally cannot see.
+ *
+ *   `mocked`   every defender replaces the persistence layer. Call shape only.
+ *   `unmocked` at least one does not, so a real write is at least possible.
+ *              NOT a promise that one happens: a test may simply never reach
+ *              the database. Possible is the honest word.
+ *   `none`     no defender at all; `nocover` already covers this.
+ *
+ * Measured on a real AI-authored application: of 37 files that write to
+ * storage, 32 were defended only by mocking tests, 4 had no defender, and 1
+ * had an unmocked defender — a mailer, not a database write. Nothing in that
+ * suite could prove any save persisted.
+ */
+export function persistenceProvability(projectDir, defenders) {
+  if (!defenders || defenders.length === 0) return { class: 'none', mocking: [], unmocked: [] };
+  const mocking = [];
+  const unmocked = [];
+  for (const d of defenders) (analyzePersistence(projectDir, d) ? mocking : unmocked).push(d);
+  return { class: unmocked.length ? 'unmocked' : 'mocked', mocking, unmocked };
+}
+
+/**
+ * The provability of a whole surface, as counts. The headline a save-path
+ * report opens with, because "how many of these could be proven at all" is a
+ * different question from "how many were probed" and a far more alarming one.
+ */
+export function provabilitySummary(projectDir, targets, defendersOf) {
+  const counts = { mocked: 0, unmocked: 0, none: 0 };
+  for (const file of targets) {
+    let defenders = [];
+    try {
+      defenders = defendersOf(file);
+    } catch {
+      defenders = [];
+    }
+    counts[persistenceProvability(projectDir, defenders).class] += 1;
+  }
+  return counts;
+}
