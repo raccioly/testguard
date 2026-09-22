@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **claimspec v1 evidence admits `persistence-payload-unasserted`** to
+  `defenders.signals`, the enum shared with every claimspec consumer. The
+  signal had lived only in the sweep document, so `probe` could not surface
+  why a save-path survivor was missed. Now a `survived` record whose fault
+  sits on the write path carries it for each resolved defender that mocks the
+  persistence layer, with the mocked `specifiers` and the file's assertion
+  `counts` (exact, partial, argument-free). The validator refuses it on any
+  other verdict, on a file that is not a resolved defender, or without its
+  reason — the same rule the sweep document already enforced on its
+  findings, and the sweep now repeats what the record says rather than
+  re-deriving it. Conformance carries a valid example and three invalid
+  cases. No consumer outside this repository validates claimspec evidence
+  today; DocGuard's adoption (docguard#420) is notified rather than broken.
 - `sweep` sets aside a purely presentational JSX element — an icon, or a
   static wrapper with no expression and no handler — instead of spending a
   probe run on it, and says so: `selection.presentational` in the document, a

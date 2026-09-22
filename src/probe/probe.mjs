@@ -16,6 +16,7 @@ import { classifyIndependence } from './independence.mjs';
 import { escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf, isReusable } from './attribution.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
 import { fingerprint } from '../../spec/lib/fingerprint.mjs';
+import { persistenceSignalsFor } from '../supply/persistence.mjs';
 
 
 /** Is `child` the same file as `root`, or under it? Both must already be real paths. */
@@ -485,13 +486,19 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
     detail.independence = classifyIndependence({ dir: historyDir, ref: historyRef, targetFile: toRepoPath(fault.file), defenders: (killers.length ? killers : defenders).map(toRepoPath) });
   }
 
+  // Why a survivor on a write path was missed: each defender that mocks the
+  // persistence layer, with its assertion mix. Descriptive, never predictive —
+  // it is attached to a verdict already reached and selects nothing. The sweep
+  // document carried this alone until claimspec v1 admitted it to the evidence.
+  const allSignals = [...signals, ...persistenceSignalsFor({ verdict, fault, defenders, projectDir: iso.projectDir })];
+
   return {
     fingerprint: fingerprint({ claimId: claim.id, subjectId: fault.id, file: fault.file, verdict }),
     claim: { id: claim.id, statement: claim.statement, severity: claim.severity, source: claim.source, producedBy: claim.producedBy },
     subject,
     verdict,
     detail,
-    defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}), ...(byRunner ? { byRunner } : {}), ...(mocking.length ? { mocking } : {}), ...(signals.length ? { signals } : {}) },
+    defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}), ...(byRunner ? { byRunner } : {}), ...(mocking.length ? { mocking } : {}), ...(allSignals.length ? { signals: allSignals } : {}) },
     inputs,
     rank: rank({ severity: claim.severity, sourceKind: claim.source.kind, blast, independence: detail.independence?.class }),
   };

@@ -38,7 +38,7 @@ import { selectFaults, onWritePath, capFor } from '../supply/select.mjs';
 import { learnedProductivity } from '../supply/feedback.mjs';
 import { loadConcerns, concernById, targetsFor, filterByConcern } from '../supply/concerns.mjs';
 import { saveSurface } from '../supply/savepath.mjs';
-import { persistenceSignals, persistenceHint, provabilitySummary } from '../supply/persistence.mjs';
+import { persistenceHint, provabilitySummary } from '../supply/persistence.mjs';
 import { probe } from '../probe/probe.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { hintFor } from '../brief/brief.mjs';
@@ -275,7 +275,10 @@ export async function sweep({
   // second scan; `line` and `find` live on the draft, not on the evidence.
   const draftOf = new Map(selection.selected.map(({ claim, fault }) => [`${claim.id}/${fault.id}`, fault]));
 
-  const signalsFor = (r) => persistenceSignals(projectDir, r.defenders?.resolved ?? []);
+  // The probe attaches the persistence signal to the record itself now
+  // (claimspec v1 evidence, `defenders.signals`); the finding repeats what the
+  // record says rather than re-deriving it, so the two can never disagree.
+  const signalsFor = (r) => (r.defenders?.signals ?? []).filter((s) => s.signal === 'persistence-payload-unasserted');
   const counts = {};
   const findings = [];
   for (const r of evidence.records) {

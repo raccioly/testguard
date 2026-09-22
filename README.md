@@ -234,6 +234,10 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    static signal `mocked-never-asserted` — the cheapest blind-spot signal
    there is, and the exact signature of one escaped bug in the field
    reports. Silence it, visibly, with `// unasserted: <why>` above the mock.
+   Its sibling `persistence-payload-unasserted` is attached to a **survivor
+   on a write path** whose defender mocks the database: the test can prove
+   the call shape and never that the row landed, and the signal names the
+   mocked layer and the file's assertion mix (exact, partial, argument-free).
 
    Runners: **vitest**, **jest**, **Playwright** and **Python** (`--runner
    auto` picks the first of vitest, jest, python that resolves). A JavaScript

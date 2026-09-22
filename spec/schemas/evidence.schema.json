@@ -547,7 +547,7 @@
               }
             },
             "signals": {
-              "description": "Static, annotation-grade signals about the defenders. They never change a verdict. `mocked-never-asserted`: the file mocks the subject and never asserts on anything imported from it. `unasserted-annotated`: the same, but the author annotated the mock with a reason (`// unasserted: <why>`), recorded here \u2014 silenced, never hidden. `target-attribute-patched`: a Python defender that patches individual attributes of the subject (`patch(\"pkg.mod.fn\")`) rather than the module. Unlike a JavaScript module mock it does NOT disqualify the file \u2014 a fault anywhere else in the module is still detectable \u2014 so the file stays in `resolved`; `reason` names the patched attributes, which are where that test is least likely to notice anything.",
+              "description": "Static, annotation-grade signals about the defenders. They never change a verdict. `mocked-never-asserted`: the file mocks the subject and never asserts on anything imported from it. `unasserted-annotated`: the same, but the author annotated the mock with a reason (`// unasserted: <why>`), recorded here \u2014 silenced, never hidden. `target-attribute-patched`: a Python defender that patches individual attributes of the subject (`patch(\"pkg.mod.fn\")`) rather than the module. Unlike a JavaScript module mock it does NOT disqualify the file \u2014 a fault anywhere else in the module is still detectable \u2014 so the file stays in `resolved`; `reason` names the patched attributes, which are where that test is least likely to notice anything. `persistence-payload-unasserted`: a resolved defender that mocks the persistence layer (`vi.mock('@/lib/prisma')`) and so can prove the call shape but never that a row landed; `reason` names the mocked layer and the file's assertion mix (exact, partial, argument-free), `counts` carries the mix as numbers and `specifiers` the mocked module paths. It belongs only to a `survived` record whose fault sits on the write path \u2014 a field of a persisted payload, or the write call itself \u2014 because there it explains why the survivor was missed and anywhere else it explains nothing. Measured on a real application: 12 of 12 survivors on the save path were a dropped payload field, and every one of their defenders asserted with a partial matcher.",
               "type": "array",
               "items": {
                 "type": "object",
@@ -563,13 +563,46 @@
                     "enum": [
                       "mocked-never-asserted",
                       "unasserted-annotated",
-                      "target-attribute-patched"
+                      "target-attribute-patched",
+                      "persistence-payload-unasserted"
                     ]
                   },
                   "reason": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 512
+                  },
+                  "specifiers": {
+                    "description": "persistence-payload-unasserted only: the persistence-layer module specifiers the file mocks.",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "counts": {
+                    "description": "persistence-payload-unasserted only: the file's call-shape assertions by kind. `exact` is the only kind a dropped field can fail.",
+                    "type": "object",
+                    "required": [
+                      "exact",
+                      "partial",
+                      "argless"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "exact": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "partial": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "argless": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    }
                   }
                 },
                 "additionalProperties": false

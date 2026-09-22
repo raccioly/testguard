@@ -4780,6 +4780,109 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-PERSISTENCE-SIGNAL-EXPLAINS-A-SURVIVOR-ONLY",
+      "statement": "The persistence-payload-unasserted signal is attached to a survived record whose fault sits on the write path and to nothing else, and a conforming evidence document never carries it on another verdict, on a file that is not a resolved defender, or without its reason.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-22T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/evidence-persistence-signal.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The signal is attached on every verdict, so a kill explains why it was missed.",
+          "faultClass": "condition-forced",
+          "file": "src/supply/persistence.mjs",
+          "find": "  if (verdict !== 'survived') return [];",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-22T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The write-path half of the rule is dropped, so a guard's survivor carries a signal about payload assertions.",
+          "faultClass": "condition-forced",
+          "file": "src/supply/persistence.mjs",
+          "find": "  if (!onWritePath(fault)) return [];",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-22T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The validator accepts the signal on any verdict, so a document that carries it on a kill conforms.",
+          "faultClass": "statement-deleted",
+          "file": "spec/lib/validate.mjs",
+          "find": "          if (r.verdict !== 'survived') errors.push({ path: `${p}/defenders/signals`, message: `persistence-payload-unasserted explains a survivor; on a ${r.verdict} record it explains nothing` });",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-22T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The validator no longer requires the file to be a resolved defender, so a signal about a file that never ran conforms.",
+          "faultClass": "statement-deleted",
+          "file": "spec/lib/validate.mjs",
+          "find": "          if (!r.defenders.resolved.includes(s.file)) errors.push({ path: `${p}/defenders/signals`, message: `${s.file} mocks the persistence layer but is not a resolved defender` });",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-22T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PROBE-CARRIES-THE-PERSISTENCE-SIGNAL",
+      "statement": "When a fault on a write path survives, the evidence record probe writes carries persistence-payload-unasserted for each resolved defender that mocks the persistence layer, with the mocked specifiers and the file's assertion mix, so the reason a save-path survivor was missed is in the evidence and not only in a sweep document.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/evidence.schema.json#signals"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-22T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/probe-persistence-signal.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The probe never asks: the record carries only the mock signals, and the persistence signal stays confined to the sweep document.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "  const allSignals = [...signals, ...persistenceSignalsFor({ verdict, fault, defenders, projectDir: iso.projectDir })];",
+          "replace": "  const allSignals = [...signals];",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-22T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

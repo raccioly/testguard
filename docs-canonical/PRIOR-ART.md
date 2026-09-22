@@ -178,6 +178,9 @@ Recorded so they are not mistaken for decisions.
     running-depth guard on that class catches 74 of the 77 and drops no
     valid proposal. Not arid — a producer that spends probe runs saying
     nothing — but found by the same pass.
-- **The persistence signal is confined to the sweep document.** It is not yet
-  in `evidence.defenders.signals`, which is a closed enum in the shared
-  claimspec contract and needs a coordinated bump.
+- **The persistence signal reached the evidence on 2026-09-22**
+  (`persistence-payload-unasserted` in `evidence.defenders.signals`, a closed
+  enum in the shared claimspec contract). No tool outside this repository
+  validated claimspec evidence at the time; DocGuard's adoption (docguard#420)
+  was notified rather than broken. Listed here because the enum is shared:
+  the next addition needs the same notice.

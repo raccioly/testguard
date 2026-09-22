@@ -144,6 +144,16 @@ const semantic = {
         if (s.signal === 'target-attribute-patched') {
           if (!s.reason) errors.push({ path: `${p}/defenders/signals`, message: `target-attribute-patched on ${s.file} requires the patched attributes as its reason` });
           if (!r.defenders.resolved.includes(s.file)) errors.push({ path: `${p}/defenders/signals`, message: `${s.file} patches attributes of the subject but is not a resolved defender` });
+        } else if (s.signal === 'persistence-payload-unasserted') {
+          // The same rule the sweep document enforces on its findings: the
+          // signal explains a SURVIVOR on the write path. A record does not
+          // carry the fault's line, so the write-path half is the producer's
+          // to keep (`persistenceSignalsFor`); the verdict half is checked here.
+          // The file mocks the persistence layer, not the subject, so it is a
+          // resolved defender and never a mocking one.
+          if (!s.reason) errors.push({ path: `${p}/defenders/signals`, message: `persistence-payload-unasserted on ${s.file} requires the mocked layer and assertion mix as its reason` });
+          if (r.verdict !== 'survived') errors.push({ path: `${p}/defenders/signals`, message: `persistence-payload-unasserted explains a survivor; on a ${r.verdict} record it explains nothing` });
+          if (!r.defenders.resolved.includes(s.file)) errors.push({ path: `${p}/defenders/signals`, message: `${s.file} mocks the persistence layer but is not a resolved defender` });
         } else if (!(r.defenders.mocking ?? []).includes(s.file)) {
           errors.push({ path: `${p}/defenders/signals`, message: `${s.file} carries a mock signal but is not listed in defenders.mocking` });
         }
