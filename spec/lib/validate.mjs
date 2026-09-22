@@ -144,6 +144,16 @@ const semantic = {
         if (s.signal === 'target-attribute-patched') {
           if (!s.reason) errors.push({ path: `${p}/defenders/signals`, message: `target-attribute-patched on ${s.file} requires the patched attributes as its reason` });
           if (!r.defenders.resolved.includes(s.file)) errors.push({ path: `${p}/defenders/signals`, message: `${s.file} patches attributes of the subject but is not a resolved defender` });
+        } else if (s.signal === 'persistence-payload-unasserted') {
+          // The same rule the sweep document enforces on its findings: the
+          // signal explains a SURVIVOR on the write path. A record does not
+          // carry the fault's line, so the write-path half is the producer's
+          // to keep (`persistenceSignalsFor`); the verdict half is checked here.
+          // The file mocks the persistence layer, not the subject, so it is a
+          // resolved defender and never a mocking one.
+          if (!s.reason) errors.push({ path: `${p}/defenders/signals`, message: `persistence-payload-unasserted on ${s.file} requires the mocked layer and assertion mix as its reason` });
+          if (r.verdict !== 'survived') errors.push({ path: `${p}/defenders/signals`, message: `persistence-payload-unasserted explains a survivor; on a ${r.verdict} record it explains nothing` });
+          if (!r.defenders.resolved.includes(s.file)) errors.push({ path: `${p}/defenders/signals`, message: `${s.file} mocks the persistence layer but is not a resolved defender` });
         } else if (!(r.defenders.mocking ?? []).includes(s.file)) {
           errors.push({ path: `${p}/defenders/signals`, message: `${s.file} carries a mock signal but is not listed in defenders.mocking` });
         }
@@ -333,7 +343,8 @@ const semantic = {
     const s = doc.selection;
     // A cap that hides its remainder is a coverage claim nobody made, so the
     // arithmetic that proves nothing was dropped is checked, not trusted.
-    if (s.proposed !== s.selected + s.deferred) errors.push({ path: '/selection/proposed', message: `proposed (${s.proposed}) must equal selected (${s.selected}) + deferred (${s.deferred})` });
+    const setAside = s.presentational ?? 0;
+    if (s.proposed !== s.selected + s.deferred + setAside) errors.push({ path: '/selection/proposed', message: `proposed (${s.proposed}) must equal selected (${s.selected}) + deferred (${s.deferred})${setAside ? ` + presentational (${setAside})` : ''}` });
     if (s.selected > s.cap) errors.push({ path: '/selection/selected', message: `selected (${s.selected}) exceeds the cap (${s.cap})` });
     if (doc.scope.swept > doc.scope.targets) errors.push({ path: '/scope/swept', message: `swept (${doc.scope.swept}) cannot exceed targets (${doc.scope.targets})` });
     // The counters that only mean something in one mode must not appear in the

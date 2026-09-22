@@ -343,6 +343,14 @@ the suppress-up-to-count semantics are identical.
   tool then records `unasserted-annotated` with the reason — silenced, never
   hidden. A file that mocks the subject is never a discovered defender: a
   mock cannot detect a fault in what it replaced.
+  `persistence-payload-unasserted`: a resolved defender mocks the persistence
+  layer, so it can prove the call shape and never that a row landed; the
+  reason names the layer and the file's assertion mix. It is attached only to
+  a **survived** record whose fault sits on the write path — a field of a
+  persisted payload or the write call itself — because there it says why the
+  survivor was missed, and anywhere else it says nothing. A conforming
+  document never carries it on another verdict, on a file that is not a
+  resolved defender, or without its reason.
 
 ## Claimed source surface
 

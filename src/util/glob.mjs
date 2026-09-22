@@ -11,7 +11,11 @@ import { join } from 'node:path';
 // the application — including its writes and its tests — so a surface scan of a
 // real app counted the same code twice and a defender glob could match a
 // compiled chunk. The promise was right and the list was short.
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'coverage', '.testguard',
+// `.claude` holds agent tooling and, under `.claude/worktrees/`, whole nested
+// checkouts of OTHER branches. Measured: discovery on a real repository returned
+// another branch's test file as a defender — a file the scratch tree cannot
+// even contain, because the directory is gitignored.
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'coverage', '.testguard', '.claude',
   '.next', '.nuxt', '.svelte-kit', '.output', '.turbo', '.parcel-cache', '.angular', '.astro',
   'build', 'out', '.cache', '.vercel', '.netlify',
   '__pycache__', '.venv', 'venv', 'site-packages', '.tox', '.nox',

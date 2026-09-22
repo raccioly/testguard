@@ -234,6 +234,10 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    static signal `mocked-never-asserted` — the cheapest blind-spot signal
    there is, and the exact signature of one escaped bug in the field
    reports. Silence it, visibly, with `// unasserted: <why>` above the mock.
+   Its sibling `persistence-payload-unasserted` is attached to a **survivor
+   on a write path** whose defender mocks the database: the test can prove
+   the call shape and never that the row landed, and the signal names the
+   mocked layer and the file's assertion mix (exact, partial, argument-free).
 
    Runners: **vitest**, **jest**, **Playwright** and **Python** (`--runner
    auto` picks the first of vitest, jest, python that resolves). A JavaScript
@@ -423,8 +427,9 @@ alarming: something was deliberately broken and not one test failed.
 
 ```
 swept 13 of 14 unclaimed changed files against origin/main.
-proposed 510 faults, probed 10 (cap 10), deferred 500.
-  The 500 deferred are not a verdict: raise --cap, or sweep a smaller change.
+proposed 510 faults, probed 10 (cap 10), deferred 350.
+  The 350 deferred are not a verdict: raise --cap, or sweep a smaller change.
+  150 presentational elements (icons, static wrappers) set aside: nobody writes a test for those, and a survivor there would teach the ordering the wrong lesson.
 
 9 findings — a deliberate break that no test noticed:
 
@@ -981,7 +986,8 @@ parameter-derived argument swapped for `None`, a key dropped from a payload
 `dict` or an allow-list. Two differences are deliberate. A statement is
 removed by replacing it with `pass`, never by deleting the line, because a
 block whose only statement is gone is an `IndentationError`; and a line that
-leaves a bracket open (`COLOURS = {`) is never removed at all. Both exist
+leaves a bracket open (`COLOURS = {`), or sits inside one opened on an earlier
+line (`help="…"` in an `add_argument(`), is never removed at all. Both exist
 because a fault that cannot compile is a `fault-invalid` verdict — a probe run
 spent saying nothing about the tests. The two JSX shapes (`element-removed`,
 `handler-dropped`) have no Python meaning and are absent rather than faked.

@@ -38,7 +38,7 @@ import { selectFaults, onWritePath, capFor } from '../supply/select.mjs';
 import { learnedProductivity } from '../supply/feedback.mjs';
 import { loadConcerns, concernById, targetsFor, filterByConcern } from '../supply/concerns.mjs';
 import { saveSurface } from '../supply/savepath.mjs';
-import { persistenceSignals, persistenceHint, provabilitySummary } from '../supply/persistence.mjs';
+import { persistenceHint, provabilitySummary } from '../supply/persistence.mjs';
 import { probe } from '../probe/probe.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { hintFor } from '../brief/brief.mjs';
@@ -108,6 +108,27 @@ export function sortFindings(findings) {
 
 /** How many findings a sweep is willing to fail on. */
 export const gatingCount = (findings) => findings.filter((f) => GATING.has(f.verdict)).length;
+
+/**
+ * The `selection` block of the document: every proposal accounted for.
+ *
+ * Pure and exported for the same reason as `findingFrom`: the arithmetic that
+ * proves nothing was hidden — proposed = probed + deferred + set aside — is a
+ * rule you can state in one line, and the validator that checks it is not the
+ * engine that has to satisfy it.
+ */
+export function summarizeSelection(selection, { proposed, outOfScope = 0 }) {
+  const presentationalCount = selection.presentational?.length ?? 0;
+  return {
+    proposed,
+    ...(outOfScope ? { outOfScope } : {}),
+    selected: selection.selected.length,
+    deferred: selection.deferred.length,
+    ...(presentationalCount ? { presentational: presentationalCount } : {}),
+    cap: selection.cap,
+    byClass: selection.byClass,
+  };
+}
 
 /** A concern named on the command line that this project does not declare. */
 export class ConcernError extends Error {}
@@ -254,7 +275,10 @@ export async function sweep({
   // second scan; `line` and `find` live on the draft, not on the evidence.
   const draftOf = new Map(selection.selected.map(({ claim, fault }) => [`${claim.id}/${fault.id}`, fault]));
 
-  const signalsFor = (r) => persistenceSignals(projectDir, r.defenders?.resolved ?? []);
+  // The probe attaches the persistence signal to the record itself now
+  // (claimspec v1 evidence, `defenders.signals`); the finding repeats what the
+  // record says rather than re-deriving it, so the two can never disagree.
+  const signalsFor = (r) => (r.defenders?.signals ?? []).filter((s) => s.signal === 'persistence-payload-unasserted');
   const counts = {};
   const findings = [];
   for (const r of evidence.records) {
@@ -281,14 +305,7 @@ export async function sweep({
       swept: drafts.length,
       ...(skipped.length ? { skipped } : {}),
     },
-    selection: {
-      proposed: relevant.length,
-      ...(candidates.length !== relevant.length ? { outOfScope: candidates.length - relevant.length } : {}),
-      selected: selection.selected.length,
-      deferred: selection.deferred.length,
-      cap: selection.cap,
-      byClass: selection.byClass,
-    },
+    selection: summarizeSelection(selection, { proposed: relevant.length, outOfScope: candidates.length - relevant.length }),
     counts,
     ordering: { observed: learned.observed, sources: learned.sources },
     // Carried, not written here: the caller owns I/O. Persisting it is what
@@ -342,6 +359,9 @@ export function renderSweep(doc, { limit = 20 } = {}) {
   // A narrow concern must not look like a quiet one: the producers found these,
   // and this concern is not about them.
   if (selection.outOfScope) out.push(`  ${selection.outOfScope} further proposal${selection.outOfScope === 1 ? ' was' : 's were'} outside this concern's fault classes.`);
+  // The arid class this tool has. Set aside and said so: a count nobody prints
+  // is a proposal nobody made.
+  if (selection.presentational) out.push(`  ${selection.presentational} presentational element${selection.presentational === 1 ? '' : 's'} (icons, static wrappers) set aside: nobody writes a test for those, and a survivor there would teach the ordering the wrong lesson.`);
   // An ordering nobody can trace is a number nobody should trust.
   if (doc.ordering) {
     out.push(doc.ordering.observed === 0

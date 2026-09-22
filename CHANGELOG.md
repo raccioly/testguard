@@ -7,8 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **claimspec v1 evidence admits `persistence-payload-unasserted`** to
+  `defenders.signals`, the enum shared with every claimspec consumer. The
+  signal had lived only in the sweep document, so `probe` could not surface
+  why a save-path survivor was missed. Now a `survived` record whose fault
+  sits on the write path carries it for each resolved defender that mocks the
+  persistence layer, with the mocked `specifiers` and the file's assertion
+  `counts` (exact, partial, argument-free). The validator refuses it on any
+  other verdict, on a file that is not a resolved defender, or without its
+  reason — the same rule the sweep document already enforced on its
+  findings, and the sweep now repeats what the record says rather than
+  re-deriving it. Conformance carries a valid example and three invalid
+  cases. No consumer outside this repository validates claimspec evidence
+  today; DocGuard's adoption (docguard#420) is notified rather than broken.
+- `sweep` sets aside a purely presentational JSX element — an icon, or a
+  static wrapper with no expression and no handler — instead of spending a
+  probe run on it, and says so: `selection.presentational` in the document, a
+  line in the report, and the remainder arithmetic now proves
+  proposed = probed + deferred + set aside. Measured on a 14-file UI diff:
+  150 of 510 proposals, 29 of 30 probe slots and 7 of 10 survivors were of
+  this shape — Google's definition of an arid node, in a syntax Google never
+  mutated. Because the ordering learns from survival, those survivors were
+  also teaching it to rank the class higher; set-aside proposals never enter
+  the evidence, so they no longer can. Google's own five arid categories were
+  measured at under 1% of proposals and are not suppressed.
+
+### Fixed
+
+- Python defender discovery lost the last name on an import line that ends in
+  a comment: `from pkg import cli, demo  # noqa: E402` found only `cli`, and
+  `import pkg.demo  # noqa` found nothing. On a real suite where `# noqa` is
+  the idiom of every src-layout test, 12 of 30 probed faults were reported
+  NOCOVER for modules whose tests import them — a gating verdict in the
+  forbidden direction. Comments are now stripped before names are read.
+- File walking descended into `.claude/`, so a nested agent worktree under
+  `.claude/worktrees/` contributed another branch's tests as defenders of this
+  tree — files the scratch worktree cannot even contain, because the directory
+  is gitignored. `.claude` joins the tool-directory skip list, and the claim
+  that promised this now names it.
+- The Python `statement-deleted` producer proposed on lines inside a bracket
+  opened earlier — `help="…")` inside an `add_argument(` — and none of those
+  faults compiled: 81 of 600 proposals on a real CLI (13.5%). The producer now
+  tracks bracket depth across lines (triple-quoted strings included, so a
+  docstring's parentheses cannot leave the rest of the file "inside") and
+  refuses the `pass` shapes there; dict entries and call arguments keep their
+  own producers. Re-measured: 7 of 526 (1.3%).
+
 ### Changed
 
+- The self-probe cost budget is 1650 s, from 1440. Six new claims (85 s on
+  the Node 22 PR leg, worst 22 s, all under the 100 s per-claim ceiling) took
+  that leg from 1367 s to 1457 s, over by 17 s. The v0.13.0 release job
+  measured 1113 s from scratch, but the PR leg runs the same claims 25-30%
+  slower and is where the ceiling is checked, so 1650 restores ~13% headroom
+  over the leg that binds. The per-claim ceiling is unchanged.
 - The technical brief carries the 0.12 and 0.13 results it was missing: the
   whole-surface provability measurement (32 of 37 files that write are defended
   only by tests that mock the database) replaces the sample-level number in
@@ -17,6 +71,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   forced to `false` with no test failing) rather than a description of intent;
   and the first rung says its ordering learns from the project's own runs.
   Re-rendered; still eight sheets from eight pages.
+- `docs-canonical/PRIOR-ART.md` records the arid-node measurement instead of
+  a promise: every proposal from four sweeps over two of the maintainer's
+  repositories was classified by hand against Google's five arid categories,
+  and they account for under 1% of what the producers propose. No suppressor
+  is built for them. The same pass found what IS material — presentational
+  JSX taking 29 of 30 probe slots on a UI diff, and 13.5% of Python proposals
+  that cannot compile — and lists both as open, with numbers.
 - `docs-canonical/PRIOR-ART.md` no longer lists the feedback loop and concerns
   as unbuilt. The two gaps that remain are restated precisely: the loop learns
   from verdicts rather than explicit developer clicks, and concerns have no

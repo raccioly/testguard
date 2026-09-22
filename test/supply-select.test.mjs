@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { selectFaults, scoreOf, priorFor, onWritePath, capFor, MEASURED_PRODUCTIVITY } from '../src/supply/select.mjs';
+import { selectFaults, scoreOf, priorFor, onWritePath, capFor, presentational, MEASURED_PRODUCTIVITY } from '../src/supply/select.mjs';
 
 const f = (over = {}) => ({ id: 'S1', faultClass: 'statement-deleted', file: 'src/a.ts', line: 1, find: 'x = 1;', ...over });
 const pair = (claimId, over) => ({ claim: { id: claimId }, fault: f(over) });
@@ -42,6 +42,55 @@ describe('onWritePath — the persistence lines every measured survivor sat on',
   it('ordinary logic is not on the write path', () => {
     expect(onWritePath(f({ find: 'if (!session) return null;' }))).toBe(false);
     expect(onWritePath(f({ find: 'const total = a + b;' }))).toBe(false);
+  });
+});
+
+describe('presentational — the arid class this tool actually has', () => {
+  // Measured 2026-09-22 on a 14-file UI diff: 147 of 510 proposals, 29 of 30
+  // probe slots, 7 of 10 survivors. Google's arid categories were under 1%.
+  const el = (find) => f({ faultClass: 'element-removed', find });
+
+  it('an icon is a self-closing PascalCase element with only sizing and styling props', () => {
+    expect(presentational(el('        <X size={16} className="text-muted" />'))).toBe(true);
+    expect(presentational(el('<ChevronLeft />'))).toBe(true);
+    expect(presentational(el('<Search size={18} strokeWidth={1.5} aria-hidden="true" />'))).toBe(true);
+  });
+
+  it('a static wrapper is a layout or text tag with no expression and no handler', () => {
+    expect(presentational(el('  <div className="flex items-center gap-2">'))).toBe(true);
+    expect(presentational(el('<p className="note">All time</p>'))).toBe(true);
+    expect(presentational(el('<h2 className="title">Taste Fingerprint</h2>'))).toBe(true);
+    expect(presentational(el('<span />'))).toBe(true);
+  });
+
+  it('anything that renders data, reacts, or is addressed by a test is a real proposal', () => {
+    expect(presentational(el('<p className="ts">{data.timestamp}</p>'))).toBe(false);
+    expect(presentational(el('<div onClick={() => close()}>'))).toBe(false);
+    expect(presentational(el('<span role="status">saved</span>'))).toBe(false);
+    expect(presentational(el('<div data-testid="empty-state">'))).toBe(false);
+    expect(presentational(el('<label htmlFor="email">Email</label>'))).toBe(false);
+    expect(presentational(el('<img src="/logo.png" alt="Logo" />'))).toBe(false);
+    expect(presentational(el('<HeatBadge level={venue.heat} />'))).toBe(false);
+    expect(presentational(el('<Link href="/login">Sign in</Link>'))).toBe(false);
+  });
+
+  it('only ever applies to an element removal — a wrapper line under another class is not its business', () => {
+    expect(presentational(f({ faultClass: 'handler-dropped', find: '<div className="row">' }))).toBe(false);
+  });
+
+  it('selectFaults sets them aside, returns them, and still counts them in the tally', () => {
+    const r = selectFaults([
+      pair('A', { id: 'S1', faultClass: 'element-removed', find: '<X size={16} />', line: 1 }),
+      pair('A', { id: 'S2', faultClass: 'element-removed', find: '<HeatBadge level={x} />', line: 2 }),
+      pair('A', { id: 'S3', faultClass: 'handler-dropped', find: 'onClick={save}', line: 3 }),
+    ], { cap: 5 });
+    expect(r.selected.map((c) => c.fault.id).sort()).toEqual(['S2', 'S3']);
+    expect(r.deferred).toEqual([]);
+    expect(r.presentational.map((c) => c.fault.id)).toEqual(['S1']);
+    // The partition is complete: nothing was dropped without a name.
+    expect(r.selected.length + r.deferred.length + r.presentational.length).toBe(3);
+    expect(r.byClass['element-removed'].proposed).toBe(2);
+    expect(r.byClass['element-removed'].selected).toBe(1);
   });
 });
 

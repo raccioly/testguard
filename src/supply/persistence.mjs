@@ -38,6 +38,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { onWritePath } from './select.mjs';
 
 /**
  * Module specifiers that mean "the database". A project-local path counts when
@@ -156,6 +157,25 @@ export function analyzePersistence(projectDir, testRel) {
  */
 export function persistenceSignals(projectDir, defenders) {
   return defenders.map((d) => analyzePersistence(projectDir, d)).filter(Boolean);
+}
+
+/**
+ * The persistence signals ONE EVIDENCE RECORD may carry, or none.
+ *
+ * The rule the sweep document already enforces, now applied where the record
+ * is written: the signal explains a SURVIVOR whose fault sits on the write
+ * path, and nothing else. On a kill it explains nothing; off the write path a
+ * loose mock assertion is not evidence of anything; on `nocover` or
+ * `unverifiable` the question was never asked. Reporting it anywhere else is
+ * the non-actionable noise that gets a check switched off.
+ *
+ * `analyze` is injected so the rule is testable without a filesystem; the
+ * probe passes the scratch tree, where the defenders are the project's own.
+ */
+export function persistenceSignalsFor({ verdict, fault, defenders, projectDir }, analyze = persistenceSignals) {
+  if (verdict !== 'survived') return [];
+  if (!onWritePath(fault)) return [];
+  return analyze(projectDir, defenders);
 }
 
 /**

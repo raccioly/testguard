@@ -198,6 +198,11 @@
           "type": "integer",
           "minimum": 0,
           "description": "Proposals the concern's fault classes excluded. Reported so a narrow concern cannot look like a quiet one: the producers found these, and this concern is not about them."
+        },
+        "presentational": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Proposals set aside because they remove a purely presentational JSX element — an icon, or a static wrapper with no expression and no handler. Nobody writes a test for those, and a survivor on one would teach the survival-learned ordering to prefer the class. Counted in `proposed` and in `byClass`; never probed, never a finding. Absent when zero."
         }
       }
     },

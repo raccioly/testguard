@@ -89,6 +89,35 @@ export function onWritePath(fault) {
   return PERSISTENCE_CALL.test(line) || PAYLOAD_KEY.test(line) || PERSISTENCE_CALL.test(fault.description ?? '');
 }
 
+/**
+ * Is this proposal a purely presentational JSX element — the arid class this
+ * tool actually has?
+ *
+ * Google suppresses "arid" nodes nobody would write a test for (logging,
+ * timeouts, flags). Measured here on 2026-09-22, those account for under 1% of
+ * proposals: the producers are shape-targeted and rarely land on a log line.
+ * What IS material is this: on a 14-file UI diff, 150 of 510 proposals were an
+ * `element-removed` on an icon (`<X />`) or a static wrapper (`<div>`, `<p>`
+ * with no expression and no handler). The ranker spent 29 of 30 slots on that
+ * class, 7 of the 10 survivors were of this shape, and because the ordering
+ * learns from survival those survivors then teach it to rank the class higher.
+ *
+ * Line-oriented, like every producer. An icon is a self-closing PascalCase
+ * element whose props are only sizing and styling; a static wrapper is a
+ * layout or text tag whose own line carries no `{expression}` and no
+ * interactive or test-facing attribute. Anything else — a component, an
+ * `<img>`, a `<label>`, an element with a handler or dynamic children — is a
+ * real proposal and stays.
+ */
+const ICON_ELEMENT = /^\s*<[A-Z]\w*(?:\s+(?:size|className|strokeWidth|aria-hidden|color|width|height|fill)(?:=(?:"[^"]*"|\{[^}]*\}))?)*\s*\/>\s*$/;
+const WRAPPER_ELEMENT = /^\s*<(?:div|span|p|h[1-6]|section|header|footer|main|nav|ul|ol|li|small|strong|em|b|i|hr|br)\b/;
+const INTERACTIVE_ATTR = /\b(?:on[A-Z]\w*=|href=|role=|aria-(?!hidden)\w+=|data-testid=|htmlFor=|tabIndex=)/;
+export function presentational(fault) {
+  if (fault.faultClass !== 'element-removed') return false;
+  const line = fault.find ?? '';
+  return ICON_ELEMENT.test(line) || (WRAPPER_ELEMENT.test(line) && !line.includes('{') && !INTERACTIVE_ATTR.test(line));
+}
+
 /** The boost a write-path fault gets. Additive, not multiplicative: it must not be able to overtake a measured 1.0. */
 const WRITE_PATH_BONUS = 0.25;
 
@@ -109,13 +138,17 @@ export const capFor = (fileCount, perFile = 7) => Math.max(perFile, fileCount * 
  *
  * `candidates` are `{ claim, fault }` pairs — the claim is carried so the
  * caller can rebuild a claims document from the selection without a second
- * lookup. Returns the selection, everything deferred, and the per-class tally
- * a report needs to explain itself.
+ * lookup. Returns the selection, everything deferred, everything set aside as
+ * presentational, and the per-class tally a report needs to explain itself.
+ * The three lists partition the candidates: nothing is dropped without a name.
  */
 export function selectFaults(candidates, { cap, table } = {}) {
   const limit = Number.isInteger(cap) && cap > 0 ? cap : capFor(new Set(candidates.map((c) => c.fault.file)).size);
-  const ranked = candidates
-    .map((c) => ({ ...c, score: scoreOf(c.fault, { table }), writePath: onWritePath(c.fault) }))
+  const all = candidates.map((c) => ({ ...c, score: scoreOf(c.fault, { table }), writePath: onWritePath(c.fault) }));
+  // Set aside, never silently: a presentational element is not worth a probe
+  // run, and a survivor on one would teach the ordering the wrong lesson.
+  const presentationalList = all.filter((c) => presentational(c.fault));
+  const ranked = all.filter((c) => !presentational(c.fault))
     // Deterministic to the last tie: score, then file, then line, then id.
     // Two runs of the same sweep on the same tree are the same sweep.
     .sort((a, b) =>
@@ -158,11 +191,11 @@ export function selectFaults(candidates, { cap, table } = {}) {
   const taken = new Set(selected);
   const deferred = ranked.filter((r) => !taken.has(r));
   const byClass = {};
-  for (const r of ranked) {
+  for (const r of all) {
     const e = (byClass[r.fault.faultClass] ??= { proposed: 0, selected: 0, writePath: 0 });
     e.proposed += 1;
     if (r.writePath) e.writePath += 1;
   }
   for (const r of selected) byClass[r.fault.faultClass].selected += 1;
-  return { selected, deferred, cap: limit, byClass };
+  return { selected, deferred, presentational: presentationalList, cap: limit, byClass };
 }

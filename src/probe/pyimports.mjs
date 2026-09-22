@@ -49,11 +49,18 @@ export function pyModuleName(projectDir, rel) {
  * `from x import (a, b)` collapsed onto one line so the names are visible.
  */
 function logicalLines(source) {
-  const raw = source.split('\n');
+  // A trailing comment is stripped from every physical line BEFORE anything
+  // is joined or split. An import statement carries no string literal, so a
+  // `#` on one always starts a comment — and `from pkg import cli, demo  # noqa: E402`
+  // is the idiom of every src-layout test that inserts into sys.path before
+  // importing. Measured on a real suite: the comment was kept inside the LAST
+  // name, which then failed the identifier test, so `demo` was never seen and
+  // its tests were reported as no cover. 72 import lines in one suite.
+  const raw = source.split('\n').map((l) => l.replace(/#.*$/, ''));
   const out = [];
   for (let i = 0; i < raw.length; i++) {
     let line = raw[i];
-    if (COMMENT.test(line)) continue;
+    if (!line.trim()) continue;
     while (/\\\s*$/.test(line) && i + 1 < raw.length) line = line.replace(/\\\s*$/, ' ') + raw[++i];
     if (/^\s*from\s/.test(line) && line.includes('(') && !line.includes(')')) {
       // Bounded: a malformed file must not make this loop to the end of a large source.

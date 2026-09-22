@@ -31,7 +31,10 @@ describe('glob', () => {
     for (const f of ['test/real.test.mjs', 'node_modules/pkg/inner.test.mjs', 'dist/built.test.mjs', 'coverage/lcov.test.mjs', '.testguard/scratch.test.mjs', '.git/hooks/x.test.mjs',
       // Framework build output carries compiled copies of the application: its
       // writes, and its tests. Scanning it counts the same code twice.
-      '.next/server/chunk.test.mjs', 'build/bundle.test.mjs', 'out/static.test.mjs', '.svelte-kit/generated.test.mjs', '.turbo/cache.test.mjs']) {
+      '.next/server/chunk.test.mjs', 'build/bundle.test.mjs', 'out/static.test.mjs', '.svelte-kit/generated.test.mjs', '.turbo/cache.test.mjs',
+      // An agent's nested worktree is a whole checkout of ANOTHER branch; its
+      // tests are not this tree's defenders and do not exist in the scratch tree.
+      '.claude/worktrees/other-branch/test/theirs.test.mjs']) {
       mkdirSync(dirname(join(dir, f)), { recursive: true });
       writeFileSync(join(dir, f), '');
     }
