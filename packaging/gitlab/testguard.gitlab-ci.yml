@@ -3,7 +3,7 @@
 # Include it from a project's .gitlab-ci.yml, pinned to a release:
 #
 #   include:
-#     - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.13.0/packaging/gitlab/testguard.gitlab-ci.yml'
+#     - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.14.0/packaging/gitlab/testguard.gitlab-ci.yml'
 #       inputs:
 #         dir: backend            # where testguard.claims.json lives (default ".")
 #         post_note: true         # post the brief as a merge-request note (needs TESTGUARD_GITLAB_TOKEN, api scope)
@@ -29,7 +29,7 @@ spec:
   inputs:
     version:
       description: testguard-cli version to run
-      default: "0.13.0"
+      default: "0.14.0"
     dir:
       description: directory whose test runner is invoked (where testguard.claims.json lives)
       default: "."
