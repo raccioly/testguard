@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The technical brief carries the 0.12 and 0.13 results it was missing: the
+  whole-surface provability measurement (32 of 37 files that write are defended
+  only by tests that mock the database) replaces the sample-level number in
+  Fig. 7; the ladder's second rung is now a shipped verb with a real finding
+  (a five-line concern found an admin route whose owner/manager check can be
+  forced to `false` with no test failing) rather than a description of intent;
+  and the first rung says its ordering learns from the project's own runs.
+  Re-rendered; still eight sheets from eight pages.
+- `docs-canonical/PRIOR-ART.md` no longer lists the feedback loop and concerns
+  as unbuilt. The two gaps that remain are restated precisely: the loop learns
+  from verdicts rather than explicit developer clicks, and concerns have no
+  model-backed producer.
+
 ## [0.13.0] - 2026-09-22
 
 Automated weekly release — everything merged since `v0.12.0`.

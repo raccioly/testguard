@@ -678,7 +678,7 @@
       <tr><td><code>init</code></td><td>Installs the agent layer — skill, session-start hook, AGENTS.md section — at the git root.</td></tr>
       <tr><td><code>claims</code></td><td>Lists the claims and reports drift against the <code>@claim</code> annotations in the code.</td></tr>
       <tr><td><code>scaffold</code></td><td>Proposes faults mechanically for one file, as a draft claims document. A starting point, not an answer.</td></tr>
-      <tr><td><code>sweep</code></td><td>The cold start: propose and probe faults for changed files that carry <em>no</em> claim.</td></tr>
+      <tr><td><code>sweep</code></td><td>The cold start: probe files with <em>no</em> claim — a diff, the write surface, or a one-line <code>concern</code>.</td></tr>
       <tr><td class="v-good"><code>probe</code></td><td>The engine. Inject each fault, run its defenders, report what survived.</td></tr>
       <tr><td><code>admit</code></td><td>The two-gate rule as one verb: green on HEAD <em>and</em> failing on every fault of the claim. Otherwise the test is not a defender.</td></tr>
       <tr><td><code>baseline</code></td><td>Freezes today's unproven findings so only new ones gate.</td></tr>
@@ -755,7 +755,7 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
     <p>Twenty-six faults injected on the persistence path of seven server actions in a real
     AI-authored application: the database write itself, and the fields of the payload it carries.</p>
     <figure style="margin-top:11px">
-      <svg viewBox="0 0 760 150" role="img" aria-label="Save-path measurement: 12 of 26 faults survived, all of them a dropped payload field; 10 of 10 tests mock the database and none read back">
+      <svg viewBox="0 0 760 150" role="img" aria-label="Save-path measurement: 12 of 26 faults survived, all of them a dropped payload field; across the whole write surface, 32 of 37 files are defended only by tests that mock the database">
         <rect x="0" y="0" width="243" height="74" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
         <text x="18" y="38" style="font-family:var(--sans);font-size:27px;font-weight:700;letter-spacing:-0.03em;fill:#b85636">12 of 26</text>
         <text class="s-sub" x="18" y="56" style="font-size:8px">survived a fully green suite</text>
@@ -767,9 +767,9 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
         <text class="s-sub" x="276" y="68" style="font-size:8px">field — not one was anything else</text>
 
         <rect x="516" y="0" width="244" height="74" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
-        <text x="534" y="38" style="font-family:var(--sans);font-size:27px;font-weight:700;letter-spacing:-0.03em;fill:#191917">10 of 10</text>
-        <text class="s-sub" x="534" y="56" style="font-size:8px">tests mock the database; none</text>
-        <text class="s-sub" x="534" y="68" style="font-size:8px">read the record back</text>
+        <text x="534" y="38" style="font-family:var(--sans);font-size:27px;font-weight:700;letter-spacing:-0.03em;fill:#b85636">32 of 37</text>
+        <text class="s-sub" x="534" y="56" style="font-size:8px">files that write are defended only</text>
+        <text class="s-sub" x="534" y="68" style="font-size:8px">by tests that mock the database</text>
 
         <rect x="0" y="86" width="760" height="58" rx="4" fill="#fbf1ec" stroke="#e8d5cc"/>
         <text class="s-tiny" x="16" y="104" style="fill:#b85636">The worst case — user registration</text>
@@ -778,9 +778,10 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
       </svg>
       <p class="figcap">Fig. 7 — The save button reports success. The suite agrees. The column is empty.</p>
     </figure>
-    <p class="note">This is the page-one exhibit again, measured rather than recounted: an assertion that
-    names the call but not the payload cannot fail when a field goes missing. It is invisible to coverage,
-    invisible to a mutation score, and invisible to the test's own author.</p>
+    <p class="note">The third number is the read-back answer. A test that replaced the database proves the
+    call shape and nothing beyond it — a <code>where</code> matching no rows, a rolled-back transaction, a
+    rejected constraint all pass against a mock. On this surface a clean probe is not evidence of
+    persistence; it is evidence that nothing could have measured it, and the tool says so before any verdict.</p>
   </section>
 
   <section class="rule-top">
@@ -788,28 +789,28 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
     <div class="cols-3">
       <div>
         <h3>Nothing written</h3>
-        <p class="note"><code>sweep</code> takes the changed files the gate just called uncovered,
-        proposes faults with the mechanical producers, probes a bounded selection, and reports what
-        nothing noticed. A fault that survives needs no claim to be alarming.</p>
+        <p class="note"><code>sweep</code> takes the files the gate just called uncovered, proposes
+        faults mechanically, probes a bounded selection, and reports what nothing noticed — ordering
+        candidates by what this project’s own runs have shown survives, the feedback that took
+        Google’s productive rate from 15% to 89%, read from evidence already on disk.</p>
       </div>
       <div>
         <h3>A sentence or ten</h3>
-        <p class="note">A <em>concern</em> — “every save persists its data” — is one sentence that applies
-        across two hundred screens. It is human-anchored and machine-instantiated, and every proposal it
-        produces still has to survive an execution gate.</p>
+        <p class="note">A <em>concern</em> names a kind of promise and where to look. Five lines of JSON
+        on the same application — “every admin route refuses a caller without the admin role” — found a
+        route whose owner/manager check can be forced to <code>false</code> with no test failing. One
+        sentence, twenty-four routes, no model.</p>
       </div>
       <div>
         <h3>A claim</h3>
         <p class="note">The survivors worth defending become the first claims: a statement, its faults,
-        and a reproducer already in hand. The ladder ends where the rest of this brief begins.</p>
+        and a reproducer already in hand.</p>
       </div>
     </div>
-    <p class="note" style="margin-top:9px">Three rules keep the bottom rung safe on a repository that has
-    never seen this tool. A sweep <strong>never writes the claims file</strong> — a sentence nobody wrote
-    is not a claim. Its evidence <strong>never replaces</strong> the canonical evidence, which is the
-    record of what the project actually claims. And it <strong>does not fail on its own bad guess</strong>:
-    only a survivor or an untested file exits non-zero, because a proposal that would not compile is the
-    tool’s mistake, and a tool that fails on its own mistakes gets switched off.</p>
+    <p class="note" style="margin-top:9px">Three rules keep the lower rungs safe. A sweep <strong>never
+    writes the claims file</strong> — a sentence nobody wrote is not a claim. Its evidence <strong>never
+    replaces</strong> the canonical record. And it <strong>does not fail on its own bad guess</strong>:
+    only a survivor or an untested file exits non-zero.</p>
   </section>
 
   <div class="pull">
