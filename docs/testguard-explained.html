@@ -752,8 +752,8 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
 
   <section class="rule-top">
     <h2>Field report C — where a save button actually fails</h2>
-    <p>Twenty-six faults injected on the persistence path of seven server actions in a real
-    AI-authored application: the database write itself, and the fields of the payload it carries.</p>
+    <p>Twenty-six faults on the persistence path of seven server actions in a real AI-authored
+    application: the write itself, and the fields it carries.</p>
     <figure style="margin-top:11px">
       <svg viewBox="0 0 760 150" role="img" aria-label="Save-path measurement: 12 of 26 faults survived, all of them a dropped payload field; across the whole write surface, 32 of 37 files are defended only by tests that mock the database">
         <rect x="0" y="0" width="243" height="74" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
@@ -781,7 +781,9 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
     <p class="note">The third number is the read-back answer. A test that replaced the database proves the
     call shape and nothing beyond it — a <code>where</code> matching no rows, a rolled-back transaction, a
     rejected constraint all pass against a mock. On this surface a clean probe is not evidence of
-    persistence; it is evidence that nothing could have measured it, and the tool says so before any verdict.</p>
+    persistence; it is evidence that nothing could have measured it, and the tool says so before any verdict.
+    The evidence now names the mocked layer and the assertion shape — exact, partial or argument-free —
+    beside the survivor’s verdict.</p>
   </section>
 
   <section class="rule-top">
@@ -792,12 +794,11 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
         <p class="note"><code>sweep</code> takes the files the gate just called uncovered, proposes
         faults mechanically, probes a bounded selection, and reports what nothing noticed — ordering
         candidates by what this project’s own runs have shown survives, the feedback that took
-        Google’s productive rate from 15% to 89%, read from evidence already on disk.</p>
+        Google’s productive rate from 15% to 89%.</p>
       </div>
       <div>
         <h3>A sentence or ten</h3>
-        <p class="note">A <em>concern</em> names a kind of promise and where to look. Five lines of JSON
-        on the same application — “every admin route refuses a caller without the admin role” — found a
+        <p class="note">A <em>concern</em> names a kind of promise and where to look. Five lines of JSON — “every admin route refuses a caller without the admin role” — found a
         route whose owner/manager check can be forced to <code>false</code> with no test failing. One
         sentence, twenty-four routes, no model.</p>
       </div>
@@ -807,15 +808,16 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
         and a reproducer already in hand.</p>
       </div>
     </div>
-    <p class="note" style="margin-top:9px">Three rules keep the lower rungs safe. A sweep <strong>never
+    <p class="note" style="margin-top:9px">Four rules keep the lower rungs safe. A sweep <strong>never
     writes the claims file</strong> — a sentence nobody wrote is not a claim. Its evidence <strong>never
     replaces</strong> the canonical record. And it <strong>does not fail on its own bad guess</strong>:
-    only a survivor or an untested file exits non-zero.</p>
+    only a survivor or an untested file exits non-zero. And whatever it does not probe, it counts —
+    past the cap, outside the concern, or presentational: an icon or a static wrapper nobody would test.</p>
   </section>
 
   <div class="pull">
-    <p>A sweep is weaker evidence than a probe, and says so. Nobody stated that the behaviour mattered.
-    It is stronger than nothing, which is what a repository with no claims has.</p>
+    <p>A sweep is weaker evidence than a probe, and says so. It is stronger than nothing,
+    which is what a repository with no claims has.</p>
     <div class="attrib">Why the ladder has a bottom rung</div>
   </div>
 

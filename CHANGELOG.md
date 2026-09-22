@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The brief's page 6 says what 0.14.0 changed there: the evidence now names
+  the mocked layer and the assertion shape beside a save-path survivor's
+  verdict, and the fourth rule of the lower rungs — whatever a sweep does not
+  probe, it counts, presentational elements included. Re-rendered; still eight
+  sheets from eight pages.
+
 ## [0.14.0] - 2026-09-22
 
 Automated weekly release — everything merged since `v0.13.0`.
