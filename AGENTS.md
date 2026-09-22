@@ -1,6 +1,6 @@
 # AI Agent Instructions — TestGuard
 
-<!-- docguard:last-reviewed 2026-09-19 -->
+<!-- docguard:last-reviewed 2026-09-22 -->
 
 Read this before changing anything. It is short on purpose.
 
@@ -17,6 +17,7 @@ their first consumer.
 
 ```bash
 npm test               # unit + fixture acceptance (~15s)
+npm ci --prefix fixtures/known-answer-playwright   # once; without it the Playwright fixture acceptance silently skips
 npm run test:spec      # conformance suite only
 npm run self:probe     # TestGuard probes its own claims; must exit 0
 npm run test:install   # the packed tarball must run with production deps only
