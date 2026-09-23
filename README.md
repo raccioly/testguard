@@ -983,13 +983,20 @@ The table above is JavaScript. `scaffold` reads Python too, and proposes the
 same fault classes in Python syntax: `if <guard>:` → `if False:`,
 `return <check>` → `return True`, `verify=True` → `verify=False`, a
 parameter-derived argument swapped for `None`, a key dropped from a payload
-`dict` or an allow-list. Two differences are deliberate. A statement is
+`dict` or an allow-list. Three differences are deliberate. A statement is
 removed by replacing it with `pass`, never by deleting the line, because a
 block whose only statement is gone is an `IndentationError`; and a line that
 leaves a bracket open (`COLOURS = {`), or sits inside one opened on an earlier
 line (`help="…"` in an `add_argument(`), is never removed at all. Both exist
 because a fault that cannot compile is a `fault-invalid` verdict — a probe run
-spent saying nothing about the tests. The two JSX shapes (`element-removed`,
+spent saying nothing about the tests. Third, a **module-level dunder
+assignment** (`__version__`, `__all__`, `__author__`) is not proposed. Deleting
+one does change behaviour, so it is not an equivalent mutant; it is something
+nobody writes a test for, which is the disqualification an icon already gets on
+the JSX side — a survivor there teaches the survival-learned ordering to prefer
+a barren class. The rule is narrow on purpose: a module-level *constant*
+(`DEFAULT_MAX_SIZE = 100`) is still proposed, because removing a real default
+changes a real default. The two JSX shapes (`element-removed`,
 `handler-dropped`) have no Python meaning and are absent rather than faked.
 
 Every proposal's `find` is the exact line with `expectHits`/`occurrence`

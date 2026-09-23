@@ -192,3 +192,36 @@ describe('Python: the same two producer defects, in the syntax the file is writt
     expect(scan('    if not allowed: raise ValueError(1)')[0]).toMatchObject({ faultClass: 'statement-deleted', replace: '    pass' });
   });
 });
+
+describe('module-level dunder metadata is not a proposal', () => {
+  const scan = (line) => proposalsForLine([line], 0, {});
+  const deleted = (line) => scan(line).filter((p) => p.faultClass === 'statement-deleted');
+
+  it('does not propose deleting __version__ or __all__ at module level', () => {
+    // Not because the mutation is equivalent — removing __version__ makes the
+    // attribute stop existing — but because nobody writes a test for it, which
+    // is the same disqualification the JSX side applies to an icon. Measured:
+    // every false positive in the adjudicated external sample was a
+    // module-level metadata assignment, and `statement-deleted` was already
+    // taking the majority of a heavily capped sample.
+    expect(deleted("__version__ = '1.2.3'")).toEqual([]);
+    expect(deleted('__all__ = ["Cache", "DefaultCache"]')).toEqual([]);
+    expect(deleted('__author__ = "someone"')).toEqual([]);
+  });
+
+  it('keeps a module-level CONSTANT, where a test may well be owed', () => {
+    // Deliberately narrow. Removing a real default changes real behaviour.
+    expect(deleted('DEFAULT_MAX_SIZE = 100')).toHaveLength(1);
+    expect(deleted('TIMEOUT_SECONDS = 30')).toHaveLength(1);
+  });
+
+  it('keeps a dunder that is not at module level', () => {
+    // A class attribute or an assignment inside a function is ordinary state.
+    expect(deleted('    __version__ = "x"')).toHaveLength(1);
+    expect(deleted('self._warned = True')).toHaveLength(1);
+  });
+
+  it('keeps a dunder COMPARISON, which is not an assignment at all', () => {
+    expect(scan('__name__ == "__main__"').filter((p) => p.faultClass === 'statement-deleted')).toEqual([]);
+  });
+});

@@ -314,7 +314,7 @@
       "faults": [
         {
           "id": "F1",
-          "description": "Only the vitest wording is matched; esbuild's `Expected … but found` falls back to suite-failed-to-load.",
+          "description": "Only the vitest wording is matched; esbuild's `Expected \u2026 but found` falls back to suite-failed-to-load.",
           "faultClass": "literal-changed",
           "file": "src/probe/classify.mjs",
           "find": "/syntax|parse|transform failed|expected .+ but found|unexpected token/i",
@@ -761,7 +761,7 @@
     },
     {
       "id": "TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT",
-      "statement": "The release version check exits non-zero when any version surface is out of step with package.json — including a Homebrew formula whose sha256 is the known-stale placeholder or, checked online, does not match the published tarball — the sha256 mode writes the hash of the registry tarball into the formula, and --list-surfaces names every file a release writes so the release workflows allow exactly those; a release can never ship with drifting version strings, an unverifiable formula, or be blocked by a surface its own allow-list forgot.",
+      "statement": "The release version check exits non-zero when any version surface is out of step with package.json \u2014 including a Homebrew formula whose sha256 is the known-stale placeholder or, checked online, does not match the published tarball \u2014 the sha256 mode writes the hash of the registry tarball into the formula, and --list-surfaces names every file a release writes so the release workflows allow exactly those; a release can never ship with drifting version strings, an unverifiable formula, or be blocked by a surface its own allow-list forgot.",
       "source": {
         "kind": "spec",
         "ref": "CONTRIBUTING.md#releases"
@@ -1146,7 +1146,7 @@
     },
     {
       "id": "TG-WALK-SKIPS-TOOL-DIRS",
-      "statement": "File walking never descends into a dependency, a build or an agent-tooling directory — node_modules, .git, dist, build, out, coverage, .next, .svelte-kit, .turbo, .claude and their siblings — so test discovery and defender globs cannot pick up a dependency's, a build's or a nested worktree's test files, and a surface scan cannot count compiled copies of the application twice.",
+      "statement": "File walking never descends into a dependency, a build or an agent-tooling directory \u2014 node_modules, .git, dist, build, out, coverage, .next, .svelte-kit, .turbo, .claude and their siblings \u2014 so test discovery and defender globs cannot pick up a dependency's, a build's or a nested worktree's test files, and a surface scan cannot count compiled copies of the application twice.",
       "source": {
         "kind": "spec",
         "ref": "README.md#how-it-works"
@@ -1299,7 +1299,7 @@
     },
     {
       "id": "TG-INIT-HOOK-NO-NETWORK",
-      "statement": "The session-start hook resolves an already-installed testguard — the project's, the git root's, or one on PATH — and contains no form of npx, because even `npx --no-install` resolves the package from the registry before declining to install it.",
+      "statement": "The session-start hook resolves an already-installed testguard \u2014 the project's, the git root's, or one on PATH \u2014 and contains no form of npx, because even `npx --no-install` resolves the package from the registry before declining to install it.",
       "source": {
         "kind": "spec",
         "ref": "README.md#built-for-agents-to-run"
@@ -1965,7 +1965,7 @@
     },
     {
       "id": "TG-WILSON-REPRODUCES-AT-THE-DOCUMENTS-PRECISION",
-      "statement": "The spec's single Wilson implementation reproduces a cell at the precision the document wrote — rounding, not truncating, to the document's own decimal places — and accepts either the exact quantile or the textbook z, so an honest producer at 3 or 4 dp is never rejected and a truncated bound never passes.",
+      "statement": "The spec's single Wilson implementation reproduces a cell at the precision the document wrote \u2014 rounding, not truncating, to the document's own decimal places \u2014 and accepts either the exact quantile or the textbook z, so an honest producer at 3 or 4 dp is never rejected and a truncated bound never passes.",
       "source": {
         "kind": "spec",
         "ref": "spec/GATE-SEMANTICS.md#calibration-arithmetic-is-reproducible"
@@ -2376,8 +2376,8 @@
           "description": "The line init prints as it installs the hook describes a mechanism hookCommand() does not emit.",
           "faultClass": "literal-changed",
           "file": "src/init/init.mjs",
-          "find": "    done.push(`${rel(settingsPath)}: SessionStart hook → brief --text${dir === '.' ? '' : ` ${dir}`} (local install first, then a testguard on PATH, never a fetch)`);",
-          "replace": "    done.push(`${rel(settingsPath)}: SessionStart hook → brief --text${dir === '.' ? '' : ` ${dir}`} (local install first, npx --no-install fallback, never a fetch)`);",
+          "find": "    done.push(`${rel(settingsPath)}: SessionStart hook \u2192 brief --text${dir === '.' ? '' : ` ${dir}`} (local install first, then a testguard on PATH, never a fetch)`);",
+          "replace": "    done.push(`${rel(settingsPath)}: SessionStart hook \u2192 brief --text${dir === '.' ? '' : ` ${dir}`} (local install first, npx --no-install fallback, never a fetch)`);",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -2401,7 +2401,7 @@
     },
     {
       "id": "TG-COST-COUNTS-EVERY-PHASE",
-      "statement": "A probe's reported cost is every run it paid for — the clean baseline runs and any escalation runs, not only the runs made with the fault applied. A cost report that undercounts the baseline understates the gate by more than half.",
+      "statement": "A probe's reported cost is every run it paid for \u2014 the clean baseline runs and any escalation runs, not only the runs made with the fault applied. A cost report that undercounts the baseline understates the gate by more than half.",
       "source": {
         "kind": "spec",
         "ref": "README.md#cost"
@@ -2418,7 +2418,7 @@
       "faults": [
         {
           "id": "F1",
-          "description": "Only the fault runs are counted, so the clean baseline runs — half the wall clock — vanish from the report.",
+          "description": "Only the fault runs are counted, so the clean baseline runs \u2014 half the wall clock \u2014 vanish from the report.",
           "faultClass": "statement-deleted",
           "file": "src/probe/cost.mjs",
           "find": "  ...(record.detail?.baselineRuns ?? []),\n",
@@ -2431,7 +2431,7 @@
         },
         {
           "id": "F2",
-          "description": "Escalation runs are dropped, so the claims that cost the most — the ones that escalated — look cheapest.",
+          "description": "Escalation runs are dropped, so the claims that cost the most \u2014 the ones that escalated \u2014 look cheapest.",
           "faultClass": "statement-deleted",
           "file": "src/probe/cost.mjs",
           "find": "  ...(record.detail?.escalationRuns ?? []),\n",
@@ -2536,7 +2536,7 @@
     },
     {
       "id": "TG-PROGRESS-NEVER-ON-STDOUT",
-      "statement": "Progress is written to stderr, never stdout. stdout carries the result — with --json it is one document and nothing else — so a progress line there does not degrade the output, it destroys it for every consumer that parses it.",
+      "statement": "Progress is written to stderr, never stdout. stdout carries the result \u2014 with --json it is one document and nothing else \u2014 so a progress line there does not degrade the output, it destroys it for every consumer that parses it.",
       "source": {
         "kind": "spec",
         "ref": "README.md#progress"
@@ -2845,7 +2845,7 @@
         },
         {
           "id": "F2",
-          "description": "A line inside a bracket opened above it — a call's keyword argument, a dict entry — is replaced with pass, and the file no longer parses. Measured: 77 of 600 proposals on a real CLI.",
+          "description": "A line inside a bracket opened above it \u2014 a call's keyword argument, a dict entry \u2014 is replaced with pass, and the file no longer parses. Measured: 77 of 600 proposals on a real CLI.",
           "faultClass": "condition-forced",
           "file": "src/scaffold/producers.python.mjs",
           "find": "  const inside = depthBefore(lines)[i] > 0;",
@@ -2920,7 +2920,7 @@
     },
     {
       "id": "TG-IN-PLACE-STILL-RAISES-A-MISSING-TARGET",
-      "statement": "Under --in-place a target that vanished before the restore is the user’s own file gone, and is always raised; only a worktree run may record it instead.",
+      "statement": "Under --in-place a target that vanished before the restore is the user\u2019s own file gone, and is always raised; only a worktree run may record it instead.",
       "source": {
         "kind": "spec",
         "ref": "spec/GATE-SEMANTICS.md#verdicts"
@@ -3056,7 +3056,7 @@
       "faults": [
         {
           "id": "F1",
-          "description": "The control result is ignored, so a suite that never loads the subject reports every claim about it as SURVIVED — total blindness where there was none.",
+          "description": "The control result is ignored, so a suite that never loads the subject reports every claim about it as SURVIVED \u2014 total blindness where there was none.",
           "faultClass": "guard-removed",
           "file": "src/probe/classify.mjs",
           "find": "    if (subjectReached === false) return { verdict: 'unverifiable', reason: 'subject-not-executed' };",
@@ -3399,7 +3399,7 @@
     },
     {
       "id": "TG-CALIBRATION-BACKOFF-TIERS-ARE-CHECKED",
-      "statement": "Every backoff tier of a calibration is held to the same rules as the primary buckets — arithmetic, ordering, arity. A coarser tier a consumer falls back to is exactly where a wrong number would go unnoticed.",
+      "statement": "Every backoff tier of a calibration is held to the same rules as the primary buckets \u2014 arithmetic, ordering, arity. A coarser tier a consumer falls back to is exactly where a wrong number would go unnoticed.",
       "source": {
         "kind": "spec",
         "ref": "spec/GATE-SEMANTICS.md#calibration-provenance-backoff-and-merging"
@@ -3495,7 +3495,7 @@
     },
     {
       "id": "TG-SCAFFOLD-NEVER-PROPOSES-A-NO-OP",
-      "statement": "A proposed fault always changes the line it anchors to. A replacement equal to its find is rejected by the schema, so a single one aborts the whole scaffold run — one `expired: 0` made a 725-line file impossible to scaffold. Each numeric producer refuses its own fixed point where it knows the arithmetic, and a zero-valued window is still widened to a real value rather than dropped: 0 is exactly the window worth widening.",
+      "statement": "A proposed fault always changes the line it anchors to. A replacement equal to its find is rejected by the schema, so a single one aborts the whole scaffold run \u2014 one `expired: 0` made a 725-line file impossible to scaffold. Each numeric producer refuses its own fixed point where it knows the arithmetic, and a zero-valued window is still widened to a real value rather than dropped: 0 is exactly the window worth widening.",
       "source": {
         "kind": "manual",
         "ref": "field report 2026-09-18 (pocket-archive, 0.8.1)"
@@ -3513,7 +3513,7 @@
       "faults": [
         {
           "id": "F1",
-          "description": "A zero-valued window widens to itself: ×1000 of 0 is 0, the replacement equals the find, and the run aborts.",
+          "description": "A zero-valued window widens to itself: \u00d71000 of 0 is 0, the replacement equals the find, and the run aborts.",
           "faultClass": "literal-changed",
           "file": "src/scaffold/producers.mjs",
           "find": "    const widened = Number(m[3]) * 1000 || 1000;",
@@ -3571,7 +3571,7 @@
     },
     {
       "id": "TG-SCAFFOLD-LOOP-GUARD-IS-A-GUARD",
-      "statement": "`if (…) continue;` and `if (…) break;` are guards and are proposed as faults. Pure selection-over-rows is the shape the “pure logic, caller does the IO” advice produces, and scaffold returned nothing at all for two fully-claimed files of seven such guards each — while the hand-written faults on those same lines all killed. The shape scaffold skipped was the one demonstrably worth proposing.",
+      "statement": "`if (\u2026) continue;` and `if (\u2026) break;` are guards and are proposed as faults. Pure selection-over-rows is the shape the \u201cpure logic, caller does the IO\u201d advice produces, and scaffold returned nothing at all for two fully-claimed files of seven such guards each \u2014 while the hand-written faults on those same lines all killed. The shape scaffold skipped was the one demonstrably worth proposing.",
       "source": {
         "kind": "manual",
         "ref": "field report 2026-09-18 (pocket-archive, 0.8.1)"
@@ -3602,7 +3602,7 @@
         },
         {
           "id": "F2",
-          "description": "A single-line `if (…) continue;` no longer matches the if-shape at all, so nothing is proposed for it.",
+          "description": "A single-line `if (\u2026) continue;` no longer matches the if-shape at all, so nothing is proposed for it.",
           "faultClass": "literal-changed",
           "file": "src/scaffold/producers.mjs",
           "find": "const IF_LINE = /^(\\s*)(?:\\}\\s*)?(?:else\\s+)?if\\s*\\((.+)\\)\\s*(\\{\\s*|(?:return|throw|continue|break)\\b.*;\\s*)?$/;",
@@ -3634,7 +3634,7 @@
     },
     {
       "id": "TG-CALIBRATION-COUNTS-ONLY-BUGS",
-      "statement": "`p` is computed over escaped BUGS, not over every commit that changed source and a test together. Where a repository labels its commits a `feat:` is not a bug: a run measured “12 of 12 measurable bugs invisible — 100%” over a corpus of five features, a refactor, a style change and a commit whose whole purpose was adding a test. Selection stays broad, the estimator narrows, and the document records which rule produced it so two calibrations can never be compared by accident.",
+      "statement": "`p` is computed over escaped BUGS, not over every commit that changed source and a test together. Where a repository labels its commits a `feat:` is not a bug: a run measured \u201c12 of 12 measurable bugs invisible \u2014 100%\u201d over a corpus of five features, a refactor, a style change and a commit whose whole purpose was adding a test. Selection stays broad, the estimator narrows, and the document records which rule produced it so two calibrations can never be compared by accident.",
       "source": {
         "kind": "manual",
         "ref": "field report 2026-09-18 (pocket-archive, 0.8.1)"
@@ -3684,7 +3684,7 @@
     },
     {
       "id": "TG-CLI-NAMES-ITS-OWN-BUGS",
-      "statement": "An unexpected exception reaches the user as a testguard bug with its trace, never as a bare Node stack. A producer defect printed `Node.js v24.18.0` at someone debugging their own project; a tool whose thesis is “never optimistic, always legible” owes the operator the sentence that says whose fault it is. The trace stays: a framed error without one cannot be reported.",
+      "statement": "An unexpected exception reaches the user as a testguard bug with its trace, never as a bare Node stack. A producer defect printed `Node.js v24.18.0` at someone debugging their own project; a tool whose thesis is \u201cnever optimistic, always legible\u201d owes the operator the sentence that says whose fault it is. The trace stays: a framed error without one cannot be reported.",
       "source": {
         "kind": "manual",
         "ref": "field report 2026-09-18 (pocket-archive, 0.8.1)"
@@ -3720,7 +3720,7 @@
     },
     {
       "id": "TG-CONTENTION-IGNORES-A-DEAD-PID",
-      "statement": "A runner that exited between the process snapshot and the warning is not reported as contention. `ps` is a snapshot; a suite that finishes in that window produced “1 test runner is already running (pid 65751)” for a process the operator could not find. Detection stays best-effort — it may under-report — but it may not invent load that is not there.",
+      "statement": "A runner that exited between the process snapshot and the warning is not reported as contention. `ps` is a snapshot; a suite that finishes in that window produced \u201c1 test runner is already running (pid 65751)\u201d for a process the operator could not find. Detection stays best-effort \u2014 it may under-report \u2014 but it may not invent load that is not there.",
       "source": {
         "kind": "manual",
         "ref": "field report 2026-09-18 (pocket-archive, 0.8.1)"
@@ -3796,7 +3796,7 @@
       "statement": "A claim over the per-claim ceiling fails the gate even when the total is comfortably inside its budget. The total alone cannot see this: a calibration claim cost 51 s for two faults purely by naming replay.test.mjs instead of calibration.test.mjs, and re-pointing it took it to 4.9 s while the total never moved. A per-fault average cannot see it either - the regression that prompted this budget raised the fault count 59 to 91 while per-fault cost barely moved. The ceiling is optional and additive: a budget without one behaves exactly as it did.",
       "source": {
         "kind": "manual",
-        "ref": "field report 2026-09-18 (pocket-archive, 0.8.1) — cost analysis"
+        "ref": "field report 2026-09-18 (pocket-archive, 0.8.1) \u2014 cost analysis"
       },
       "severity": "medium",
       "producedBy": {
@@ -3856,7 +3856,7 @@
     },
     {
       "id": "TG-BRIEF-PDF-MATCHES-ITS-SOURCE",
-      "statement": "The technical brief's PDF is rendered from its HTML and can never silently disagree with it: the release runs build-one-pager.mjs with --require-chrome, so a machine without a browser fails the release instead of leaving the committed PDF stale at exit 0, and every render is rejected unless it produced exactly one sheet per `.page` div — a section that overflows its sheet spills onto a second one with no warning from Chrome, contradicting the \"Page N of M\" footers the document prints about itself.",
+      "statement": "The technical brief's PDF is rendered from its HTML and can never silently disagree with it: the release runs build-one-pager.mjs with --require-chrome, so a machine without a browser fails the release instead of leaving the committed PDF stale at exit 0, and every render is rejected unless it produced exactly one sheet per `.page` div \u2014 a section that overflows its sheet spills onto a second one with no warning from Chrome, contradicting the \"Page N of M\" footers the document prints about itself.",
       "source": {
         "kind": "spec",
         "ref": "CONTRIBUTING.md#releases"
@@ -4473,7 +4473,7 @@
       "faults": [
         {
           "id": "F1",
-          "description": "A fixed-width window reads past the assertion, so the next assertion's expect.objectContaining makes this one partial — the measured bug this scan was rewritten to remove.",
+          "description": "A fixed-width window reads past the assertion, so the next assertion's expect.objectContaining makes this one partial \u2014 the measured bug this scan was rewritten to remove.",
           "faultClass": "return-altered",
           "file": "src/supply/persistence.mjs",
           "find": "    if (depth === 0) return source.slice(open + 1, i);",
@@ -4689,7 +4689,7 @@
       "faults": [
         {
           "id": "F1",
-          "description": "A glob concern is pooled from the diff, so on a clean branch it matches nothing and reports clean — the false reassurance a concern exists to prevent.",
+          "description": "A glob concern is pooled from the diff, so on a clean branch it matches nothing and reports clean \u2014 the false reassurance a concern exists to prevent.",
           "faultClass": "variable-swap",
           "file": "src/supply/concerns.mjs",
           "find": "    return walk(projectDir).filter((f) => res.some((re) => re.test(f)));",
@@ -4715,7 +4715,7 @@
     },
     {
       "id": "TG-SWEEP-SETS-ASIDE-PRESENTATIONAL-AND-SAYS-SO",
-      "statement": "A sweep never spends a probe run on a purely presentational JSX element — an icon, or a static wrapper with no expression and no handler — and never hides that it did not: the count set aside is reported beside the proposals, and the proposed total still equals probed plus deferred plus set aside.",
+      "statement": "A sweep never spends a probe run on a purely presentational JSX element \u2014 an icon, or a static wrapper with no expression and no handler \u2014 and never hides that it did not: the count set aside is reported beside the proposals, and the proposed total still equals probed plus deferred plus set aside.",
       "source": {
         "kind": "spec",
         "ref": "spec/schemas/sweep.schema.json#selection"
@@ -4733,7 +4733,7 @@
       "faults": [
         {
           "id": "F1",
-          "description": "Nothing is presentational, so icons and static wrappers take the probe slots again — 29 of 30 on the measured diff.",
+          "description": "Nothing is presentational, so icons and static wrappers take the probe slots again \u2014 29 of 30 on the measured diff.",
           "faultClass": "return-altered",
           "file": "src/supply/select.mjs",
           "find": "  if (fault.faultClass !== 'element-removed') return false;",
@@ -4880,6 +4880,166 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-22T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-REPLAY-RESOLVES-PYTHON-IMPORTERS",
+      "statement": "replay finds the tests that import a reverted source file using the resolver for that file's language; a Python target resolved with the JavaScript importer matches nothing, so every Python verdict becomes nocover however complete the suite.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#replay-reports-it-never-gates"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-23T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/replay-python-defenders.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A .py target is resolved with the JavaScript importer, which wants a quoted specifier and never matches `from pkg.mod import x`; the defender set is always empty and every Python bug reports as uncovered.",
+          "faultClass": "argument-swapped",
+          "file": "src/replay/replay.mjs",
+          "find": "      ? pyFileImports(iso.projectDir, join(iso.projectDir, t), target, t)",
+          "replace": "      ? fileImports(iso.projectDir, join(iso.projectDir, t), target)",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-23T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RUNNER-THAT-SEES-NO-TEST-FILE-SAYS-SO",
+      "statement": "`--runner auto` prefers a resolvable runner that matches at least one test file, and when none does it says so; a runner selected while seeing zero tests turns discovery's failure into a nocover finding about the project.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-23T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/runner-selection-blind.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The first runner that resolves is returned whether or not its globs match any test file, so a TypeScript project reaches the Python runner and every fault reports as uncovered.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/index.mjs",
+          "find": "    if (testFiles > 0 || name !== 'auto') return { ...selected, testFiles };",
+          "replace": "    if (true) return { ...selected, testFiles };",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-23T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-ORDERING-NAMES-ONLY-WHAT-IT-LEARNED-FROM",
+      "statement": "An ordering names as a source only a document that contributed an observation; naming one it learned nothing from produces sources-with-observed-zero, which the sweep validator refuses, and the refusal persists because the document is on disk.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/sweep.schema.json"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-23T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/supply-feedback.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every document read is named as a source, so evidence whose records are all nocover yields sources named with observed zero and no sweep can write its document again.",
+          "faultClass": "statement-deleted",
+          "file": "src/supply/feedback.mjs",
+          "find": "  const contributing = tallied.filter((t) => Object.keys(t.tally).length > 0);",
+          "replace": "  const contributing = tallied;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-23T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PYTHON-MODULE-DUNDER-IS-NOT-A-PROPOSAL",
+      "statement": "The Python producers do not propose deleting a module-level dunder assignment; it is metadata nobody writes a test for, and a survivor on one teaches the survival-learned ordering to prefer a barren class.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#authoring-faults-mechanically"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-23T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/scaffold.python.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The module-level dunder guard is dropped, so `__version__` and `__all__` become statement-deleted proposals again and crowd an already dominant class.",
+          "faultClass": "condition-forced",
+          "file": "src/scaffold/producers.python.mjs",
+          "find": "  } else if (complete && MUTATION.test(line) && !(indent === '' && MODULE_DUNDER.test(line))) {",
+          "replace": "  } else if (complete && MUTATION.test(line)) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-23T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-REPLAY-NO-TEST-FILE-LEFT-IS-UNVERIFIABLE",
+      "statement": "When removing the fix's own test leaves no test file at all, replay reports unverifiable, not nocover: the removal takes the whole file including tests that pre-dated the fix, so nothing can be concluded and the project must not be charged in the calibration for evidence the method destroyed.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#replay-reports-it-never-gates"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-23T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/replay-no-test-file-left.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The empty-suite check is removed, so a project whose only test file was the fix's own reports nocover and enters the calibration as a miss.",
+          "faultClass": "condition-forced",
+          "file": "src/replay/replay.mjs",
+          "find": "  if (all.length === 0) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-23T00:00:00Z"
           }
         }
       ]

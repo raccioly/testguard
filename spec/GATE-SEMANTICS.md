@@ -197,8 +197,8 @@ Its verdicts mirror the probe's, for the same reasons:
 |---|---|
 | `caught` | a remaining test failed **by assertion** on the reverted source, every run. The suite knew. |
 | `blind` | the suite stayed green on known-broken code. |
-| `nocover` | no test imports the reverted files. Worse than `blind`: nothing was even tried. |
-| `unverifiable` | the revert did not apply, the suite failed to load, or it timed out. Carries a `reason`. |
+| `nocover` | no test imports the reverted files, **and at least one test file remained to ask**. Worse than `blind`: nothing was even tried. |
+| `unverifiable` | the revert did not apply, the suite failed to load, it timed out, or removing the fix's own test left **no test file at all** (`the-fix-shipped-the-only-test-file`). Carries a `reason`. |
 | `flaky` | the runs disagreed. A flaky failure reads as "the suite caught it", so flakiness biases this metric **optimistically** — mixed runs are never `caught`. |
 
 Two rules that follow:
@@ -208,6 +208,13 @@ Two rules that follow:
    twice corrupts the corpus a calibration is computed from.
 2. **The fix's own test is removed before the run.** It proves nothing about
    what the suite knew before the fix existed.
+3. **If that leaves no test file, the run is `unverifiable`, not `nocover`.**
+   Removal takes the whole FILE, so on a project with few, large test files it
+   also removes tests that pre-dated the fix and might have caught the bug. The
+   suite the measurement needed no longer exists, so nothing can be concluded.
+   `nocover` is a statement about the PROJECT — "no test exercises this" — and
+   using it here would charge the project, in the calibration, for evidence the
+   method itself destroyed.
 
 `caught`, `blind` and `nocover` are measurements and enter the calibration
 ratio: `caught` as a hit, the other two as misses. `nocover` counts as a miss
@@ -216,7 +223,9 @@ because it is one — the worst kind. Leaving it out would let a project with
 since its worst outcomes would leave the denominator before the ratio is
 taken; Stryker and PIT count no-coverage mutants against the headline score
 for the same reason. `flaky` and `unverifiable` are failed measurements and
-enter neither side.
+enter neither side — which is why rule 3 above matters: a run with no test
+file left is a failed measurement wearing `nocover`'s clothes, and left
+unclassified it would inflate every miss rate computed from the corpus.
 
 ### Calibration arithmetic is reproducible
 

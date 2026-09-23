@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`sweep` no longer refuses to write after a sweep that learned nothing.**
+  `learnedProductivity` named every evidence document it *read* as an ordering
+  source, while `observed` counts only `killed` and `survived` records. A
+  document whose records are all `nocover` — the ordinary shape of a first
+  sweep — therefore produced `sources: [...]` with `observed: 0`, which the
+  sweep validator correctly refuses. Because that document is written to
+  `.testguard/sweep-evidence.json`, **every later sweep failed the same way,
+  permanently**, until someone deleted a gitignored file nothing mentioned. An
+  ordering now names only the documents that contributed an observation, which
+  is what "the documents it was learned from" always meant. Measured on an
+  external corpus: this fired on 10 of 34 sweep invocations.
+- **`replay` resolves Python importers with the Python resolver.**
+  `replay` matched test files against a reverted source file with the
+  JavaScript importer for every language. `from pkg.mod import x` carries no
+  quoted specifier, so nothing ever matched, the defender set was always empty
+  for Python, and **every Python verdict was `nocover`** — "no test imports the
+  reverted source" — however complete the suite. `discoverDefendersDetailed`
+  has always branched on the target's language; `replay` now does the same.
+- **A runner that matches no test file is no longer selected silently.**
+  `--runner auto` tries vitest, jest, then python. A TypeScript project on
+  Playwright resolves neither JavaScript runner, so `auto` reached python
+  wherever a `python3` existed, globbed for `.py`, found none, and reported
+  every fault as `nocover`. `auto` now prefers a resolvable runner that can see
+  test files, and when none can it says so (`no runner matched a test file …
+  every verdict will be nocover`) instead of letting discovery's failure read
+  as a finding about the project. An explicitly named `--runner` is still
+  honoured; every selection now reports `testFiles`.
+
+- **`replay` no longer reports `nocover` when it removed the only test file.**
+  Removing the fix's own test removes the whole FILE, and on a project with
+  few, large test files that also removes tests which pre-dated the fix and
+  might have caught the bug. Nothing is left to run, so nothing can be
+  concluded: the verdict is now `unverifiable` with reason
+  `the-fix-shipped-the-only-test-file`. `nocover` is a statement about the
+  PROJECT — "no test exercises this" — and it enters the calibration as a
+  miss, so the old behaviour charged a project for evidence the measurement
+  itself destroyed. The validator now refuses the mislabelled form, and
+  `GATE-SEMANTICS.md` carries it as a third rule beside de-duplication and
+  test removal.
+
+### Changed
+
+- **Python: a module-level dunder assignment is no longer proposed as a
+  fault.** `__version__`, `__all__` and `__author__` at module level are
+  metadata nobody writes a test for, so a survivor on one teaches the
+  survival-learned ordering to prefer a barren class — the same reasoning that
+  already sets a presentational JSX element aside. Narrow on purpose: a
+  module-level *constant* such as `DEFAULT_MAX_SIZE = 100` is still proposed,
+  because removing a real default changes a real default.
+
 ### Changed
 
 - The brief's page 6 says what 0.14.0 changed there: the evidence now names

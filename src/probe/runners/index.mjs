@@ -39,11 +39,30 @@ export async function selectRunner({ projectDir, sourceDir, python, name = 'auto
   const candidates = name === 'auto' ? [vitest, jest, pythonRunner] : [RUNNERS[name]];
   if (!candidates[0]) return { error: `unknown runner "${name}"; use ${RUNNER_NAMES.join(', ')} or auto` };
   const messages = [];
+  // A runner that resolves but whose globs match ZERO test files is not an
+  // answer. A pure TypeScript project using Playwright resolves neither vitest
+  // nor jest, and `auto` then reaches python — which resolves wherever a
+  // python3 exists — globs for `.py`, finds none, and reports every fault as
+  // `nocover`: a damning statement about the project produced by a runner that
+  // could not have seen its tests.
+  //
+  // So `auto` prefers a candidate that can actually see tests. An explicitly
+  // named runner is still honoured, because the caller asked for it; it is
+  // reported with `testFiles` so a caller can say what it is working with.
+  let blind = null;
   for (const r of candidates) {
     const c = await r.check({ projectDir, sourceDir, python });
-    if (c.ok) return { runner: r, version: c.version, source: c.source, engine: c.engine };
-    messages.push(`${r.name}: ${c.message}`);
+    if (!c.ok) { messages.push(`${r.name}: ${c.message}`); continue; }
+    const selected = { runner: r, version: c.version, source: c.source, engine: c.engine };
+    let testFiles = 0;
+    try { testFiles = r.tests(projectDir).length; } catch { testFiles = 0; }
+    if (testFiles > 0 || name !== 'auto') return { ...selected, testFiles };
+    blind ??= { ...selected, testFiles: 0 };
+    messages.push(`${r.name}: resolved but matched no test files`);
   }
+  // Nothing saw a test file. Return the first that resolved, and say plainly
+  // what that means, rather than letting every verdict read as a finding.
+  if (blind) return { ...blind, warning: `no runner matched a test file in this project; using ${blind.runner.name}, which sees none — every verdict will be nocover` };
   return { error: messages.join('; ') };
 }
 

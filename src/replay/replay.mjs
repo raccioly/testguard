@@ -7,6 +7,7 @@ import { selectRunner, RUNNERS } from '../probe/runners/index.mjs';
 import { parseCommandTemplate } from '../probe/runners/shared.mjs';
 import { fileImports } from '../probe/rank.mjs';
 import { IS_PY_TEST, pyFileImports } from '../probe/pyimports.mjs';
+import { isPython } from '../probe/discover.mjs';
 import { labelDiff } from './label.mjs';
 import { wilsonInterval, roundTo } from '../../spec/lib/wilson.mjs';
 
@@ -211,7 +212,27 @@ async function replayOne({ fix, iso, root, projectDir, confirmRuns, budgetMs, co
   // reverted source file. `nocover` means nothing does — worse than blind,
   // and a coverage report shows it as a red line you can ignore.
   const all = runner.tests(iso.projectDir).filter((t) => !fix.tests.some((ft) => rel(ft) === t));
-  const related = all.filter((t) => fix.source.some((sf) => fileImports(iso.projectDir, join(iso.projectDir, t), rel(sf))));
+  // Removing the fix's test removes the whole FILE, which on a project with
+  // few, large test files takes pre-existing tests with it — tests that did
+  // exist before the fix and might have caught the bug. When nothing is left,
+  // the suite this measurement needed no longer exists, so nothing can be
+  // concluded. That is `unverifiable`, not `nocover`: `nocover` is a finding
+  // about the project ("no test exercises this"), and counting it as a miss
+  // would charge the project for evidence the method itself destroyed.
+  if (all.length === 0) {
+    return { ...base, faultClass, verdict: 'unverifiable', reason: 'the-fix-shipped-the-only-test-file', ranTests: 0, runs: [{ outcome: 'error', durationMs: 0 }] };
+  }
+  // A target's language decides how its importers are found, exactly as
+  // `discoverDefendersDetailed` decides it. Resolving a `.py` target with the
+  // JavaScript resolver matches nothing — `IMPORT_RE` wants a quoted
+  // specifier and `from pkg.mod import x` has none — so `related` was always
+  // empty for Python and EVERY verdict was `nocover`, however good the suite.
+  const related = all.filter((t) => fix.source.some((sf) => {
+    const target = rel(sf);
+    return isPython(target)
+      ? pyFileImports(iso.projectDir, join(iso.projectDir, t), target, t)
+      : fileImports(iso.projectDir, join(iso.projectDir, t), target);
+  }));
   if (related.length === 0) {
     return { ...base, faultClass, verdict: 'nocover', reason: 'no-test-imports-the-reverted-source', ranTests: 0, runs: [{ outcome: 'error', durationMs: 0 }] };
   }

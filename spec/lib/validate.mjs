@@ -297,6 +297,14 @@ const semantic = {
       }
       if (r.verdict === 'nocover' && r.ranTests) errors.push({ path: `${p}/ranTests`, message: 'nocover means no test exercises the reverted files; it cannot have run tests' });
       if (r.verdict === 'unverifiable' && !r.reason) errors.push({ path: `${p}/reason`, message: 'unverifiable requires a reason (e.g. revert-did-not-apply, suite-failed-to-load)' });
+      // A run that had no test file left is a FAILED MEASUREMENT, never a
+      // finding about the project: removing the fix's test removed the file it
+      // lived in, and with it any pre-existing test that might have caught the
+      // bug. Recording that as `nocover` would put it in the calibration as a
+      // miss and charge the project for evidence the method destroyed.
+      if (r.reason === 'the-fix-shipped-the-only-test-file' && r.verdict !== 'unverifiable') {
+        errors.push({ path: `${p}/verdict`, message: 'no test file remained after removing the fix\'s own, so nothing could be concluded: that is unverifiable, not a finding about the project' });
+      }
     });
     return errors;
   },
