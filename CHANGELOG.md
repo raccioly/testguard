@@ -37,6 +37,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as a finding about the project. An explicitly named `--runner` is still
   honoured; every selection now reports `testFiles`.
 
+- **`replay` no longer reports `nocover` when it removed the only test file.**
+  Removing the fix's own test removes the whole FILE, and on a project with
+  few, large test files that also removes tests which pre-dated the fix and
+  might have caught the bug. Nothing is left to run, so nothing can be
+  concluded: the verdict is now `unverifiable` with reason
+  `the-fix-shipped-the-only-test-file`. `nocover` is a statement about the
+  PROJECT — "no test exercises this" — and it enters the calibration as a
+  miss, so the old behaviour charged a project for evidence the measurement
+  itself destroyed. The validator now refuses the mislabelled form, and
+  `GATE-SEMANTICS.md` carries it as a third rule beside de-duplication and
+  test removal.
+
 ### Changed
 
 - **Python: a module-level dunder assignment is no longer proposed as a

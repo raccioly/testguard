@@ -212,6 +212,16 @@ async function replayOne({ fix, iso, root, projectDir, confirmRuns, budgetMs, co
   // reverted source file. `nocover` means nothing does — worse than blind,
   // and a coverage report shows it as a red line you can ignore.
   const all = runner.tests(iso.projectDir).filter((t) => !fix.tests.some((ft) => rel(ft) === t));
+  // Removing the fix's test removes the whole FILE, which on a project with
+  // few, large test files takes pre-existing tests with it — tests that did
+  // exist before the fix and might have caught the bug. When nothing is left,
+  // the suite this measurement needed no longer exists, so nothing can be
+  // concluded. That is `unverifiable`, not `nocover`: `nocover` is a finding
+  // about the project ("no test exercises this"), and counting it as a miss
+  // would charge the project for evidence the method itself destroyed.
+  if (all.length === 0) {
+    return { ...base, faultClass, verdict: 'unverifiable', reason: 'the-fix-shipped-the-only-test-file', ranTests: 0, runs: [{ outcome: 'error', durationMs: 0 }] };
+  }
   // A target's language decides how its importers are found, exactly as
   // `discoverDefendersDetailed` decides it. Resolving a `.py` target with the
   // JavaScript resolver matches nothing — `IMPORT_RE` wants a quoted

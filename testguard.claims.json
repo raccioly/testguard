@@ -5011,6 +5011,38 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-REPLAY-NO-TEST-FILE-LEFT-IS-UNVERIFIABLE",
+      "statement": "When removing the fix's own test leaves no test file at all, replay reports unverifiable, not nocover: the removal takes the whole file including tests that pre-dated the fix, so nothing can be concluded and the project must not be charged in the calibration for evidence the method destroyed.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#replay-reports-it-never-gates"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-23T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/replay-no-test-file-left.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The empty-suite check is removed, so a project whose only test file was the fix's own reports nocover and enters the calibration as a miss.",
+          "faultClass": "condition-forced",
+          "file": "src/replay/replay.mjs",
+          "find": "  if (all.length === 0) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-23T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }
