@@ -116,6 +116,34 @@ describe('learnedProductivity — traceable, or it should not be trusted', () =>
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('a document that taught nothing is not named as a source', () => {
+    // THE SWEEP-BRICKING REGRESSION. `tallyEvidence` counts only killed and
+    // survived, so evidence whose records are all `nocover` teaches nothing —
+    // the ordinary shape of a first sweep on a project with no defenders
+    // discovered yet. Naming it anyway produced `sources: [...]` with
+    // `observed: 0`, which the sweep validator correctly refuses to write; and
+    // because the document is on disk, EVERY later sweep failed the same way,
+    // permanently, until someone deleted a gitignored file.
+    const dir = project({ '.testguard/sweep-evidence.json': evidence([rec('field-dropped', 'nocover'), rec('g', 'unverifiable')]) });
+    const l = learnedProductivity(dir);
+    expect(l.observed).toBe(0);
+    expect(l.sources).toEqual([]);
+    // and it still falls back to the shipped prior rather than failing
+    expect(renderLearned(l)).toMatch(/shipped productivity prior/);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('names only the documents that contributed, when one of several taught nothing', () => {
+    const dir = project({
+      '.testguard/sweep-evidence.json': evidence([rec('g', 'nocover')]),
+      '.testguard/evidence.json': evidence([rec('g', 'survived')]),
+    });
+    const l = learnedProductivity(dir);
+    expect(l.observed).toBe(1);
+    expect(l.sources).toEqual(['.testguard/evidence.json']);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('a document it cannot parse is skipped, never guessed at', () => {
     // A ranking built on a guess about a corrupt file is worse than one built
     // on the shipped prior.

@@ -129,11 +129,23 @@ export function readEvidence(projectDir, paths = EVIDENCE_PATHS) {
  */
 export function learnedProductivity(projectDir, { paths, shipped } = {}) {
   const docs = readEvidence(projectDir, paths);
-  const local = mergeTallies(docs.map((d) => tallyEvidence(d.doc)));
+  const tallied = docs.map((d) => ({ path: d.path, tally: tallyEvidence(d.doc) }));
+  // A document is a SOURCE only if it contributed an observation. One that was
+  // read but yielded nothing countable is not something an ordering was
+  // "learned from", and naming it anyway is what produced a sweep document the
+  // validator correctly refused to write: sources named, observed zero.
+  //
+  // That state is the ORDINARY shape of a first sweep. `tallyEvidence` counts
+  // only `killed` and `survived`, so evidence whose records are all `nocover`
+  // teaches nothing — and once such a document was on disk, EVERY later sweep
+  // failed the same check, permanently, until someone deleted a gitignored
+  // file nothing told them about.
+  const contributing = tallied.filter((t) => Object.keys(t.tally).length > 0);
+  const local = mergeTallies(contributing.map((t) => t.tally));
   const observed = Object.values(local).reduce((a, e) => a + e.n, 0);
   return {
     table: combinedProductivity(local, shipped),
-    sources: docs.map((d) => d.path),
+    sources: contributing.map((t) => t.path),
     observed,
     classes: Object.keys(local).sort(),
   };

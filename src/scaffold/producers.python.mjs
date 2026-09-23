@@ -208,6 +208,25 @@ function argumentSwapProposals(lines, i, params) {
  * parameter names; `ctx.fieldDrops` disables payload shapes in files where a
  * dict literal is data rather than something the product sends.
  */
+/**
+ * A module-level dunder assignment — `__version__`, `__all__`, `__author__`.
+ *
+ * Deleting one changes behaviour (an attribute stops existing, a star-import
+ * exports differently), so it is not an equivalent mutant. It is something
+ * nobody writes a test for, which is a different disqualification and the same
+ * one the JSX side already applies to an icon: a survivor there teaches the
+ * survival-learned ordering to prefer the class, and the class is barren.
+ *
+ * Measured on this corpus: every false positive in the adjudicated sample was
+ * a module-level metadata assignment, and `statement-deleted` already took 55%
+ * of a 3% sample of proposals, so the class does not need the help.
+ *
+ * Deliberately NARROW. Only a dunder, and only at module level. A module-level
+ * CONSTANT (`DEFAULT_MAX_SIZE = 100`) is excluded from this rule on purpose:
+ * removing one changes a real default and a test may well be owed.
+ */
+const MODULE_DUNDER = /^__\w+__\s*(?::[^=]+)?=[^=]/;
+
 export function proposalsForLine(lines, i, ctx = {}) {
   const out = [];
   const line = lines[i];
@@ -238,7 +257,7 @@ export function proposalsForLine(lines, i, ctx = {}) {
   const complete = !inside && !isIncomplete(line);
   if (complete && CHECK_CALL.test(line)) {
     out.push({ faultClass: 'call-removed', description: `Check call removed: \`${line.trim()}\` no longer runs.`, replace: `${indent}pass` });
-  } else if (complete && MUTATION.test(line)) {
+  } else if (complete && MUTATION.test(line) && !(indent === '' && MODULE_DUNDER.test(line))) {
     out.push({ faultClass: 'statement-deleted', description: `State change removed: \`${line.trim()}\` no longer runs.`, replace: `${indent}pass` });
   }
 
