@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-09-27
+
+Automated weekly release — everything merged since `v0.14.0`.
+
+### Changed
+
+- fix: four defects that made `nocover` report discovery failures as findings (#169)
+- chore: untrack local agent tooling and a generated fixture artifact (#168)
+- chore(homebrew): sha256 for v0.14.0 (#167)
+- docs(brief): page 6 carries what 0.14.0 changed there (#166)
+
+
 ### Fixed
 
 - **`sweep` no longer refuses to write after a sweep that learned nothing.**
