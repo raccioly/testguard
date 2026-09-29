@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-29
+
+Automated weekly release — everything merged since `v0.14.2`.
+
+### Changed
+
+- feat: harden discovery, replay, and command budgets (#174)
+- chore(homebrew): sha256 for v0.14.2 (#173)
+
+
 ### Added
 
 - Runner-native test discovery for Vitest, Jest, and Playwright, with bounded
