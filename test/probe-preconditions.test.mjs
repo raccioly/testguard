@@ -13,20 +13,20 @@ import { PreconditionError } from '../src/probe/worktree.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** A one-claim repo whose defender exists but has an uncommitted edit. The refusal cases never invoke a runner; the honoured cases do, so the project's node_modules is linked in. */
-function dirtyRepo() {
+function dirtyRepo(defender = 'test/a.test.mjs') {
   const dir = mkdtempSync(join(tmpdir(), 'tg-precond-'));
   const g = (...a) => spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8' });
   g('init', '-q');
   mkdirSync(join(dir, 'src'));
   mkdirSync(join(dir, 'test'));
   writeFileSync(join(dir, 'src', 'a.mjs'), 'export const a = () => 1;\n');
-  writeFileSync(join(dir, 'test', 'a.test.mjs'), "import { a } from '../src/a.mjs';\n");
+  writeFileSync(join(dir, defender), "import { a } from '../src/a.mjs';\n");
   writeFileSync(join(dir, '.gitignore'), 'node_modules\n');
   g('add', '-A');
   g('commit', '-qm', 'one');
   symlinkSync(join(ROOT, 'node_modules'), join(dir, 'node_modules'), 'dir'); // the honoured cases run vitest; CI has no npx cache to fall back on
-  writeFileSync(join(dir, 'test', 'a.test.mjs'), "import { a } from '../src/a.mjs';\n// uncommitted\n");
-  const claims = { schemaVersion: 1, claims: [{ id: 'C-1', statement: 's', source: { kind: 'manual' }, severity: 'low', producedBy: { producer: 'human' }, defendedBy: ['test/a.test.mjs'],
+  writeFileSync(join(dir, defender), "import { a } from '../src/a.mjs';\n// uncommitted\n");
+  const claims = { schemaVersion: 1, claims: [{ id: 'C-1', statement: 's', source: { kind: 'manual' }, severity: 'low', producedBy: { producer: 'human' }, defendedBy: [defender],
     faults: [{ id: 'F1', description: 'd', faultClass: 'other', file: 'src/a.mjs', find: '1', replace: '2', producedBy: { producer: 'human' } }] }] };
   return { dir, claims };
 }

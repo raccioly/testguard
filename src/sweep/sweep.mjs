@@ -162,6 +162,7 @@ export async function sweep({
   cap,
   confirmRuns = 3,
   budgetMs = 120_000,
+  commandBudget,
   runnerCommand,
   runnerName,
   nodeModules,
@@ -172,6 +173,7 @@ export async function sweep({
   onStage,
   onWarn = () => {},
 }) {
+  commandBudget?.assertOpen();
   const gate = computeChangedGate({ projectDir, ref, includeDirty, exclude, toolVersion, claimsPath, ignorePath });
 
   // ── What the sweep is pointed at. ──
@@ -208,6 +210,7 @@ export async function sweep({
   const skipped = [];
   const drafts = [];
   for (const file of targets) {
+    commandBudget?.assertOpen();
     let result;
     try {
       result = scaffoldFile({ projectDir, file, existingClaims, toolVersion });
@@ -256,6 +259,7 @@ export async function sweep({
       claims: { schemaVersion: 1, claims },
       confirmRuns,
       budgetMs,
+      commandBudget,
       mode: 'worktree',
       includeDirty,
       // A proposed fault has no declared defenders to be missing from, so the
@@ -288,6 +292,7 @@ export async function sweep({
   }
   const ordered = sortFindings(findings);
   const gating = gatingCount(ordered);
+  commandBudget?.assertOpen();
   return {
     schemaVersion: 1,
     tool: { name: 'testguard', version: toolVersion },

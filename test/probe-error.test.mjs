@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { probe, errorRecord, checkProvenance } from '../src/probe/probe.mjs';
+import { probe, errorRecord, discoveryIndeterminateRecord, checkProvenance } from '../src/probe/probe.mjs';
 import { PreconditionError } from '../src/probe/worktree.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 
@@ -17,13 +17,13 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // by definition not something an input can provoke on demand. So provoke it
 // where it really happened: at the moment the fault is applied, which in #64
 // was a parallel session deleting the scratch worktree mid-run.
-const boom = vi.hoisted(() => ({ faultId: null }));
+const boom = vi.hoisted(() => ({ faultId: null, error: null }));
 vi.mock('../src/probe/inject.mjs', async (importOriginal) => {
   const real = await importOriginal();
   return {
     ...real,
     applyFault: (dir, fault, opts) => {
-      if (fault.id === boom.faultId) throw new TypeError(`simulated failure applying ${fault.id}\n    at applyFault (inject.mjs:81:5)`);
+      if (fault.id === boom.faultId) throw boom.error ?? new TypeError(`simulated failure applying ${fault.id}\n    at applyFault (inject.mjs:81:5)`);
       return real.applyFault(dir, fault, opts);
     },
   };
@@ -97,6 +97,27 @@ describe('errorRecord — the shape a fault gets when probing it threw', () => {
   });
 });
 
+describe('discoveryIndeterminateRecord', () => {
+  it('fails closed without claiming nocover and conforms to the evidence schema', () => {
+    const record = discoveryIndeterminateRecord({
+      claim: { ...CLAIM, faults: [FAULT], defendedBy: undefined },
+      fault: FAULT,
+      defenders: [],
+      discovered: true,
+      inputs: { targetHash: 'a'.repeat(64), defenderHashes: {}, testUniverseHash: 'b'.repeat(64), discoveryHashes: { 'test/a.test.mjs': 'c'.repeat(64) } },
+      indeterminate: [{ file: 'test/a.test.mjs', reason: 'ambiguous-resolution' }],
+    });
+    expect(record).toMatchObject({ verdict: 'unverifiable', detail: { reason: 'defender-discovery-indeterminate' }, defenders: { nocover: false, discovered: true } });
+    const doc = {
+      schemaVersion: 1,
+      tool: { name: 'testguard', version: '0.0.0' },
+      run: { id: 'run-20260918-000000', startedAt: '2026-09-18T00:00:00Z', finishedAt: '2026-09-18T00:00:01Z', repo: { head: 'a'.repeat(40), dirty: false }, runner: { name: 'vitest' }, confirmRuns: 3, mode: 'worktree' },
+      records: [record],
+    };
+    expect(validate('evidence', doc)).toMatchObject({ ok: true, errors: [] });
+  });
+});
+
 describe('one bad fault does not cost the evidence for the rest', () => {
   it('records the fault that threw as unverifiable and still returns a complete, conformant document', async () => {
     const { dir, claims } = repo();
@@ -115,21 +136,26 @@ describe('one bad fault does not cost the evidence for the rest', () => {
       expect(validate('evidence', ev)).toMatchObject({ ok: true, errors: [] });
     } finally {
       boom.faultId = null;
+      boom.error = null;
       rmSync(dir, { recursive: true, force: true });
     }
   }, 120_000);
 
   it('still refuses the whole run on a precondition failure, which is about every verdict in it', async () => {
     const { dir, claims } = repo();
-    // A Python defender with no usable interpreter: `ensureOwned` raises from
-    // inside the per-fault body, which is precisely where the catch sits. A
-    // catch that swallowed this would turn "no verdict in this run means
-    // anything" into one quiet unverifiable claim.
-    writeFileSync(join(dir, 'test', 'a_test.py'), 'def test_a():\n    assert True\n');
-    claims.claims = [{ ...CLAIM, defendedBy: ['test/a_test.py'], faults: [FAULT] }];
-    await expect(probe({ projectDir: dir, claims, mode: 'in-place', confirmRuns: 1, budgetMs: 30_000, escalate: false, toolVersion: 't', python: '/nonexistent/python-binary' }))
-      .rejects.toThrow(PreconditionError);
-    rmSync(dir, { recursive: true, force: true });
+    // Inject at applyFault so the error originates inside the exact per-fault
+    // try/catch this regression defends. Runner preflights happen earlier and
+    // cannot prove that this catch preserves whole-run preconditions.
+    boom.faultId = 'F1';
+    boom.error = new PreconditionError('simulated whole-run precondition');
+    try {
+      await expect(probe({ projectDir: dir, claims, mode: 'in-place', confirmRuns: 1, budgetMs: 30_000, escalate: false, toolVersion: 't' }))
+        .rejects.toThrow(PreconditionError);
+    } finally {
+      boom.faultId = null;
+      boom.error = null;
+      rmSync(dir, { recursive: true, force: true });
+    }
   }, 120_000);
 });
 

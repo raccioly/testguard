@@ -1,6 +1,7 @@
 import { dirname, join, resolve } from 'node:path';
 import { replay, calibrationFrom, renderReplay } from '../replay/replay.mjs';
 import { writeSpecDoc } from '../evidence/writer.mjs';
+import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
 
 export const replayPath = (projectDir) => join(projectDir, '.testguard', 'replay.json');
 export const calibrationPath = (projectDir) => join(projectDir, '.testguard', 'calibration.json');
@@ -13,17 +14,24 @@ export async function replayCommand({ projectDir, values, version }, io) {
   }
   const confirmRuns = Number(values.confirm);
   const budgetMs = Number(values.budget);
+  const commandBudgetMs = parseCommandBudget(values['command-budget']);
   const limit = values.max ? Number(values.max) : undefined;
   if (!Number.isInteger(confirmRuns) || confirmRuns < 1 || !Number.isInteger(budgetMs) || budgetMs < 1000) {
     io.err('--confirm must be a positive integer and --budget at least 1000');
     return 3;
   }
+  if (commandBudgetMs === null) {
+    io.err('--command-budget must be at least 1000 milliseconds');
+    return 3;
+  }
+  const commandBudget = createCommandBudget(commandBudgetMs);
 
   const doc = await replay({
     projectDir,
     range,
     confirmRuns,
     budgetMs,
+    commandBudget,
     runnerCommand: values['runner-cmd'],
     runnerName: values.runner,
     nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
@@ -36,12 +44,17 @@ export async function replayCommand({ projectDir, values, version }, io) {
   });
 
   const outPath = values.out ? resolve(values.out) : replayPath(projectDir);
-  writeSpecDoc('replay', outPath, doc);
   const calibration = calibrationFrom(doc, { toolVersion: version });
   // Beside the replay document, whatever --out says: the two are one result,
   // and splitting them across directories loses the pairing — and leaves a
   // file behind in a repository the run is only meant to read.
   const calPath = values.baseline ? resolve(values.baseline) : values.out ? join(dirname(outPath), 'calibration.json') : calibrationPath(projectDir);
+  // Replay and calibration are one result. Cross the deadline boundary only
+  // after both complete documents exist in memory; serialization is then the
+  // documented non-interruptible final step, so expiry can never leave half
+  // of the pair as though it were complete.
+  commandBudget?.assertOpen();
+  writeSpecDoc('replay', outPath, doc);
   writeSpecDoc('calibration', calPath, calibration);
 
   if (values.json) {

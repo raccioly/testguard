@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { parseReport, runProcess, checkRunner, resolveRunner, runnerArgv, resetRunnerCache } from '../src/probe/runners/shared.mjs';
 import { argvFor as vitestArgv } from '../src/probe/runners/vitest.mjs';
 import { argvFor as jestArgv } from '../src/probe/runners/jest.mjs';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -55,6 +55,40 @@ describe('runVitest budget', () => {
   it('kills a process that exceeds the wall-clock budget and reports timeout', async () => {
     const { run } = await runProcess({ argv: () => [],  projectDir: process.cwd(), files: [], budgetMs: 300, command: [process.execPath, '-e', 'setInterval(() => {}, 1000)'] });
     expect(run.outcome).toBe('timeout');
+  }, 5000);
+
+  it('kills a detached descendant before reporting the timeout', async () => {
+    if (process.platform === 'win32') return; // taskkill /T is exercised by the same implementation path on Windows CI.
+    const dir = mkdtempSync(join(tmpdir(), 'tg-runner-tree-'));
+    const marker = join(dir, 'survived');
+    const grandchild = `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'alive'), 350)`;
+    const parent = `const { spawn } = require('node:child_process'); spawn(process.execPath, ['-e', ${JSON.stringify(grandchild)}], { detached: true, stdio: 'ignore' }).unref(); setInterval(() => {}, 1000);`;
+    try {
+      const { run } = await runProcess({ argv: () => [], projectDir: dir, files: [], budgetMs: 100, command: [process.execPath, '-e', parent] });
+      expect(run.outcome).toBe('timeout');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 5000);
+
+  it('reports cleanup as unverified when a daemon reparented before timeout', async () => {
+    if (process.platform === 'win32') return;
+    const dir = mkdtempSync(join(tmpdir(), 'tg-runner-orphan-'));
+    const marker = join(dir, 'survived');
+    const grandchild = `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'alive'), 450)`;
+    const helper = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(grandchild)}], { detached: true, stdio: 'ignore' }).unref()`;
+    const parent = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(helper)}], { detached: true, stdio: 'ignore' }).unref(); setInterval(() => {}, 1000);`;
+    try {
+      const { run, loadMessage } = await runProcess({ argv: () => [], projectDir: dir, files: [], budgetMs: 150, command: [process.execPath, '-e', parent] });
+      expect(run.outcome).toBe('timeout');
+      expect(loadMessage).toMatch(/cleanup-unverified.*reparented daemon/i);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      expect(existsSync(marker)).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }, 5000);
 
   it('reports error when the command produces no report', async () => {
@@ -109,6 +143,30 @@ describe('runner resolution: the project package first, PATH second, npx never',
       resetRunnerCache();
     }
   });
+
+  it('kills detached descendants of a timed-out PATH resolution probe', async () => {
+    if (process.platform === 'win32') return;
+    const dir = mkdtempSync(join(tmpdir(), 'tg-resolve-tree-'));
+    const bin = mkdtempSync(join(tmpdir(), 'tg-resolve-tree-bin-'));
+    const marker = join(dir, 'survived');
+    const grandchild = `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'alive'), 350)`;
+    const shim = join(bin, 'tree-runner');
+    writeFileSync(shim, `#!${process.execPath}\nrequire('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(grandchild)}], { detached: true, stdio: 'ignore' }).unref(); setInterval(() => {}, 1000);\n`, { mode: 0o755 });
+    const saved = process.env.PATH;
+    process.env.PATH = `${bin}:${saved}`;
+    try {
+      resetRunnerCache();
+      const result = await checkRunner({ projectDir: dir, pkg: 'tree-runner', bin: 'tree-runner', budgetMs: 100 });
+      expect(result.ok).toBe(false);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      process.env.PATH = saved;
+      resetRunnerCache();
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(bin, { recursive: true, force: true });
+    }
+  }, 5000);
 });
 
 describe('each runner invokes the binary resolved for the project, not a bare name', () => {

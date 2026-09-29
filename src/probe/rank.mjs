@@ -1,6 +1,7 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve, extname } from 'node:path';
 import { walk } from '../util/glob.mjs';
+import { createImportResolver } from './imports.mjs';
 import { pyBlastRadius } from './pyimports.mjs';
 
 const aliasCache = new Map();
@@ -17,9 +18,10 @@ function parseJsonc(text) {
  * vite/vitest `resolve.alias` read as text, and package.json `imports`. Bare
  * specifiers that match no rule are ignored, as documented.
  */
-export function loadAliases(projectDir) {
+function loadAliasContext(projectDir) {
   if (aliasCache.has(projectDir)) return aliasCache.get(projectDir);
   const rules = [];
+  const configFiles = new Set();
   const toRule = (pattern, targets, base) => {
     const [prefix, suffix = ''] = pattern.split('*');
     rules.push({ prefix, suffix, wildcard: pattern.includes('*'), targets: targets.map((t) => resolve(base, t)) });
@@ -32,6 +34,7 @@ export function loadAliases(projectDir) {
     const cfgPath = queue.shift();
     if (seen.has(cfgPath) || !existsSync(cfgPath)) continue;
     seen.add(cfgPath);
+    configFiles.add(cfgPath);
     let cfg;
     try {
       cfg = parseJsonc(readFileSync(cfgPath, 'utf8'));
@@ -58,6 +61,7 @@ export function loadAliases(projectDir) {
   for (const f of ['vitest.config.ts', 'vitest.config.mts', 'vitest.config.js', 'vitest.config.mjs', 'vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs']) {
     const path = join(projectDir, f);
     if (!existsSync(path)) continue;
+    configFiles.add(path);
     const text = readFileSync(path, 'utf8');
     const start = /\balias\s*:\s*([\[{])/.exec(text);
     if (!start) continue;
@@ -92,6 +96,7 @@ export function loadAliases(projectDir) {
 
   const pkgPath = join(projectDir, 'package.json');
   if (existsSync(pkgPath)) {
+    configFiles.add(pkgPath);
     try {
       const imports = JSON.parse(readFileSync(pkgPath, 'utf8')).imports ?? {};
       for (const [pattern, target] of Object.entries(imports)) {
@@ -100,8 +105,13 @@ export function loadAliases(projectDir) {
       }
     } catch {}
   }
-  aliasCache.set(projectDir, rules);
-  return rules;
+  const context = { rules, configFiles: [...configFiles].map((file) => realpathSync(file)) };
+  aliasCache.set(projectDir, context);
+  return context;
+}
+
+export function loadAliases(projectDir) {
+  return loadAliasContext(projectDir).rules;
 }
 
 /** Absolute candidate bases an aliased specifier could mean, or [] if it matches no rule. */
@@ -164,6 +174,20 @@ export function fileImports(projectDir, absFile, targetRel) {
 }
 
 /**
+ * Symbol-aware import relation for discovery and proof callers. Unlike the
+ * compatibility boolean above, uncertainty stays explicit and the result
+ * carries the barrel witnesses and configuration/source dependencies used.
+ */
+export function fileImportRelation(projectDir, absFile, targetRel, { limits } = {}) {
+  const { rules, configFiles } = loadAliasContext(projectDir);
+  return createImportResolver(projectDir, {
+    aliases: rules,
+    configFiles,
+    ...(limits ? { limits } : {}),
+  }).relation(absFile, targetRel);
+}
+
+/**
  * Number of non-test source files that import `targetRel`: relative specifiers,
  * tsconfig/jsconfig `paths` aliases and package.json `imports` are resolved;
  * bare package specifiers are not. Direct imports only.
@@ -201,4 +225,3 @@ export function rank({ severity, sourceKind, blast, independence }) {
   const score = SEVERITY_WEIGHT[severity] * (SOURCE_WEIGHT[sourceKind] ?? 0.9) * (1 + Math.log2(1 + blast)) * (INDEPENDENCE_WEIGHT[independence] ?? 1);
   return { score: Number(score.toFixed(3)), blastRadius: blast, tier: severity };
 }
-

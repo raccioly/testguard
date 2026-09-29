@@ -17,10 +17,22 @@ describe('discoverDefenders', () => {
   writeFileSync(join(dir, 'test', 'guard.test.ts'), "import { g } from '../src/lib/guard';\n");
   writeFileSync(join(dir, 'test', 'alias.test.ts'), "import { g } from '@/lib/guard';\n");
   writeFileSync(join(dir, 'test', 'other.test.ts'), "import { o } from '../src/lib/other';\n");
+  mkdirSync(join(dir, 'checks'));
+  writeFileSync(join(dir, 'checks', 'guard.case.mjs'), "import { g } from '../src/lib/guard';\n");
   it('returns the test files that import the target, by relative path or alias, and nothing else', () => {
     expect(discoverDefenders(dir, 'src/lib/guard.ts')).toEqual(['test/alias.test.ts', 'test/guard.test.ts']);
     expect(discoverDefenders(dir, 'src/lib/other.ts')).toEqual(['test/other.test.ts']);
     expect(discoverDefenders(dir, 'src/lib/nothing.ts')).toEqual([]);
+  });
+
+  it('uses an immutable explicit test universe verbatim, including config-defined names outside legacy globs', () => {
+    const files = Object.freeze(['checks/guard.case.mjs']);
+    const manifest = Object.freeze({ files });
+    expect(discoverDefendersDetailed(dir, 'src/lib/guard.ts', manifest).importing).toEqual(['checks/guard.case.mjs']);
+    expect(discoverDefendersDetailed(dir, 'src/lib/guard.ts', files).canDetect).toEqual(['checks/guard.case.mjs']);
+    expect(files).toEqual(['checks/guard.case.mjs']);
+    expect(() => discoverDefendersDetailed(dir, 'src/lib/guard.ts', ['checks/guard.case.mjs'])).toThrow(/immutable/i);
+    expect(() => discoverDefendersDetailed(dir, 'src/lib/guard.ts', { files })).toThrow(/manifest must be immutable/i);
   });
 });
 
@@ -53,5 +65,34 @@ describe('discoverDefenders — nested __tests__, tsconfig references, vite alia
     expect(d.canDetect).toEqual(['src/components/__tests__/Menu.test.tsx', 'src/utils/__tests__/permissions.test.ts', 'test/deep/nested/perm.test.ts', 'test/hash.test.ts']);
     expect(d.signals).toEqual([{ file: 'src/components/__tests__/Toolbar.test.tsx', signal: 'mocked-never-asserted' }]);
     expect(discoverDefenders(dir, 'src/utils/permissions.ts')).toEqual(d.canDetect);
+  });
+});
+
+describe('discoverDefenders — symbol-level barrels', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tg-discover-barrel-'));
+  const write = (rel, text) => { mkdirSync(join(dir, ...rel.split('/').slice(0, -1)), { recursive: true }); writeFileSync(join(dir, rel), text); };
+  write('src/guard.ts', 'export const allowed = () => true;\n');
+  write('src/index.ts', "export { allowed } from './guard';\n");
+  write('test/real.test.ts', "import { allowed } from '../src/index';\nexpect(allowed()).toBe(true);\n");
+  write('test/mocked.test.ts', "import { vi, expect } from 'vitest';\nimport { allowed } from '../src/index';\nvi.mock('../src/index');\nexpect(allowed).toBeDefined();\n");
+  write('src/a.ts', 'export const same = 1;\n');
+  write('src/b.ts', 'export const same = 2;\n');
+  write('src/ambiguous.ts', "export * from './a';\nexport * from './b';\n");
+  write('test/ambiguous.test.ts', "import { same } from '../src/ambiguous';\nexpect(same).toBeDefined();\n");
+  afterAll(() => { rmSync(dir, { recursive: true, force: true }); resetAliasCache(); });
+
+  it('follows the imported symbol and disqualifies a mock anywhere on its witnessed path', () => {
+    const detail = discoverDefendersDetailed(dir, 'src/guard.ts', Object.freeze(['test/mocked.test.ts', 'test/real.test.ts']));
+    expect(detail.importing).toEqual(['test/mocked.test.ts', 'test/real.test.ts']);
+    expect(detail.canDetect).toEqual(['test/real.test.ts']);
+    expect(detail.mocking).toEqual(['test/mocked.test.ts']);
+    expect(detail.indeterminate).toEqual([]);
+    expect(detail.dependencies).toEqual(['src/index.ts', 'test/mocked.test.ts', 'test/real.test.ts']);
+  });
+
+  it('keeps an ambiguous symbol origin explicit instead of turning it into nocover', () => {
+    const detail = discoverDefendersDetailed(dir, 'src/a.ts', Object.freeze(['test/ambiguous.test.ts']));
+    expect(detail.canDetect).toEqual([]);
+    expect(detail.indeterminate).toEqual([expect.objectContaining({ file: 'test/ambiguous.test.ts', reason: 'ambiguous-resolution' })]);
   });
 });

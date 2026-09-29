@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runProcess, listTestFiles, firstInformativeLine } from './shared.mjs';
+import { runProcess, listTestFiles, firstInformativeLine, terminateProcessTree } from './shared.mjs';
 
 /**
  * The Python runner. Selected **per file**: any `.py` defender runs here
@@ -116,7 +116,7 @@ function ask(path, budgetMs) {
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(path, ['-c', PROBE], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CI: '1' } });
+      child = spawn(path, ['-c', PROBE], { stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32', env: { ...process.env, CI: '1' } });
     } catch {
       return resolve(null);
     }
@@ -124,7 +124,7 @@ function ask(path, budgetMs) {
     child.on('error', () => resolve(null));
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', () => {});
-    const timer = setTimeout(() => child.kill('SIGKILL'), budgetMs);
+    const timer = setTimeout(() => terminateProcessTree(child), budgetMs);
     child.on('close', (code) => {
       clearTimeout(timer);
       if (code !== 0) return resolve(null);
@@ -145,14 +145,14 @@ function ask(path, budgetMs) {
  * meant to be — never copied and never symlinked, which would break the
  * `pyvenv.cfg` prefix detection that makes one work at all.
  */
-export function resolveInterpreter({ projectDir, python, budgetMs = 30_000 }) {
+export function resolveInterpreter({ projectDir, python, budgetMs = 30_000, budgetFor }) {
   const key = `${projectDir}\0${python ?? ''}`;
   if (interpreters.has(key)) return interpreters.get(key);
   const task = (async () => {
     const tried = [];
     for (const candidate of candidates(projectDir, python)) {
       if (!candidate.explicit && candidate.source === 'project' && !existsSync(candidate.path)) continue;
-      const answer = await ask(candidate.path, budgetMs);
+      const answer = await ask(candidate.path, budgetFor ? budgetFor() : budgetMs);
       if (answer) return { ...candidate, ...answer };
       tried.push(candidate.path);
     }
@@ -189,10 +189,10 @@ export function chooseEngine(pinned, found) {
 }
 
 export function makeCheck(pinned) {
-  return async ({ projectDir, sourceDir, python, budgetMs = 30_000 }) => {
+  return async ({ projectDir, sourceDir, python, budgetMs = 30_000, budgetFor }) => {
     // Always the ORIGINAL project directory when there is one: a virtualenv is
     // gitignored, so the scratch worktree does not contain it.
-    const found = await resolveInterpreter({ projectDir: sourceDir ?? projectDir, python, budgetMs });
+    const found = await resolveInterpreter({ projectDir: sourceDir ?? projectDir, python, budgetMs, budgetFor });
     if (found.error) return { ok: false, message: found.error };
     const chosen = chooseEngine(pinned, found);
     if (!chosen.ok) return chosen;

@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
@@ -13,6 +13,50 @@ export const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
 /** Node's own advisory warnings about the probed project's configuration; never about the fault. */
 export const NODE_NOISE = /MODULE_TYPELESS_PACKAGE_JSON|ExperimentalWarning|--trace-warnings|Reparsing as ES module|To eliminate this warning/;
+
+function descendantPids(rootPid) {
+  if (process.platform === 'win32') return [];
+  const result = spawnSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' });
+  if (result.status !== 0) return [];
+  const children = new Map();
+  for (const line of result.stdout.split('\n')) {
+    const [pid, ppid] = line.trim().split(/\s+/).map(Number);
+    if (!Number.isInteger(pid) || !Number.isInteger(ppid)) continue;
+    if (!children.has(ppid)) children.set(ppid, []);
+    children.get(ppid).push(pid);
+  }
+  const out = [];
+  const visit = (pid) => { for (const child of children.get(pid) ?? []) { visit(child); out.push(child); } };
+  visit(rootPid);
+  return out;
+}
+
+export const TIMEOUT_CLEANUP_WARNING = 'cleanup-unverified: TestGuard hard-killed the runner process group and descendants still attributable at timeout, but an already-reparented daemon may survive; use an OS or container containment boundary for daemonizing or untrusted commands';
+
+/**
+ * Best-effort runner cleanup. POSIX process groups plus a PPID snapshot cover
+ * ordinary descendants and a still-attributable detached child. Node exposes
+ * no portable cgroup/job-object/subreaper primitive, so a daemon that already
+ * reparented cannot be proven dead here. Callers must keep the result a
+ * timeout and surface TIMEOUT_CLEANUP_WARNING rather than claiming containment.
+ */
+export function terminateProcessTree(child) {
+  if (!child.pid) return;
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    try { child.kill('SIGKILL'); } catch {}
+    return;
+  }
+  // Freeze the main group before enumerating so it cannot fork between the
+  // snapshot and the kill. A deliberately detached descendant is outside the
+  // group but remains visible through PPID and is killed explicitly.
+  try { process.kill(-child.pid, 'SIGSTOP'); } catch {}
+  for (const pid of descendantPids(child.pid)) {
+    try { process.kill(pid, 'SIGKILL'); } catch {}
+  }
+  try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+  try { child.kill('SIGKILL'); } catch {}
+}
 
 /**
  * Split a runner command template into argv. Supports double and single
@@ -94,7 +138,12 @@ export function checkRunner({ projectDir, pkg, bin, budgetMs = 60_000, env = pro
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(process.platform === 'win32' ? `${bin}.cmd` : bin, ['--version'], { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], env: { ...env, CI: '1' } });
+      child = spawn(process.platform === 'win32' ? `${bin}.cmd` : bin, ['--version'], {
+        cwd: projectDir,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: process.platform !== 'win32',
+        env: { ...env, CI: '1' },
+      });
     } catch (e) {
       return resolve({ ok: false, message: e.message });
     }
@@ -103,7 +152,7 @@ export function checkRunner({ projectDir, pkg, bin, budgetMs = 60_000, env = pro
     child.on('error', () => resolve({ ok: false, message: `${pkg} is not installed in the project and \`${bin}\` is not on PATH (npm i -D ${pkg})` }));
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (err += d));
-    const timer = setTimeout(() => child.kill('SIGKILL'), budgetMs);
+    const timer = setTimeout(() => terminateProcessTree(child), budgetMs);
     child.on('close', (code) => {
       clearTimeout(timer);
       const version = out.trim().replace(/^vitest\//, '').replace(/^Version\s+/i, '').split('\n').pop();
@@ -183,7 +232,7 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
   const started = Date.now();
 
   return new Promise((resolve) => {
-    const child = spawn(cmd, args, { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CI: '1', FORCE_COLOR: '0', ...extraEnv } });
+    const child = spawn(cmd, args, { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32', env: { ...process.env, CI: '1', FORCE_COLOR: '0', ...extraEnv } });
     let stderr = '';
     // Node prints MODULE_TYPELESS_PACKAGE_JSON (and friends) for the PROBED
     // project's config, not for anything the fault did. Keep it out of the
@@ -193,7 +242,7 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
     let killed = false;
     const timer = setTimeout(() => {
       killed = true;
-      child.kill('SIGKILL');
+      terminateProcessTree(child);
     }, budgetMs);
 
     child.on('close', () => {
@@ -201,7 +250,7 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
       const durationMs = Date.now() - started;
       let result;
       if (killed) {
-        result = { run: { outcome: 'timeout', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs }, timeouts: 1, loadMessage: `budget of ${budgetMs}ms exceeded`, failedTests: [] };
+        result = { run: { outcome: 'timeout', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs }, timeouts: 1, loadMessage: `budget of ${budgetMs}ms exceeded; ${TIMEOUT_CLEANUP_WARNING}`, failedTests: [] };
       } else if (!existsSync(outFile)) {
         result = { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs }, timeouts: 0, loadMessage: stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? 'runner produced no report', failedTests: [] };
       } else {

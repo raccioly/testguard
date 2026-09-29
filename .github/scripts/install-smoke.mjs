@@ -31,9 +31,23 @@ try {
   const version = run(bin, ['--version'], consumer).trim();
   const claims = run(bin, ['claims', '.'], consumer);
   const draft = JSON.parse(run(bin, ['scaffold', 'src/redact.mjs', '--json'], consumer));
+  const installedValidator = join(consumer, 'node_modules', 'testguard-cli', 'spec', 'lib', 'validate.mjs');
+  const candidateEvidence = join(root, 'spec', 'conformance', 'examples', 'evidence.json');
+  const validatesCandidateEvidence = run(process.execPath, [
+    '--input-type=module',
+    '-e',
+    `import { pathToFileURL } from 'node:url'; import { readFileSync } from 'node:fs';
+     const { validate } = await import(pathToFileURL(process.argv[1]));
+     const result = validate('evidence', JSON.parse(readFileSync(process.argv[2], 'utf8')));
+     if (!result.ok) throw new Error(result.errors.map((error) => \`${'${error.path}: ${error.message}'}\`).join('; '));
+     process.stdout.write('ok');`,
+    installedValidator,
+    candidateEvidence,
+  ], consumer).trim();
   if (!draft.claims?.length) throw new Error('scaffold produced no claims from the installed tarball');
   if (!/^\d+\.\d+\.\d+/.test(version)) throw new Error(`unexpected --version output: ${version}`);
   if (!/^\d+ claims in /.test(claims)) throw new Error(`claims did not list the fixture:\n${claims}`);
+  if (validatesCandidateEvidence !== 'ok') throw new Error('installed package did not validate candidate-format evidence');
   const deps = Object.keys(JSON.parse(run(npm, ['ls', '--omit=dev', '--json', '--depth=0'], consumer)).dependencies ?? {});
   console.log(`install smoke OK — testguard ${version} runs from the installed tarball; consumer deps: ${deps.join(', ')}`);
 } finally {

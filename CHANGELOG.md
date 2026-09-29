@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Runner-native test discovery for Vitest, Jest, and Playwright, with bounded
+  output, path validation, immutable universe manifests, exact mixed-runner
+  routing, and configuration-closure hashes (including workspace configs,
+  package helpers, setup files, and Python collection hooks) that prevent stale
+  evidence reuse.
+- Symbol-aware JavaScript/TypeScript defender discovery through named,
+  default, namespace, CommonJS, and barrel re-exports. Ambiguity and bounded
+  resolver exhaustion fail closed as `defender-discovery-indeterminate`.
+- `probe`, `sweep`, and `replay` accept `--command-budget <ms>` as a
+  cooperative measurement deadline distinct from the existing per-run
+  `--budget`. It caps asynchronous children and is checked at stage and write
+  boundaries; synchronous setup may overrun but cannot publish a partial
+  result, so an unattempted suffix can never be reported as clean.
+
+### Fixed
+
+- Runner timeouts now hard-kill the original process group and descendants
+  still attributable at timeout. Diagnostics explicitly say cleanup is
+  unverified because a previously reparented daemon requires external OS or
+  container containment.
+- Generated CommonJS export mutations and unresolved symbol/configuration
+  paths fail closed instead of allowing a false `nocover` result.
+- Dirty-tree preflight now resolves the same full primary-plus-owned runner
+  universe as measurement, including custom Playwright names and imported
+  configuration helpers; discovery failure blocks rather than hiding edits.
+
 ## [0.14.2] - 2026-09-28
 
 Automated weekly release — everything merged since `v0.14.1`.
@@ -14,7 +42,6 @@ Automated weekly release — everything merged since `v0.14.1`.
 ### Changed
 
 - chore(homebrew): sha256 for v0.14.1 (#171)
-
 
 ## [0.14.1] - 2026-09-27
 

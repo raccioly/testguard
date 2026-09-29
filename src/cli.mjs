@@ -44,6 +44,7 @@ probe
   --claims <path>      claims file             (default: <dir>/testguard.claims.json)
   --confirm <n>        runs per verdict        (default: 3)
   --budget <ms>        wall clock per run      (default: 120000)
+  --command-budget <ms> cooperative measurement deadline for probe, sweep, or replay. Caps async children; expiry exits 2 and writes no partial result
   --out <path>         evidence file           (default: <dir>/.testguard/evidence.json)
   --baseline <path>    baseline to gate against (default: <dir>/.testguard/baseline.json if present)
   --severity <level>   gate only at or above   (default: low)
@@ -84,7 +85,7 @@ sweep      --changed <ref> (required unless --save-paths; CI bases and a safe lo
            --save-paths      sweep every file that WRITES TO STORAGE instead of the diff, and report the surface as the
                              denominator: "120 writes across 38 files, swept 12". A clean sweep over an unstated
                              denominator is a sample of unknown size, not a guarantee that saving works
-           --include-dirty  --exclude <glob>  --confirm <n>  --budget <ms>  --max <n>  --out <path>  --json
+           --include-dirty  --exclude <glob>  --confirm <n>  --budget <ms>  --command-budget <ms>  --max <n>  --out <path>  --json
            the cold start: no claim and no concern needed. Everything it proposes is a DRAFT — it never writes testguard.claims.json,
            and its evidence never replaces .testguard/evidence.json. exit 1 on a fault that survived, or a file no test imports
            shapes: if-guard → if (false) · single-line guard/mutation removed · return <check> → return true
@@ -96,6 +97,7 @@ mcp        no options. JSON-RPC 2.0 over stdio; five READ-ONLY tools (status, br
 replay     --since <range>   commit range to search for fix commits (HEAD~50..HEAD, a tag, origin/main..HEAD)
            --max <n>         replay at most n fixes (they are slow: one worktree and N runs each)
            --confirm <n>     runs per verdict (default 3); a flaky failure reads as "the suite caught it", so mixed runs are never caught
+           --command-budget <ms> cooperative measurement deadline; expiry writes neither replay nor calibration, so an unmeasured suffix cannot look clean
            --out <path>       replay document (default: <dir>/.testguard/replay.json); the calibration goes beside it
            reports, never gates: a bug that escaped is history, not a regression in this change
                    · one-line JSX element removed · on<Event> handler prop dropped
@@ -142,6 +144,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         claims: { type: 'string' },
         confirm: { type: 'string', default: '3' },
         budget: { type: 'string', default: '120000' },
+        'command-budget': { type: 'string' },
         out: { type: 'string' },
         evidence: { type: 'string' },
         baseline: { type: 'string' },

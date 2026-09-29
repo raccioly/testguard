@@ -117,6 +117,8 @@ export function isReusable(prior, current) {
   const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
   return prior.inputs.targetHash === current.inputs.targetHash
     && same(prior.inputs.defenderHashes, current.inputs.defenderHashes)
+    && same(prior.inputs.testUniverseHash, current.inputs.testUniverseHash)
+    && same(prior.inputs.discoveryHashes, current.inputs.discoveryHashes)
     && same(prior.defenders.requested, current.requested)
     && same(prior.defenders.resolved, current.resolved)
     && prior.subject.contentHash === current.contentHash;

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -141,6 +141,50 @@ describe('the interpreter is a precondition, never a verdict', () => {
     expect(c.ok).toBe(false);
     expect(c.message).toMatch(/not a usable Python interpreter/);
   }, 40_000);
+
+  it('recomputes the live allowance for each interpreter fallback', async () => {
+    if (process.platform === 'win32') return;
+    const dir = mkdtempSync(join(tmpdir(), 'tg-pybudget-'));
+    const fake = join(dir, '.venv', 'bin', 'python');
+    mkdirSync(dirname(fake), { recursive: true });
+    writeFileSync(fake, `#!${process.execPath}\nprocess.exit(1);\n`, { mode: 0o755 });
+    const saved = process.env.VIRTUAL_ENV;
+    const savedExplicit = process.env.TESTGUARD_PYTHON;
+    delete process.env.VIRTUAL_ENV;
+    delete process.env.TESTGUARD_PYTHON;
+    const allowances = [];
+    try {
+      const result = await makeCheck('unittest')({
+        projectDir: dir,
+        budgetFor: () => { allowances.push(5000); return 5000; },
+      });
+      expect(result.ok).toBe(true);
+      expect(allowances.length).toBeGreaterThanOrEqual(2);
+    } finally {
+      if (saved === undefined) delete process.env.VIRTUAL_ENV;
+      else process.env.VIRTUAL_ENV = saved;
+      if (savedExplicit === undefined) delete process.env.TESTGUARD_PYTHON;
+      else process.env.TESTGUARD_PYTHON = savedExplicit;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 40_000);
+
+  it('kills detached descendants of a timed-out interpreter probe', async () => {
+    if (process.platform === 'win32') return;
+    const dir = mkdtempSync(join(tmpdir(), 'tg-pytree-'));
+    const marker = join(dir, 'survived');
+    const fake = join(dir, 'python');
+    const grandchild = `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'alive'), 350)`;
+    writeFileSync(fake, `#!${process.execPath}\nrequire('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(grandchild)}], { detached: true, stdio: 'ignore' }).unref(); setInterval(() => {}, 1000);\n`, { mode: 0o755 });
+    try {
+      const result = await makeCheck('unittest')({ projectDir: dir, python: fake, budgetMs: 100 });
+      expect(result.ok).toBe(false);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 5000);
 
   it('an unresolvable runner returns a message instead of running anything', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-pynone-'));

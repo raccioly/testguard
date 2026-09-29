@@ -1,9 +1,10 @@
 import { join } from 'node:path';
 import { listTestFiles } from './runners/shared.mjs';
 import { testGlobs as PY_TEST_GLOBS } from './runners/python.mjs';
-import { fileImports } from './rank.mjs';
+import { fileImportRelation } from './rank.mjs';
 import { pyFileImports } from './pyimports.mjs';
 import { classifyDefenders } from './mocks.mjs';
+import { normalizeDiscoveredFiles } from './runners/discovery.mjs';
 
 /** A target's language decides how its importers are found. Nothing else about it matters here. */
 export const isPython = (rel) => rel.endsWith('.py');
@@ -17,13 +18,48 @@ export const isPython = (rel) => rel.endsWith('.py');
  * `nocover` therefore means exactly "no test file imports this source without
  * mocking it".
  */
-export function discoverDefendersDetailed(projectDir, targetRel) {
-  const importing = isPython(targetRel)
-    ? listTestFiles(projectDir, PY_TEST_GLOBS).filter((t) => pyFileImports(projectDir, join(projectDir, t), targetRel, t))
-    : listTestFiles(projectDir).filter((t) => fileImports(projectDir, join(projectDir, t), targetRel));
-  return { importing, ...classifyDefenders(projectDir, targetRel, importing) };
+const explicitFiles = (projectDir, testUniverse) => {
+  if (testUniverse === undefined) return null;
+  if (!Array.isArray(testUniverse) && !Object.isFrozen(testUniverse)) throw new TypeError('explicit test universe manifest must be immutable');
+  const files = Array.isArray(testUniverse) ? testUniverse : testUniverse?.files;
+  if (!Array.isArray(files)) throw new TypeError('explicit test universe must be an array or a manifest with files');
+  if (!Object.isFrozen(files)) throw new TypeError('explicit test universe must be immutable');
+  return normalizeDiscoveredFiles(projectDir, files);
+};
+
+export function discoverDefendersDetailed(projectDir, targetRel, testUniverse) {
+  const explicit = explicitFiles(projectDir, testUniverse);
+  const candidates = explicit ?? (isPython(targetRel) ? listTestFiles(projectDir, PY_TEST_GLOBS) : listTestFiles(projectDir));
+  if (isPython(targetRel)) {
+    const pythonCandidates = candidates.filter((t) => t.endsWith('.py'));
+    const importing = pythonCandidates.filter((t) => pyFileImports(projectDir, join(projectDir, t), targetRel, t));
+    return { importing, ...classifyDefenders(projectDir, targetRel, importing), indeterminate: [], dependencies: pythonCandidates, relations: new Map() };
+  }
+
+  const relations = new Map();
+  const importing = [];
+  const indeterminate = [];
+  const jsCandidates = candidates.filter((candidate) => !candidate.endsWith('.py'));
+  // Every candidate's source participates in the negative discovery result:
+  // editing an unrelated test so it starts importing the target must invalidate
+  // a prior `nocover`, not silently reuse it.
+  const dependencies = new Set(jsCandidates);
+  for (const file of jsCandidates) {
+    const relation = fileImportRelation(projectDir, join(projectDir, file), targetRel);
+    relations.set(file, relation);
+    for (const dependency of relation.dependencies) dependencies.add(dependency);
+    if (relation.status === 'matched') importing.push(file);
+    else if (relation.status === 'indeterminate') indeterminate.push({ file, reason: relation.reason, issues: relation.issues ?? [] });
+  }
+  return {
+    importing,
+    ...classifyDefenders(projectDir, targetRel, importing, relations),
+    indeterminate,
+    dependencies: [...dependencies].sort(),
+    relations,
+  };
 }
 
-export function discoverDefenders(projectDir, targetRel) {
-  return discoverDefendersDetailed(projectDir, targetRel).canDetect;
+export function discoverDefenders(projectDir, targetRel, testUniverse) {
+  return discoverDefendersDetailed(projectDir, targetRel, testUniverse).canDetect;
 }

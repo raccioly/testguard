@@ -67,7 +67,7 @@ function expectMentions(source, bindings) {
  * an unasserted mock with a reason (`// unasserted: <why>` on or above the
  * mock line).
  */
-export function analyzeDefender(projectDir, testRel, targetRel) {
+export function analyzeDefender(projectDir, testRel, targetRel, relation) {
   const abs = join(projectDir, testRel);
   let source;
   try {
@@ -75,7 +75,16 @@ export function analyzeDefender(projectDir, testRel, targetRel) {
   } catch {
     return { file: testRel, imports: false, mocks: false, asserted: false, annotation: null };
   }
-  const matchesTarget = (spec) => specifierResolvesTo(projectDir, abs, spec, targetRel);
+  // A symbol-level witness can pass through one or more barrels. Mocking any
+  // module on that witnessed path replaces the subject just as surely as
+  // mocking the leaf itself, so it must disqualify the candidate. Declared
+  // defenders do not supply a witness and retain the direct, author-chosen
+  // semantics.
+  const witnessedModules = relation?.status === 'matched'
+    ? [...new Set(relation.paths.flatMap((path) => path.slice(1)))]
+    : [];
+  const matchesTarget = (spec) => specifierResolvesTo(projectDir, abs, spec, targetRel)
+    || witnessedModules.some((moduleRel) => specifierResolvesTo(projectDir, abs, spec, moduleRel));
   const mocks = mockSpecifiers(source).filter((m) => matchesTarget(m.specifier));
   const bindings = bindingsFor(source, matchesTarget);
   const asserted = expectMentions(source, bindings);
@@ -104,13 +113,13 @@ function matchesTargetAnyImport(source, matchesTarget) {
  * the target carries `mocked-never-asserted`, unless annotated, in which case
  * the annotation is recorded (`unasserted-annotated`) — silenced, never hidden.
  */
-export function classifyDefenders(projectDir, targetRel, candidates) {
+export function classifyDefenders(projectDir, targetRel, candidates, relations = new Map()) {
   if (targetRel.endsWith('.py')) return classifyPythonDefenders(projectDir, targetRel, candidates);
   const canDetect = [];
   const mocking = [];
   const signals = [];
   for (const file of candidates) {
-    const a = analyzeDefender(projectDir, file, targetRel);
+    const a = analyzeDefender(projectDir, file, targetRel, relations.get(file));
     if (a.mocks) {
       mocking.push(file);
       if (!a.asserted) signals.push(a.annotation ? { file, signal: 'unasserted-annotated', reason: a.annotation } : { file, signal: 'mocked-never-asserted' });
