@@ -694,6 +694,16 @@ talks to the network; only the job posts, and only when told to.
 - **Never optimistic.** A timeout, a load failure, a mixed N-run result, a
   flaky defender or a missing anchor is reported as unproven, never rounded
   toward green. The one pass is `killed`; everything else gates.
+- **Per-run and whole-command time are separate.** `--budget` limits each
+  runner invocation. `--command-budget` optionally limits the complete
+  `probe`, `sweep`, or `replay` measurement. If that total expires, TestGuard exits `2`
+  and writes no new result document; a completed prefix is not presented as
+  though the unattempted suffix were clean.
+- **Configured discovery is evidence.** Vitest, Jest, and Playwright enumerate
+  their own configured files; TestGuard validates and hashes that immutable
+  universe instead of guessing with filename globs. Automatic JavaScript and
+  TypeScript discovery follows the imported symbol through barrels. Ambiguous
+  or unbounded resolution is `unverifiable`, never a flattering `nocover`.
 - **One exact-pinned runtime dependency** (`ajv`), Node ≥ 20, MIT.
 
 ### Prior art, and what was taken from where

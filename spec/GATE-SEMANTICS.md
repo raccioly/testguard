@@ -12,7 +12,7 @@ The verdict set is closed. Only one value is a pass.
 | `killed` | Fault applied; every one of N probe runs failed with a genuine assertion failure, on a defender set that was green N/N unmodified. | no |
 | `survived` | Fault applied; every one of N probe runs passed. The claim is **unproven**. | **yes** |
 | `nocover` | No defending test exists: the declared globs resolve to nothing, or no test imports the subject. Worse than `survived` — nothing was even tried. | **yes** |
-| `unverifiable` | The claim could not be probed: the fault's anchor is missing or ambiguous, its defenders failed to load (`defenders-failed-to-load`), probing it threw (`probe-error`), or the defenders do not execute the subject at all (`subject-not-executed`). Carries a `reason`. A loud, gating verdict — a claim that cannot be probed is not "skipped", it is undefended until someone fixes the fault or the defenders. Never confused with `flaky-defender`, which requires tests that *ran*. | **yes** |
+| `unverifiable` | The claim could not be probed: the fault's anchor is missing or ambiguous, configured or symbol-level defender discovery was indeterminate (`defender-discovery-indeterminate`), its defenders failed to load (`defenders-failed-to-load`), probing it threw (`probe-error`), or the defenders do not execute the subject at all (`subject-not-executed`). Carries a `reason`. A loud, gating verdict — a claim that cannot be probed is not "skipped", it is undefended until someone fixes the fault or the defenders. Never confused with `flaky-defender`, which requires tests that *ran*. | **yes** |
 | `timeout` | Probe run exceeded its budget. Not counted as a kill; the pessimistic reading is the safe one because flakiness biases the metric optimistically. | **yes** |
 | `fault-invalid` | The replacement does not load or compile. A bad fault, not a detection. | **yes** |
 | `flaky-defender` | Defenders were not green N/N on unmodified source (`defenders-not-green`), or the N probe runs disagreed with each other (`inconsistent-probe`). Either way no verdict about the fault can be trusted; fix the defenders first. | **yes** |
@@ -151,7 +151,43 @@ Rules that follow from the table:
    can name the file the interpreter loaded) answers the same question more
    precisely for one language; where both are present they must agree.
 
-13. **Fault injection is one method, not the definition.** A claim declares
+13. **The configured runner defines the test universe.** For JavaScript and
+   TypeScript, defender discovery, baseline runs and escalation use the exact
+   file set returned by the resolved runner's native listing protocol. A
+   resolvable runner whose configuration cannot load, whose listing times out
+   or is malformed, or whose reported paths escape the project is a
+   precondition failure. It never falls back to built-in filename globs and
+   never becomes `nocover`. An explicitly selected runner that lists zero
+   files is also a precondition failure; `auto` may continue past a successful
+   empty listing, but must fail when every eligible runner is empty.
+   `inputs.testUniverseHash` binds the normalized file set, runner identity,
+   and hashed configuration dependencies. Those dependencies include absent
+   root candidates, nested workspace configs, Python collection hooks, and the
+   bounded static closure of local or package-imported config helpers and setup
+   files; creating or editing any of them forces remeasurement. Evidence that
+   predates this hash, or whose hash
+   changed, is readable but never reusable for a current native discovery run.
+   When several configured runners list defenders, exact manifest membership
+   assigns each file. An owned runner takes precedence over the project runner;
+   competing owned runners or a declared defender absent from every manifest
+   are precondition failures, never heuristic routing decisions.
+
+14. **Barrel resolution follows symbols, not module reachability.** Automatic
+   discovery may traverse a re-export chain only for the binding the test
+   actually imports. Importing an unrelated symbol from a broad barrel does
+   not defend every file the barrel exports. Renames, explicit exports and
+   star exports are resolved deterministically; type-only paths do not count.
+   Ambiguous origins, unsupported runtime-generated exports, graph-limit
+   exhaustion, and originless cycles are `unverifiable` with reason
+   `defender-discovery-indeterminate`, never `nocover`. A declared
+   `defendedBy` remains authoritative. `inputs.discoveryHashes` binds every
+   candidate test, intermediate barrel, and resolver-configuration file
+   consulted by automatic discovery. Negative candidates are dependencies too:
+   editing a previously unrelated test so it begins importing the target must
+   invalidate an earlier `nocover`. Absent or changed dependencies force
+   remeasurement.
+
+15. **Fault injection is one method, not the definition.** A claim declares
    what must be true; a probe declares how a tool would try to make it false,
    and `method` says which way. `fault-injection` — mutate the source, run the
    claim's defenders, confirm over N runs — is the only method specified in
@@ -184,6 +220,22 @@ Rules that follow from the table:
    The verdict set stays closed and shared. What each method may legitimately
    report is part of defining it.
 
+## Per-run and whole-command budgets are different
+
+`--budget` remains the wall-clock ceiling for one runner invocation. An
+optional `--command-budget` is the ceiling for the complete `probe`, `sweep`,
+or `replay` measurement, including discovery and setup through construction of
+the complete result. Every child process is given no more than the command's
+remaining time. Cleanup and result serialization are not interruptible; they
+begin only after the completed result has cleared the deadline.
+
+Exhausting the whole-command budget is not a test verdict and is never a
+successful partial measurement. The command exits `2` and writes no new
+result document; any previous document remains untouched. Cleanup may finish
+after the deadline, but no record from the incomplete operation becomes
+evidence. This is deliberately stricter than a per-run timeout: publishing
+the completed prefix would let the unattempted suffix look clean.
+
 ## Replay reports; it never gates
 
 A replayed bug is history. It escaped, by definition, which means the suite
@@ -198,7 +250,7 @@ Its verdicts mirror the probe's, for the same reasons:
 | `caught` | a remaining test failed **by assertion** on the reverted source, every run. The suite knew. |
 | `blind` | the suite stayed green on known-broken code. |
 | `nocover` | no test imports the reverted files, **and at least one test file remained to ask**. Worse than `blind`: nothing was even tried. |
-| `unverifiable` | the revert did not apply, the suite failed to load, it timed out, or removing the fix's own test left **no test file at all** (`the-fix-shipped-the-only-test-file`). Carries a `reason`. |
+| `unverifiable` | the revert did not apply, configured or symbol-level defender discovery was indeterminate (`defender-discovery-indeterminate`), the suite failed to load, it timed out, or removing the fix's own test left **no test file at all** (`the-fix-shipped-the-only-test-file`). Carries a `reason`. |
 | `flaky` | the runs disagreed. A flaky failure reads as "the suite caught it", so flakiness biases this metric **optimistically** — mixed runs are never `caught`. |
 
 Two rules that follow:

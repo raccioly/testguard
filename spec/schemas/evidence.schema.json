@@ -641,6 +641,20 @@
               "additionalProperties": {
                 "$ref": "urn:claimspec:v1:common#/$defs/sha256"
               }
+            },
+            "testUniverseHash": {
+              "description": "Canonical hash of the runner-native test universe and the configuration files that produced it. Optional for backward compatibility; current probes emit it, and evidence without it is never reusable against a configured discovery run.",
+              "$ref": "urn:claimspec:v1:common#/$defs/sha256"
+            },
+            "discoveryHashes": {
+              "description": "Content hashes of candidate tests, intermediate barrels, and resolver-configuration files consulted by automatic defender discovery. This includes negative candidates: a test edited to begin importing the target must invalidate an earlier `nocover`. Optional for backward compatibility; a changed or absent dependency forces remeasurement.",
+              "type": "object",
+              "propertyNames": {
+                "$ref": "urn:claimspec:v1:common#/$defs/repoPath"
+              },
+              "additionalProperties": {
+                "$ref": "urn:claimspec:v1:common#/$defs/sha256"
+              }
             }
           },
           "additionalProperties": false

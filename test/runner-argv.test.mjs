@@ -28,9 +28,14 @@ function projectWith(pkg) {
   const dir = mkdtempSync(join(tmpdir(), `tg-argv-${pkg}-`));
   const mod = join(dir, 'node_modules', pkg);
   mkdirSync(join(mod, 'bin'), { recursive: true });
+  mkdirSync(join(dir, 'test'));
   writeFileSync(join(mod, 'package.json'), JSON.stringify({ name: pkg, version: '9.9.9', bin: { [pkg]: `bin/${pkg}.js` } }));
-  writeFileSync(join(mod, 'bin', `${pkg}.js`), '#!/usr/bin/env node\n');
+  const listed = pkg === 'jest'
+    ? 'process.stdout.write(JSON.stringify([require("node:path").join(process.cwd(), "test/a.test.js")]))'
+    : 'process.stdout.write(require("node:path").join(process.cwd(), "test/a.test.js") + "\\n")';
+  writeFileSync(join(mod, 'bin', `${pkg}.js`), `#!/usr/bin/env node\n${listed};\n`);
   writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'p', devDependencies: { [pkg]: '9.9.9' } }));
+  writeFileSync(join(dir, 'test', 'a.test.js'), '');
   return dir;
 }
 
@@ -97,11 +102,9 @@ describe('the command line starts with the binary resolved for THIS project', ()
 /**
  * Runner selection, without a fixture probe.
  *
- * `selectRunner` resolves; the expensive part of proving it is spawning the
- * runners it resolves to. The rules that do not need a spawn — an unknown name
- * is a usage error rather than a silent fallback, and `auto` tries the
- * documented order — are pure enough to assert here, which is what stops a
- * claim about a one-line guard from paying a 33-second jest fixture probe.
+ * `selectRunner` resolves and invokes the runner's native listing command.
+ * The tiny fixture binaries above emit deterministic lists so the selection
+ * contract is tested without paying for a full runner invocation.
  */
 describe('selectRunner', () => {
   it('an unknown name is a usage error, never a silent fallback to a runner that happens to resolve', async () => {

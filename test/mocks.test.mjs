@@ -66,4 +66,18 @@ describe('classifyDefenders', () => {
       { file: 'test/greet-jest.test.js', signal: 'mocked-never-asserted' },
     ]);
   });
+
+  it('treats a mocked barrel on a symbol witness path as mocking the target', () => {
+    write('src/services/index.ts', "export { isOpen } from './schedule';\n");
+    write('test/barrel.test.ts', "import { vi, expect } from 'vitest';\nimport { isOpen } from '../src/services/index';\nvi.mock('../src/services/index');\nexpect(isOpen).toBeDefined();\n");
+    const relation = {
+      status: 'matched',
+      bindings: ['isOpen'],
+      paths: [['test/barrel.test.ts', 'src/services/index.ts', 'src/services/schedule.ts']],
+      dependencies: ['src/services/index.ts', 'src/services/schedule.ts', 'test/barrel.test.ts'],
+    };
+    const result = classifyDefenders(dir, 'src/services/schedule.ts', ['test/barrel.test.ts'], new Map([['test/barrel.test.ts', relation]]));
+    expect(result.canDetect).toEqual([]);
+    expect(result.mocking).toEqual(['test/barrel.test.ts']);
+  });
 });

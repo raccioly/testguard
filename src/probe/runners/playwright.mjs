@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join, relative, resolve, sep } from 'node:path';
-import { npx, runProcess, listTestFiles, firstInformativeLine } from './shared.mjs';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { npx, runProcess, listTestFiles, firstInformativeLine, runnerArgv } from './shared.mjs';
+import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs, normalizeDiscoveredFiles, runDiscoveryReportProcess } from './discovery.mjs';
 import { globToRegExp } from '../../util/glob.mjs';
 
 /**
@@ -88,6 +89,61 @@ export async function check({ projectDir }) {
 }
 
 export const tests = (projectDir) => listTestFiles(projectDir, SPEC_GLOBS).filter((f) => owns(projectDir, f));
+const DISCOVERY_CONFIG_FILES = ['ts', 'mts', 'cts', 'js', 'mjs', 'cjs'].map((ext) => `playwright.config.${ext}`);
+
+/** Ask Playwright itself to load config/projects and list without executing. */
+export const discoveryArgvFor = (projectDir) => [...runnerArgv(projectDir, '@playwright/test', 'playwright'), 'test', '--list', '--reporter=json'];
+
+export function parseDiscoveryReport(report) {
+  if (report == null || typeof report !== 'object' || Array.isArray(report) || !Array.isArray(report.suites)) {
+    throw new DiscoveryError('Playwright discovery report must contain a suites array');
+  }
+  if (report.errors !== undefined && !Array.isArray(report.errors)) {
+    throw new DiscoveryError('Playwright discovery report errors must be an array');
+  }
+  if (Array.isArray(report.errors) && report.errors.length > 0) {
+    const message = report.errors.map((error) => error?.message ?? String(error)).find(Boolean);
+    throw new DiscoveryError(`Playwright discovery failed${message ? `: ${firstInformativeLine(message)}` : ''}`);
+  }
+  const files = [];
+  const walk = (suite) => {
+    if (typeof suite?.file === 'string' && suite.file.length > 0) files.push(suite.file);
+    for (const spec of suite?.specs ?? []) {
+      if (typeof spec?.file === 'string' && spec.file.length > 0) files.push(spec.file);
+    }
+    for (const child of suite?.suites ?? []) walk(child);
+  };
+  for (const suite of report.suites) walk(suite);
+  return files;
+}
+
+export async function discoverTests({ projectDir, version, timeoutMs, maxOutputBytes } = {}) {
+  const before = hashDiscoveryConfigs(projectDir, DISCOVERY_CONFIG_FILES);
+  const { report } = await runDiscoveryReportProcess({
+    projectDir,
+    argv: discoveryArgvFor(projectDir),
+    timeoutMs,
+    maxOutputBytes,
+    env: { PLAYWRIGHT_JSON_OUTPUT_FILE: '{out}', PLAYWRIGHT_JSON_OUTPUT_NAME: '{out}' },
+  });
+  const configFiles = hashDiscoveryConfigs(projectDir, DISCOVERY_CONFIG_FILES);
+  if (JSON.stringify(configFiles) !== JSON.stringify(before)) throw new DiscoveryError('Playwright discovery config changed while tests were being listed');
+  const cfg = loadConfig(projectDir);
+  const reported = parseDiscoveryReport(report).map((file) => {
+    if (isAbsolute(file)) return file;
+    const fromRoot = resolve(projectDir, file);
+    const fromTestDir = resolve(projectDir, cfg?.testDir ?? '.', file);
+    const rootExists = existsSync(fromRoot);
+    const testDirExists = existsSync(fromTestDir);
+    if (rootExists && testDirExists && fromRoot !== fromTestDir) {
+      throw new DiscoveryError(`Playwright discovery path is ambiguous between the project and testDir: ${file}`);
+    }
+    if (testDirExists) return fromTestDir;
+    return file;
+  });
+  const files = normalizeDiscoveredFiles(projectDir, reported);
+  return createDiscoveryManifest({ runner: name, version, files, configFiles });
+}
 
 /**
  * Playwright's JSON report → the spec's testRun. Pure; exported for the

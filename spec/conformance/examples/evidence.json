@@ -165,7 +165,9 @@
         "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "defenderHashes": {
           "test/redact.test.mjs": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        }
+        },
+        "testUniverseHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "discoveryHashes": {}
       },
       "rank": {
         "score": 9.5,

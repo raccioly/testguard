@@ -266,7 +266,7 @@
     },
     {
       "id": "TG-DISCOVERY-BY-IMPORT",
-      "statement": "With no defendedBy, the defenders are the test files that import the fault's target.",
+      "statement": "With no defendedBy, the defenders are configured test files whose imported symbol resolves to the fault's target.",
       "source": {
         "kind": "spec",
         "ref": "spec/schemas/claims.schema.json defendedBy"
@@ -283,11 +283,11 @@
       "faults": [
         {
           "id": "F1",
-          "description": "Every test file counts as an importer of the target; discovery no longer depends on the import.",
-          "faultClass": "statement-deleted",
+          "description": "Every configured test file counts as an importer of the target; discovery no longer depends on the symbol relation.",
+          "faultClass": "condition-forced",
           "file": "src/probe/discover.mjs",
-          "find": "    : listTestFiles(projectDir).filter((t) => fileImports(projectDir, join(projectDir, t), targetRel));",
-          "replace": "    : listTestFiles(projectDir);",
+          "find": "    if (relation.status === 'matched') importing.push(file);",
+          "replace": "    if (true) importing.push(file);",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -1585,11 +1585,11 @@
       "faults": [
         {
           "id": "F1",
-          "description": "The owning runner's check is ignored; its defenders run under a binary that is not there and the failure becomes a verdict.",
-          "faultClass": "condition-forced",
+          "description": "A declared defender absent from every resolved manifest is assigned to the primary runner, so an unavailable owning runner becomes a verdict.",
+          "faultClass": "other",
           "file": "src/probe/probe.mjs",
-          "find": "      if (!c.ok) throw new PreconditionError(`${file} is a ${r.name} test",
-          "replace": "      if (false) throw new PreconditionError(`${file} is a ${r.name} test",
+          "find": "        const excluded = declared.filter((file) => !ownerByFile.has(file));",
+          "replace": "        const excluded = [];\n        for (const file of declared) if (!ownerByFile.has(file)) ownerByFile.set(file, runner);",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -4904,10 +4904,10 @@
         {
           "id": "F1",
           "description": "A .py target is resolved with the JavaScript importer, which wants a quoted specifier and never matches `from pkg.mod import x`; the defender set is always empty and every Python bug reports as uncovered.",
-          "faultClass": "argument-swapped",
+          "faultClass": "condition-forced",
           "file": "src/replay/replay.mjs",
-          "find": "      ? pyFileImports(iso.projectDir, join(iso.projectDir, t), target, t)",
-          "replace": "      ? fileImports(iso.projectDir, join(iso.projectDir, t), target)",
+          "find": "        matched ||= test.endsWith('.py') && pyFileImports(iso.projectDir, join(iso.projectDir, test), target, test);",
+          "replace": "        matched ||= false;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -5040,6 +5040,431 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-23T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COMMAND-BUDGET-NEVER-PUBLISHES-A-PARTIAL",
+      "statement": "A whole-command deadline caps every child runner at the remaining time and, once exhausted, aborts the operation before any partial result can be published as complete.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#per-run-and-whole-command-budgets-are-different"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-27T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/command-budget.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Deadline exhaustion no longer aborts the command, allowing the completed prefix to continue toward a result document.",
+          "faultClass": "condition-forced",
+          "file": "src/command-budget.mjs",
+          "find": "    if (this.remainingMs() === 0) {",
+          "replace": "    if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Child runners receive their full per-run budget even when it exceeds the command's remaining wall-clock allowance.",
+          "faultClass": "return-altered",
+          "file": "src/command-budget.mjs",
+          "find": "    return Math.max(1, Math.min(perRunMs, Math.floor(this.remainingMs())));",
+          "replace": "    return perRunMs;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-NATIVE-DISCOVERY-REJECTS-PATH-ESCAPES",
+      "statement": "Runner-native discovery accepts only regular files whose real paths remain inside the project; an escaped or malformed universe is a precondition failure, never a fallback to guessed globs.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-27T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/runner-discovery.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A runner-reported symlink or absolute path may escape the project and still enter the test universe.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    if (outside(realRoot, real)) throw new DiscoveryError(`native test discovery path resolves outside the project: ${reported}`);",
+          "replace": "    if (false) throw new DiscoveryError(`native test discovery path resolves outside the project: ${reported}`);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-INDETERMINATE-DISCOVERY-IS-NEVER-NOCOVER",
+      "statement": "An ambiguous or bounded-out symbol relation remains explicit and produces unverifiable with defender-discovery-indeterminate; it never becomes a nocover claim about the project.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-27T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/discover.test.mjs",
+        "test/probe-error.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Indeterminate symbol relations are discarded, making an unknown defender look absent.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/discover.mjs",
+          "find": "    else if (relation.status === 'indeterminate') indeterminate.push({ file, reason: relation.reason, issues: relation.issues ?? [] });",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The fail-closed discovery record labels the unresolved target as nocover.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/probe.mjs",
+          "find": "resolved: defenders, nocover: false,",
+          "replace": "resolved: defenders, nocover: true,",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-REUSE-BINDS-DISCOVERY-INPUTS",
+      "statement": "A prior verdict is reusable only when both the configured test universe and every automatic-discovery dependency are unchanged.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-27T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/attribution.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A changed configured test universe can reuse a verdict measured against a different set of tests.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/attribution.mjs",
+          "find": "    && same(prior.inputs.testUniverseHash, current.inputs.testUniverseHash)",
+          "replace": "    && true",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A changed barrel or negative discovery candidate can reuse a verdict measured through the old dependency graph.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/attribution.mjs",
+          "find": "    && same(prior.inputs.discoveryHashes, current.inputs.discoveryHashes)",
+          "replace": "    && true",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-DISCOVERY-CONFIG-CLOSURE-INVALIDATES-REUSE",
+      "statement": "A configured test universe is bound to absent root candidates, nested workspace configs, and the bounded static closure of imported config helpers and setup files.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 13"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-27T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/runner-discovery.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Previously absent root configs are omitted, allowing their later creation to reuse an older universe hash.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "  const entries = new Map(rootCandidates.map((path) => [path, { path, sha256: ABSENT_CONFIG_HASH }]));",
+          "replace": "  const entries = new Map();",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Imported config helpers and setup files are not added to the hashed dependency closure.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    if (!seen.has(dependencyName) && !queued.includes(dependencyName)) queued.push(dependencyName);",
+          "replace": "    if (false) queued.push(dependencyName);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Package-imported config helpers are omitted from the configuration hash closure.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    for (const specifier of references.imports) {",
+          "replace": "    for (const specifier of []) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Nested Python collection hooks are omitted from the configured test-universe hash.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    if (runnerConfigFiles.includes('conftest.py')) {",
+          "replace": "    if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-REPLAY-RUNNER-OWNERSHIP-IS-MANIFEST-BOUND",
+      "statement": "Replay assigns every defender by exact frozen manifest membership, gives an owned runner precedence over primary overlap, and refuses ambiguous or absent ownership.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#replay-reports-it-never-gates"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-27T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/replay-mixed-runners.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Primary membership incorrectly wins when an owned runner also natively lists the defender.",
+          "faultClass": "argument-swapped",
+          "file": "src/replay/replay.mjs",
+          "find": "      ownerByFile.set(file, owner);",
+          "replace": "      ownerByFile.set(file, previous ?? owner);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A defender absent from every frozen runner manifest is routed anyway.",
+          "faultClass": "condition-forced",
+          "file": "src/replay/replay.mjs",
+          "find": "    if (!owner) throw new PreconditionError(`${file} is not in any resolved runner's configured test universe`);",
+          "replace": "    if (false) throw new PreconditionError(`${file} is not in any resolved runner's configured test universe`);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RUNNER-TIMEOUT-KILLS-DESCENDANTS",
+      "statement": "A timed-out runner is not considered stopped until TestGuard has terminated its complete descendant process tree, including detached descendants.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#per-run-and-whole-command-budgets-are-different"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-27T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/runner-vitest.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Detached descendants are omitted from timeout termination and can mutate the project after TestGuard returns.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "  for (const pid of descendantPids(child.pid)) {",
+          "replace": "  for (const pid of []) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-GENERATED-COMMONJS-FAILS-CLOSED",
+      "statement": "Runtime-generated CommonJS export surfaces remain indeterminate unless the resolver models them; they can never support a negative nocover conclusion.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 14"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-27T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/imports.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Generated CommonJS export mutations are treated as a safely understood negative relation.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/imports.mjs",
+          "find": "  if (hasUnsupportedCommonJsExportMutation(tokens)) module.uncertain.push('unsupported-syntax');",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-DIRTY-PREFLIGHT-USES-FULL-NATIVE-UNIVERSE",
+      "statement": "Dirty-tree preflight resolves the same primary-plus-owned native manifests as measurement and refuses any dirty defender or config input that scratch HEAD would replace.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 13"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-27T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/probe-preconditions.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Owned-runner manifests are omitted, hiding dirty custom-named defenders from preflight.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "            manifests.set(candidate, await discoverRunnerManifest(candidate, check, projectDir, budgetFor()));",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Playwright paths relative to testDir are interpreted at the project root and disappear from the native manifest.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/playwright.mjs",
+          "find": "    if (testDirExists) return fromTestDir;",
+          "replace": "    if (testDirExists) return file;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PYTHON-RESOLUTION-CONSUMES-LIVE-DEADLINE",
+      "statement": "Each Python interpreter fallback is bounded by the whole command's current remaining time, never by a stale allowance captured before earlier candidates ran.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#per-run-and-whole-command-budgets-are-different"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-27T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/runner-python.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every interpreter fallback receives the same original allowance instead of recomputing the remaining deadline.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/python.mjs",
+          "find": "      const answer = await ask(candidate.path, budgetFor ? budgetFor() : budgetMs);",
+          "replace": "      const answer = await ask(candidate.path, budgetMs);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-27T00:00:00Z"
           }
         }
       ]

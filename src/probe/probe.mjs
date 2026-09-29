@@ -3,13 +3,13 @@ import { git } from '../git.mjs';
 import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { repoRoot as gitRoot, headSha, isDirty, snapshotWorkingTree } from '../git.mjs';
-import { discoverDefenders, discoverDefendersDetailed } from './discover.mjs';
+import { discoverDefendersDetailed } from './discover.mjs';
 import { classifyDefenders } from './mocks.mjs';
 import { detectContention, contentionWarning } from './contention.mjs';
 import { createScratch, inPlace, PreconditionError } from './worktree.mjs';
 import { applyContent, applyFault, locate } from './inject.mjs';
 import { resolveDefenders, parseCommandTemplate } from './runners/shared.mjs';
-import { selectRunner, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns, runnerLabel, runnerFor } from './runners/index.mjs';
+import { selectRunner, discoverRunnerManifest, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns, runnerLabel, runnerFor } from './runners/index.mjs';
 import { classify, shouldStopEarly } from './classify.mjs';
 import { blastRadius, rank } from './rank.mjs';
 import { classifyIndependence } from './independence.mjs';
@@ -66,6 +66,7 @@ export async function probe({
   serial = false,
   onWarn = () => {},
   budgetMs = 120_000,
+  commandBudget,
   runnerCommand,
   runnerName = 'auto',
   nodeModules,
@@ -79,6 +80,7 @@ export async function probe({
   previous,
   onProgress = () => {},
 }) {
+  commandBudget?.assertOpen();
   // realpath: git reports the repository root by its real path (/private/var
   // on macOS, not /var); every relative() below must start from the same place.
   projectDir = realpathSync(resolve(projectDir));
@@ -109,12 +111,50 @@ export async function probe({
       if (isDirty(root)) snapshot = snapshotWorkingTree(root);
     } else {
       const watched = new Set(targets);
+      const dirtyPaths = git(['status', '--porcelain'], root).split('\n').filter(Boolean).map((l) => l.replace(/^[ MADRCU?!]{1,2}\s+/, '').replace(/^.* -> /, ''));
+      let configuredFiles;
+      // Use the same exact primary + owned native universes as measurement.
+      // A dirty custom-named Playwright test or imported config helper must be
+      // refused before the scratch tree silently substitutes HEAD's version.
+      if (dirtyPaths.length && !runnerCommand) {
+        const budgetFor = () => commandBudget?.runBudget(budgetMs) ?? budgetMs;
+        const selected = await selectRunner({ projectDir, sourceDir: projectDir, python, name: runnerName, budgetMs: budgetFor(), budgetFor });
+        commandBudget?.assertOpen();
+        if (selected.error) throw new PreconditionError(`cannot verify dirty defender/config inputs because test discovery failed (${selected.error})`);
+        const manifests = new Map([[selected.runner, selected.manifest]]);
+        const primaryIsPython = ['python', 'pytest', 'unittest'].includes(selected.runner.name);
+        const owned = OWNED_RUNNERS.filter((candidate) => candidate !== selected.runner && !(candidate.name === 'python' && primaryIsPython));
+        for (const candidate of owned) {
+          const check = await candidate.check({ projectDir, sourceDir: projectDir, python, budgetMs: budgetFor(), budgetFor });
+          commandBudget?.assertOpen();
+          if (!check.ok) continue;
+          try {
+            manifests.set(candidate, await discoverRunnerManifest(candidate, check, projectDir, budgetFor()));
+          } catch (error) {
+            throw new PreconditionError(`cannot verify dirty defender/config inputs because ${candidate.name} discovery failed (${error.message})`);
+          }
+        }
+        configuredFiles = Object.freeze([...new Set([...manifests.values()].flatMap((manifest) => manifest.files))].sort());
+        for (const manifest of manifests.values()) {
+          for (const file of manifest.files) watched.add(relative(root, join(projectDir, file)));
+          for (const config of manifest.configFiles) {
+            if (!config.path.startsWith('@module/')) watched.add(relative(root, join(projectDir, config.path)));
+          }
+        }
+      }
       for (const claim of scopedClaims) {
-        const declared = claim.defendedBy?.length ? resolveDefenders(projectDir, claim.defendedBy) : claim.faults.flatMap((f) => discoverDefenders(projectDir, f.file));
+        const discovered = claim.defendedBy?.length ? null : claim.faults.map((fault) => discoverDefendersDetailed(projectDir, fault.file, configuredFiles));
+        const declared = claim.defendedBy?.length ? resolveDefenders(projectDir, claim.defendedBy) : discovered.flatMap((detail) => detail.canDetect);
         for (const d of declared) watched.add(relative(root, join(projectDir, d)));
+        for (const dependency of discovered?.flatMap((detail) => detail.dependencies) ?? []) watched.add(relative(root, join(projectDir, dependency)));
         for (const g of claim.defendedBy ?? []) if (!g.includes('*')) watched.add(relative(root, join(projectDir, g)));
       }
-      const dirty = git(['status', '--porcelain', '--', ...watched], root).split('\n').filter(Boolean).map((l) => l.replace(/^[ MADRCU?!]{1,2}\s+/, '').replace(/^.* -> /, ''));
+      for (const config of [
+        'package.json', 'pnpm-workspace.yaml', 'pnpm-workspace.yml', 'lerna.json', 'nx.json', 'turbo.json', 'rush.json', 'workspace.json',
+        ...['js', 'mjs', 'cjs', 'ts', 'mts', 'cts'].flatMap((ext) => [`vitest.config.${ext}`, `vite.config.${ext}`, `vitest.workspace.${ext}`, `jest.config.${ext}`, `playwright.config.${ext}`]),
+        'vitest.workspace.json',
+      ]) watched.add(relative(root, join(projectDir, config)));
+      const dirty = dirtyPaths.filter((path) => watched.has(path));
       if (dirty.length && !refExplicit && !ignoreDirty) {
         throw new PreconditionError(`${dirty.length} defender/target file${dirty.length === 1 ? ' has' : 's have'} uncommitted changes (${dirty.join(', ')}); worktree mode probes HEAD (${head.slice(0, 7)}), so those changes would be silently ignored. Commit them, run with --include-dirty to probe the working tree, use --in-place, or --ignore-dirty if you mean HEAD as committed.`);
       }
@@ -135,6 +175,7 @@ export async function probe({
   const records = [];
   let runnerVersion;
   let runnerSource;
+  let primaryManifest;
   let runner = RUNNERS[runnerName === 'auto' ? 'vitest' : runnerName];
   // A runner with more than one engine (Python: pytest or unittest) is recorded
   // by the engine that actually ran, never by the module's name. TestGuard does
@@ -146,7 +187,8 @@ export async function probe({
     const commandTemplate = runnerCommand ? parseCommandTemplate(runnerCommand) : undefined;
     if (!commandTemplate) {
       // An unresolvable runner is a precondition failure, not a flaky defender.
-      const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, python, name: runnerName });
+      const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, python, name: runnerName, budgetMs, budgetFor: () => commandBudget?.runBudget(budgetMs) ?? budgetMs });
+      commandBudget?.assertOpen();
       if (sel.error) {
         throw new PreconditionError(`test runner is not resolvable in the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${sel.error}). ` +
           (mode === 'worktree' ? 'No usable node_modules was linked: pass --node-modules <path>, or run with --in-place.' : 'Install dependencies first.'));
@@ -154,22 +196,66 @@ export async function probe({
       runner = sel.runner;
       runnerVersion = sel.version;
       runnerSource = sel.source;
+      primaryManifest = sel.manifest;
       if (sel.engine) engines.set(sel.runner, sel.engine);
     }
     runnersUsed.set(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name));
     // Files an owning runner (Playwright) claims run under it, whatever the
     // project runner is; it must resolve before the first such defender runs.
-    const owned = OWNED_RUNNERS.filter((r) => r !== runner);
+    const owned = OWNED_RUNNERS.filter((r) => r !== runner
+      && !(r.name === 'python' && ['python', 'pytest', 'unittest'].includes(runner.name)));
     const ownedChecked = new Map();
+    const manifests = new Map(primaryManifest ? [[runner, primaryManifest]] : []);
+    if (!commandTemplate) {
+      for (const r of owned) {
+        const check = await r.check({ projectDir: iso.projectDir, sourceDir: projectDir, python, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, budgetFor: () => commandBudget?.runBudget(budgetMs) ?? budgetMs });
+        commandBudget?.assertOpen();
+        ownedChecked.set(r, check);
+        if (!check.ok) continue;
+        try {
+          manifests.set(r, await discoverRunnerManifest(r, check, iso.projectDir, commandBudget?.runBudget(budgetMs) ?? budgetMs));
+        } catch (error) {
+          throw new PreconditionError(`${r.name}: test discovery failed: ${error.message}`);
+        }
+      }
+    }
     const ensureOwned = async (r, file) => {
-      if (!ownedChecked.has(r)) ownedChecked.set(r, await r.check({ projectDir: iso.projectDir, sourceDir: projectDir, python }));
+      if (!ownedChecked.has(r)) {
+        ownedChecked.set(r, await r.check({ projectDir: iso.projectDir, sourceDir: projectDir, python, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, budgetFor: () => commandBudget?.runBudget(budgetMs) ?? budgetMs }));
+        commandBudget?.assertOpen();
+      }
       const c = ownedChecked.get(r);
       if (!c.ok) throw new PreconditionError(`${file} is a ${r.name} test (${r.name === 'python' ? 'it is a .py file' : `it lives under ${r.name}'s testDir`}) but ${r.name} is not resolvable for the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${c.message}).`);
       if (c.engine) engines.set(r, c.engine);
       runnersUsed.set(labelOf(r), c.version);
     };
-    const allTests = [...new Set([...runner.tests(iso.projectDir).filter((t) => !owned.some((r) => r.owns(iso.projectDir, t))), ...owned.flatMap((r) => r.tests(iso.projectDir))])].sort();
+    const ownerByFile = new Map();
+    if (!commandTemplate) {
+      for (const file of manifests.get(runner)?.files ?? []) ownerByFile.set(file, runner);
+      for (const [owner, manifest] of manifests) {
+        if (owner === runner) continue;
+        for (const file of manifest.files) {
+          const previousOwner = ownerByFile.get(file);
+          if (previousOwner && previousOwner !== runner && previousOwner !== owner) {
+            throw new PreconditionError(`${file} was listed by both ${previousOwner.name} and ${owner.name}; TestGuard cannot choose which configured runner owns it.`);
+          }
+          // A per-file runner that natively lists a file owns it over a broad
+          // project runner that also collected it. Membership, never filename
+          // heuristics, makes that decision.
+          ownerByFile.set(file, owner);
+        }
+      }
+    }
+    const allTests = Object.freeze((commandTemplate
+      ? [...new Set([...runner.tests(iso.projectDir).filter((t) => !owned.some((r) => r.owns(iso.projectDir, t))), ...owned.flatMap((r) => r.tests(iso.projectDir))])]
+      : [...ownerByFile.keys()]).sort());
+    const testUniverseHash = commandTemplate
+      ? sha256(JSON.stringify({ schemaVersion: 1, source: 'custom-command-static', files: allTests }))
+      : sha256(JSON.stringify([...manifests]
+        .map(([r, manifest]) => ({ runner: r.name, hash: manifest.testUniverseHash }))
+        .sort((a, b) => a.runner.localeCompare(b.runner))));
     const baselineCache = new Map();
+    const discoveryHashCache = new Map();
     // The negative control is charged per (target file, defender set): two
     // claims over the same file with the same defenders ask the same question.
     const controlCache = new Map();
@@ -179,39 +265,73 @@ export async function probe({
     const prior = previous && previous.run.confirmRuns === confirmRuns
       ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
       : new Map();
+    const partitionConfigured = (files) => {
+      if (commandTemplate) return partitionByRunner(iso.projectDir, files, runner);
+      const groups = new Map([[runner, []]]);
+      for (const file of files) {
+        const owner = ownerByFile.get(file);
+        if (!owner) throw new PreconditionError(`${file} is not in any resolved runner's configured test universe`);
+        if (!groups.has(owner)) groups.set(owner, []);
+        groups.get(owner).push(file);
+      }
+      if (groups.get(runner).length === 0 && groups.size > 1) groups.delete(runner);
+      return groups;
+    };
     // `targets` are the fault's files, passed so a runner that can tell which
     // file the interpreter actually loaded (Python) reports it back.
     const runDefenders = async (files, targets = []) => {
-      if (commandTemplate) return runner.run({ projectDir: iso.projectDir, sourceDir: projectDir, python, files, budgetMs, commandTemplate, serial, targets });
-      const groups = partitionByRunner(iso.projectDir, files, runner);
+      if (commandTemplate) {
+        const result = await runner.run({ projectDir: iso.projectDir, sourceDir: projectDir, python, files, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, commandTemplate, serial, targets });
+        commandBudget?.assertOpen();
+        return result;
+      }
+      const groups = partitionConfigured(files);
       const parts = [];
       for (const [r, group] of groups) {
+        commandBudget?.assertOpen();
         if (r !== runner) await ensureOwned(r, group[0]);
-        parts.push(await r.run({ projectDir: iso.projectDir, sourceDir: projectDir, python, files: group, budgetMs, serial, targets }));
+        parts.push(await r.run({ projectDir: iso.projectDir, sourceDir: projectDir, python, files: group, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, serial, targets }));
+        commandBudget?.assertOpen();
       }
       return mergeRuns(parts);
     };
     /** Which runner each defender runs under, when more than the project runner is involved. */
     const byRunner = (files) => {
-      const groups = partitionByRunner(iso.projectDir, files, runner);
+      const groups = partitionConfigured(files);
       if (groups.size <= 1) return undefined; // one runner ran them all, whichever it was
       return Object.fromEntries([...groups].map(([r, group]) => [labelOf(r), group]));
     };
 
     for (const claim of scopedClaims) {
+      commandBudget?.assertOpen();
       const declared = claim.defendedBy?.length ? resolveDefenders(iso.projectDir, claim.defendedBy) : null;
+      if (declared && !commandTemplate) {
+        const excluded = declared.filter((file) => !ownerByFile.has(file));
+        for (const file of excluded) {
+          const expectedOwner = owned.find((candidate) => candidate.owns?.(iso.projectDir, file));
+          const check = expectedOwner && ownedChecked.get(expectedOwner);
+          if (expectedOwner && check && !check.ok) {
+            throw new PreconditionError(`${file} is a ${expectedOwner.name} test (${expectedOwner.name === 'python' ? 'it is a .py file' : `it lives under ${expectedOwner.name}'s testDir`}) but ${expectedOwner.name} is not resolvable for the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${check.message}).`);
+          }
+        }
+        if (excluded.length) throw new PreconditionError(`${claim.id}: defendedBy resolves to ${excluded.join(', ')}, but the configured runners do not collect ${excluded.length === 1 ? 'that file' : 'those files'}`);
+      }
       for (const fault of claim.faults) {
+        commandBudget?.assertOpen();
         // Mock-awareness: a discovered file that mocks the target is not a
         // defender; a declared one that mocks it stays (the author named it)
         // but is listed, because a declared defender that mocks the subject
         // is a broken evidence chain the author should see.
-        const mockInfo = declared ? classifyDefenders(iso.projectDir, fault.file, declared) : discoverDefendersDetailed(iso.projectDir, fault.file);
+        const mockInfo = declared ? classifyDefenders(iso.projectDir, fault.file, declared) : discoverDefendersDetailed(iso.projectDir, fault.file, allTests);
         const defenders = declared ?? mockInfo.canDetect;
+        const discoveryHashes = declared ? {} : hashDiscoveryDependencies(iso.projectDir, mockInfo.dependencies, iso.mode === 'worktree' ? discoveryHashCache : new Map());
         const stage = (name, i, n) => onStage({ claimId: claim.id, faultId: fault.id, stage: name, i, n });
         const common = { claim, fault, defenders, discovered: declared === null, byRunner: byRunner(defenders), mocking: mockInfo.mocking, signals: mockInfo.signals };
         let record;
         try {
-          record = await probeOne({ ...common, allTests, iso, isoReal, onWarn, confirmRuns, escalate, baselineCache, controlCache, fatalEditFor, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id,
+          if (!declared && mockInfo.indeterminate.length > 0) {
+            record = discoveryIndeterminateRecord({ ...common, inputs: safeInputs(iso.projectDir, fault, defenders, { testUniverseHash, discoveryHashes }), indeterminate: mockInfo.indeterminate });
+          } else record = await probeOne({ ...common, allTests, iso, isoReal, onWarn, confirmRuns, escalate, baselineCache, controlCache, fatalEditFor, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, testUniverseHash, discoveryHashes,
             historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root,
             // A path from the runner is absolute inside the SCRATCH worktree, or
             // project-relative. Either way history is read from the real repository,
@@ -225,7 +345,7 @@ export async function probe({
           // is not resolvable — and continuing would produce verdicts that are
           // all false. Everything else is this one fault's problem.
           if (err instanceof PreconditionError) throw err;
-          record = errorRecord({ ...common, error: err, inputs: safeInputs(iso.projectDir, fault, defenders) });
+          record = errorRecord({ ...common, error: err, inputs: safeInputs(iso.projectDir, fault, defenders, { testUniverseHash, discoveryHashes }) });
           onWarn(`${claim.id}/${fault.id}: ${record.detail.message} — reported as unverifiable so the rest of the run still produces evidence.`);
         }
         records.push(record);
@@ -235,6 +355,8 @@ export async function probe({
   } finally {
     iso.cleanup();
   }
+
+  commandBudget?.assertOpen();
 
   return {
     schemaVersion: 1,
@@ -285,13 +407,28 @@ export function errorRecord({ claim, fault, defenders, discovered, byRunner, moc
   };
 }
 
+/** Automatic discovery failed closed: uncertainty can never become `nocover`. */
+export function discoveryIndeterminateRecord({ claim, fault, defenders, discovered, byRunner, mocking = [], signals = [], inputs, indeterminate }) {
+  const first = indeterminate[0];
+  const message = `${indeterminate.length} candidate test file${indeterminate.length === 1 ? '' : 's'} could not be resolved safely; first: ${first.file} (${first.reason ?? 'unknown'})`.slice(0, 1024);
+  return {
+    fingerprint: fingerprint({ claimId: claim.id, subjectId: fault.id, file: fault.file, verdict: 'unverifiable' }),
+    claim: { id: claim.id, statement: claim.statement, severity: claim.severity, source: claim.source, producedBy: claim.producedBy },
+    subject: subjectOf(fault, sha256),
+    verdict: 'unverifiable',
+    detail: { baselineRuns: [], probeRuns: [], reason: 'defender-discovery-indeterminate', message },
+    defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: false, ...(discovered ? { discovered: true } : {}), ...(byRunner ? { byRunner } : {}), ...(mocking.length ? { mocking } : {}), ...(signals.length ? { signals } : {}) },
+    inputs,
+  };
+}
+
 /**
  * `inputs` for a record built after something threw — which is exactly when a
  * file may no longer be readable. Hashing must not be the second failure, so an
  * unreadable file hashes as empty: never equal to a real file's hash, so the
  * record can only ever fail a reuse check, never pass one by accident.
  */
-function safeInputs(projectDir, fault, defenders) {
+function safeInputs(projectDir, fault, defenders, extra = {}) {
   const h = (f) => {
     try {
       return hashFile(join(projectDir, f));
@@ -299,7 +436,14 @@ function safeInputs(projectDir, fault, defenders) {
       return sha256('');
     }
   };
-  return { targetHash: h(fault.file), defenderHashes: Object.fromEntries(defenders.map((f) => [f, h(f)])) };
+  return { targetHash: h(fault.file), defenderHashes: Object.fromEntries(defenders.map((f) => [f, h(f)])), ...extra };
+}
+
+function hashDiscoveryDependencies(projectDir, dependencies = [], cache = new Map()) {
+  return Object.fromEntries(dependencies.map((file) => {
+    if (!cache.has(file)) cache.set(file, hashFile(join(projectDir, file)));
+    return [file, cache.get(file)];
+  }));
 }
 
 /**
@@ -348,12 +492,14 @@ async function negativeControl({ file, defenders, iso, runDefenders, fatalEditFo
   return reached;
 }
 
-async function probeOne({ claim, fault, defenders, discovered, allTests, iso, isoReal, onWarn = () => {}, confirmRuns, escalate, baselineCache, controlCache, fatalEditFor, runDefenders, stage, prior, priorRunId, byRunner, mocking = [], signals = [], historyRef, historyDir, toRepoPath }) {
+async function probeOne({ claim, fault, defenders, discovered, allTests, iso, isoReal, onWarn = () => {}, confirmRuns, escalate, baselineCache, controlCache, fatalEditFor, runDefenders, stage, prior, priorRunId, byRunner, mocking = [], signals = [], historyRef, historyDir, toRepoPath, testUniverseHash, discoveryHashes = {} }) {
   const targetPath = join(iso.projectDir, fault.file);
   const targetExists = existsSync(targetPath);
   const inputs = {
     targetHash: targetExists ? hashFile(targetPath) : sha256(''),
     defenderHashes: Object.fromEntries(defenders.map((f) => [f, hashFile(join(iso.projectDir, f))])),
+    testUniverseHash,
+    discoveryHashes,
   };
 
   const subject = subjectOf(fault, sha256);

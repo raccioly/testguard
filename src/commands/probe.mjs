@@ -10,6 +10,7 @@ import { resolveChangedRef, withChangedRef } from '../gate/changed.mjs';
 import { costReport, renderCost } from '../probe/cost.mjs';
 import { progressMode, stageReporter, clearStageLine, recordEvent, isProgressMode, progressStream } from '../probe/progress.mjs';
 import { validate } from '../../spec/lib/validate.mjs';
+import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
 export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
@@ -36,10 +37,16 @@ export function partialScope(only, records) {
 export async function probeCommand({ projectDir, values, version }, io) {
   const confirmRuns = Number(values.confirm);
   const budgetMs = Number(values.budget);
+  const commandBudgetMs = parseCommandBudget(values['command-budget']);
   if (!Number.isInteger(confirmRuns) || confirmRuns < 1 || !Number.isInteger(budgetMs) || budgetMs < 1000) {
     io.err('--confirm must be a positive integer and --budget at least 1000');
     return 3;
   }
+  if (commandBudgetMs === null) {
+    io.err('--command-budget must be at least 1000 milliseconds');
+    return 3;
+  }
+  const commandBudget = createCommandBudget(commandBudgetMs);
   if (values.progress && !isProgressMode(values.progress)) {
     io.err(`--progress must be one of auto, tty, plain, ndjson, none (got ${values.progress})`);
     return 3;
@@ -74,6 +81,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
     previous,
     confirmRuns,
     budgetMs,
+    commandBudget,
     mode: values['in-place'] ? 'in-place' : 'worktree',
     ref: values.ref ?? 'HEAD',
     refExplicit: values.ref !== undefined,

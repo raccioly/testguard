@@ -2,6 +2,7 @@ import { join, resolve } from 'node:path';
 import { sweep, renderSweep, ConcernError } from '../sweep/sweep.mjs';
 import { resolveChangedRef } from '../gate/changed.mjs';
 import { writeSpecDoc } from '../evidence/writer.mjs';
+import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
 
 export const sweepPath = (projectDir) => join(projectDir, '.testguard', 'sweep.json');
 /**
@@ -29,6 +30,18 @@ export const sweepEvidencePath = (projectDir) => join(projectDir, '.testguard', 
  */
 export async function sweepCommand({ projectDir, values, version }, io) {
   const mode = values['save-paths'] ? 'save-paths' : 'changed';
+  const confirmRuns = Number(values.confirm);
+  const budgetMs = Number(values.budget);
+  const commandBudgetMs = parseCommandBudget(values['command-budget']);
+  if (!Number.isInteger(confirmRuns) || confirmRuns < 1 || !Number.isInteger(budgetMs) || budgetMs < 1000) {
+    io.err('--confirm must be a positive integer and --budget at least 1000');
+    return 3;
+  }
+  if (commandBudgetMs === null) {
+    io.err('--command-budget must be at least 1000 milliseconds');
+    return 3;
+  }
+  const commandBudget = createCommandBudget(commandBudgetMs);
   // A concern that aims at the write surface or at a glob needs no diff, the
   // same as --save-paths. Only a concern that defers to the gate does.
   const aimed = Boolean(values.concern) || mode === 'save-paths';
@@ -39,12 +52,6 @@ export async function sweepCommand({ projectDir, values, version }, io) {
     ?? (aimed ? { ref: 'HEAD', from: values.concern ? `concern ${values.concern}` : 'save-paths', required: false } : null);
   if (!resolved) {
     io.err('sweep needs a reference to measure the change against: --changed <ref> (e.g. origin/main), or set TESTGUARD_CHANGED_REF. CI bases and a safe local remote default or differently named upstream are detected automatically. Or sweep the write surface instead with --save-paths.');
-    return 3;
-  }
-  const confirmRuns = Number(values.confirm);
-  const budgetMs = Number(values.budget);
-  if (!Number.isInteger(confirmRuns) || confirmRuns < 1 || !Number.isInteger(budgetMs) || budgetMs < 1000) {
-    io.err('--confirm must be a positive integer and --budget at least 1000');
     return 3;
   }
   let cap;
@@ -70,6 +77,7 @@ export async function sweepCommand({ projectDir, values, version }, io) {
       cap,
       confirmRuns,
       budgetMs,
+      commandBudget,
       runnerCommand: values['runner-cmd'],
       runnerName: values.runner,
       nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,

@@ -3,9 +3,9 @@ import { basename, dirname, join, relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { git, GitError, repoRoot, headSha } from '../git.mjs';
 import { createScratch, PreconditionError } from '../probe/worktree.mjs';
-import { selectRunner, RUNNERS } from '../probe/runners/index.mjs';
+import { selectRunner, discoverRunnerManifest, RUNNERS, OWNED_RUNNERS, mergeRuns } from '../probe/runners/index.mjs';
 import { parseCommandTemplate } from '../probe/runners/shared.mjs';
-import { fileImports } from '../probe/rank.mjs';
+import { fileImportRelation } from '../probe/rank.mjs';
 import { IS_PY_TEST, pyFileImports } from '../probe/pyimports.mjs';
 import { isPython } from '../probe/discover.mjs';
 import { labelDiff } from './label.mjs';
@@ -83,6 +83,7 @@ export async function replay({
   range,
   confirmRuns = 3,
   budgetMs = 120_000,
+  commandBudget,
   runnerCommand,
   runnerName = 'auto',
   nodeModules,
@@ -92,6 +93,7 @@ export async function replay({
   onProgress = () => {},
   onStage = () => {},
 }) {
+  commandBudget?.assertOpen();
   projectDir = realpathSync(resolve(projectDir));
   const root = repoRoot(projectDir);
   if (!headSha(root)) throw new PreconditionError('repository has no commits; there is nothing to replay');
@@ -109,23 +111,46 @@ export async function replay({
   let runnerVersion;
 
   for (const [i, fix] of selected.entries()) {
+    commandBudget?.assertOpen();
     onStage({ commit: fix.commit, i: i + 1, n: selected.length, stage: 'prepare' });
     const iso = createScratch({ repoRoot: root, projectDir, ref: fix.commit, scratchBase, nodeModules });
     try {
       const commandTemplate = runnerCommand ? parseCommandTemplate(runnerCommand) : undefined;
+      let universe;
       if (!commandTemplate) {
-        const sel = await selectRunner({ projectDir: iso.projectDir, name: runnerName });
+        const budgetFor = () => commandBudget?.runBudget(budgetMs) ?? budgetMs;
+        const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, name: runnerName, budgetMs: budgetFor(), budgetFor });
+        commandBudget?.assertOpen();
         if (sel.error) throw new PreconditionError(`test runner is not resolvable in the scratch worktree (${sel.error}). Pass --node-modules <path>.`);
         runnerUsed = sel.runner;
         runnerVersion = sel.version;
+        const manifests = new Map([[runnerUsed, sel.manifest]]);
+        // A pinned Python engine is already the Python per-file adapter. Adding
+        // the unpinned adapter again would let manifest precedence silently
+        // replace `--runner unittest` with pytest (or vice versa).
+        const primaryIsPython = ['python', 'pytest', 'unittest'].includes(runnerUsed.name);
+        const owned = OWNED_RUNNERS.filter((candidate) => candidate !== runnerUsed && !(candidate.name === 'python' && primaryIsPython));
+        for (const candidate of owned) {
+          const check = await candidate.check({ projectDir: iso.projectDir, sourceDir: projectDir, budgetMs: budgetFor(), budgetFor });
+          commandBudget?.assertOpen();
+          if (!check.ok) continue;
+          try {
+            manifests.set(candidate, await discoverRunnerManifest(candidate, check, iso.projectDir, budgetFor()));
+          } catch (error) {
+            throw new PreconditionError(`${candidate.name}: test discovery failed: ${error.message}`);
+          }
+        }
+        universe = buildReplayRunnerUniverse(runnerUsed, manifests);
       }
-      const record = await replayOne({ fix, iso, root, projectDir, confirmRuns, budgetMs, commandTemplate, runner: runnerUsed, onStage, index: i + 1, total: selected.length });
+      const record = await replayOne({ fix, iso, root, projectDir, confirmRuns, budgetMs, commandBudget, commandTemplate, runner: runnerUsed, universe, onStage, index: i + 1, total: selected.length });
       records.push(record);
       onProgress(record);
     } finally {
       iso.cleanup();
     }
   }
+
+  commandBudget?.assertOpen();
 
   return {
     schemaVersion: 1,
@@ -144,7 +169,47 @@ export async function replay({
   };
 }
 
-async function replayOne({ fix, iso, root, projectDir, confirmRuns, budgetMs, commandTemplate, runner, onStage, index, total }) {
+/**
+ * Exact configured test universe for replay. The project runner may list a
+ * broad set that overlaps a per-file runner. A file listed by one owned
+ * runner belongs to it; primary+owned overlap therefore resolves to owned.
+ * Two owned runners listing the same file is ambiguous and fails closed.
+ * Filename heuristics are deliberately absent: native manifest membership is
+ * the evidence of which configured engine collects a file.
+ */
+export function buildReplayRunnerUniverse(primary, manifests) {
+  const ownerByFile = new Map();
+  for (const file of manifests.get(primary)?.files ?? []) ownerByFile.set(file, primary);
+  for (const [owner, manifest] of manifests) {
+    if (owner === primary) continue;
+    for (const file of manifest.files) {
+      const previous = ownerByFile.get(file);
+      if (previous && previous !== primary && previous !== owner) {
+        throw new PreconditionError(`${file} was listed by both ${previous.name} and ${owner.name}; TestGuard cannot choose which configured runner owns it.`);
+      }
+      ownerByFile.set(file, owner);
+    }
+  }
+  return Object.freeze({
+    files: Object.freeze([...ownerByFile.keys()].sort()),
+    ownerOf(file) { return ownerByFile.get(file); },
+  });
+}
+
+/** Partition only files proved to belong to the frozen configured universe. */
+export function partitionReplayDefenders(files, primary, universe) {
+  const groups = new Map([[primary, []]]);
+  for (const file of files) {
+    const owner = universe.ownerOf(file);
+    if (!owner) throw new PreconditionError(`${file} is not in any resolved runner's configured test universe`);
+    if (!groups.has(owner)) groups.set(owner, []);
+    groups.get(owner).push(file);
+  }
+  if (groups.get(primary).length === 0 && groups.size > 1) groups.delete(primary);
+  return groups;
+}
+
+async function replayOne({ fix, iso, root, projectDir, confirmRuns, budgetMs, commandBudget, commandTemplate, runner, universe, onStage, index, total }) {
   // git reports paths from the REPOSITORY root; the runner and every file
   // operation here work inside the scratch worktree, relative to the PROJECT
   // directory. Map once, and refuse anything that would land outside the
@@ -211,7 +276,7 @@ async function replayOne({ fix, iso, root, projectDir, confirmRuns, budgetMs, co
   // What remains that could possibly notice: the test files importing any
   // reverted source file. `nocover` means nothing does — worse than blind,
   // and a coverage report shows it as a red line you can ignore.
-  const all = runner.tests(iso.projectDir).filter((t) => !fix.tests.some((ft) => rel(ft) === t));
+  const all = (universe?.files ?? runner.tests(iso.projectDir)).filter((t) => !fix.tests.some((ft) => rel(ft) === t));
   // Removing the fix's test removes the whole FILE, which on a project with
   // few, large test files takes pre-existing tests with it — tests that did
   // exist before the fix and might have caught the bug. When nothing is left,
@@ -227,20 +292,50 @@ async function replayOne({ fix, iso, root, projectDir, confirmRuns, budgetMs, co
   // JavaScript resolver matches nothing — `IMPORT_RE` wants a quoted
   // specifier and `from pkg.mod import x` has none — so `related` was always
   // empty for Python and EVERY verdict was `nocover`, however good the suite.
-  const related = all.filter((t) => fix.source.some((sf) => {
-    const target = rel(sf);
-    return isPython(target)
-      ? pyFileImports(iso.projectDir, join(iso.projectDir, t), target, t)
-      : fileImports(iso.projectDir, join(iso.projectDir, t), target);
-  }));
+  const related = [];
+  const indeterminate = [];
+  for (const test of all) {
+    let matched = false;
+    for (const sf of fix.source) {
+      const target = rel(sf);
+      if (isPython(target)) {
+        matched ||= test.endsWith('.py') && pyFileImports(iso.projectDir, join(iso.projectDir, test), target, test);
+        continue;
+      }
+      if (test.endsWith('.py')) continue;
+      const relation = fileImportRelation(iso.projectDir, join(iso.projectDir, test), target);
+      if (relation.status === 'matched') matched = true;
+      else if (relation.status === 'indeterminate') indeterminate.push({ test, target, reason: relation.reason });
+    }
+    if (matched) related.push(test);
+  }
+  if (indeterminate.length > 0) {
+    return { ...base, faultClass, verdict: 'unverifiable', reason: 'defender-discovery-indeterminate', ranTests: 0, runs: [{ outcome: 'error', durationMs: 0 }] };
+  }
   if (related.length === 0) {
     return { ...base, faultClass, verdict: 'nocover', reason: 'no-test-imports-the-reverted-source', ranTests: 0, runs: [{ outcome: 'error', durationMs: 0 }] };
   }
 
   const runs = [];
   for (let i = 0; i < confirmRuns; i++) {
+    commandBudget?.assertOpen();
     onStage({ commit: fix.commit, i: index, n: total, stage: `run ${i + 1}/${confirmRuns}` });
-    const res = await runner.run({ projectDir: iso.projectDir, files: related, budgetMs, commandTemplate });
+    let res;
+    if (commandTemplate) {
+      // A custom command is one explicit execution boundary. Preserve that
+      // contract exactly; TestGuard cannot infer several native engines from
+      // an opaque user command.
+      res = await runner.run({ projectDir: iso.projectDir, sourceDir: projectDir, files: related, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, commandTemplate });
+    } else {
+      const parts = [];
+      for (const [configuredRunner, files] of partitionReplayDefenders(related, runner, universe)) {
+        commandBudget?.assertOpen();
+        parts.push(await configuredRunner.run({ projectDir: iso.projectDir, sourceDir: projectDir, files, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs }));
+        commandBudget?.assertOpen();
+      }
+      res = mergeRuns(parts);
+    }
+    commandBudget?.assertOpen();
     runs.push(res.run);
     // A suite that cannot load says nothing about the bug.
     if (res.run.outcome === 'error') return { ...base, faultClass, verdict: 'unverifiable', reason: 'suite-failed-to-load', ranTests: related.length, runs };

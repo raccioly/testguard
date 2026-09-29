@@ -2,6 +2,7 @@ import * as vitest from './vitest.mjs';
 import * as jest from './jest.mjs';
 import * as playwright from './playwright.mjs';
 import * as pythonRunner from './python.mjs';
+import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs } from './discovery.mjs';
 
 export const RUNNERS = {
   vitest,
@@ -27,15 +28,42 @@ export const RUNNER_NAMES = ['vitest', 'jest', 'playwright', 'python', 'pytest',
  */
 export const OWNED_RUNNERS = [playwright, pythonRunner];
 
+const PYTHON_DISCOVERY_CONFIG_FILES = ['pyproject.toml', 'pytest.ini', 'setup.cfg', 'tox.ini', 'conftest.py'];
+
+const immutableManifest = (manifest) => Object.freeze({
+  ...manifest,
+  runner: Object.freeze({ ...manifest.runner }),
+  files: Object.freeze([...manifest.files]),
+  configFiles: Object.freeze(manifest.configFiles.map((entry) => Object.freeze({ ...entry }))),
+});
+
+export async function discoverRunnerManifest(runner, check, projectDir, budgetMs) {
+  let manifest;
+  if (runner.discoverTests) {
+    manifest = await runner.discoverTests({ projectDir, version: check.version, ...(budgetMs === undefined ? {} : { timeoutMs: budgetMs }) });
+    return immutableManifest(manifest);
+  }
+  // Python's adapter discovery is already language-aware but is not a native
+  // subprocess listing yet. Bind its immutable universe to every conventional
+  // pytest configuration input so it cannot be reused across a config edit.
+  const before = hashDiscoveryConfigs(projectDir, PYTHON_DISCOVERY_CONFIG_FILES);
+  const files = runner.tests(projectDir);
+  const configFiles = hashDiscoveryConfigs(projectDir, PYTHON_DISCOVERY_CONFIG_FILES);
+  if (JSON.stringify(configFiles) !== JSON.stringify(before)) throw new DiscoveryError(`${runner.name} discovery config changed while tests were being listed`);
+  manifest = createDiscoveryManifest({ runner: runner.name, version: check.version, files, configFiles, source: 'adapter' });
+  return immutableManifest(manifest);
+}
+
 /**
  * Pick the project runner: an explicit name, or the first of vitest, jest,
  * python that is resolvable from the project. Returns
- * { runner, version, source, engine } or { error }. `engine` is set when the
- * runner has more than one (Python: pytest or unittest) and names the one
- * that will actually run — it, not the module name, is what the evidence
- * records.
+ * { runner, version, source, engine, manifest, testFiles } only after the
+ * runner's immutable non-empty test universe is known, or { error }. `engine`
+ * is set when the runner has more than one (Python: pytest or unittest) and
+ * names the one that will actually run — it, not the module name, is what the
+ * evidence records.
  */
-export async function selectRunner({ projectDir, sourceDir, python, name = 'auto' }) {
+export async function selectRunner({ projectDir, sourceDir, python, name = 'auto', budgetMs, budgetFor }) {
   const candidates = name === 'auto' ? [vitest, jest, pythonRunner] : [RUNNERS[name]];
   if (!candidates[0]) return { error: `unknown runner "${name}"; use ${RUNNER_NAMES.join(', ')} or auto` };
   const messages = [];
@@ -46,24 +74,28 @@ export async function selectRunner({ projectDir, sourceDir, python, name = 'auto
   // `nocover`: a damning statement about the project produced by a runner that
   // could not have seen its tests.
   //
-  // So `auto` prefers a candidate that can actually see tests. An explicitly
-  // named runner is still honoured, because the caller asked for it; it is
-  // reported with `testFiles` so a caller can say what it is working with.
-  let blind = null;
+  // So `auto` prefers a candidate that can actually see tests. An explicit
+  // runner with an empty universe is also refused: choosing it knowingly does
+  // not turn zero observations into evidence.
   for (const r of candidates) {
-    const c = await r.check({ projectDir, sourceDir, python });
+    const checkBudget = budgetFor ? budgetFor() : budgetMs;
+    const c = await r.check({ projectDir, sourceDir, python, budgetFor, ...(checkBudget === undefined ? {} : { budgetMs: checkBudget }) });
     if (!c.ok) { messages.push(`${r.name}: ${c.message}`); continue; }
-    const selected = { runner: r, version: c.version, source: c.source, engine: c.engine };
-    let testFiles = 0;
-    try { testFiles = r.tests(projectDir).length; } catch { testFiles = 0; }
+    let selected = { runner: r, version: c.version, source: c.source, engine: c.engine };
+    let manifest;
+    try {
+      manifest = await discoverRunnerManifest(r, c, projectDir, budgetFor ? budgetFor() : budgetMs);
+    } catch (error) {
+      return { error: `${r.name}: test discovery failed: ${error.message}` };
+    }
+    selected = { ...selected, manifest };
+    const testFiles = manifest.files.length;
+    const empty = `${r.name}: resolved but discovered no test files`;
+    if (name !== 'auto' && testFiles === 0) return { error: empty };
     if (testFiles > 0 || name !== 'auto') return { ...selected, testFiles };
-    blind ??= { ...selected, testFiles: 0 };
-    messages.push(`${r.name}: resolved but matched no test files`);
+    messages.push(empty);
   }
-  // Nothing saw a test file. Return the first that resolved, and say plainly
-  // what that means, rather than letting every verdict read as a finding.
-  if (blind) return { ...blind, warning: `no runner matched a test file in this project; using ${blind.runner.name}, which sees none — every verdict will be nocover` };
-  return { error: messages.join('; ') };
+  return { error: messages.length ? messages.join('; ') : 'no runner discovered test files' };
 }
 
 /** What the evidence calls a runner: the engine that actually ran, else the module's name. */

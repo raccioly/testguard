@@ -16,7 +16,7 @@ const project = (files) => {
   return dir;
 };
 
-describe('selectRunner — a runner that sees no test file is not an answer', () => {
+describe('selectRunner — native discovery is a precondition, not a guess', () => {
   it('auto prefers a resolvable runner that can actually see tests', () => {
     // A project with vitest available and real test files: unchanged behaviour,
     // now reporting how many files the choice can see.
@@ -34,7 +34,29 @@ describe('selectRunner — a runner that sees no test file is not an answer', ()
     });
   });
 
-  it('says so plainly when nothing matched a test file, instead of letting every verdict read as a finding', async () => {
+  it('recomputes a live whole-command allowance before each runner subprocess', async () => {
+    const dir = project({
+      'package.json': JSON.stringify({ name: 'x', devDependencies: { vitest: '*' } }),
+      'test/a.test.mjs': "import { it } from 'vitest';\nit('a', () => {});\n",
+    });
+    const allowances = [30_000, 29_000];
+    const requested = [];
+    const sel = await selectRunner({
+      projectDir: dir,
+      name: 'auto',
+      budgetFor: () => {
+        const allowance = allowances[requested.length] ?? 28_000;
+        requested.push(allowance);
+        return allowance;
+      },
+    });
+    expect(sel.error).toBeUndefined();
+    expect(sel.runner.name).toBe('vitest');
+    expect(requested).toEqual([30_000, 29_000]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('fails closed when no resolvable runner discovers a test file', async () => {
     // THE REGRESSION. A pure TypeScript project on Playwright resolves neither
     // vitest nor jest; `auto` then reaches python — which resolves wherever a
     // python3 exists — globs for .py, finds none, and reports every fault as
@@ -49,29 +71,57 @@ describe('selectRunner — a runner that sees no test file is not an answer', ()
       'e2e/a.pw.ts': "import { test } from '@playwright/test';\ntest('a', async () => {});\n",
     });
     const sel = await selectRunner({ projectDir: dir, name: 'auto' });
-    if (!sel.error) {
-      expect(sel.testFiles).toBe(0);
-      expect(sel.warning).toMatch(/no runner matched a test file/);
-      expect(sel.warning).toMatch(/every verdict will be nocover/);
-    } else {
-      // Equally acceptable: nothing resolved at all, which is already explicit.
-      expect(sel.error).toMatch(/vitest|jest|python/);
-    }
+    expect(sel.runner).toBeUndefined();
+    expect(sel.error).toMatch(/no test files|matched no test files|discovered no test files/i);
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('an explicitly named runner is still honoured, and reports what it can see', async () => {
-    // The caller asked for it. Overriding that would be the tool deciding it
-    // knows better than the person who typed --runner.
+  it('an explicitly named runner with an empty universe fails closed', async () => {
     const dir = project({
       'package.json': JSON.stringify({ name: 'x', devDependencies: { vitest: '*' } }),
+      'vitest.config.mjs': 'export default { test: { passWithNoTests: true } };\n',
       'src/a.mjs': 'export const a = 1;\n',
     });
     const sel = await selectRunner({ projectDir: dir, name: 'vitest' });
-    if (!sel.error) {
-      expect(sel.runner.name).toBe('vitest');
-      expect(sel.testFiles).toBe(0);
-    }
+    expect(sel.runner).toBeUndefined();
+    expect(sel.error).toMatch(/vitest.*no test files/i);
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it('auto continues after a successful empty discovery and selects the next non-empty runner', async () => {
+    const dir = project({
+      'package.json': JSON.stringify({ name: 'x', devDependencies: { vitest: '*', jest: '*' } }),
+      'vitest.config.mjs': "export default { test: { include: ['never/**/*.test.js'], passWithNoTests: true } };\n",
+      'jest.config.mjs': "export default { testMatch: ['<rootDir>/checks/**/*.case.js'] };\n",
+      'checks/a.case.js': "test('a', () => {});\n",
+    });
+    const sel = await selectRunner({ projectDir: dir, name: 'auto' });
+    expect(sel.error).toBeUndefined();
+    expect(sel.runner.name).toBe('jest');
+    expect(sel.manifest.files).toEqual(['checks/a.case.js']);
+    expect(Object.isFrozen(sel.manifest)).toBe(true);
+    expect(Object.isFrozen(sel.manifest.files)).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('a resolved runner discovery failure stops auto instead of falling through', async () => {
+    const dir = project({
+      'package.json': JSON.stringify({ name: 'x', devDependencies: { vitest: '*', jest: '*' } }),
+      'vitest.config.mjs': "throw new Error('sentinel discovery config failure');\n",
+      'test/a.test.js': "test('a', () => {});\n",
+    });
+    const sel = await selectRunner({ projectDir: dir, name: 'auto' });
+    expect(sel.runner).toBeUndefined();
+    expect(sel.error).toMatch(/vitest.*discovery.*sentinel discovery config failure/i);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('does not mistake an incidental Jest on PATH for a runner configured in a pure Python project', async () => {
+    const dir = project({ 'tests/test_a.py': 'def test_a():\n    assert True\n' });
+    const sel = await selectRunner({ projectDir: dir, name: 'auto' });
+    expect(sel.error).toBeUndefined();
+    expect(sel.runner.name).toBe('python');
+    expect(sel.manifest.files).toEqual(['tests/test_a.py']);
+    rmSync(dir, { recursive: true, force: true });
+  }, 40_000);
 });

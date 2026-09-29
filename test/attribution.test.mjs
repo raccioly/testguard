@@ -181,6 +181,26 @@ describe('reuse — a prior verdict may only stand for the fault that produced i
     expect(isReusable(prior({ defenders: { requested: ['a.test.mjs'], resolved: ['a.test.mjs', 'b.test.mjs'] } }), current())).toBe(false);
   });
 
+  it('never reuses across a configured universe or discovery dependency change', () => {
+    const measured = prior({
+      inputs: {
+        targetHash: 'T',
+        defenderHashes: { 'a.test.mjs': 'D' },
+        testUniverseHash: 'U1',
+        discoveryHashes: { 'barrel.mjs': 'B1' },
+      },
+    });
+    const withDiscovery = (testUniverseHash, discoveryHashes) => ({
+      ...current(),
+      inputs: { ...current().inputs, testUniverseHash, discoveryHashes },
+    });
+    expect(isReusable(measured, withDiscovery('U1', { 'barrel.mjs': 'B1' }))).toBe(true);
+    expect(isReusable(measured, withDiscovery('U2', { 'barrel.mjs': 'B1' }))).toBe(false);
+    expect(isReusable(measured, withDiscovery('U1', { 'barrel.mjs': 'B2' }))).toBe(false);
+    // A record from before configured discovery cannot stand in for a current universe.
+    expect(isReusable(prior(), withDiscovery('U1', {}))).toBe(false);
+  });
+
   it('never reuses a record that exists because the probe threw', () => {
     // `probe-error` is a statement about the run, not about the code: the tree
     // was being deleted underneath it, a runner vanished, something threw. Its
