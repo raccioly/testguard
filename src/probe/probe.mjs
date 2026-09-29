@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, realpathSync as fsRealpathSync } from 'node:fs';
-import { git } from '../git.mjs';
+import { gitRaw } from '../git.mjs';
 import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { repoRoot as gitRoot, headSha, isDirty, snapshotWorkingTree } from '../git.mjs';
@@ -111,7 +111,18 @@ export async function probe({
       if (isDirty(root)) snapshot = snapshotWorkingTree(root);
     } else {
       const watched = new Set(targets);
-      const dirtyPaths = git(['status', '--porcelain'], root).split('\n').filter(Boolean).map((l) => l.replace(/^[ MADRCU?!]{1,2}\s+/, '').replace(/^.* -> /, ''));
+      const records = gitRaw(['status', '--porcelain=v1', '-z'], root).split('\0');
+      const dirtyPaths = [];
+      for (let i = 0; i < records.length; i += 1) {
+        const record = records[i];
+        if (!record) continue;
+        const status = record.slice(0, 2);
+        dirtyPaths.push(record.slice(3));
+        // Under -z, rename/copy records carry the destination in this record
+        // and the source as the next NUL-delimited record. Watch both: either
+        // side may be a declared defender, fault target, or config input.
+        if (/[RC]/.test(status) && records[i + 1]) dirtyPaths.push(records[++i]);
+      }
       let configuredFiles;
       // Use the same exact primary + owned native universes as measurement.
       // A dirty custom-named Playwright test or imported config helper must be

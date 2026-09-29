@@ -2,13 +2,15 @@ import { PreconditionError } from './probe/worktree.mjs';
 import { performance } from 'node:perf_hooks';
 
 /**
- * A total wall-clock deadline shared by every stage of one command.
+ * A cooperative measurement deadline shared by every stage of one command.
  *
  * Per-run budgets answer "how long may this runner invocation take?". This
- * deadline answers the different question "how long may the whole command
- * keep producing a result?". Expiry is deliberately not a verdict: a partial
- * result would make the unattempted suffix look clean. Callers therefore let
- * CommandBudgetExpired escape before writing any result document.
+ * deadline answers the different question "may the whole command still
+ * produce a result?". Async child processes receive no more than the
+ * remaining time; synchronous setup can overrun because JavaScript cannot
+ * preempt it, so every stage boundary and every write boundary checks again.
+ * Expiry is deliberately not a verdict: a partial result would make the
+ * unattempted suffix look clean.
  */
 export class CommandBudget {
   constructor(limitMs, { now = () => performance.now() } = {}) {

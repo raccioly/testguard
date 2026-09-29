@@ -73,6 +73,24 @@ describe('runVitest budget', () => {
     }
   }, 5000);
 
+  it('reports cleanup as unverified when a daemon reparented before timeout', async () => {
+    if (process.platform === 'win32') return;
+    const dir = mkdtempSync(join(tmpdir(), 'tg-runner-orphan-'));
+    const marker = join(dir, 'survived');
+    const grandchild = `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'alive'), 450)`;
+    const helper = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(grandchild)}], { detached: true, stdio: 'ignore' }).unref()`;
+    const parent = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(helper)}], { detached: true, stdio: 'ignore' }).unref(); setInterval(() => {}, 1000);`;
+    try {
+      const { run, loadMessage } = await runProcess({ argv: () => [], projectDir: dir, files: [], budgetMs: 150, command: [process.execPath, '-e', parent] });
+      expect(run.outcome).toBe('timeout');
+      expect(loadMessage).toMatch(/cleanup-unverified.*reparented daemon/i);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      expect(existsSync(marker)).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 5000);
+
   it('reports error when the command produces no report', async () => {
     const { run, loadMessage } = await runProcess({ argv: () => [],  projectDir: process.cwd(), files: [], budgetMs: 5000, command: [process.execPath, '-e', 'console.error("boom"); process.exit(1)'] });
     expect(run.outcome).toBe('error');

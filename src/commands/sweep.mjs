@@ -103,6 +103,7 @@ export async function sweepCommand({ projectDir, values, version }, io) {
 
   const { evidence, ...document } = doc;
   const outPath = values.out ? resolve(values.out) : sweepPath(projectDir);
+  commandBudget?.assertOpen();
   writeSpecDoc('sweep', outPath, document);
   // Written only when something was actually probed: an empty document would
   // teach the next run that every class is unproductive.

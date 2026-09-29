@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cpSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +10,17 @@ import { main } from '../src/cli.mjs';
 describe('whole-command budget', () => {
   const scratch = [];
   afterEach(() => scratch.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true })));
+
+  const git = (dir, ...args) => execFileSync('git', args, { cwd: dir });
+  const initializeRepository = (dir) => {
+    git(dir, 'init', '-q');
+    git(dir, 'config', 'user.email', 'test@example.invalid');
+    git(dir, 'config', 'user.name', 'Test');
+  };
+  const commitAll = (dir, message) => {
+    git(dir, 'add', '.');
+    git(dir, 'commit', '-qm', message);
+  };
 
   it('caps every child run at the remaining command time', () => {
     let now = 1_000;
@@ -72,5 +83,72 @@ describe('whole-command budget', () => {
     expect(code).toBe(2);
     expect(lines.join('\n')).toContain('no partial result was written');
     expect(existsSync(out)).toBe(false);
+  }, 8_000);
+
+  it('preserves both sweep documents when the total expires inside a runner', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'testguard-sweep-command-budget-'));
+    scratch.push(dir);
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    mkdirSync(join(dir, 'test'), { recursive: true });
+    mkdirSync(join(dir, '.testguard'), { recursive: true });
+    writeFileSync(join(dir, '.gitignore'), '.testguard/\n');
+    writeFileSync(join(dir, 'package.json'), '{"type":"module"}\n');
+    writeFileSync(join(dir, 'src', 'guard.mjs'), 'export function allowed(value) { return Boolean(value); }\n');
+    writeFileSync(join(dir, 'test', 'guard.test.mjs'), "import { allowed } from '../src/guard.mjs';\nvoid allowed;\n");
+    const slow = join(dir, 'slow-runner.mjs');
+    writeFileSync(slow, 'setTimeout(() => {}, 2_000);\n');
+    initializeRepository(dir);
+    commitAll(dir, 'base');
+    writeFileSync(join(dir, 'src', 'guard.mjs'), 'export function allowed(value) {\n  if (!value) return false;\n  return true;\n}\n');
+    commitAll(dir, 'change guard');
+
+    const sweepOut = join(dir, '.testguard', 'sweep.json');
+    const evidenceOut = join(dir, '.testguard', 'sweep-evidence.json');
+    writeFileSync(sweepOut, 'previous sweep\n');
+    writeFileSync(evidenceOut, 'previous evidence\n');
+    const lines = [];
+    const code = await main([
+      'sweep', dir, '--changed', 'HEAD~1', '--cap', '1', '--confirm', '1',
+      '--command-budget', '1000', '--runner-cmd', `node ${slow} {files} {out}`, '--out', sweepOut,
+    ], { out: (line) => lines.push(line), err: (line) => lines.push(line) });
+
+    expect(code).toBe(2);
+    expect(lines.join('\n')).toContain('no partial result was written');
+    expect(readFileSync(sweepOut, 'utf8')).toBe('previous sweep\n');
+    expect(readFileSync(evidenceOut, 'utf8')).toBe('previous evidence\n');
+  }, 8_000);
+
+  it('preserves replay and calibration when the total expires inside a runner', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'testguard-replay-command-budget-'));
+    scratch.push(dir);
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    mkdirSync(join(dir, 'test'), { recursive: true });
+    mkdirSync(join(dir, '.testguard'), { recursive: true });
+    writeFileSync(join(dir, '.gitignore'), '.testguard/\n');
+    writeFileSync(join(dir, 'package.json'), '{"type":"module"}\n');
+    writeFileSync(join(dir, 'src', 'value.mjs'), 'export const value = () => 0;\n');
+    writeFileSync(join(dir, 'test', 'value.test.mjs'), "import { value } from '../src/value.mjs';\nvoid value;\n");
+    const slow = join(dir, 'slow-runner.mjs');
+    writeFileSync(slow, 'setTimeout(() => {}, 2_000);\n');
+    initializeRepository(dir);
+    commitAll(dir, 'base');
+    writeFileSync(join(dir, 'src', 'value.mjs'), 'export const value = () => 1;\n');
+    writeFileSync(join(dir, 'test', 'fix.test.mjs'), "import { value } from '../src/value.mjs';\nvoid value;\n");
+    commitAll(dir, 'fix: correct value');
+
+    const replayOut = join(dir, '.testguard', 'replay.json');
+    const calibrationOut = join(dir, '.testguard', 'calibration.json');
+    writeFileSync(replayOut, 'previous replay\n');
+    writeFileSync(calibrationOut, 'previous calibration\n');
+    const lines = [];
+    const code = await main([
+      'replay', dir, '--since', 'HEAD~1..HEAD', '--max', '1', '--confirm', '1',
+      '--command-budget', '1000', '--runner-cmd', `node ${slow} {files} {out}`, '--out', replayOut,
+    ], { out: (line) => lines.push(line), err: (line) => lines.push(line) });
+
+    expect(code).toBe(2);
+    expect(lines.join('\n')).toContain('no partial result was written');
+    expect(readFileSync(replayOut, 'utf8')).toBe('previous replay\n');
+    expect(readFileSync(calibrationOut, 'utf8')).toBe('previous calibration\n');
   }, 8_000);
 });

@@ -13,20 +13,20 @@ import { PreconditionError } from '../src/probe/worktree.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** A one-claim repo whose defender exists but has an uncommitted edit. The refusal cases never invoke a runner; the honoured cases do, so the project's node_modules is linked in. */
-function dirtyRepo() {
+function dirtyRepo(defender = 'test/a.test.mjs') {
   const dir = mkdtempSync(join(tmpdir(), 'tg-precond-'));
   const g = (...a) => spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8' });
   g('init', '-q');
   mkdirSync(join(dir, 'src'));
   mkdirSync(join(dir, 'test'));
   writeFileSync(join(dir, 'src', 'a.mjs'), 'export const a = () => 1;\n');
-  writeFileSync(join(dir, 'test', 'a.test.mjs'), "import { a } from '../src/a.mjs';\n");
+  writeFileSync(join(dir, defender), "import { a } from '../src/a.mjs';\n");
   writeFileSync(join(dir, '.gitignore'), 'node_modules\n');
   g('add', '-A');
   g('commit', '-qm', 'one');
   symlinkSync(join(ROOT, 'node_modules'), join(dir, 'node_modules'), 'dir'); // the honoured cases run vitest; CI has no npx cache to fall back on
-  writeFileSync(join(dir, 'test', 'a.test.mjs'), "import { a } from '../src/a.mjs';\n// uncommitted\n");
-  const claims = { schemaVersion: 1, claims: [{ id: 'C-1', statement: 's', source: { kind: 'manual' }, severity: 'low', producedBy: { producer: 'human' }, defendedBy: ['test/a.test.mjs'],
+  writeFileSync(join(dir, defender), "import { a } from '../src/a.mjs';\n// uncommitted\n");
+  const claims = { schemaVersion: 1, claims: [{ id: 'C-1', statement: 's', source: { kind: 'manual' }, severity: 'low', producedBy: { producer: 'human' }, defendedBy: [defender],
     faults: [{ id: 'F1', description: 'd', faultClass: 'other', file: 'src/a.mjs', find: '1', replace: '2', producedBy: { producer: 'human' } }] }] };
   return { dir, claims };
 }
@@ -36,6 +36,20 @@ describe('probe preconditions', () => {
     const { dir, claims } = dirtyRepo();
     await expect(probe({ projectDir: dir, claims, mode: 'worktree', toolVersion: 't' })).rejects.toThrow(PreconditionError);
     await expect(probe({ projectDir: dir, claims, mode: 'worktree', toolVersion: 't' })).rejects.toThrow(/\(test\/a\.test\.mjs\).*probes HEAD \([a-f0-9]{7}\).*--include-dirty/s);
+  });
+  it('refuses Git-quoted dirty paths containing spaces and non-ASCII characters', async () => {
+    const { dir, claims } = dirtyRepo('test/a b-é.test.mjs');
+    await expect(probe({ projectDir: dir, claims, mode: 'worktree', toolVersion: 't' }))
+      .rejects.toThrow(/test\/a b-é\.test\.mjs/);
+  });
+  it('refuses both sides of a dirty defender rename from NUL-delimited status', async () => {
+    const { dir, claims } = dirtyRepo();
+    const renamed = join(dir, 'test', 'a renamed.test.mjs');
+    writeFileSync(renamed, "import { a } from '../src/a.mjs';\n// renamed while dirty\n");
+    spawnSync('git', ['rm', '-q', 'test/a.test.mjs'], { cwd: dir, encoding: 'utf8' });
+    spawnSync('git', ['add', 'test/a renamed.test.mjs'], { cwd: dir, encoding: 'utf8' });
+    await expect(probe({ projectDir: dir, claims, mode: 'worktree', toolVersion: 't' }))
+      .rejects.toThrow(/test\/a\.test\.mjs|test\/a renamed\.test\.mjs/);
   });
   it('refuses a dirty config-defined defender even when its name is outside legacy test globs', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-precond-configured-'));

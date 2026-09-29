@@ -6,11 +6,13 @@ import { randomBytes } from 'node:crypto';
 
 export class GitError extends Error {}
 
-export function git(args, cwd, env) {
+export function gitRaw(args, cwd, env) {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8', env: env ? { ...process.env, ...env } : process.env });
   if (r.status !== 0) throw new GitError(`git ${args.join(' ')}: ${(r.stderr || r.stdout).trim()}`);
-  return r.stdout.trim();
+  return r.stdout;
 }
+
+export const git = (args, cwd, env) => gitRaw(args, cwd, env).trim();
 
 export const repoRoot = (dir) => git(['rev-parse', '--show-toplevel'], dir);
 

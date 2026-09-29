@@ -695,10 +695,12 @@ talks to the network; only the job posts, and only when told to.
   flaky defender or a missing anchor is reported as unproven, never rounded
   toward green. The one pass is `killed`; everything else gates.
 - **Per-run and whole-command time are separate.** `--budget` limits each
-  runner invocation. `--command-budget` optionally limits the complete
-  `probe`, `sweep`, or `replay` measurement. If that total expires, TestGuard exits `2`
-  and writes no new result document; a completed prefix is not presented as
-  though the unattempted suffix were clean.
+  runner invocation. `--command-budget` is a cooperative deadline for the
+  complete `probe`, `sweep`, or `replay` measurement: asynchronous children
+  receive only the remaining time, and stage/write boundaries re-check it.
+  Synchronous setup may overrun the nominal deadline, but once expiry is
+  observed TestGuard exits `2` and writes no new result document; a completed
+  prefix is not presented as though the unattempted suffix were clean.
 - **Configured discovery is evidence.** Vitest, Jest, and Playwright enumerate
   their own configured files; TestGuard validates and hashes that immutable
   universe instead of guessing with filename globs. Automatic JavaScript and

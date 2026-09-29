@@ -64,6 +64,18 @@ describe('the native discovery process boundary', () => {
       })).rejects.toThrow(/100ms.*exceeded/i);
       await new Promise((resolve) => setTimeout(resolve, 500));
       expect(existsSync(marker)).toBe(false);
+
+      const orphanMarker = join(dir, 'orphan-survived');
+      const orphan = `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(orphanMarker)}, 'alive'), 450)`;
+      const helper = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(orphan)}], { detached: true, stdio: 'ignore' }).unref()`;
+      const daemonizer = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(helper)}], { detached: true, stdio: 'ignore' }).unref(); setInterval(() => {}, 1000);`;
+      await expect(runDiscoveryProcess({
+        projectDir: dir,
+        argv: [process.execPath, '-e', daemonizer],
+        timeoutMs: 150,
+      })).rejects.toThrow(/cleanup-unverified.*reparented daemon/i);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      expect(existsSync(orphanMarker)).toBe(true);
     }
     await expect(runDiscoveryProcess({
       projectDir: ROOT,

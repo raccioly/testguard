@@ -44,7 +44,7 @@ probe
   --claims <path>      claims file             (default: <dir>/testguard.claims.json)
   --confirm <n>        runs per verdict        (default: 3)
   --budget <ms>        wall clock per run      (default: 120000)
-  --command-budget <ms> total measurement wall clock for probe, sweep, or replay. On expiry exit 2; write no partial result
+  --command-budget <ms> cooperative measurement deadline for probe, sweep, or replay. Caps async children; expiry exits 2 and writes no partial result
   --out <path>         evidence file           (default: <dir>/.testguard/evidence.json)
   --baseline <path>    baseline to gate against (default: <dir>/.testguard/baseline.json if present)
   --severity <level>   gate only at or above   (default: low)
@@ -97,7 +97,7 @@ mcp        no options. JSON-RPC 2.0 over stdio; five READ-ONLY tools (status, br
 replay     --since <range>   commit range to search for fix commits (HEAD~50..HEAD, a tag, origin/main..HEAD)
            --max <n>         replay at most n fixes (they are slow: one worktree and N runs each)
            --confirm <n>     runs per verdict (default 3); a flaky failure reads as "the suite caught it", so mixed runs are never caught
-           --command-budget <ms> total measurement wall clock; expiry writes neither replay nor calibration, so an unmeasured suffix cannot look clean
+           --command-budget <ms> cooperative measurement deadline; expiry writes neither replay nor calibration, so an unmeasured suffix cannot look clean
            --out <path>       replay document (default: <dir>/.testguard/replay.json); the calibration goes beside it
            reports, never gates: a bug that escaped is history, not a regression in this change
                    · one-line JSX element removed · on<Event> handler prop dropped

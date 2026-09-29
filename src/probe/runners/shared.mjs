@@ -31,7 +31,15 @@ function descendantPids(rootPid) {
   return out;
 }
 
-/** Kill the complete runner tree, including a descendant that created its own process group. */
+export const TIMEOUT_CLEANUP_WARNING = 'cleanup-unverified: TestGuard hard-killed the runner process group and descendants still attributable at timeout, but an already-reparented daemon may survive; use an OS or container containment boundary for daemonizing or untrusted commands';
+
+/**
+ * Best-effort runner cleanup. POSIX process groups plus a PPID snapshot cover
+ * ordinary descendants and a still-attributable detached child. Node exposes
+ * no portable cgroup/job-object/subreaper primitive, so a daemon that already
+ * reparented cannot be proven dead here. Callers must keep the result a
+ * timeout and surface TIMEOUT_CLEANUP_WARNING rather than claiming containment.
+ */
 export function terminateProcessTree(child) {
   if (!child.pid) return;
   if (process.platform === 'win32') {
@@ -242,7 +250,7 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
       const durationMs = Date.now() - started;
       let result;
       if (killed) {
-        result = { run: { outcome: 'timeout', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs }, timeouts: 1, loadMessage: `budget of ${budgetMs}ms exceeded`, failedTests: [] };
+        result = { run: { outcome: 'timeout', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs }, timeouts: 1, loadMessage: `budget of ${budgetMs}ms exceeded; ${TIMEOUT_CLEANUP_WARNING}`, failedTests: [] };
       } else if (!existsSync(outFile)) {
         result = { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs }, timeouts: 0, loadMessage: stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? 'runner produced no report', failedTests: [] };
       } else {

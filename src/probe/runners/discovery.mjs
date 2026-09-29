@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { sha256 } from '../../util/hash.mjs';
 import { globToRegExp, walk } from '../../util/glob.mjs';
 import { parseModuleSource, tokenizeModule } from '../imports.mjs';
-import { terminateProcessTree } from './shared.mjs';
+import { terminateProcessTree, TIMEOUT_CLEANUP_WARNING } from './shared.mjs';
 
 export const DISCOVERY_TIMEOUT_MS = 60_000;
 export const MAX_DISCOVERY_OUTPUT_BYTES = 16 * 1024 * 1024;
@@ -214,7 +214,7 @@ export function runDiscoveryProcess({
       reject(terminalError);
     });
     timer = setTimeout(() => {
-      terminalError ??= new DiscoveryError(`native test discovery timeout of ${timeoutMs}ms exceeded`);
+      terminalError ??= new DiscoveryError(`native test discovery timeout of ${timeoutMs}ms exceeded; ${TIMEOUT_CLEANUP_WARNING}`);
       reject(terminalError);
       terminate();
     }, timeoutMs);

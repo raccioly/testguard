@@ -17,15 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Symbol-aware JavaScript/TypeScript defender discovery through named,
   default, namespace, CommonJS, and barrel re-exports. Ambiguity and bounded
   resolver exhaustion fail closed as `defender-discovery-indeterminate`.
-- `probe`, `sweep`, and `replay` accept `--command-budget <ms>` as a total
-  wall-clock deadline distinct from the existing per-run `--budget`. Expiry
-  exits with a precondition failure and writes no partial result, so an
-  unattempted suffix can never be reported as clean.
+- `probe`, `sweep`, and `replay` accept `--command-budget <ms>` as a
+  cooperative measurement deadline distinct from the existing per-run
+  `--budget`. It caps asynchronous children and is checked at stage and write
+  boundaries; synchronous setup may overrun but cannot publish a partial
+  result, so an unattempted suffix can never be reported as clean.
 
 ### Fixed
 
-- Runner timeouts now terminate the complete descendant process tree, including
-  children that created their own process group, before returning a timeout.
+- Runner timeouts now hard-kill the original process group and descendants
+  still attributable at timeout. Diagnostics explicitly say cleanup is
+  unverified because a previously reparented daemon requires external OS or
+  container containment.
 - Generated CommonJS export mutations and unresolved symbol/configuration
   paths fail closed instead of allowing a false `nocover` result.
 - Dirty-tree preflight now resolves the same full primary-plus-owned runner

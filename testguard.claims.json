@@ -5046,7 +5046,7 @@
     },
     {
       "id": "TG-COMMAND-BUDGET-NEVER-PUBLISHES-A-PARTIAL",
-      "statement": "A whole-command deadline caps every child runner at the remaining time and, once exhausted, aborts the operation before any partial result can be published as complete.",
+      "statement": "A cooperative whole-command deadline caps every asynchronous child runner at the remaining time and is rechecked at every result-write boundary; synchronous setup may overrun, but expiry can never publish a partial result as complete.",
       "source": {
         "kind": "spec",
         "ref": "spec/GATE-SEMANTICS.md#per-run-and-whole-command-budgets-are-different"
@@ -5076,7 +5076,7 @@
         },
         {
           "id": "F2",
-          "description": "Child runners receive their full per-run budget even when it exceeds the command's remaining wall-clock allowance.",
+          "description": "Child runners receive their full per-run budget even when it exceeds the command's remaining allowance.",
           "faultClass": "return-altered",
           "file": "src/command-budget.mjs",
           "find": "    return Math.max(1, Math.min(perRunMs, Math.floor(this.remainingMs())));",
@@ -5085,6 +5085,45 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Probe no longer rechecks the cooperative deadline at its evidence-write boundary.",
+          "faultClass": "statement-deleted",
+          "file": "src/commands/probe.mjs",
+          "find": "  commandBudget?.assertOpen();\n  writeSpecDoc('evidence', outPath, evidence);",
+          "replace": "  writeSpecDoc('evidence', outPath, evidence);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-29T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Sweep no longer rechecks the cooperative deadline before writing its paired result documents.",
+          "faultClass": "statement-deleted",
+          "file": "src/commands/sweep.mjs",
+          "find": "  commandBudget?.assertOpen();\n  writeSpecDoc('sweep', outPath, document);",
+          "replace": "  writeSpecDoc('sweep', outPath, document);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-29T00:00:00Z"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "Replay no longer rechecks the cooperative deadline before writing its paired result documents.",
+          "faultClass": "statement-deleted",
+          "file": "src/commands/replay.mjs",
+          "find": "  commandBudget?.assertOpen();\n  writeSpecDoc('replay', outPath, doc);",
+          "replace": "  writeSpecDoc('replay', outPath, doc);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-29T00:00:00Z"
           }
         }
       ]
@@ -5330,7 +5369,7 @@
     },
     {
       "id": "TG-RUNNER-TIMEOUT-KILLS-DESCENDANTS",
-      "statement": "A timed-out runner is not considered stopped until TestGuard has terminated its complete descendant process tree, including detached descendants.",
+      "statement": "A timed-out runner remains a timeout while TestGuard hard-kills its process group and every still-attributable descendant; diagnostics explicitly say cleanup is unverified because an already-reparented daemon may survive.",
       "source": {
         "kind": "spec",
         "ref": "spec/GATE-SEMANTICS.md#per-run-and-whole-command-budgets-are-different"
@@ -5347,7 +5386,7 @@
       "faults": [
         {
           "id": "F1",
-          "description": "Detached descendants are omitted from timeout termination and can mutate the project after TestGuard returns.",
+          "description": "Still-attributable detached descendants are omitted from timeout cleanup and can mutate the project after TestGuard returns.",
           "faultClass": "return-altered",
           "file": "src/probe/runners/shared.mjs",
           "find": "  for (const pid of descendantPids(child.pid)) {",
@@ -5356,6 +5395,19 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Timeout diagnostics claim cleanup without warning that an already-reparented daemon may survive.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "export const TIMEOUT_CLEANUP_WARNING = 'cleanup-unverified: TestGuard hard-killed the runner process group and descendants still attributable at timeout, but an already-reparented daemon may survive; use an OS or container containment boundary for daemonizing or untrusted commands';",
+          "replace": "export const TIMEOUT_CLEANUP_WARNING = 'cleanup complete';",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-29T00:00:00Z"
           }
         }
       ]
@@ -5433,6 +5485,19 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Dirty paths are read from line-oriented porcelain output, allowing Git-quoted names with spaces or non-ASCII characters to miss the watched set.",
+          "faultClass": "return-altered",
+          "file": "src/probe/probe.mjs",
+          "find": "      const records = gitRaw(['status', '--porcelain=v1', '-z'], root).split('\\0');",
+          "replace": "      const records = gitRaw(['status', '--porcelain=v1'], root).split('\\n');",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-09-29T00:00:00Z"
           }
         }
       ]

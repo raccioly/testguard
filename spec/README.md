@@ -40,10 +40,11 @@ which verdicts turn CI red, baseline and delta rules, exit codes — is in
 [`GATE-SEMANTICS.md`](GATE-SEMANTICS.md).
 
 Operational completeness is contractual too. `--budget` bounds one runner
-invocation; `--command-budget` bounds a complete probe, sweep, or replay measurement. A
-whole-command deadline produces no document at all, because a valid document
-containing only the completed prefix would make an unattempted suffix look
-measured. The exact rule is in `GATE-SEMANTICS.md`.
+invocation; `--command-budget` is a cooperative deadline for a complete probe,
+sweep, or replay measurement. It caps asynchronous child processes, is checked
+at stage and write boundaries, and produces no document once observed expired.
+Synchronous setup may overrun but cannot authorize a partial result. The exact
+rule is in `GATE-SEMANTICS.md`.
 
 Schemas are JSON Schema 2020-12 and identified as `urn:claimspec:v1:<kind>`.
 

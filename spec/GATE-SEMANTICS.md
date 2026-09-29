@@ -223,11 +223,13 @@ Rules that follow from the table:
 ## Per-run and whole-command budgets are different
 
 `--budget` remains the wall-clock ceiling for one runner invocation. An
-optional `--command-budget` is the ceiling for the complete `probe`, `sweep`,
-or `replay` measurement, including discovery and setup through construction of
-the complete result. Every child process is given no more than the command's
-remaining time. Cleanup and result serialization are not interruptible; they
-begin only after the completed result has cleared the deadline.
+optional `--command-budget` is a cooperative deadline for the complete
+`probe`, `sweep`, or `replay` measurement. Every asynchronous child runner and
+discovery process is given no more than the command's remaining time, and the
+deadline is checked again at stage boundaries and immediately before any
+result is written. Synchronous filesystem, Git, parsing, and cleanup work is
+not preemptible in portable Node.js and may finish after the nominal deadline;
+that overrun grants no authority to publish a result.
 
 Exhausting the whole-command budget is not a test verdict and is never a
 successful partial measurement. The command exits `2` and writes no new
@@ -235,6 +237,14 @@ result document; any previous document remains untouched. Cleanup may finish
 after the deadline, but no record from the incomplete operation becomes
 evidence. This is deliberately stricter than a per-run timeout: publishing
 the completed prefix would let the unattempted suffix look clean.
+
+Timeout cleanup is best effort, not portable process containment. TestGuard
+hard-kills the runner's original process group and every descendant still
+attributable through the process table. A daemon that detached, reparented,
+and disappeared from that ancestry before timeout may survive, so timeout
+diagnostics state `cleanup-unverified`. Such a run remains a timeout and never
+becomes evidence of detection. Daemonizing or untrusted commands require an
+OS or container boundary that TestGuard does not claim to provide.
 
 ## Replay reports; it never gates
 

@@ -109,6 +109,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
       if (values.verbose || r.verdict !== 'killed') io.out(renderRecord(r, { provisional, showDiscovered: firstOfClaim }) + (r.reusedFrom ? '  (reused)' : ''));
     },
   });
+  commandBudget?.assertOpen();
   writeSpecDoc('evidence', outPath, evidence);
 
   const g = gate(evidence.records, baseline, { severityFloor: values.severity });
