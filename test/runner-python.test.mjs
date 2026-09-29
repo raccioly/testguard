@@ -149,7 +149,9 @@ describe('the interpreter is a precondition, never a verdict', () => {
     mkdirSync(dirname(fake), { recursive: true });
     writeFileSync(fake, `#!${process.execPath}\nprocess.exit(1);\n`, { mode: 0o755 });
     const saved = process.env.VIRTUAL_ENV;
+    const savedExplicit = process.env.TESTGUARD_PYTHON;
     delete process.env.VIRTUAL_ENV;
+    delete process.env.TESTGUARD_PYTHON;
     const allowances = [];
     try {
       const result = await makeCheck('unittest')({
@@ -161,6 +163,8 @@ describe('the interpreter is a precondition, never a verdict', () => {
     } finally {
       if (saved === undefined) delete process.env.VIRTUAL_ENV;
       else process.env.VIRTUAL_ENV = saved;
+      if (savedExplicit === undefined) delete process.env.TESTGUARD_PYTHON;
+      else process.env.TESTGUARD_PYTHON = savedExplicit;
       rmSync(dir, { recursive: true, force: true });
     }
   }, 40_000);

@@ -97,7 +97,19 @@ describe('probe preconditions', () => {
     g('init', '-q');
     for (const path of ['src', 'unit', 'e2e', 'node_modules/@playwright']) mkdirSync(join(dir, path), { recursive: true });
     symlinkSync(join(ROOT, 'node_modules', 'vitest'), join(dir, 'node_modules', 'vitest'), 'dir');
-    symlinkSync(join(ROOT, 'fixtures', 'known-answer-playwright', 'node_modules', '@playwright', 'test'), join(dir, 'node_modules', '@playwright', 'test'), 'dir');
+    const playwrightPackage = join(dir, 'node_modules', '@playwright', 'test');
+    mkdirSync(playwrightPackage, { recursive: true });
+    writeFileSync(join(playwrightPackage, 'package.json'), JSON.stringify({
+      name: '@playwright/test',
+      version: '1.0.0-test',
+      type: 'module',
+      bin: { playwright: './cli.mjs' },
+    }));
+    writeFileSync(join(playwrightPackage, 'cli.mjs'), [
+      "import { writeFileSync } from 'node:fs';",
+      "writeFileSync(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE, JSON.stringify({ errors: [], suites: [{ file: 'e2e/a.pw.ts', specs: [], suites: [] }] }));",
+      '',
+    ].join('\n'));
     writeFileSync(join(dir, 'package.json'), '{"type":"module","devDependencies":{"vitest":"*","@playwright/test":"*"}}');
     writeFileSync(join(dir, 'src', 'a.mjs'), 'export const a = () => 1;\n');
     writeFileSync(join(dir, 'unit', 'a.test.mjs'), "import { it } from 'vitest';\nit('unit', () => {});\n");
