@@ -5059,7 +5059,8 @@
         "at": "2026-09-27T00:00:00Z"
       },
       "defendedBy": [
-        "test/command-budget.test.mjs"
+        "test/command-budget.test.mjs",
+        "test/command-budget-write-boundaries.test.mjs"
       ],
       "faults": [
         {
@@ -5459,7 +5460,7 @@
         "at": "2026-09-27T00:00:00Z"
       },
       "defendedBy": [
-        "test/probe-preconditions.test.mjs"
+        "test/probe-native-manifest.test.mjs"
       ],
       "faults": [
         {
@@ -5487,9 +5488,28 @@
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
           }
-        },
+        }
+      ]
+    },
+    {
+      "id": "TG-DIRTY-PREFLIGHT-PARSES-NUL-PATHS",
+      "statement": "Dirty-tree preflight reads Git's NUL-delimited porcelain records so quoted, non-ASCII, spaced, and renamed paths cannot disappear from the watched defender universe.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 13"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-09-29T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/probe-dirty-paths.test.mjs"
+      ],
+      "faults": [
         {
-          "id": "F3",
+          "id": "F1",
           "description": "Dirty paths are read from line-oriented porcelain output, allowing Git-quoted names with spaces or non-ASCII characters to miss the watched set.",
           "faultClass": "return-altered",
           "file": "src/probe/probe.mjs",

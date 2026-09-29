@@ -24,6 +24,13 @@ const scratch = (prefix = 'testguard-discovery-') => {
   dirs.push(dir);
   return dir;
 };
+const waitForFile = async (path, timeoutMs = 3_000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (!existsSync(path) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  return existsSync(path);
+};
 
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -74,8 +81,7 @@ describe('the native discovery process boundary', () => {
         argv: [process.execPath, '-e', daemonizer],
         timeoutMs: 150,
       })).rejects.toThrow(/cleanup-unverified.*reparented daemon/i);
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      expect(existsSync(orphanMarker)).toBe(true);
+      expect(await waitForFile(orphanMarker)).toBe(true);
     }
     await expect(runDiscoveryProcess({
       projectDir: ROOT,
