@@ -278,7 +278,8 @@
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/discover.test.mjs"
+        "test/discover.test.mjs",
+        "test/rank-aliases.test.mjs"
       ],
       "faults": [
         {
