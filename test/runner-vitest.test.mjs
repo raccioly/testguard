@@ -116,14 +116,23 @@ describe('runVitest budget', () => {
     if (process.platform === 'win32') return;
     const dir = mkdtempSync(join(tmpdir(), 'tg-runner-orphan-'));
     const marker = join(dir, 'survived');
-    const grandchild = `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'alive'), 450)`;
+    const ready = join(dir, 'ready');
+    const release = join(dir, 'release');
+    // Establish startup, then test survival after cleanup, not scheduler speed.
+    const grandchild = `const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(ready)}, 'ready'); const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(release)})) { fs.writeFileSync(${JSON.stringify(marker)}, 'alive'); clearInterval(timer); } }, 25); setTimeout(() => process.exit(), 10000).unref();`;
     const helper = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(grandchild)}], { detached: true, stdio: 'ignore' }).unref()`;
     const parent = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(helper)}], { detached: true, stdio: 'ignore' }).unref(); setInterval(() => {}, 1000);`;
     try {
-      const { run, loadMessage } = await runProcess({ argv: () => [], projectDir: dir, files: [], budgetMs: 150, command: [process.execPath, '-e', parent] });
+      const { run, loadMessage } = await runProcess({ argv: () => [], projectDir: dir, files: [], budgetMs: 1000, command: [process.execPath, '-e', parent] });
       expect(run.outcome).toBe('timeout');
       expect(loadMessage).toMatch(/cleanup-unverified.*reparented daemon/i);
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      expect(existsSync(ready)).toBe(true);
+      expect(existsSync(marker)).toBe(false);
+      writeFileSync(release, 'release');
+      const deadline = Date.now() + 3000;
+      while (!existsSync(marker) && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
       expect(existsSync(marker)).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });

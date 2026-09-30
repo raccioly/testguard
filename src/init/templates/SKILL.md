@@ -9,6 +9,49 @@ TestGuard injects the faults a project's claims forbid and reports every one
 the tests fail to detect. It is a **claim verifier**, not a test generator.
 You operate it through one loop and one source of truth.
 
+## Update advice (once per session, never an automatic install)
+
+Before the operating loop, identify the CLI you will actually run: prefer the
+project's installed `node_modules/.bin/testguard`, then the repository-root
+install for a nested project, then `testguard` on PATH. Run that exact CLI with
+`--version`, and use the same executable for verification. Do not use `npx` to
+discover a version: it can fetch or install a different tool. When developing
+TestGuard itself, use `node cli/testguard.mjs`; do not replace a source checkout
+with a published version to make validation pass.
+
+If the user's network policy permits registry access, make one bounded,
+read-only check per session (not per command or project):
+
+```bash
+npm view testguard-cli dist-tags.latest --json --fetch-retries=0 --fetch-timeout=5000
+```
+
+Compare valid stable versions by numeric SemVer major, minor, then patch, not
+lexicographically and not merely for inequality. Do not recommend a downgrade
+or replacing a prerelease/development checkout. If the registry result is
+missing, malformed, unavailable, or network access is prohibited, continue the
+operating loop without claiming the installation is up to date. No retries or
+repeated prompts after the user declines within this session.
+
+For a newer stable version, say: "Using TestGuard X from <resolved executable>;
+Y is available. Would you like to update?" Respect project pins, compatibility,
+company policy and the original package manager; a registry's `latest` tag is
+not proof that an upgrade is safe. Never install automatically, modify a
+lockfile or CI pin, or switch between local and global installs without approval.
+After an approved update, verify the same executable's version again.
+
+Keep this advice in the AI conversation, separate from CLI JSON, evidence,
+verdicts and exit codes. The CLI and session-start hook remain offline; the AI
+performs this optional check, not TestGuard. Instructions cannot guarantee that
+every AI checks for updates.
+
+Package upgrades do not refresh an existing copied skill. Preserve customized
+instructions: compare this file with the upgraded package's
+`src/init/templates/SKILL.md` and merge approved changes. Use `testguard init
+--force` only with explicit permission to replace the whole skill; review the
+diff afterward. An ordinary `init` preserves existing skills and managed
+sections already listing this project.
+
 ## The one source of truth
 
 ```bash
