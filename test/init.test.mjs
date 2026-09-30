@@ -142,6 +142,42 @@ describe('the session-start hook never reaches the network', () => {
 });
 
 describe('init', () => {
+  it('installs advisory update instructions without a connected hook or automatic refresh', () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-advisory-')));
+    initProject({ projectDir: dir });
+    const skillPath = join(dir, '.claude', 'skills', 'testguard', 'SKILL.md');
+    const agentsPath = join(dir, 'AGENTS.md');
+    const skill = readFileSync(skillPath, 'utf8');
+    const agents = readFileSync(agentsPath, 'utf8');
+    const query = 'npm view testguard-cli dist-tags.latest --json --fetch-retries=0 --fetch-timeout=5000';
+    for (const text of [skill, agents]) {
+      expect(text).toContain(query);
+      expect(text).toMatch(/once per (?:AI )?session/i);
+      expect(text).toContain('network policy permits');
+      expect(text).toMatch(/Never install automatically/i);
+      expect(text).toContain('SemVer');
+      expect(text).toContain('prerelease/development checkout');
+      expect(text).toContain('exit codes');
+    }
+    expect(skill).toContain('use the same executable for verification');
+    expect(skill).toContain('Do not use `npx`');
+    expect(skill).toContain('without claiming the installation is up to date');
+    expect(agents).toContain('project-local first, then repository-root, then PATH');
+    const settings = readFileSync(join(dir, '.claude', 'settings.json'), 'utf8');
+    expect(settings).not.toMatch(/npm|dist-tags|fetch-timeout/);
+
+    const customizedSkill = `${skill}\nUser customization: keep the pinned tool.\n`;
+    const customizedAgents = `User instructions before.\n${agents}\nUser instructions after.\n`;
+    writeFileSync(skillPath, customizedSkill);
+    writeFileSync(agentsPath, customizedAgents);
+    expect(initProject({ projectDir: dir }).done).toEqual([]);
+    expect(readFileSync(skillPath, 'utf8')).toBe(customizedSkill);
+    expect(readFileSync(agentsPath, 'utf8')).toBe(customizedAgents);
+    initProject({ projectDir: dir, force: true });
+    expect(readFileSync(skillPath, 'utf8')).toBe(skill);
+    expect(readFileSync(agentsPath, 'utf8')).toBe(customizedAgents);
+  });
+
   it('installs skill, hook, AGENTS.md section and gitignore lines; is idempotent; --force replaces only the skill', () => {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-')));
     mkdirSync(join(dir, '.claude'));

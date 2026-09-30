@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   narrowing warnings (#90). Selection changes invalidate reuse and status;
   admission and changed-file coverage use the actual selected defenders.
 
+### Changed
+
+- New AI integrations include permission-aware, once-per-session update advice
+  that identifies the actual CLI and requests approval before any upgrade.
+  CLI commands and session-start hooks remain offline. Existing customized
+  instructions remain untouched; safe manual refresh is documented.
+
+### Fixed
+
+- The daemon-cleanup regression test now requires explicit startup and
+  post-cleanup release signals instead of assuming a detached process starts
+  and writes within fixed sleeps. Timeout and cleanup semantics are unchanged.
+
 ## [0.15.1] - 2026-09-30
 
 Automated weekly release — everything merged since `v0.15.0`.

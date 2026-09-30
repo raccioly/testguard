@@ -336,6 +336,34 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    offline. The brief's first line says which install answered
    (`local install` or `global`), so a stale one is visible.
 
+### Advisory updates for AI sessions
+
+New integrations created by `testguard init` tell the AI to identify the actual
+CLI (project-local before global) and, once per session when network policy
+permits, read the registry's stable version:
+
+```bash
+npm view testguard-cli dist-tags.latest --json --fetch-retries=0 --fetch-timeout=5000
+```
+
+This is an optional check performed by the AI, not by TestGuard's CLI or hook.
+A newer stable version produces a suggestion and a request for approval, never
+an automatic install. Project pins and the original package manager still
+apply; prereleases and development checkouts are not replaced. Offline or
+failed checks do not change verdicts, evidence or exit codes, and do not prove
+that an installation is current. AI instructions are guidance, not a guarantee
+that every harness performs the check.
+
+Upgrading the package does **not** refresh an existing copied skill or an
+existing managed section already listing the project. Compare the upgraded
+package's `src/init/templates/SKILL.md` with
+`.claude/skills/testguard/SKILL.md` and merge approved changes, preserving local
+customizations. For an existing `AGENTS.md` section, add the same advisory
+policy after reviewing it. `testguard init --force` replaces the whole skill
+but does not refresh an already-listed managed section; use it only with
+explicit overwrite approval and review the diff. No new automatic refresh
+mechanism is introduced.
+
 ### Would this suite have caught the bugs that already escaped?
 
 An injected fault is a fault somebody thought of. A bug that actually shipped
