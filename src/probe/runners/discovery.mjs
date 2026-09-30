@@ -275,7 +275,6 @@ const inside = (root, path) => {
 const relativeConfigPath = (root, path) => relative(root, path).split(sep).join('/');
 
 const existingConfigCandidate = (root, path) => {
-  if (!inside(root, path)) throw new DiscoveryError(`discovery config dependency resolves outside the project: ${path}`);
   let stat;
   try {
     stat = lstatSync(path);
@@ -285,6 +284,7 @@ const existingConfigCandidate = (root, path) => {
   }
   if (stat.isSymbolicLink()) throw new DiscoveryError(`discovery config dependency is not readable: symbolic links are not allowed`);
   if (!stat.isFile()) return null;
+  if (!inside(root, path)) throw new DiscoveryError(`discovery config dependency resolves outside the project: ${path}`);
   return path;
 };
 
@@ -305,7 +305,9 @@ const resolveConfigReference = (root, fromPath, rawReference) => {
 
   const resolved = new Set();
   for (const base of bases) {
-    if (!inside(root, base)) throw new DiscoveryError(`discovery config dependency resolves outside the project: ${rawReference}`);
+    // Strings in executable configs also describe URLs and separators. Only
+    // existing file candidates are dependencies; the boundary check follows
+    // that distinction, while symlinks remain refused even when dangling.
     const candidates = extname(base)
       ? [base]
       : [base, ...RESOLVABLE_CONFIG_EXTENSIONS.map((extension) => `${base}${extension}`),

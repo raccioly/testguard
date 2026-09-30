@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Assertion messages quoting "timed out" no longer become runner timeouts.
+  Native timeout headers and structured timeout failures remain non-detections
+  (#179).
+- Configuration dependency hashing no longer rejects harmless absolute-looking
+  strings such as Vite URL bases, middleware routes, or `split('/')`. Existing
+  outside-project file dependencies and symlinks still fail closed (#178).
+- Discovery failures no longer assert that dependencies are missing when the
+  runner resolved successfully but its configuration could not be discovered.
+- Each subcommand's `--help` now shows its own options and an example; global
+  `--help` exits successfully and points to command-specific help (#120).
+- Parent gates, status change reports, and claimed-surface counts respect valid
+  nested TestGuard project boundaries. Delegated files are explicitly reported
+  and require a separate child gate; invalid or symlinked markers fail (#150).
+
+### Added
+
+- Explicit `probe --allow-empty` adoption mode, also available as an opt-in
+  GitHub Action input. A valid empty claims file skips verification without
+  writing evidence; JSON keeps the `no-claims` state. Default empty probes,
+  invalid claims, and explicit claim selections still fail (#176).
+
 ## [0.15.0] - 2026-09-29
 
 Automated weekly release — everything merged since `v0.14.2`.

@@ -57,6 +57,19 @@ export async function probeCommand({ projectDir, values, version }, io) {
   const stageOut = stageReporter(progress, (s) => progressTo.write(s));
   const claims = loadClaims(values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir));
   if (claims.claims.length === 0) {
+    if (values['allow-empty'] && values.claim === undefined) {
+      io.err('claims file declares no claims; verification skipped (--allow-empty); run gate to check changed-file coverage');
+      if (values.json) {
+        const doc = computeStatus({ projectDir, toolVersion: version, paths: {
+          claims: values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir),
+          evidence: evidencePath(projectDir), provisional: provisionalEvidencePath(projectDir), baseline: baselinePath(projectDir),
+        } });
+        const result = validate('status', doc);
+        if (!result.ok) throw new Error(`empty probe JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
+        io.out(JSON.stringify(doc, null, 2));
+      }
+      return 0;
+    }
     io.err('claims file declares no claims; nothing to verify');
     return 2;
   }

@@ -7,7 +7,7 @@
  * devDependency and crashed on startup for every npm/npx/pip/brew user.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, cpSync, readdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, cpSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -29,6 +29,29 @@ try {
 
   const bin = join(consumer, 'node_modules', '.bin', process.platform === 'win32' ? 'testguard.cmd' : 'testguard');
   const version = run(bin, ['--version'], consumer).trim();
+  const emptyProject = join(scratch, 'empty-adoption');
+  mkdirSync(emptyProject);
+  writeFileSync(join(emptyProject, 'testguard.claims.json'), JSON.stringify({ schemaVersion: 1, claims: [] }));
+  const emptyStatus = JSON.parse(run(bin, ['probe', emptyProject, '--allow-empty', '--json'], consumer));
+  if (emptyStatus.state !== 'no-claims' || emptyStatus.run || existsSync(join(emptyProject, '.testguard', 'evidence.json'))) throw new Error('installed empty-adoption probe invented verification evidence');
+  const replayHelp = run(bin, ['replay', '--help'], consumer);
+  if (!replayHelp.includes('--since') || replayHelp.includes('--node-modules')) throw new Error('installed command help is not command-specific');
+  writeFileSync(join(emptyProject, 'vite.config.mjs'), "export default { base: '/', plugins: [{ configureServer(s) { s.middlewares.use('/__rooms', () => {}); const parts = '/__room'.split('/'); } }] };\n");
+  const installedDiscovery = join(consumer, 'node_modules', 'testguard-cli', 'src', 'probe', 'runners', 'discovery.mjs');
+  run(process.execPath, ['--input-type=module', '-e',
+    "import { pathToFileURL } from 'node:url'; const { hashDiscoveryConfigs } = await import(pathToFileURL(process.argv[1])); hashDiscoveryConfigs(process.argv[2], ['vite.config.mjs']);",
+    installedDiscovery, emptyProject,
+  ], consumer);
+  const installedRunner = join(consumer, 'node_modules', 'testguard-cli', 'src', 'probe', 'runners', 'shared.mjs');
+  run(process.execPath, ['--input-type=module', '-e',
+    `import { pathToFileURL } from 'node:url'; const { parseReport } = await import(pathToFileURL(process.argv[1]));
+     const result = parseReport({ success: false, numTotalTests: 2, numFailedTests: 2, testResults: [{ name: 'test.mjs', status: 'failed', assertionResults: [
+       { status: 'failed', failureMessages: ['AssertionError: expected /specify timed out/'] },
+       { status: 'failed', failureMessages: ['Error: Test timed out in 1000ms.'] },
+     ] }] }, 1);
+     if (result.timeouts !== 1 || result.run.assertionFailures !== 1) throw new Error('installed runner confuses assertion text with timeout identity');`,
+    installedRunner,
+  ], consumer);
   const claims = run(bin, ['claims', '.'], consumer);
   const draft = JSON.parse(run(bin, ['scaffold', 'src/redact.mjs', '--json'], consumer));
   const installedValidator = join(consumer, 'node_modules', 'testguard-cli', 'spec', 'lib', 'validate.mjs');
@@ -40,9 +63,14 @@ try {
      const { validate } = await import(pathToFileURL(process.argv[1]));
      const result = validate('evidence', JSON.parse(readFileSync(process.argv[2], 'utf8')));
      if (!result.ok) throw new Error(result.errors.map((error) => \`${'${error.path}: ${error.message}'}\`).join('; '));
+     const gate = JSON.parse(readFileSync(process.argv[3], 'utf8'));
+     gate.nested = [{ project: 'backend', files: ['backend/src/guard.mjs'] }]; gate.changed++;
+     const nestedResult = validate('gate', gate);
+     if (!nestedResult.ok) throw new Error('installed package rejected the nested-project gate contract');
      process.stdout.write('ok');`,
     installedValidator,
     candidateEvidence,
+    join(root, 'spec', 'conformance', 'examples', 'gate.json'),
   ], consumer).trim();
   if (!draft.claims?.length) throw new Error('scaffold produced no claims from the installed tarball');
   if (!/^\d+\.\d+\.\d+/.test(version)) throw new Error(`unexpected --version output: ${version}`);

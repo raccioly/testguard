@@ -75,6 +75,7 @@ probe
   --in-place           mutate the working tree instead of a scratch worktree
   --no-escalate        do not re-run survivors against the whole suite
   --no-reuse           re-probe claims whose inputs have not changed
+  --allow-empty        adoption only: skip a valid empty claims file; writes no evidence; run gate separately
   --quiet              suppress the per-fault stream and ranked block; print only the summary and evidence path
   --json               the status document plus this run's result (records, newSinceBaseline, exitCode)
 
@@ -134,6 +135,27 @@ exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift, or uncl
 
 const COMMANDS = { mcp: mcpCommand, replay: replayCommand, probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand, admit: admitCommand, sweep: sweepCommand, concerns: concernsCommand };
 
+/** Derive command help from the same option descriptions as the overview. */
+export function commandUsage(command) {
+  const lines = USAGE.split('\n');
+  const overview = lines.find((line) => line.startsWith(`  testguard ${command} `)) ?? `  testguard ${command}`;
+  const sections = [];
+  let selected = false;
+  for (const line of lines) {
+    const heading = /^([a-z]+)(?:\s|$)/.exec(line)?.[1];
+    if (heading && Object.hasOwn(COMMANDS, heading)) selected = heading === command;
+    else if (line.startsWith('every command ') || line.startsWith('exit codes:')) selected = false;
+    if (selected) sections.push(line);
+  }
+  if (command === 'concerns') sections.push('concerns   --concerns <path>  read a custom concerns file; --json prints the validated inventory');
+  const examples = {
+    probe: 'probe . --confirm 3', gate: 'gate . --changed origin/main',
+    scaffold: 'scaffold src/example.mjs --json', replay: 'replay . --since HEAD~10..HEAD --max 3',
+    admit: 'admit test/example.test.mjs --claim EXAMPLE-001', sweep: 'sweep . --changed origin/main --cap 10',
+  };
+  return `${lines[0]}\n\n${overview}\n\n${sections.join('\n').trim()}\n\nCommon: --json, --help, --version\nExample: testguard ${examples[command] ?? `${command}${command === 'mcp' ? '' : ' .'}`}\n`;
+}
+
 export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') }) {
   let parsed;
   try {
@@ -180,6 +202,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         'in-place': { type: 'boolean', default: false },
         'no-escalate': { type: 'boolean', default: false },
         'no-reuse': { type: 'boolean', default: false },
+        'allow-empty': { type: 'boolean', default: false },
         quiet: { type: 'boolean', default: false },
         json: { type: 'boolean', default: false },
         text: { type: 'boolean', default: false },
@@ -202,15 +225,19 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
     return 0;
   }
   const [command, dirArg] = positionals;
-  if (values.help || !command) {
-    io.out(USAGE);
-    return command ? 0 : 3;
+  if (!command) {
+    io.out(USAGE + "\nRun 'testguard <command> --help' for that command's options.");
+    return values.help ? 0 : 3;
   }
   const handler = COMMANDS[command];
   if (!handler) {
     io.err(`unknown command: ${command}`);
     io.err(USAGE);
     return 3;
+  }
+  if (values.help) {
+    io.out(commandUsage(command));
+    return 0;
   }
   if (![...RUNNER_NAMES, 'auto'].includes(values.runner)) {
     io.err(`--runner must be one of ${RUNNER_NAMES.join(', ')} or auto`);

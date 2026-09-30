@@ -184,6 +184,21 @@ export function firstInformativeLine(message) {
   return lines.find((l) => /error|syntax|unexpected|expected .+ but found|cannot find|failed to parse|transform failed/i.test(l) && !/^●/.test(l)) ?? lines[0] ?? '';
 }
 
+function isRunnerTimeout(test) {
+  if (test.failureType === 'testTimeoutFailure') return true;
+  const details = test.failureDetails ?? [];
+  if (details.some((error) => error?.failureType === 'testTimeoutFailure')) return true;
+  return (test.failureMessages ?? []).some((message, index) => {
+    const error = details[index];
+    // Assertion text may quote a timeout header verbatim. Inspect only the
+    // error header, never stack frames, source excerpts, or expected values.
+    if (error?.name === 'AssertionError' || error?.code === 'ERR_ASSERTION' || error?.operator !== undefined) return false;
+    const header = String(message).replace(/\x1b\[[0-9;]*m/g, '').trimStart().split('\n')[0].trimEnd();
+    return /^(?:Error:\s*)?(?:thrown:\s*")?(?:Exceeded timeout of \d+(?:\.\d+)?\s*ms for a (?:test|hook)\b|(?:Test|Hook) timed out in \d+(?:\.\d+)?ms\b|test timed out after \d+(?:\.\d+)?ms\b)/i.test(header)
+      || /^(?:(?:Error|AroundHookSetupError|AroundHookTeardownError):\s*)?The (?:setup|teardown) phase of "around(?:Each|All)" hook timed out after \d+(?:\.\d+)?ms\b/.test(header);
+  });
+}
+
 export function parseReport(report, durationMs) {
   // A report that parsed as JSON but carries no `testResults` is not a suite
   // that ran zero tests — it is a report of a shape this parser does not
@@ -195,7 +210,7 @@ export function parseReport(report, durationMs) {
   const files = report.testResults ?? [];
   const loadFailed = files.some((f) => f.status === 'failed' && (f.assertionResults?.length ?? 0) === 0);
   const results = files.flatMap((f) => (f.assertionResults ?? []).map((t) => ({ ...t, id: `${f.name}::${t.fullName ?? t.title ?? ''}` }))).filter((t) => t.status === 'failed');
-  const timeouts = results.filter((t) => (t.failureMessages ?? []).some((m) => /timed out|exceeded timeout/i.test(m))).length;
+  const timeouts = results.filter(isRunnerTimeout).length;
   const failedTests = results.map((t) => t.id);
   const assertionFailures = results.length - timeouts;
   const tests = { total: report.numTotalTests ?? 0, passed: report.numPassedTests ?? 0, failed: report.numFailedTests ?? 0 };
