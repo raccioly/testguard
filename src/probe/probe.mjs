@@ -13,7 +13,7 @@ import { selectRunner, discoverRunnerManifest, RUNNERS, OWNED_RUNNERS, partition
 import { classify, shouldStopEarly } from './classify.mjs';
 import { blastRadius, rank } from './rank.mjs';
 import { classifyIndependence } from './independence.mjs';
-import { escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf, isReusable } from './attribution.mjs';
+import { escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf, isReusable, defenderSelection } from './attribution.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
 import { fingerprint } from '../../spec/lib/fingerprint.mjs';
 import { persistenceSignalsFor } from '../supply/persistence.mjs';
@@ -154,11 +154,14 @@ export async function probe({
         }
       }
       for (const claim of scopedClaims) {
-        const discovered = claim.defendedBy?.length ? null : claim.faults.map((fault) => discoverDefendersDetailed(projectDir, fault.file, configuredFiles));
-        const declared = claim.defendedBy?.length ? resolveDefenders(projectDir, claim.defendedBy) : discovered.flatMap((detail) => detail.canDetect);
-        for (const d of declared) watched.add(relative(root, join(projectDir, d)));
-        for (const dependency of discovered?.flatMap((detail) => detail.dependencies) ?? []) watched.add(relative(root, join(projectDir, dependency)));
-        for (const g of claim.defendedBy ?? []) if (!g.includes('*')) watched.add(relative(root, join(projectDir, g)));
+        for (const fault of claim.faults) {
+          const { requested } = defenderSelection(claim, fault);
+          const discovered = requested.length ? null : discoverDefendersDetailed(projectDir, fault.file, configuredFiles);
+          const declared = requested.length ? resolveDefenders(projectDir, requested) : discovered.canDetect;
+          for (const d of declared) watched.add(relative(root, join(projectDir, d)));
+          for (const dependency of discovered?.dependencies ?? []) watched.add(relative(root, join(projectDir, dependency)));
+          for (const g of requested) if (!g.includes('*')) watched.add(relative(root, join(projectDir, g)));
+        }
       }
       for (const config of [
         'package.json', 'pnpm-workspace.yaml', 'pnpm-workspace.yml', 'lerna.json', 'nx.json', 'turbo.json', 'rush.json', 'workspace.json',
@@ -315,20 +318,21 @@ export async function probe({
 
     for (const claim of scopedClaims) {
       commandBudget?.assertOpen();
-      const declared = claim.defendedBy?.length ? resolveDefenders(iso.projectDir, claim.defendedBy) : null;
-      if (declared && !commandTemplate) {
-        const excluded = declared.filter((file) => !ownerByFile.has(file));
-        for (const file of excluded) {
-          const expectedOwner = owned.find((candidate) => candidate.owns?.(iso.projectDir, file));
-          const check = expectedOwner && ownedChecked.get(expectedOwner);
-          if (expectedOwner && check && !check.ok) {
-            throw new PreconditionError(`${file} is a ${expectedOwner.name} test (${expectedOwner.name === 'python' ? 'it is a .py file' : `it lives under ${expectedOwner.name}'s testDir`}) but ${expectedOwner.name} is not resolvable for the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${check.message}).`);
-          }
-        }
-        if (excluded.length) throw new PreconditionError(`${claim.id}: defendedBy resolves to ${excluded.join(', ')}, but the configured runners do not collect ${excluded.length === 1 ? 'that file' : 'those files'}`);
-      }
       for (const fault of claim.faults) {
         commandBudget?.assertOpen();
+        const { requested } = defenderSelection(claim, fault);
+        const declared = requested.length ? resolveDefenders(iso.projectDir, requested) : null;
+        if (declared && !commandTemplate) {
+          const excluded = declared.filter((file) => !ownerByFile.has(file));
+          for (const file of excluded) {
+            const expectedOwner = owned.find((candidate) => candidate.owns?.(iso.projectDir, file));
+            const check = expectedOwner && ownedChecked.get(expectedOwner);
+            if (expectedOwner && check && !check.ok) {
+              throw new PreconditionError(`${file} is a ${expectedOwner.name} test (${expectedOwner.name === 'python' ? 'it is a .py file' : `it lives under ${expectedOwner.name}'s testDir`}) but ${expectedOwner.name} is not resolvable for the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${check.message}).`);
+            }
+          }
+          if (excluded.length) throw new PreconditionError(`${claim.id}/${fault.id}: defendedBy resolves to ${excluded.join(', ')}, but the configured runners do not collect ${excluded.length === 1 ? 'that file' : 'those files'}`);
+        }
         // Mock-awareness: a discovered file that mocks the target is not a
         // defender; a declared one that mocks it stays (the author named it)
         // but is listed, because a declared defender that mocks the subject
@@ -413,7 +417,7 @@ export function errorRecord({ claim, fault, defenders, discovered, byRunner, moc
     subject: subjectOf(fault, sha256),
     verdict: 'unverifiable',
     detail: { baselineRuns: [], probeRuns: [], reason: 'probe-error', message },
-    defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}), ...(byRunner ? { byRunner } : {}), ...(mocking.length ? { mocking } : {}), ...(signals.length ? { signals } : {}) },
+    defenders: { ...defenderSelection(claim, fault), resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}), ...(byRunner ? { byRunner } : {}), ...(mocking.length ? { mocking } : {}), ...(signals.length ? { signals } : {}) },
     inputs,
   };
 }
@@ -428,7 +432,7 @@ export function discoveryIndeterminateRecord({ claim, fault, defenders, discover
     subject: subjectOf(fault, sha256),
     verdict: 'unverifiable',
     detail: { baselineRuns: [], probeRuns: [], reason: 'defender-discovery-indeterminate', message },
-    defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: false, ...(discovered ? { discovered: true } : {}), ...(byRunner ? { byRunner } : {}), ...(mocking.length ? { mocking } : {}), ...(signals.length ? { signals } : {}) },
+    defenders: { ...defenderSelection(claim, fault), resolved: defenders, nocover: false, ...(discovered ? { discovered: true } : {}), ...(byRunner ? { byRunner } : {}), ...(mocking.length ? { mocking } : {}), ...(signals.length ? { signals } : {}) },
     inputs,
   };
 }
@@ -516,8 +520,8 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
   const subject = subjectOf(fault, sha256);
 
   // Same source, same defenders, same N, same fault: the verdict cannot have changed.
-  if (isReusable(prior, { inputs, requested: claim.defendedBy ?? [], resolved: defenders, contentHash: subject.contentHash })) {
-    return { ...prior, reusedFrom: prior.reusedFrom ?? priorRunId };
+  if (isReusable(prior, { inputs, ...defenderSelection(claim, fault), resolved: defenders, contentHash: subject.contentHash })) {
+    return { ...prior, defenders: { ...prior.defenders, ...defenderSelection(claim, fault) }, reusedFrom: prior.reusedFrom ?? priorRunId };
   }
 
   const detail = { baselineRuns: [], probeRuns: [] };
@@ -655,7 +659,7 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
     subject,
     verdict,
     detail,
-    defenders: { requested: claim.defendedBy ?? [], resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}), ...(byRunner ? { byRunner } : {}), ...(mocking.length ? { mocking } : {}), ...(allSignals.length ? { signals: allSignals } : {}) },
+    defenders: { ...defenderSelection(claim, fault), resolved: defenders, nocover: defenders.length === 0, ...(discovered ? { discovered: true } : {}), ...(byRunner ? { byRunner } : {}), ...(mocking.length ? { mocking } : {}), ...(allSignals.length ? { signals: allSignals } : {}) },
     inputs,
     rank: rank({ severity: claim.severity, sourceKind: claim.source.kind, blast, independence: detail.independence?.class }),
   };

@@ -86,9 +86,26 @@ describe('costReport', () => {
     expect(r.sharedDefenders[0]).toMatchObject({ file: 'fixture.test.mjs', claims: ['C1', 'C2'] });
   });
 
-  it('does not call a file shared when one claim names it for several faults', () => {
+  it('reports sharing between faults of the same claim using the actual resolved sets', () => {
     const r = costReport([rec('C1', 'F1', ['x.test.mjs'], { probe: [run(1)] }), rec('C1', 'F2', ['x.test.mjs'], { probe: [run(1)] })]);
-    expect(r.sharedDefenders).toEqual([]);
+    expect(r.sharedDefenders[0].faults).toEqual(['C1/F1', 'C1/F2']);
+    expect(r.faults.map((f) => f.faultId)).toEqual(['F1', 'F2']);
+  });
+
+  it('does not confuse repeated confirmation runs with distinct faults sharing a defender', () => {
+    expect(costReport([rec('C', 'F1', ['one.test.mjs'], { baseline: [run(1), run(1), run(1)], probe: [run(1), run(1), run(1)] })]).sharedDefenders).toEqual([]);
+  });
+
+  it('attributes distinct sets and selection origins per fault without charging an unused sibling', () => {
+    const unit = rec('C', 'F1', ['unit.test.mjs'], { probe: [run(10)] });
+    unit.defenders.selectionSource = 'fault';
+    const integration = rec('C', 'F2', ['integration.test.mjs'], { probe: [run(100)] });
+    integration.defenders.selectionSource = 'claim';
+    const report = costReport([unit, integration]);
+    expect(report.totalMs).toBe(110);
+    expect(report.sharedDefenders).toEqual([]);
+    expect(report.faults[0]).toMatchObject({ faultId: 'F2', ms: 100, defenders: ['integration.test.mjs'], selectionSource: 'claim' });
+    expect(report.faults[1]).toMatchObject({ faultId: 'F1', ms: 10, defenders: ['unit.test.mjs'], selectionSource: 'fault' });
   });
 
   it('totals only the additive numbers', () => {
@@ -111,7 +128,7 @@ describe('renderCost', () => {
     ]));
     expect(text).toContain('2 fault records cost 100s across 2 defender runs');
     expect(text).toContain('shared defenders');
-    expect(text).toContain('named by C1, C2');
+    expect(text).toContain('named by C1/F1, C2/F1');
     expect(text).toMatch(/split the behaviour a shared defender proves/);
   });
 

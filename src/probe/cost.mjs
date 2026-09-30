@@ -12,7 +12,7 @@
  * already recorded. Nothing re-measures, nothing spawns, nothing guesses: a
  * cost report costs the price of reading one JSON file.
  *
- * ATTRIBUTION, HONESTLY. Runs execute a claim's whole defender set together,
+ * ATTRIBUTION, HONESTLY. Runs execute a fault's selected defender set together,
  * so the runner never says how much of a run belonged to which file. Per-file
  * `ms` is therefore the time of every run that *included* that file: an upper
  * bound on what removing it could save, and, when a claim names several
@@ -70,15 +70,16 @@ export function defenderCosts(records) {
   for (const r of records) {
     const c = recordCost(r);
     for (const file of r.defenders?.resolved ?? []) {
-      const e = by.get(file) ?? { file, ms: 0, runs: 0, claims: new Set() };
+      const e = by.get(file) ?? { file, ms: 0, runs: 0, claims: new Set(), faults: new Set() };
       e.ms += c.ms;
       e.runs += c.runs;
       e.claims.add(r.claim.id);
+      e.faults.add(`${r.claim.id}/${r.subject.id}`);
       by.set(file, e);
     }
   }
   return [...by.values()]
-    .map((e) => ({ ...e, claims: [...e.claims].sort() }))
+    .map((e) => ({ ...e, claims: [...e.claims].sort(), faults: [...e.faults].sort() }))
     .sort((a, b) => b.ms - a.ms || a.file.localeCompare(b.file));
 }
 
@@ -86,7 +87,7 @@ export function defenderCosts(records) {
  * The whole cost model for one evidence document.
  *
  * `sharedDefenders` is the actionable part: a file named by more than one
- * claim, whose cost is multiplied by every claim that names it. Splitting the
+ * fault identity, including siblings within one claim. Splitting the
  * behaviour it defends into a unit test that runs in milliseconds is what
  * turns a twenty-four-minute gate into a one-minute one, and until a report
  * names the file nobody knows which test to split.
@@ -100,8 +101,10 @@ export function costReport(records) {
     reusedRecords: records.filter((r) => r.reusedFrom).length,
     records: records.length,
     claims,
+    faults: records.map((r) => ({ claimId: r.claim.id, faultId: r.subject.id, ...recordCost(r), defenders: [...(r.defenders?.resolved ?? [])], ...(r.defenders?.selectionSource ? { selectionSource: r.defenders.selectionSource } : {}) }))
+      .sort((a, b) => b.ms - a.ms || a.claimId.localeCompare(b.claimId) || a.faultId.localeCompare(b.faultId)),
     defenders,
-    sharedDefenders: defenders.filter((d) => d.claims.length > 1),
+    sharedDefenders: defenders.filter((d) => d.faults.length > 1),
   };
 }
 
@@ -123,19 +126,24 @@ export function renderCost(report, { limit = 10 } = {}) {
     out.push(`  ${secs(c.ms).padStart(7)}  ${c.claimId.padEnd(34)} ${c.faults} fault${c.faults === 1 ? ' ' : 's'} · ${c.runs} runs${c.reused ? ` · ${c.reused} reused` : ''}`);
   }
   if (report.claims.length > limit) out.push(`  … ${report.claims.length - limit} more`);
+  if (report.faults?.length) {
+    out.push('', 'most expensive faults');
+    for (const f of report.faults.slice(0, limit)) out.push(`  ${secs(f.ms).padStart(7)}  ${f.claimId}/${f.faultId} · ${f.runs} runs${f.selectionSource ? ` · ${f.selectionSource}` : ''} · ${f.defenders.join(', ') || 'no defenders'}`);
+    if (report.faults.length > limit) out.push(`  … ${report.faults.length - limit} more`);
+  }
   out.push('');
   out.push('defender files, by the time of the runs that included them');
-  out.push('  (a claim runs its whole defender set at once, so these overlap and do not sum to the total)');
+  out.push('  (a fault runs its selected defender set at once, so these overlap and do not sum to the total)');
   for (const d of report.defenders.slice(0, limit)) {
     out.push(`  ${secs(d.ms).padStart(7)}  ${d.file.padEnd(44)} ${d.claims.length} claim${d.claims.length === 1 ? '' : 's'}`);
   }
   if (report.defenders.length > limit) out.push(`  … ${report.defenders.length - limit} more`);
   if (report.sharedDefenders.length) {
     out.push('');
-    out.push('shared defenders — each claim pays the file\'s full cost again');
+    out.push('shared defenders — each fault selects the file; durations include recorded baseline sharing');
     for (const d of report.sharedDefenders.slice(0, limit)) {
       out.push(`  ${secs(d.ms).padStart(7)}  ${d.file}`);
-      out.push(`           named by ${d.claims.join(', ')}`);
+      out.push(`           named by ${d.faults.join(', ')}`);
     }
     out.push('');
     out.push('  To make a probe cheaper, split the behaviour a shared defender proves into a');

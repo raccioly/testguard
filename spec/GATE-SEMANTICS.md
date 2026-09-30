@@ -1,5 +1,26 @@
 # Gate semantics
 
+## Fault-specific defender selection
+
+A fault's `defendedBy`, when present, overrides its claim's declaration.
+An explicit empty fault list requests discovery and never falls back to the
+claim. Without a fault override, a non-empty claim list is inherited; otherwise
+defenders are discovered. New evidence records `defenders.selectionSource` as
+`fault`, `claim`, or `discovery`, alongside the actual requested and resolved
+sets. Empty requests use discovery and carry `discovered: true`, including an
+explicit empty fault override. Non-empty requests are never marked discovered.
+Dirty-input preflight, runner ownership, mock-awareness, input hashing and
+baseline caching all operate on each fault's selected defender set.
+
+Changing requested globs, resolved files or selection origin invalidates verdict
+reuse. Legacy evidence remains readable but cannot authorize a new fault-level
+override. A strict resolved subset after a previous kill is reported by `claims`
+as a narrowing warning and requires re-probing; it is not a new verdict.
+Cost reports include per-fault recorded run durations and selection origin.
+Shared defenders identify the actual fault records that selected each file,
+including multiple faults within one claim. File costs remain overlapping upper
+bounds, not additive shares. Existing total/per-claim budget ceilings are unchanged.
+
 How a Guard-spec tool decides whether CI goes red. Shared by every tool that
 adopts the spec; each tool may add stricter rules, never looser ones.
 

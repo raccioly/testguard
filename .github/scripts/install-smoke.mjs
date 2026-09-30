@@ -61,8 +61,18 @@ try {
     '-e',
     `import { pathToFileURL } from 'node:url'; import { readFileSync } from 'node:fs';
      const { validate } = await import(pathToFileURL(process.argv[1]));
-     const result = validate('evidence', JSON.parse(readFileSync(process.argv[2], 'utf8')));
+     const candidate = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+     for (const r of candidate.records) {
+       r.defenders.selectionSource = r.defenders.requested.length ? 'claim' : 'discovery';
+       if (!r.defenders.requested.length) r.defenders.discovered = true;
+     }
+     const result = validate('evidence', candidate);
      if (!result.ok) throw new Error(result.errors.map((error) => \`${'${error.path}: ${error.message}'}\`).join('; '));
+     const claims = JSON.parse(readFileSync(process.argv[4], 'utf8'));
+     claims.claims[0].faults[0].defendedBy = [];
+     if (!validate('claims', claims).ok) throw new Error('installed package rejected a fault discovery override');
+     claims.claims[0].faults[0].defendedBy = ['test/unit.test.mjs'];
+     if (!validate('claims', claims).ok) throw new Error('installed package rejected a fault defender override');
      const gate = JSON.parse(readFileSync(process.argv[3], 'utf8'));
      gate.nested = [{ project: 'backend', files: ['backend/src/guard.mjs'] }]; gate.changed++;
      const nestedResult = validate('gate', gate);
@@ -71,6 +81,7 @@ try {
     installedValidator,
     candidateEvidence,
     join(root, 'spec', 'conformance', 'examples', 'gate.json'),
+    join(root, 'spec', 'conformance', 'examples', 'claims.json'),
   ], consumer).trim();
   if (!draft.claims?.length) throw new Error('scaffold produced no claims from the installed tarball');
   if (!/^\d+\.\d+\.\d+/.test(version)) throw new Error(`unexpected --version output: ${version}`);

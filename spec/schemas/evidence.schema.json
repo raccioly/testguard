@@ -520,6 +520,10 @@
             "nocover"
           ],
           "properties": {
+            "selectionSource": {
+              "description": "Origin of the requested defender selection: explicit fault override, inherited non-empty claim declaration, or automatic discovery. Optional only for legacy evidence; a changed origin invalidates reuse.",
+              "enum": ["fault", "claim", "discovery"]
+            },
             "requested": {
               "type": "array",
               "items": {

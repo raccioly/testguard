@@ -221,6 +221,14 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    the evidence records them as `repo.ignoredDirty`, so the run says what it
    did not look at. Every summary names the commit probed.
 
+   A fault may declare its own `defendedBy` to override the claim's set.
+   Omit the fault field to inherit; set it to `[]` to request discovery rather
+   than inheritance. Evidence names the selection origin and selected files.
+   Changing either invalidates reuse and makes status stale. A narrowed fault
+   set after a prior kill is warned about by `claims`; re-probe before trusting
+   it. For example, a unit-level fault can select `["test/unit.test.mjs"]`
+   while an integration fault inherits the claim's broader set.
+
    A claim with no `defendedBy` has its defenders **discovered**: the test
    files that import the fault's target, by relative path or resolved alias
    (tsconfig `paths`, through `extends` and `references`, vite/vitest
@@ -983,19 +991,23 @@ most expensive claims
     4m 58s  TG-FAULT-EDIT-VISIBLE              1 fault  · 6 runs
 
 defender files, by the time of the runs that included them
-  (a claim runs its whole defender set at once, so these overlap and do not sum to the total)
+  (a fault runs its selected defender set at once, so these overlap and do not sum to the total)
     24m 3s  test/probe.fixture.test.mjs                  5 claims
 
-shared defenders — each claim pays the file's full cost again
+shared defenders — each fault selects the file; durations include recorded baseline sharing
     24m 3s  test/probe.fixture.test.mjs
-            named by TG-ESCALATION-N-RUNS, TG-FAULT-EDIT-VISIBLE, …
+            named by TG-ESCALATION-N-RUNS/F1, TG-FAULT-EDIT-VISIBLE/F1, …
 ```
 
 Every number is read back out of the `durationMs` the probe already records.
 `--cost` re-measures nothing, spawns nothing, and costs the price of reading
 one JSON file.
 
-**The per-file figures overlap.** A run executes a claim's whole defender set
+Cost output also lists individual faults, their selected defenders and selection
+origin. Sharing is counted across distinct fault identities, including siblings
+within one claim; repeated confirmation runs alone are not sharing.
+
+**The per-file figures overlap.** A run executes a fault's whole defender set
 at once, so the runner never says how much of it belonged to which file. A
 file's `ms` is the time of every run that *included* it: an upper bound on
 what removing it could save, which is the decision you are making. Only

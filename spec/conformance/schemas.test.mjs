@@ -8,11 +8,55 @@ import { dirname, join, basename } from 'node:path';
 import { validate, KINDS } from '../lib/validate.mjs';
 import { fingerprint } from '../lib/fingerprint.mjs';
 import { probit, zCandidates, wilsonInterval, roundTo } from '../lib/wilson.mjs';
+import { costReport } from '../../src/probe/cost.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const load = (dir, f) => JSON.parse(readFileSync(join(here, dir, f), 'utf8'));
 
 describe('claimspec v1 — conformance', () => {
+  it('admits per-fault cost output in status and rejects invalid selection origins', () => {
+    const status = load('examples', 'status.json');
+    const evidence = load('examples', 'evidence.json');
+    status.cost = costReport(evidence.records);
+    expect(validate('status', status).errors).toEqual([]);
+    status.cost.faults[0].selectionSource = 'fault';
+    expect(validate('status', status).errors).toEqual([]);
+    status.cost.faults[0].selectionSource = 'guessed';
+    expect(validate('status', status).ok).toBe(false);
+    delete status.cost.faults;
+    for (const d of [...status.cost.defenders, ...status.cost.sharedDefenders]) delete d.faults;
+    expect(validate('status', status).errors).toEqual([]);
+  });
+  it('admits fault overrides and rejects duplicate or malformed defender declarations', () => {
+    const claims = load('examples', 'claims.json');
+    const fault = claims.claims[0].faults[0];
+    fault.defendedBy = ['test/unit.test.mjs'];
+    expect(validate('claims', claims).errors).toEqual([]);
+    fault.defendedBy = [];
+    expect(validate('claims', claims).errors).toEqual([]);
+    fault.defendedBy = ['same', 'same'];
+    expect(validate('claims', claims).ok).toBe(false);
+    fault.defendedBy = [42];
+    expect(validate('claims', claims).ok).toBe(false);
+  });
+
+  it('validates defender selection origin without rejecting legacy evidence', () => {
+    const evidence = load('examples', 'evidence.json');
+    const d = evidence.records[0].defenders;
+    delete d.selectionSource;
+    expect(validate('evidence', evidence).errors).toEqual([]);
+    d.selectionSource = 'discovery';
+    d.discovered = false;
+    expect(validate('evidence', evidence).ok).toBe(false);
+    d.selectionSource = 'claim'; d.requested = []; delete d.discovered;
+    expect(validate('evidence', evidence).ok).toBe(false);
+    d.selectionSource = 'fault'; d.discovered = true;
+    expect(validate('evidence', evidence).errors).toEqual([]);
+    d.requested = ['test/unit.test.mjs'];
+    expect(validate('evidence', evidence).ok).toBe(false);
+    delete d.discovered;
+    expect(validate('evidence', evidence).errors).toEqual([]);
+  });
   it('accounts for descendant-project delegation without calling it coverage or double-counting it', () => {
     const gate = load('examples', 'gate.json');
     gate.nested = [{ project: 'backend', files: ['backend/src/guard.mjs'] }];

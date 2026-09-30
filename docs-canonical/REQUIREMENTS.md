@@ -1,8 +1,8 @@
 # Requirements
 
-<!-- docguard:version 1.1.0 -->
+<!-- docguard:version 1.2.0 -->
 <!-- docguard:status approved -->
-<!-- docguard:last-reviewed 2026-09-19 -->
+<!-- docguard:last-reviewed 2026-09-30 -->
 <!-- docguard:owner @raccioly -->
 <!-- docguard:quality passive-voice off — requirements are written in the standard "the system shall ..." register, where the agent is the system throughout. -->
 
@@ -28,6 +28,7 @@
 | FR-14 | Serve the read-only operating loop over MCP so the loop survives a change of agent harness | P3 |
 | FR-15 | Validate every exact fault anchor and the syntax of supported in-memory replacements before starting a test runner (`claims --check-anchors`), without guessing repairs | P1 |
 | FR-16 | Preserve every repeated or comma-separated `probe --claim` selection in first-seen order, collapse duplicates, and report requested versus probed scope without allowing an empty selection to pass | P1 |
+| FR-17 | Select defenders per fault: an explicit override takes precedence, an empty override requests discovery, and absence inherits the claim. Record the origin, invalidate stale/reused selections, report per-fault costs and warn on narrowing after a prior kill | P1 |
 
 ## Non-Functional Requirements
 
@@ -103,6 +104,7 @@ fails the pull request naming the unclaimed file, and `status` reports
 | FR-14 | `src/mcp/` | `test/mcp.test.mjs` |
 | FR-15 | `src/claims/anchors.mjs`, `src/commands/claims.mjs`, `src/status/status.mjs` | `test/claims-anchors.test.mjs`, `test/status.test.mjs`, `TG-ANCHOR-PREFLIGHT-FAILS-FAST` |
 | FR-16 | `src/cli.mjs`, `src/commands/probe.mjs`, `src/probe/probe.mjs`, `src/commands/scaffold.mjs`, `src/commands/admit.mjs` | `test/claim-selection.test.mjs`, `test/probe.fixture.test.mjs`, `TG-REPEATED-CLAIMS-ARE-ALL-PROBED` |
+| FR-17 | `src/probe/attribution.mjs`, `src/probe/probe.mjs`, `src/commands/claims.mjs`, `src/status/status.mjs`, `src/probe/cost.mjs` | `test/fault-defenders.test.mjs`, `test/attribution.test.mjs`, `test/status.test.mjs`, `test/cost.test.mjs`, `TG-FAULT-DEFENDER-SELECTION`, `TG-FAULT-DEFENDER-ORCHESTRATION` |
 | NFR-01 | `src/init/init.mjs`, runner resolution | `TG-INIT-HOOK-NO-NETWORK`, `TG-README-HOOK-MATCHES-THE-CODE` (every surface, not only the README), `TG-GITIGNORE-ADVICE-IS-ONE-LIST` |
 | NFR-02 | `package.json` | `npm run test:install` in CI |
 | NFR-03 | `src/probe/inject.mjs`, `src/probe/probe.mjs` | `TG-DIRTY-DEFENDERS-REFUSED`, `TG-IGNORED-DIRTY-RECORDED`, `TG-IN-PLACE-STILL-RAISES-A-MISSING-TARGET`, `TG-CONTROL-RESTORES-THE-SUBJECT` |
@@ -116,5 +118,6 @@ fails the pull request naming the unclaimed file, and `status` reports
 
 | Version | Date | Change | Author |
 |---|---|---|---|
+| 1.2.0 | 2026-09-30 | Approved fault-specific defender selection and attributable costs | @raccioly |
 | 1.1.0 | 2026-09-19 | Require lossless, visible partial claim selection | @raccioly |
 | 1.0.0 | 2026-09-18 | First canonical requirements, written against v0.6.0 | @raccioly |

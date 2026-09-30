@@ -121,6 +121,12 @@
         "faultClass": {
           "$ref": "urn:claimspec:v1:common#/$defs/faultClass"
         },
+        "defendedBy": {
+          "description": "Overrides this fault's claim-level defenders when present. An explicit empty list requests discovery; absence inherits the claim. Selection changes require re-probing, never assumed detection.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
         "file": {
           "$ref": "urn:claimspec:v1:common#/$defs/repoPath"
         },

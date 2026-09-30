@@ -1,8 +1,8 @@
 # Data Model
 
-<!-- docguard:version 1.0.0 -->
+<!-- docguard:version 1.1.0 -->
 <!-- docguard:status approved -->
-<!-- docguard:last-reviewed 2026-09-19 -->
+<!-- docguard:last-reviewed 2026-09-30 -->
 <!-- docguard:owner @raccioly -->
 <!-- docguard:quality negation-load off — the data model is largely a set of prohibitions (no database, no server state, fingerprints never derived from fault text). -->
 <!-- docguard:quality passive-voice off — this document describes what happens to documents as they flow through validation, where the artifact is the subject and the actor is irrelevant. -->
@@ -60,12 +60,23 @@ be told from a mechanically derived one.
 `{find, replace}` against one file, with `expectHits` and `occurrence` so the
 anchor is exact. `faultClass` is one of thirteen values and exists so that
 calibration (fault class → real-bug predictiveness) can be computed later.
+An optional fault-level `defendedBy` overrides the claim's declaration.
+Presence matters: `[]` requests discovery, while absence inherits a non-empty
+claim list or discovers when the claim has none.
 
 ### Evidence record
 
 The verdict plus everything it rests on: every baseline run, every probe run,
 the resolved defenders, which of them merely mock the subject, the input
 hashes that make verdict reuse sound, and the rank.
+New records carry `defenders.selectionSource` (`fault`, `claim`, `discovery`)
+alongside requested and resolved selections. Empty selections carry
+`discovered: true`. Origin or selection changes invalidate reuse and status;
+the field remains optional so new readers can validate legacy evidence.
+
+Status cost reports include per-fault recorded durations and the selected
+defenders. File-level entries list distinct `claimId/faultId` identities;
+multiple confirmation runs for one fault do not constitute sharing.
 
 ### Verdict
 
@@ -78,7 +89,7 @@ Closed set of seven. Only `killed` is a pass:
 ```
 claims.json ──1:N──> claim ──1:N──> fault ──1:1──> evidence record
                        │                              │
-                       └── defendedBy ──> test files ─┘
+                       └── default defendedBy ─> fault selection ─> test files
                                                       │
 baseline.json ──suppresses by fingerprint────────────┘
                                                       │
@@ -107,9 +118,11 @@ target file to importing tests for defender discovery.
 The contract is versioned by `schemaVersion` inside every document and by the
 `urn:claimspec:v1:` identifier on every schema.
 
-- **Additive change** (a new optional field): no migration; older readers
-  ignore it, and `additionalProperties: false` means the field must be added to
-  the schema in the same change that emits it.
+- **Additive change** (a new optional field): new readers accept old documents
+  without migration. Older strict readers may reject the new field because
+  schemas use `additionalProperties: false`; upgrade those consumers before
+  asking them to validate new-format artifacts. Add the field to the schema
+  in the same change that emits it.
 - **Semantic change** (a new verdict, a new fault class, a changed rule): a
   spec change. The schema, `GATE-SEMANTICS.md`, the validator's semantic rules,
   a conformance example, a must-reject document and the known-answer fixture
@@ -125,4 +138,5 @@ The contract is versioned by `schemaVersion` inside every document and by the
 
 | Version | Date | Change | Author |
 |---|---|---|---|
+| 1.1.0 | 2026-09-30 | Fault defender overrides, selection provenance and per-fault costs; clarify strict-reader compatibility | @raccioly |
 | 1.0.0 | 2026-09-18 | First canonical data model, written against v0.6.0 | @raccioly |

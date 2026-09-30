@@ -5,6 +5,7 @@ import { probe } from '../probe/probe.mjs';
 import { writeSpecDoc } from '../evidence/writer.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
+import { defenderSelection } from '../probe/attribution.mjs';
 import { PreconditionError } from '../probe/worktree.mjs';
 import { hintFor } from '../brief/brief.mjs';
 import { formatVerdict, PROVISIONAL_WARNING } from '../render.mjs';
@@ -62,11 +63,15 @@ export async function admitCommand({ file, values, version }, io) {
 
   // The named test must be a defender of the claim, declared or discovered;
   // otherwise `killed` below would be someone else's test doing the work.
-  const declared = claim.defendedBy?.length ? resolveDefenders(projectDir, claim.defendedBy) : null;
-  const isDefender = declared ? declared.includes(testRel) : faults.some((f) => discoverDefenders(projectDir, f.file).includes(testRel));
+  const selections = faults.map((f) => {
+    const { requested } = defenderSelection(claim, f);
+    return { requested, resolved: requested.length ? resolveDefenders(projectDir, requested) : discoverDefenders(projectDir, f.file) };
+  });
+  const declared = selections.every((s) => s.requested.length) ? selections[0].requested : null;
+  const isDefender = selections.some((s) => s.resolved.includes(testRel));
   if (!isDefender) {
     io.err(declared
-      ? `${testRel} is not a defender of ${claimId}. Add it: "defendedBy": [${[...claim.defendedBy, testRel].map((d) => JSON.stringify(d)).join(', ')}] in testguard.claims.json, then run admit again.`
+      ? `${testRel} is not a defender of ${claimId}. Add it: "defendedBy": [${[...declared, testRel].map((d) => JSON.stringify(d)).join(', ')}] on the selected fault or its inherited claim in testguard.claims.json, then run admit again.`
       : `${testRel} does not import ${[...new Set(faults.map((f) => f.file))].join(' or ')}, so it cannot be discovered as a defender of ${claimId}. Import the module under test, or declare "defendedBy": ["${testRel}"] on the claim.`);
     return 3;
   }
