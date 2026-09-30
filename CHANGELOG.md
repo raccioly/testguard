@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-30
+
+Automated weekly release — everything merged since `v0.15.1`.
+
+### Changed
+
+- feat: fault-specific defenders, provenance and cost reporting (#184)
+- Add advisory AI update guidance and stabilize cleanup regression (#183)
+- chore(homebrew): sha256 for v0.15.1 (#182)
+
+
 ### Added
 
 - Fault-specific `defendedBy` overrides, with explicit empty-list discovery,

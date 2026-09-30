@@ -8,7 +8,7 @@
       "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#fault-specific-defender-selection" },
       "severity": "critical",
       "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/fault-defenders.test.mjs"],
+      "defendedBy": ["test/fault-defender-orchestration.test.mjs"],
       "faults": [
         { "id": "F1", "description": "The probe orchestrator substitutes claim-level declarations for the selected per-fault set.", "faultClass": "condition-forced", "file": "src/probe/probe.mjs", "find": "        const declared = requested.length ? resolveDefenders(iso.projectDir, requested) : null;", "replace": "        const declared = claim.defendedBy?.length ? resolveDefenders(iso.projectDir, claim.defendedBy) : null;", "producedBy": { "producer": "agent", "by": "codex" } }
       ]
