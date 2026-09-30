@@ -1,7 +1,7 @@
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, realpathSync, lstatSync } from 'node:fs';
 import { extname, join, relative, resolve, dirname } from 'node:path';
 import { git, repoRoot, headSha, GitError } from '../git.mjs';
-import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
+import { loadClaims, defaultClaimsPath, ClaimsError } from '../claims/load.mjs';
 import { readSpecDoc } from '../evidence/writer.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
@@ -48,6 +48,33 @@ const DEFAULT_EXCLUDE_RES = DEFAULT_EXCLUDES.map(globToRegExp);
 export const isDefaultExcluded = (file) => DEFAULT_EXCLUDE_RES.some((re) => re.test(file));
 
 export const defaultIgnorePath = (projectDir) => join(projectDir, 'testguard.ignore.json');
+
+/** Cache validated descendant boundaries for one measurement, never across runs. */
+export function nestedProjectResolver(projectDir) {
+  const root = realpathSync(resolve(projectDir));
+  const markers = new Map();
+  return (file) => {
+    const parts = file.split('/').slice(0, -1);
+    for (let i = 1; i <= parts.length; i++) {
+      const project = parts.slice(0, i).join('/');
+      if (!markers.has(project)) {
+        const marker = join(root, project, 'testguard.claims.json');
+        let stat;
+        try { stat = lstatSync(marker); }
+        catch (error) {
+          if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw new ClaimsError(`cannot inspect nested claims file ${marker}: ${error.message}`);
+        }
+        if (stat) {
+          if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(marker) !== marker) throw new ClaimsError(`nested claims file must be a regular file without symlink traversal: ${marker}`);
+          loadClaims(marker);
+        }
+        markers.set(project, Boolean(stat));
+      }
+      if (markers.get(project)) return project;
+    }
+    return null;
+  };
+}
 
 /**
  * The reference the change is measured against. Environment overrides and CI
@@ -212,7 +239,15 @@ export function computeChangedGate({ projectDir, ref, includeDirty = false, excl
   const excluded = [];
   const covered = [];
   const uncovered = [];
+  const nested = new Map();
+  const ownerOf = nestedProjectResolver(projectDir);
   for (const file of changed) {
+    const owner = ownerOf(file);
+    if (owner) {
+      if (!nested.has(owner)) nested.set(owner, []);
+      nested.get(owner).push(file);
+      continue;
+    }
     if (!SOURCE_EXT.has(extname(file))) { excluded.push({ file, by: 'non-source' }); continue; }
     const ux = userExcludes.find((x) => x.re.test(file));
     if (ux) { excluded.push({ file, by: `exclude:${ux.glob}` }); continue; }
@@ -256,6 +291,7 @@ export function computeChangedGate({ projectDir, ref, includeDirty = false, excl
     changed: changed.length,
     evaluated,
     excluded,
+    ...(nested.size ? { nested: [...nested].map(([project, files]) => ({ project, files })) } : {}),
     covered,
     uncovered,
     reliedOn,
@@ -271,7 +307,8 @@ export function renderGate(doc) {
   for (const u of doc.uncovered) lines.push(`UNCLAIMED  ${u.file}  (${u.kind}${u.nearestClaimId ? `, nearest claim ${u.nearestClaimId}` : ''})\n           → ${u.suggestion}`);
   for (const r of doc.reliedOn) lines.push(`excused    ${r.files.join(', ')}  by ignore "${r.pattern}": ${r.reason}${r.expires ? ` (expires ${r.expires})` : ''}`);
   for (const e of doc.expired) lines.push(`EXPIRED    ignore "${e.pattern}" (expired ${e.expires}) no longer excuses ${e.files.join(', ')}`);
-  if (doc.changed > 0 && doc.evaluated === 0) lines.push(`note: every changed file was excluded (${[...new Set(doc.excluded.map((x) => x.by))].join(', ')}); 0 evaluated${doc.strict ? ' — --strict makes this a failure' : ''}`);
+  for (const n of doc.nested ?? []) lines.push(`delegated  ${n.files.length} file(s) belong to the TestGuard project at ${n.project}/; run testguard gate ${n.project} --changed ${doc.ref}${doc.includeDirty ? ' --include-dirty' : ''}; child coverage has not been evaluated here`);
+  if (doc.changed > 0 && doc.evaluated === 0) lines.push(`note: every changed file was excluded or delegated (${[...new Set(doc.excluded.map((x) => x.by))].join(', ')}); 0 evaluated${doc.strict ? ' — --strict makes this a failure' : ''}`);
   if (doc.changed === 0) lines.push(`no changes since ${doc.ref}; nothing to claim`);
   if (doc.uncovered.length === 0 && doc.exitCode === 0 && doc.evaluated > 0) lines.push('every changed source file carries a claim or an excusing ignore entry');
   return lines.join('\n');

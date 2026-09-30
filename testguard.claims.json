@@ -3,6 +3,67 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-RUNNER-TIMEOUT-IDENTITY",
+      "statement": "Runner timeout identity is distinct from assertion text quoting timeout messages; actual runner timeouts remain non-detections.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#verdicts" },
+      "severity": "critical",
+      "producedBy": { "producer": "human", "by": "maintainer" },
+      "defendedBy": ["test/runner-vitest.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "Quoted timeout text is classified as an actual runner timeout.", "faultClass": "condition-forced", "file": "src/probe/runners/shared.mjs", "find": "  const timeouts = results.filter(isRunnerTimeout).length;", "replace": "  const timeouts = results.filter((t) => (t.failureMessages ?? []).some((m) => /timed out|exceeded timeout/i.test(m))).length;", "producedBy": { "producer": "human" } },
+        { "id": "F2", "description": "Actual runner timeouts are counted as assertion detections.", "faultClass": "condition-forced", "file": "src/probe/runners/shared.mjs", "find": "  const timeouts = results.filter(isRunnerTimeout).length;", "replace": "  const timeouts = 0;", "producedBy": { "producer": "human" } },
+        { "id": "F3", "description": "Structured assertion errors quoting native timeout headers lose their assertion identity.", "faultClass": "condition-forced", "file": "src/probe/runners/shared.mjs", "find": "    if (error?.name === 'AssertionError' || error?.code === 'ERR_ASSERTION' || error?.operator !== undefined) return false;", "replace": "    if (false) return false;", "producedBy": { "producer": "human" } }
+      ]
+    },
+    {
+      "id": "TG-CONFIG-LITERALS-ARE-NOT-FILES",
+      "statement": "Configuration strings describing routes and separators do not prevent discovery, while real external file dependencies remain refused.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#verdicts" },
+      "severity": "critical",
+      "producedBy": { "producer": "human", "by": "maintainer" },
+      "defendedBy": ["test/runner-discovery.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "Every absolute-looking string is rejected before determining whether it names a file.", "faultClass": "condition-forced", "file": "src/probe/runners/discovery.mjs", "find": "const existingConfigCandidate = (root, path) => {\n  let stat;", "replace": "const existingConfigCandidate = (root, path) => {\n  if (!inside(root, path)) throw new DiscoveryError('absolute literal rejected');\n  let stat;", "producedBy": { "producer": "human" } },
+        { "id": "F2", "description": "Existing config dependencies may escape the project root.", "faultClass": "condition-forced", "file": "src/probe/runners/discovery.mjs", "find": "  if (!inside(root, path)) throw new DiscoveryError(`discovery config dependency resolves outside the project: ${path}`);", "replace": "  if (false) throw new DiscoveryError(`discovery config dependency resolves outside the project: ${path}`);", "producedBy": { "producer": "human" } }
+      ]
+    },
+    {
+      "id": "TG-EMPTY-PROBE-REQUIRES-OPT-IN",
+      "statement": "Empty claims succeed only under an explicit adoption opt-in without claim selection, and never produce verification evidence.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#exit-codes" },
+      "severity": "critical",
+      "producedBy": { "producer": "human", "by": "maintainer" },
+      "defendedBy": ["test/claim-selection.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "A default empty probe reports success without adoption opt-in.", "faultClass": "condition-forced", "file": "src/commands/probe.mjs", "find": "    if (values['allow-empty'] && values.claim === undefined) {", "replace": "    if (values.claim === undefined) {", "producedBy": { "producer": "human" } },
+        { "id": "F2", "description": "An explicit selection is silently skipped when the claims file is empty.", "faultClass": "condition-forced", "file": "src/commands/probe.mjs", "find": "    if (values['allow-empty'] && values.claim === undefined) {", "replace": "    if (values['allow-empty']) {", "producedBy": { "producer": "human" } }
+      ]
+    },
+    {
+      "id": "TG-HELP-IS-COMMAND-SPECIFIC",
+      "statement": "A known subcommand's help shows that command's options instead of a global option list that obscures the requested command.",
+      "source": { "kind": "manual", "ref": "https://github.com/raccioly/testguard/issues/120" },
+      "severity": "medium",
+      "producedBy": { "producer": "human", "by": "maintainer" },
+      "defendedBy": ["test/claim-selection.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "Subcommand help returns the global option list.", "faultClass": "argument-swapped", "file": "src/cli.mjs", "find": "    io.out(commandUsage(command));", "replace": "    io.out(USAGE);", "producedBy": { "producer": "human" } }
+      ]
+    },
+    {
+      "id": "TG-GATE-RESPECTS-NESTED-PROJECTS",
+      "statement": "Parent change gates and source-surface reports delegate valid descendant projects visibly without calling their files unclaimed parent code; invalid project markers cannot suppress evaluation.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#claim-coverage-of-a-change" },
+      "severity": "critical",
+      "producedBy": { "producer": "human", "by": "maintainer" },
+      "defendedBy": ["test/gate.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "Descendant files are evaluated against the parent's claims.", "faultClass": "condition-forced", "file": "src/gate/changed.mjs", "find": "    if (owner) {", "replace": "    if (false) {", "producedBy": { "producer": "human" } },
+        { "id": "F2", "description": "Invalid descendant claims suppress coverage evaluation.", "faultClass": "statement-deleted", "file": "src/gate/changed.mjs", "find": "          loadClaims(marker);", "replace": "          void marker;", "producedBy": { "producer": "human" } },
+        { "id": "F3", "description": "Descendant source modules inflate the parent's unclaimed surface.", "faultClass": "condition-forced", "file": "src/status/surface.mjs", "find": "    !isDefaultExcluded(file) && !ownerOf(file));", "replace": "    !isDefaultExcluded(file));", "producedBy": { "producer": "human" } }
+      ]
+    },
+    {
       "id": "TG-KILL-NEEDS-N",
       "statement": "A fault is killed only when every one of the N probe runs fails with an assertion; a mixed result is never a kill.",
       "source": {

@@ -13,6 +13,26 @@ const here = dirname(fileURLToPath(import.meta.url));
 const load = (dir, f) => JSON.parse(readFileSync(join(here, dir, f), 'utf8'));
 
 describe('claimspec v1 — conformance', () => {
+  it('accounts for descendant-project delegation without calling it coverage or double-counting it', () => {
+    const gate = load('examples', 'gate.json');
+    gate.nested = [{ project: 'backend', files: ['backend/src/guard.mjs'] }];
+    gate.changed++;
+    expect(validate('gate', gate).errors).toEqual([]);
+    gate.changed--;
+    expect(validate('gate', gate).errors.map((e) => e.path)).toContain('/changed');
+    gate.changed++;
+    gate.nested[0].files = ['src/guard.mjs'];
+    expect(validate('gate', gate).errors.map((e) => e.path)).toContain('/nested/0/files');
+    gate.nested[0].files = ['backend/src/guard.mjs'];
+    gate.covered.push({ file: 'backend/src/guard.mjs', by: 'fault', claimIds: ['C-1'] });
+    gate.evaluated++;
+    gate.changed++;
+    expect(validate('gate', gate).errors.map((e) => e.path)).toContain('/nested/0/files');
+    gate.covered.pop(); gate.evaluated--; gate.changed--;
+    gate.nested.push({ project: 'backend', files: ['backend/src/second.mjs'] });
+    gate.changed++;
+    expect(validate('gate', gate).errors.map((e) => e.path)).toContain('/nested/1/project');
+  });
   describe('every valid example passes', () => {
     for (const f of readdirSync(join(here, 'examples')).filter((f) => f.endsWith('.json'))) {
       const kind = KINDS.find((k) => f.startsWith(k));

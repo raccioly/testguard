@@ -35,6 +35,10 @@ inputs:
     description: 'Skip re-running survivors against the whole suite'
     required: false
     default: 'false'
+  allow-empty:
+    description: 'probe only: explicitly skip a valid empty claims file during adoption; writes no evidence. Run gate separately.'
+    required: false
+    default: 'false'
   changed-ref:
     description: 'gate only: the reference the change is measured against (default: origin/<base branch> of the pull request). Check out with fetch-depth: 0 so it resolves.'
     required: false
@@ -82,6 +86,7 @@ runs:
         if [ "${{ inputs.command }}" = "probe" ]; then
           ARGS+=(--severity "${{ inputs.severity }}" --confirm "${{ inputs.confirm }}" --budget "${{ inputs.budget }}")
           [ "${{ inputs.no-escalate }}" = "true" ] && ARGS+=(--no-escalate)
+          [ "${{ inputs.allow-empty }}" = "true" ] && ARGS+=(--allow-empty)
           [ "${{ inputs.runner }}" != "auto" ] && ARGS+=(--runner "${{ inputs.runner }}")
           [ -n "${{ inputs.python }}" ] && ARGS+=(--python "${{ inputs.python }}")
         fi

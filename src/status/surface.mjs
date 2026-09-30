@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { git } from '../git.mjs';
-import { SOURCE_EXT, isDefaultExcluded, isTestFile } from '../gate/changed.mjs';
+import { SOURCE_EXT, isDefaultExcluded, isTestFile, nestedProjectResolver } from '../gate/changed.mjs';
 import { walk } from '../util/glob.mjs';
 
 export const HISTORY_COMMITS = 200;
@@ -24,11 +24,12 @@ function listedFiles(projectDir) {
 }
 
 function claimableModules(projectDir) {
+  const ownerOf = nestedProjectResolver(projectDir);
   return listedFiles(projectDir).filter((file) =>
     existsSync(join(projectDir, file)) &&
     SOURCE_EXT.has(extname(file)) &&
     !isTestFile(file) &&
-    !isDefaultExcluded(file));
+    !isDefaultExcluded(file) && !ownerOf(file));
 }
 
 function recentChanges(projectDir, sourceModules) {

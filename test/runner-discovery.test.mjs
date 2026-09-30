@@ -73,14 +73,20 @@ describe('the native discovery process boundary', () => {
       expect(existsSync(marker)).toBe(false);
 
       const orphanMarker = join(dir, 'orphan-survived');
-      const orphan = `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(orphanMarker)}, 'alive'), 450)`;
+      const orphanReady = join(dir, 'orphan-ready');
+      const orphanRelease = join(dir, 'orphan-release');
+      // Release the daemon only after timeout cleanup. A tiny fixed startup
+      // window races CPU contention and can falsely claim cleanup killed it.
+      const orphan = `const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(orphanReady)}, 'ready'); const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(orphanRelease)})) { fs.writeFileSync(${JSON.stringify(orphanMarker)}, 'alive'); clearInterval(timer); } }, 25); setTimeout(() => process.exit(), 10000).unref();`;
       const helper = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(orphan)}], { detached: true, stdio: 'ignore' }).unref()`;
       const daemonizer = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(helper)}], { detached: true, stdio: 'ignore' }).unref(); setInterval(() => {}, 1000);`;
       await expect(runDiscoveryProcess({
         projectDir: dir,
         argv: [process.execPath, '-e', daemonizer],
-        timeoutMs: 150,
+        timeoutMs: 1500,
       })).rejects.toThrow(/cleanup-unverified.*reparented daemon/i);
+      expect(existsSync(orphanReady)).toBe(true);
+      writeFileSync(orphanRelease, 'release');
       expect(await waitForFile(orphanMarker)).toBe(true);
     }
     await expect(runDiscoveryProcess({
@@ -177,6 +183,33 @@ describe('normalization and the deterministic discovery manifest', () => {
     writeFileSync(join(dir, 'tsconfig.json'), '{"compilerOptions":{"paths":{"@/*":["./src/*"]}}}');
     const configCreated = hashDiscoveryConfigs(dir, ['vitest.config.mjs']);
     expect(configCreated.find((entry) => entry.path === 'tsconfig.json').sha256).not.toBe(absentTsconfig);
+  });
+
+  it('ignores routes, URL bases, and separators in an imported Vite config while hashing real helpers', () => {
+    const dir = scratch();
+    writeFileSync(join(dir, 'vitest.config.mjs'), "import config from './vite.config.mjs'; export default config;\n");
+    writeFileSync(join(dir, 'vite.config.mjs'), "export default { base: '/', plugins: [{ configureServer(s) { s.middlewares.use('/__rooms', () => {}); const parts = '/__room'.split('/'); } }], test: { setupFiles: ['./setup.mjs'] } };\n");
+    writeFileSync(join(dir, 'setup.mjs'), 'globalThis.ready = true;\n');
+    const before = hashDiscoveryConfigs(dir, ['vitest.config.mjs']);
+    expect(before.map((entry) => entry.path)).toEqual(expect.arrayContaining(['vite.config.mjs', 'setup.mjs']));
+    writeFileSync(join(dir, 'setup.mjs'), 'globalThis.ready = false;\n');
+    expect(hashDiscoveryConfigs(dir, ['vitest.config.mjs']).find((entry) => entry.path === 'setup.mjs').sha256)
+      .not.toBe(before.find((entry) => entry.path === 'setup.mjs').sha256);
+  });
+
+  it('still refuses outside-project files and symlinks, including dangling dependencies', () => {
+    const dir = scratch();
+    const outside = scratch('testguard-outside-config-');
+    const external = join(outside, 'setup.mjs');
+    writeFileSync(external, 'globalThis.ready = true;\n');
+    for (const reference of [external, `${outside}/setup`]) {
+      writeFileSync(join(dir, 'vitest.config.mjs'), `export default { test: { setupFiles: [${JSON.stringify(reference)}] } };\n`);
+      expect(() => hashDiscoveryConfigs(dir, ['vitest.config.mjs'])).toThrow(/outside the project/);
+    }
+    const link = join(dir, 'linked.mjs');
+    symlinkSync(join(outside, 'missing.mjs'), link);
+    writeFileSync(join(dir, 'vitest.config.mjs'), "export default { test: { setupFiles: ['./linked.mjs'] } };\n");
+    expect(() => hashDiscoveryConfigs(dir, ['vitest.config.mjs'])).toThrow(/symbolic links/);
   });
 
   it('includes nested workspace configs even when the root config does not import them', () => {

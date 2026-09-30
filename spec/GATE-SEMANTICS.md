@@ -36,7 +36,11 @@ Rules that follow from the table:
    that failed and then passed on retry (Playwright's `flaky`) is a
    **non-green run** even when the runner exits 0, and a test the runner
    reports as timed out (`timedOut`) is a timeout, never an assertion
-   failure. Python is read the same way: an `AssertionError` and any other
+   failure. Jest-compatible timeout messages are recognized by native runner
+   error headers or structured timeout identity, not by words quoted in an
+   assertion, stack frame, or source excerpt. Structured assertion identity
+   does not hide a separate timeout in the same failed test.
+   Python is read the same way: an `AssertionError` and any other
    exception raised by the test body both count, because both are the suite
    rejecting the behaviour; a collection error — a module that will not
    import, which is what a replacement that does not parse looks like from
@@ -171,6 +175,11 @@ Rules that follow from the table:
    assigns each file. An owned runner takes precedence over the project runner;
    competing owned runners or a declared defender absent from every manifest
    are precondition failures, never heuristic routing decisions.
+
+   Static string literals are conservative dependency candidates, not proof
+   of a filesystem dependency. Missing candidates and ordinary directories
+   (including `/` in URL bases and string separators) are ignored. An existing
+   candidate file outside the project, or a candidate symlink, is rejected.
 
 14. **Barrel resolution follows symbols, not module reachability.** Automatic
    discovery may traverse a re-export chain only for the binding the test
@@ -494,10 +503,22 @@ Rules:
    `unclaimed-changes` and its next action is to write the claim, before any
    `unproven` finding is surfaced. The brief renders them first. The claim is
    written before more code.
+7. **A descendant claims file defines a separate project.** The first
+   descendant directory on a changed file's path with a valid, regular,
+   non-symlinked `testguard.claims.json` owns that subtree. Invalid or unreadable
+   markers fail evaluation; they cannot hide unclaimed files. Parent gate and
+   status report the delegation as optional `nested` entries with project and
+   file paths relative to the parent, and instruct the operator to run that
+   project's gate. Delegation is not coverage, an ignore reliance, or proof
+   that the child passed. Parent source-surface counts omit these subtrees.
+   Removing the marker restores parent evaluation. The accounting identity is
+   `changed = evaluated + excluded.length + sum(nested[].files.length)`;
+   `--strict` still fails a non-empty change with zero parent evaluation.
 
-Exit codes: `0` every changed source file is claimed or excused (or nothing
-changed); `1` at least one uncovered file (or strict mode over an
-all-excluded change); `2` the change cannot be evaluated (unresolvable
+Exit codes: `0` every changed parent-owned source file is claimed or excused
+(or nothing changed); delegated projects still require separate child gates.
+`1` at least one uncovered file (or strict mode over an
+all-excluded or all-delegated change); `2` the change cannot be evaluated (unresolvable
 reference, invalid claims or ignore file, no repository); `3` no reference.
 
 ## Anchor preflight
@@ -548,3 +569,11 @@ evidence; they simply do not turn CI red.
 A tool must never exit `0` because it had nothing to check. If the claims
 file is empty or every claim is out of scope, that is reported explicitly and
 the exit code is `2`.
+
+`probe --allow-empty` is an explicit adoption exception for a valid claims
+file containing zero claims, with no `--claim` selection. It exits `0`, says
+that verification was skipped, and writes no evidence or baseline. Its JSON
+output is the existing `no-claims` status document, without run metadata;
+it never reports a clean measurement. Missing or invalid claims still fail,
+and selected claims cannot be silently skipped. Run `gate` separately to
+enforce coverage of changed files during adoption. Integrations must opt in.

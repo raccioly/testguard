@@ -64,6 +64,7 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   if (ref) {
     const g = computeChangedGate({ projectDir, ref, includeDirty, toolVersion });
     changes = { ref: g.ref, base: g.base, includeDirty: g.includeDirty, changed: g.changed, evaluated: g.evaluated, excluded: g.excluded.length, uncovered: g.uncovered, reliedOn: g.reliedOn, expired: g.expired };
+    if (g.nested?.length) changes.nested = g.nested;
     doc.changes = changes;
     if (existsSync(defaultIgnorePath(projectDir))) doc.paths.ignore = rel(defaultIgnorePath(projectDir));
   }
@@ -90,6 +91,10 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   doc.counts.claims = claims.claims.length;
   doc.counts.faults = claims.claims.reduce((n, c) => n + c.faults.length, 0);
   doc.surface = computeClaimedSurface({ projectDir, claims });
+  if (claims.claims.length === 0 && !changes?.uncovered.length) {
+    doc.next = { action: 'scaffold', command: 'testguard scaffold <source-file>', why: 'No claims have been declared; no verification was performed. State a claim before probing.' };
+    return doc;
+  }
   const faultIndex = new Map();
   for (const c of claims.claims) for (const f of c.faults) faultIndex.set(`${c.id}/${f.id}`, { claim: c, fault: f });
 
@@ -281,6 +286,7 @@ export function renderStatus(doc) {
     for (const u of c.uncovered) lines.push(`UNCLAIMED ${u.file} (${u.kind}) → ${u.suggestion}`);
     for (const r of c.reliedOn) lines.push(`excused   ${r.files.join(', ')} by ignore "${r.pattern}": ${r.reason}`);
     for (const e of c.expired) lines.push(`EXPIRED   ignore "${e.pattern}" no longer excuses ${e.files.join(', ')}`);
+    for (const n of c.nested ?? []) lines.push(`delegated ${n.files.length} file(s) belong to ${n.project}/; run testguard gate ${n.project} --changed ${c.ref}${c.includeDirty ? ' --include-dirty' : ''}; child coverage has not been evaluated here`);
   }
   for (const c of doc.changedFaults) lines.push(`CHANGED   ${c.claimId}/${c.subjectId} edited since it ${c.previousVerdict} (${c.file})`);
   for (const f of doc.invalidFaults ?? []) lines.push(`INVALID   ${f.claimId}/${f.subjectId} ${f.reason}: ${f.hits} hits, expected ${f.expected} (${f.file})`);

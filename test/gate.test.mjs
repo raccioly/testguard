@@ -1,12 +1,14 @@
 // @req FR-08
 // Requirements live in docs-canonical/REQUIREMENTS.md; the matrix there must agree with these.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { cpSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, realpathSync } from 'node:fs';
+import { cpSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, realpathSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { computeChangedGate, changedFiles, detectChangedRef, detectLocalChangedRef, DEFAULT_EXCLUDES } from '../src/gate/changed.mjs';
+import { computeChangedGate, changedFiles, detectChangedRef, detectLocalChangedRef, DEFAULT_EXCLUDES, renderGate } from '../src/gate/changed.mjs';
+import { computeStatus, renderStatus } from '../src/status/status.mjs';
+import { computeClaimedSurface } from '../src/status/surface.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { readSpecDoc } from '../src/evidence/writer.mjs';
 import { main } from '../src/cli.mjs';
@@ -149,6 +151,40 @@ describe('gate --changed: claim coverage of a change', () => {
     } finally {
       rmSync(n.root, { recursive: true, force: true });
     }
+  });
+
+  it('delegates descendant projects visibly, evaluates the child separately, and restores ownership after marker removal', () => {
+    r.write('backend/testguard.claims.json', JSON.stringify({ schemaVersion: 1, claims: [] }));
+    r.write('backend/src/newfeature.mjs', 'export const f = () => 1;\n');
+    r.write('backend-extra.mjs', 'export const g = () => 1;\n');
+    const doc = computeChangedGate({ projectDir: r.project, ref: 'HEAD', includeDirty: true });
+    expect(doc.nested).toEqual([{ project: 'backend', files: ['backend/src/newfeature.mjs', 'backend/testguard.claims.json'] }]);
+    expect(doc.uncovered.map((entry) => entry.file)).toEqual(['backend-extra.mjs']);
+    expect(validate('gate', doc).errors).toEqual([]);
+    expect(renderGate(doc)).toContain('child coverage has not been evaluated here');
+    const status = computeStatus({ projectDir: r.project, changedRef: 'HEAD', includeDirty: true });
+    expect(status.changes.nested).toEqual(doc.nested);
+    expect(validate('status', status).errors).toEqual([]);
+    expect(renderStatus(status)).toContain('testguard gate backend --changed HEAD --include-dirty');
+    expect(computeClaimedSurface({ projectDir: r.project }).rankedUnclaimed.some((entry) => entry.file.startsWith('backend/'))).toBe(false);
+    const child = computeChangedGate({ projectDir: join(r.project, 'backend'), ref: 'HEAD', includeDirty: true });
+    expect(child.uncovered.map((entry) => entry.file)).toEqual(['src/newfeature.mjs']);
+    rmSync(join(r.project, 'backend-extra.mjs'));
+    expect(computeChangedGate({ projectDir: r.project, ref: 'HEAD', includeDirty: true, strict: true }).exitCode).toBe(1);
+    rmSync(join(r.project, 'backend/testguard.claims.json'));
+    const restored = computeChangedGate({ projectDir: r.project, ref: 'HEAD', includeDirty: true });
+    expect(restored.nested).toBeUndefined();
+    expect(restored.uncovered.map((entry) => entry.file)).toEqual(['backend/src/newfeature.mjs']);
+  });
+
+  it('invalid and symlinked descendant markers fail instead of hiding unclaimed files', () => {
+    r.write('backend/src/newfeature.mjs', 'export const f = () => 1;\n');
+    const marker = join(r.project, 'backend/testguard.claims.json');
+    r.write('backend/testguard.claims.json', '{"schemaVersion":1,"claims":"broken"}');
+    expect(() => computeChangedGate({ projectDir: r.project, ref: 'HEAD', includeDirty: true })).toThrow(/does not conform/);
+    rmSync(marker);
+    symlinkSync(join(r.project, 'testguard.claims.json'), marker);
+    expect(() => computeChangedGate({ projectDir: r.project, ref: 'HEAD', includeDirty: true })).toThrow(/without symlink traversal/);
   });
 
   it('CLI: exit 1 with an UNCLAIMED line and a written gate.json; 0 once excused, printing the reliance; 2 on an unknown ref; 3 with no reference; --explain lists the defaults', async () => {

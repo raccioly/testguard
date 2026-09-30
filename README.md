@@ -407,6 +407,20 @@ is missing. TestGuard itself still makes no network calls.
 
 ### Starting from zero claims
 
+During gradual adoption, use `testguard probe --allow-empty` to skip a valid
+empty claims file without blocking a push. It explicitly reports that no
+verification was performed and writes no evidence; `--json` retains the
+`no-claims` state. Missing or invalid claims files still fail. Run `gate`
+separately to enforce changed-file coverage. For the pre-commit probe hook,
+set `args: [--allow-empty]`; for the GitHub Action, set `allow-empty: 'true'`.
+The default probe still exits 2 when no claims exist.
+
+In a monorepo, a valid nested `testguard.claims.json` marks a separate project.
+The parent gate reports its changed files as delegated and does not count them
+as parent coverage. Run `gate` in each child project as well; a passing parent
+gate does not establish that child coverage passed. Invalid child claims fail
+evaluation instead of hiding files.
+
 `gate` names the changed files that carry no claim, and stops there —
 correctly, because stating a claim is a human act. But a project adopting this
 tool reads that list, has nothing to compare it against, and closes the tab.

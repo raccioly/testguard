@@ -28,6 +28,24 @@ const schemaFor = (kind) => {
   return v;
 };
 
+const nestedErrors = (nested = [], prefix = '/nested', occupied = []) => {
+  const errors = [];
+  const projects = new Set();
+  const files = new Set(occupied);
+  for (const [i, entry] of nested.entries()) {
+    const p = `${prefix}/${i}`;
+    if (entry.project.split('/').some((part) => !part || part === '.' || part === '..') || entry.project.includes('\\')) errors.push({ path: `${p}/project`, message: 'nested project must be a canonical descendant directory' });
+    if (projects.has(entry.project)) errors.push({ path: `${p}/project`, message: 'nested project is duplicated' });
+    projects.add(entry.project);
+    for (const file of entry.files) {
+      if (!file.startsWith(`${entry.project}/`) || file.split('/').some((part) => !part || part === '.' || part === '..') || file.includes('\\')) errors.push({ path: `${p}/files`, message: 'nested file must remain beneath its canonical project directory' });
+      if (files.has(file)) errors.push({ path: `${p}/files`, message: 'nested file is counted in more than one bucket' });
+      files.add(file);
+    }
+  }
+  return errors;
+};
+
 // Rules JSON Schema cannot express. Each returns an array of {path, message}.
 const semantic = {
   claims(doc) {
@@ -243,6 +261,11 @@ const semantic = {
 
   status(doc) {
     const errors = [];
+    if (doc.changes?.nested) {
+      errors.push(...nestedErrors(doc.changes.nested, '/changes/nested', doc.changes.uncovered.map((file) => file.file)));
+      const nestedCount = doc.changes.nested.reduce((count, entry) => count + entry.files.length, 0);
+      if (doc.changes.changed !== doc.changes.evaluated + doc.changes.excluded + nestedCount) errors.push({ path: '/changes/changed', message: 'changed must account for evaluated, excluded, and nested files' });
+    }
     if (['write-test', 'review-fault-change', 'repair-fault'].includes(doc.next.action) && !doc.next.target) errors.push({ path: '/next/target', message: `${doc.next.action} requires a target` });
     if (doc.next.action === 'claim' && !doc.next.file) errors.push({ path: '/next/file', message: 'claim requires the file the claim is about' });
     if (doc.state === 'no-claims' && doc.counts.claims !== 0) errors.push({ path: '/counts/claims', message: 'no-claims with a non-zero claim count' });
@@ -311,8 +334,10 @@ const semantic = {
 
   gate(doc) {
     const errors = [];
+    const nestedCount = (doc.nested ?? []).reduce((count, entry) => count + entry.files.length, 0);
+    errors.push(...nestedErrors(doc.nested, '/nested', [...doc.covered, ...doc.uncovered, ...doc.excluded].map((entry) => entry.file)));
     if (doc.evaluated !== doc.covered.length + doc.uncovered.length) errors.push({ path: '/evaluated', message: `evaluated (${doc.evaluated}) must equal covered (${doc.covered.length}) + uncovered (${doc.uncovered.length})` });
-    if (doc.changed !== doc.evaluated + doc.excluded.length) errors.push({ path: '/changed', message: `changed (${doc.changed}) must equal evaluated (${doc.evaluated}) + excluded (${doc.excluded.length})` });
+    if (doc.changed !== doc.evaluated + doc.excluded.length + nestedCount) errors.push({ path: '/changed', message: `changed (${doc.changed}) must equal evaluated (${doc.evaluated}) + excluded (${doc.excluded.length}) + nested (${nestedCount})` });
     if (doc.uncovered.length > 0 && doc.exitCode !== 1) errors.push({ path: '/exitCode', message: 'an uncovered changed file must exit 1; the gate never passes over unclaimed code' });
     if (doc.uncovered.length === 0 && doc.exitCode === 1 && !(doc.strict && doc.changed > 0 && doc.evaluated === 0)) errors.push({ path: '/exitCode', message: 'exit 1 without uncovered files is only valid under --strict when a non-empty change evaluated nothing' });
     doc.covered.forEach((c, i) => {

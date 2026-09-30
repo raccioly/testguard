@@ -17,6 +17,7 @@
     "strict": { "description": "True when a non-empty change with zero evaluated files fails instead of passing with a note.", "type": "boolean" },
     "changed": { "description": "Files changed inside the project directory, deletions excluded.", "type": "integer", "minimum": 0 },
     "evaluated": { "description": "covered + uncovered: the changed files that are source and not excluded.", "type": "integer", "minimum": 0 },
+    "nested": { "description": "Optional descendant-project delegations; absence means none. These files are neither covered nor evaluated by the parent.", "type": "array", "items": { "$ref": "urn:claimspec:v1:common#/$defs/nestedProject" } },
     "excluded": {
       "type": "array",
       "items": {

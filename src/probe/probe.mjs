@@ -202,7 +202,7 @@ export async function probe({
       commandBudget?.assertOpen();
       if (sel.error) {
         throw new PreconditionError(`test runner is not resolvable in the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${sel.error}). ` +
-          (mode === 'worktree' ? 'No usable node_modules was linked: pass --node-modules <path>, or run with --in-place.' : 'Install dependencies first.'));
+          (mode === 'worktree' ? 'If dependencies are missing, pass --node-modules <path>, or run with --in-place. Otherwise fix the discovery error above.' : 'If dependencies are missing, install them first. Otherwise fix the discovery error above.'));
       }
       runner = sel.runner;
       runnerVersion = sel.version;

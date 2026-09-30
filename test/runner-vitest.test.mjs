@@ -38,6 +38,45 @@ describe('parseReport', () => {
     expect(timeouts).toBe(1);
   });
 
+  it.each([
+    'AssertionError [ERR_ASSERTION]: The input did not match /specify timed out/',
+    'AssertionError: expected "Test timed out in 1000ms." to be reported',
+    'Error: expected request timed out\nTest timed out in 1000ms.',
+    'Error: expected output\n    Exceeded timeout of 5000 ms for a test.',
+  ])('does not turn quoted timeout text into a runner timeout: %s', (message) => {
+    const { run, timeouts } = parseReport({ success: false, numTotalTests: 1, numFailedTests: 1, testResults: [file('failed', [t('failed', message)])] }, 10);
+    expect(run.assertionFailures).toBe(1);
+    expect(timeouts).toBe(0);
+  });
+
+  it.each([
+    'Error: Test timed out in 1000ms.',
+    'Error: Hook timed out in 1000ms while waiting for a promise.',
+    'thrown: "Exceeded timeout of 5000 ms for a test.',
+    'Error: Exceeded timeout of 5000 ms for a hook.',
+    '\u001b[31mError: Test timed out in 1000ms.\u001b[39m',
+    'Error: test timed out after 1000ms',
+    'AroundHookSetupError: The setup phase of "aroundEach" hook timed out after 1000ms.',
+    'AroundHookTeardownError: The teardown phase of "aroundAll" hook timed out after 1000ms.',
+  ])('preserves native runner timeout headers: %s', (message) => {
+    const { run, timeouts } = parseReport({ success: false, numTotalTests: 1, numFailedTests: 1, testResults: [file('failed', [t('failed', message)])] }, 10);
+    expect(run.assertionFailures).toBe(0);
+    expect(timeouts).toBe(1);
+  });
+
+  it('uses structured assertion identity but never lets it hide a separate timeout', () => {
+    const failure = { ...t('failed', 'Test timed out in 1000ms.'), failureDetails: [{ code: 'ERR_ASSERTION', operator: 'match' }] };
+    const report = { success: false, numTotalTests: 1, numFailedTests: 1, testResults: [file('failed', [failure])] };
+    expect(parseReport(report, 10).timeouts).toBe(0);
+    expect(parseReport(report, 10).run.assertionFailures).toBe(1);
+    failure.failureMessages.push('Error: Hook timed out in 1000ms.');
+    expect(parseReport(report, 10).timeouts).toBe(1);
+    expect(parseReport(report, 10).run.assertionFailures).toBe(0);
+    failure.failureMessages = ['AssertionError: text'];
+    failure.failureType = 'testTimeoutFailure';
+    expect(parseReport(report, 10).timeouts).toBe(1);
+  });
+
   it('finds the cause under jest\'s "Test suite failed to run" banner, so a syntax error is named', () => {
     const { run, loadMessage } = parseReport({ success: false, numTotalTests: 0, numPassedTests: 0, numFailedTests: 0, testResults: [file('failed', [], '  ● Test suite failed to run\n\n    SyntaxError: /x/src/redact.js: missing ) after argument list (39:60)\n\n      37 |')] }, 10);
     expect(run.outcome).toBe('error');
