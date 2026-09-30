@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-09-30
+
+Automated weekly release — everything merged since `v0.15.0`.
+
+### Changed
+
+- fix: runner timeout identity and reported adoption regressions (#180)
+- chore(homebrew): sha256 for v0.15.0 (#177)
+
+
 ### Fixed
 
 - Assertion messages quoting "timed out" no longer become runner timeouts.
