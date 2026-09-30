@@ -109,11 +109,20 @@ export function subjectOf(fault, sha256) {
  * The cost of re-measuring is a run; the cost of the other direction is a
  * verdict nobody measured.
  */
+/** Select declarations without resolving globs or running discovery. */
+export function defenderSelection(claim, fault) {
+  if (Object.hasOwn(fault, 'defendedBy')) return { requested: [...fault.defendedBy], selectionSource: 'fault' };
+  if (claim.defendedBy?.length) return { requested: [...claim.defendedBy], selectionSource: 'claim' };
+  return { requested: [], selectionSource: 'discovery' };
+}
+
 export function isReusable(prior, current) {
   if (!prior || !prior.subject?.contentHash) return false;
   // A record that exists because the probe threw is a statement about the run,
   // not about the code. Reusing it would make one disturbed run permanent.
   if (prior.detail?.reason === 'probe-error') return false;
+  const origin = prior.defenders.selectionSource ?? (prior.defenders.requested.length ? 'claim' : 'discovery');
+  if (current.selectionSource && origin !== current.selectionSource) return false;
   const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
   return prior.inputs.targetHash === current.inputs.targetHash
     && same(prior.inputs.defenderHashes, current.inputs.defenderHashes)

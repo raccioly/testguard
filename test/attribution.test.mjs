@@ -2,13 +2,24 @@
 // @req NFR-05
 // @req NFR-06
 import { describe, it, expect } from 'vitest';
-import { escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf, isReusable } from '../src/probe/attribution.mjs';
+import { escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf, isReusable, defenderSelection } from '../src/probe/attribution.mjs';
 import { sha256 } from '../src/util/hash.mjs';
 
 /** A spec `testRun`. `kill` means a genuine assertion failure, which is the only thing that can attribute. */
 const run = (outcome, assertionFailures = 0) => ({ outcome, tests: { total: 3, passed: outcome === 'pass' ? 3 : 2, failed: outcome === 'pass' ? 0 : 1 }, assertionFailures, durationMs: 1 });
 const kill = () => run('fail', 1);
 const fold = (...steps) => steps.reduce(foldEscalationRun, escalationStart());
+
+describe('fault-level defender selection', () => {
+  it('inherits a claim, overrides per fault, and honors an explicit empty override', () => {
+    const claim = { defendedBy: ['integration.test.mjs'] };
+    expect(defenderSelection(claim, {})).toEqual({ requested: ['integration.test.mjs'], selectionSource: 'claim' });
+    expect(defenderSelection(claim, { defendedBy: ['unit.test.mjs'] })).toEqual({ requested: ['unit.test.mjs'], selectionSource: 'fault' });
+    expect(defenderSelection(claim, { defendedBy: [] })).toEqual({ requested: [], selectionSource: 'fault' });
+    expect(defenderSelection({}, {})).toEqual({ requested: [], selectionSource: 'discovery' });
+    expect(defenderSelection({ defendedBy: [] }, {})).toEqual({ requested: [], selectionSource: 'discovery' });
+  });
+});
 
 describe('escalation attribution — a killer must fail in every run', () => {
   it('names a test that failed in all N runs, and only that test', () => {
@@ -146,6 +157,14 @@ describe('reuse — a prior verdict may only stand for the fault that produced i
 
   it('reuses when the source, the defenders and the fault are all unchanged', () => {
     expect(isReusable(prior(), current())).toBe(true);
+  });
+
+  it('re-probes when an identical set changes origin, including legacy evidence', () => {
+    const selected = { ...current(), selectionSource: 'fault' };
+    expect(isReusable(prior(), selected)).toBe(false);
+    expect(isReusable(prior({ defenders: { requested: selected.requested, resolved: selected.resolved, selectionSource: 'claim' } }), selected)).toBe(false);
+    expect(isReusable(prior({ defenders: { requested: selected.requested, resolved: selected.resolved, selectionSource: 'fault' } }), selected)).toBe(true);
+    expect(isReusable(prior(), { ...current(), selectionSource: 'claim' })).toBe(true);
   });
 
   it('never reuses across an edited fault — the verdict was measured against a fault that no longer exists', () => {

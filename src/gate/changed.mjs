@@ -5,6 +5,7 @@ import { loadClaims, defaultClaimsPath, ClaimsError } from '../claims/load.mjs';
 import { readSpecDoc } from '../evidence/writer.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
+import { defenderSelection } from '../probe/attribution.mjs';
 import { IS_PY_TEST } from '../probe/pyimports.mjs';
 import { globToRegExp } from '../util/glob.mjs';
 
@@ -228,7 +229,10 @@ export function computeChangedGate({ projectDir, ref, includeDirty = false, excl
   const defenderFiles = new Map(); // test file → claimIds
   for (const c of claims.claims) {
     for (const f of c.faults) faultFiles.set(f.file, [...new Set([...(faultFiles.get(f.file) ?? []), c.id])]);
-    const defenders = c.defendedBy?.length ? resolveDefenders(projectDir, c.defendedBy) : [...new Set(c.faults.flatMap((f) => discoverDefenders(projectDir, f.file)))];
+    const defenders = [...new Set(c.faults.flatMap((f) => {
+      const { requested } = defenderSelection(c, f);
+      return requested.length ? resolveDefenders(projectDir, requested) : discoverDefenders(projectDir, f.file);
+    }))];
     for (const d of defenders) defenderFiles.set(d, [...new Set([...(defenderFiles.get(d) ?? []), c.id])]);
   }
 

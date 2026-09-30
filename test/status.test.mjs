@@ -14,6 +14,9 @@ import { buildBaseline } from '../src/baseline/baseline.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { hashFile } from '../src/util/hash.mjs';
 import { fingerprint } from '../spec/lib/fingerprint.mjs';
+import { defenderSelection } from '../src/probe/attribution.mjs';
+import { resolveDefenders } from '../src/probe/runners/shared.mjs';
+import { discoverDefenders } from '../src/probe/discover.mjs';
 
 const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'known-answer');
 
@@ -48,8 +51,9 @@ function project() {
     run: { id: 'run-1', startedAt: '2026-09-17T00:00:00Z', repo: { head: 'a'.repeat(40), dirty: false }, confirmRuns: 3, mode: 'worktree' },
     records: claims.claims.flatMap((c) => c.faults.map((f) => {
       const verdict = verdictOf(c, f);
-      const defenders = c.defendedBy ?? ['test/redact.test.mjs'];
-      const resolved = defenders.filter((d) => { try { readFileSync(join(dir, d)); return true; } catch { return false; } });
+      const selection = defenderSelection(c, f);
+      const defenders = selection.requested;
+      const resolved = defenders.length ? resolveDefenders(dir, defenders) : discoverDefenders(dir, f.file);
       const runs = verdict === 'killed' ? [fail, fail, fail] : verdict === 'survived' ? [pass, pass, pass] : [];
       return {
         fingerprint: fingerprint({ claimId: c.id, subjectId: f.id, file: f.file, verdict }),
@@ -57,7 +61,7 @@ function project() {
         subject: { kind: 'fault', id: f.id, file: f.file, faultClass: f.faultClass, contentHash: faultContentHash(f) },
         verdict,
         detail: { ...(verdict === 'nocover' ? {} : verdict === 'unverifiable' ? { reason: 'anchor-missing' } : {}), baselineRuns: runs.length ? [pass, pass, pass] : [], probeRuns: runs },
-        defenders: { requested: defenders, resolved: verdict === 'nocover' ? [] : resolved, nocover: verdict === 'nocover' },
+        defenders: { ...selection, resolved: verdict === 'nocover' ? [] : resolved, ...(defenders.length ? {} : { discovered: true }), nocover: verdict === 'nocover' },
         inputs: { targetHash: hashFile(join(dir, f.file)), defenderHashes: Object.fromEntries((verdict === 'nocover' ? [] : resolved).map((d) => [d, hashFile(join(dir, d))])) },
         rank: { score: c.severity === 'critical' ? 8 : 4 },
       };
@@ -67,6 +71,21 @@ function project() {
 }
 
 describe('computeStatus — every state, with a conforming document', () => {
+  it('invalidates evidence when only the selection origin changes or an inherited defender is removed', () => {
+    const { dir, claims, evidence } = project();
+    const c = claims.claims[0];
+    c.defendedBy = ['test/redact.test.mjs', 'test/flaky.test.mjs'];
+    writeFileSync(join(dir, 'testguard.claims.json'), JSON.stringify(claims));
+    writeSpecDoc('evidence', join(dir, '.testguard', 'evidence.json'), evidence(() => 'killed'));
+    c.faults[0].defendedBy = [...c.defendedBy];
+    writeFileSync(join(dir, 'testguard.claims.json'), JSON.stringify(claims));
+    expect(computeStatus({ projectDir: dir }).stale).toContain(`defender selection for ${c.id}/${c.faults[0].id} changed since it was probed`);
+    delete c.faults[0].defendedBy;
+    c.defendedBy = ['test/redact.test.mjs'];
+    writeFileSync(join(dir, 'testguard.claims.json'), JSON.stringify(claims));
+    expect(computeStatus({ projectDir: dir }).state).toBe('evidence-stale');
+    expect(validate('status', computeStatus({ projectDir: dir })).errors).toEqual([]);
+  });
   it('no-claims → scaffold', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-empty-'));
     const s = computeStatus({ projectDir: dir });

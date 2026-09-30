@@ -3,6 +3,31 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-FAULT-DEFENDER-ORCHESTRATION",
+      "statement": "Probing selects and measures each fault's defenders rather than silently running its claim's broader inherited set.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#fault-specific-defender-selection" },
+      "severity": "critical",
+      "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/fault-defenders.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "The probe orchestrator substitutes claim-level declarations for the selected per-fault set.", "faultClass": "condition-forced", "file": "src/probe/probe.mjs", "find": "        const declared = requested.length ? resolveDefenders(iso.projectDir, requested) : null;", "replace": "        const declared = claim.defendedBy?.length ? resolveDefenders(iso.projectDir, claim.defendedBy) : null;", "producedBy": { "producer": "agent", "by": "codex" } }
+      ]
+    },
+    {
+      "id": "TG-FAULT-DEFENDER-SELECTION",
+      "statement": "Fault overrides take precedence, empty overrides request discovery, absence inherits the claim, and selection-origin changes cannot reuse a prior verdict.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#fault-specific-defender-selection" },
+      "severity": "critical",
+      "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/attribution.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "Fault overrides are ignored in favor of claim declarations.", "faultClass": "condition-forced", "file": "src/probe/attribution.mjs", "find": "  if (Object.hasOwn(fault, 'defendedBy')) return { requested: [...fault.defendedBy], selectionSource: 'fault' };", "replace": "  if (false) return { requested: [...fault.defendedBy], selectionSource: 'fault' };", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F2", "description": "An empty fault override incorrectly inherits the claim defenders.", "faultClass": "condition-forced", "file": "src/probe/attribution.mjs", "find": "  if (Object.hasOwn(fault, 'defendedBy')) return { requested: [...fault.defendedBy], selectionSource: 'fault' };", "replace": "  if (fault.defendedBy?.length) return { requested: [...fault.defendedBy], selectionSource: 'fault' };", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F3", "description": "An absent override fails to inherit a non-empty claim declaration.", "faultClass": "condition-forced", "file": "src/probe/attribution.mjs", "find": "  if (claim.defendedBy?.length) return { requested: [...claim.defendedBy], selectionSource: 'claim' };", "replace": "  if (false) return { requested: [...claim.defendedBy], selectionSource: 'claim' };", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F4", "description": "Identical file selections incorrectly reuse evidence from a different origin.", "faultClass": "condition-forced", "file": "src/probe/attribution.mjs", "find": "  if (current.selectionSource && origin !== current.selectionSource) return false;", "replace": "  if (false) return false;", "producedBy": { "producer": "agent", "by": "codex" } }
+      ]
+    },
+    {
       "id": "TG-RUNNER-TIMEOUT-IDENTITY",
       "statement": "Runner timeout identity is distinct from assertion text quoting timeout messages; actual runner timeouts remain non-detections.",
       "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#verdicts" },
@@ -2508,7 +2533,7 @@
     },
     {
       "id": "TG-COST-NAMES-SHARED-DEFENDERS",
-      "statement": "A defender file is called shared only when more than one distinct CLAIM names it. One claim probing several faults through the same file is not sharing, and reporting it as such would point the reader at a split that saves nothing.",
+      "statement": "A defender file is called shared only when more than one distinct fault identity selects it, including siblings within one claim. Repeated confirmation runs alone never imply sharing.",
       "source": {
         "kind": "spec",
         "ref": "README.md#cost"
@@ -2525,10 +2550,10 @@
       "faults": [
         {
           "id": "F1",
-          "description": "Sharing is counted by runs rather than by distinct claims, so a single claim with two faults is reported as a shared defender.",
+      "description": "Sharing is counted by runs rather than by distinct fault identities, so one fault's confirmations are reported as sharing.",
           "faultClass": "condition-forced",
           "file": "src/probe/cost.mjs",
-          "find": "    sharedDefenders: defenders.filter((d) => d.claims.length > 1),",
+      "find": "    sharedDefenders: defenders.filter((d) => d.faults.length > 1),",
           "replace": "    sharedDefenders: defenders.filter((d) => d.runs > 1),",
           "producedBy": {
             "producer": "human",
@@ -2541,7 +2566,7 @@
           "description": "Every defender is reported as shared, drowning the one file that actually is.",
           "faultClass": "condition-forced",
           "file": "src/probe/cost.mjs",
-          "find": "    sharedDefenders: defenders.filter((d) => d.claims.length > 1),",
+      "find": "    sharedDefenders: defenders.filter((d) => d.faults.length > 1),",
           "replace": "    sharedDefenders: defenders,",
           "producedBy": {
             "producer": "human",

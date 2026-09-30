@@ -195,6 +195,24 @@
         "totalRuns": { "type": "integer", "minimum": 0 },
         "reusedRecords": { "type": "integer", "minimum": 0 },
         "records": { "type": "integer", "minimum": 0 },
+        "faults": {
+          "description": "Recorded costs and selected defenders per fault; optional for legacy reports.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["claimId", "faultId", "ms", "runs", "reused", "defenders"],
+            "properties": {
+              "claimId": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" },
+              "faultId": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" },
+              "ms": { "type": "number", "minimum": 0 },
+              "runs": { "type": "integer", "minimum": 0 },
+              "reused": { "type": "boolean" },
+              "selectionSource": { "enum": ["fault", "claim", "discovery"] },
+              "defenders": { "type": "array", "uniqueItems": true, "items": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" } }
+            },
+            "additionalProperties": false
+          }
+        },
         "claims": {
           "type": "array",
           "items": {
@@ -483,6 +501,13 @@
         "file": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" },
         "ms": { "type": "number", "minimum": 0 },
         "runs": { "type": "integer", "minimum": 0 },
+        "faults": {
+          "description": "Distinct claimId/faultId identities selecting this file, not confirmation runs.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
         "claims": {
           "type": "array",
           "minItems": 1,

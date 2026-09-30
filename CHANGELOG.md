@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Fault-specific `defendedBy` overrides, with explicit empty-list discovery,
+  evidence selection provenance, per-fault cost reporting and prior-kill
+  narrowing warnings (#90). Selection changes invalidate reuse and status;
+  admission and changed-file coverage use the actual selected defenders.
+
 ## [0.15.1] - 2026-09-30
 
 Automated weekly release — everything merged since `v0.15.0`.

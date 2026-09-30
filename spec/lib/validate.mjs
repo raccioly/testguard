@@ -146,6 +146,15 @@ const semantic = {
       if (r.detail.undeclaredKillers && r.detail.reason !== 'killed-by-undeclared-tests') {
         errors.push({ path: `${p}/detail/undeclaredKillers`, message: 'undeclaredKillers is only meaningful with reason killed-by-undeclared-tests' });
       }
+      if (r.defenders.selectionSource) {
+        const empty = r.defenders.requested.length === 0;
+        if ((r.defenders.selectionSource === 'discovery' && !empty)
+          || (r.defenders.selectionSource === 'claim' && empty)
+          || (empty && r.defenders.discovered !== true)
+          || (!empty && r.defenders.discovered === true)) {
+          errors.push({ path: `${p}/defenders/selectionSource`, message: 'defender selection origin, requested set and discovery flag disagree' });
+        }
+      }
       if (r.defenders.byRunner) {
         const resolved = new Set(r.defenders.resolved);
         for (const [runner, files] of Object.entries(r.defenders.byRunner)) for (const f of files) if (!resolved.has(f)) errors.push({ path: `${p}/defenders/byRunner/${runner}`, message: `${f} ran under ${runner} but is not a resolved defender` });

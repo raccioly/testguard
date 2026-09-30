@@ -10,6 +10,27 @@ import { costReport, renderCost } from '../probe/cost.mjs';
 import { readSpecDoc } from '../evidence/writer.mjs';
 import { existsSync } from 'node:fs';
 import { checkAnchors, renderAnchorChecks } from '../claims/anchors.mjs';
+import { defenderSelection } from '../probe/attribution.mjs';
+
+/** A selection warning is not a verdict: only a fresh probe can defend it. */
+export function defenderNarrowing(projectDir, claims, records) {
+  const prior = new Map(records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]));
+  const warnings = [];
+  for (const c of claims.claims) {
+    const inherited = c.defendedBy?.length ? resolveDefenders(projectDir, c.defendedBy) : [];
+    for (const f of c.faults) {
+      const record = prior.get(`${c.id}/${f.id}`);
+      if (!Object.hasOwn(f, 'defendedBy') || record?.verdict !== 'killed') continue;
+      const { requested } = defenderSelection(c, f);
+      const resolved = requested.length ? resolveDefenders(projectDir, requested) : discoverDefendersDetailed(projectDir, f.file).canDetect;
+      if (record.defenders.selectionSource === 'fault' && JSON.stringify(record.defenders.requested) === JSON.stringify(requested) && JSON.stringify([...record.defenders.resolved].sort()) === JSON.stringify([...resolved].sort())) continue;
+      if (resolved.length < inherited.length && resolved.every((d) => inherited.includes(d))) {
+        warnings.push({ claimId: c.id, faultId: f.id, inherited, resolved });
+      }
+    }
+  }
+  return warnings;
+}
 
 export async function claimsCommand({ projectDir, values, version }, io) {
   const path = values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir);
@@ -28,14 +49,17 @@ export async function claimsCommand({ projectDir, values, version }, io) {
 
   // Cost is read back out of evidence the probe already wrote; it never runs a test.
   let cost;
+  const ev = values.evidence ? resolve(values.evidence) : evidencePath(projectDir);
+  const hasOverrides = claims.claims.some((c) => c.faults.some((f) => Object.hasOwn(f, 'defendedBy')));
+  const prior = (values.cost || hasOverrides) && existsSync(ev) ? readSpecDoc('evidence', ev) : undefined;
+  const narrowedDefenders = hasOverrides && prior ? defenderNarrowing(projectDir, claims, prior.records) : [];
   if (values.cost) {
-    const ev = values.evidence ? resolve(values.evidence) : evidencePath(projectDir);
-    cost = existsSync(ev) ? costReport(readSpecDoc('evidence', ev).records) : undefined;
+    cost = prior ? costReport(prior.records) : undefined;
     if (!cost && !values.json) io.err(`no evidence at ${ev} — run \`testguard probe\` first; cost is derived from the run durations it records`);
   }
 
   if (values.json) {
-    io.out(JSON.stringify({ path, claims, annotations, drift, ...(anchorChecks ? { anchorChecks } : {}), ...(removed ? { removed } : {}), ...(cost ? { cost } : {}) }, null, 2));
+    io.out(JSON.stringify({ path, claims, annotations, drift, ...(hasOverrides ? { narrowedDefenders } : {}), ...(anchorChecks ? { anchorChecks } : {}), ...(removed ? { removed } : {}), ...(cost ? { cost } : {}) }, null, 2));
   } else {
     const annotated = new Set(drift.annotated);
     io.out(`${claims.claims.length} claims in ${path} — ${annotated.size} carry a @claim annotation in source (test files are not scanned)`);
@@ -45,7 +69,18 @@ export async function claimsCommand({ projectDir, values, version }, io) {
       const declared = c.defendedBy?.length > 0;
       const targets = [...new Set(c.faults.map((f) => f.file))];
       let cover;
-      if (declared) {
+      if (c.faults.some((f) => Object.hasOwn(f, 'defendedBy'))) {
+        const selected = new Set();
+        for (const f of c.faults) {
+          const selection = defenderSelection(c, f);
+          const defenders = selection.requested.length ? resolveDefenders(projectDir, selection.requested) : discoverDefendersDetailed(projectDir, f.file).canDetect;
+          defenders.forEach((d) => selected.add(d));
+          const m = classifyDefenders(projectDir, f.file, defenders);
+          for (const s of m.signals) signalLines.push({ claim: c.id, target: f.file, ...s });
+          io.out(`  ${c.id}/${f.id}: ${selection.selectionSource}${selection.requested.length ? '' : ' (discovery)'} — ${defenders.join(', ') || 'NO DEFENDER'}`);
+        }
+        cover = `${selected.size} selected defender${selected.size === 1 ? '' : 's'}`;
+      } else if (declared) {
         const defenders = resolveDefenders(projectDir, c.defendedBy);
         const mocking = new Set();
         for (const t of targets) { const m = classifyDefenders(projectDir, t, defenders); m.mocking.forEach((f) => mocking.add(f)); for (const s of m.signals) signalLines.push({ claim: c.id, target: t, ...s }); }
@@ -70,6 +105,7 @@ export async function claimsCommand({ projectDir, values, version }, io) {
     if (drift.undeclared.length || drift.stale.length) io.out('');
     for (const a of drift.undeclared) io.out(`UNDECLARED   @claim ${a.id} at ${a.file}:${a.line} has no entry in the claims file — a claim with no fault model`);
     for (const c of drift.stale) io.out(`STALE        ${c.id} is annotation-sourced but no source file carries @claim ${c.id}`);
+    for (const w of narrowedDefenders) io.out(`NARROWED-DEFENDERS  ${w.claimId}/${w.faultId} selects ${w.resolved.length} of ${w.inherited.length} inherited defenders after a prior kill — re-probe; the old kill does not prove the narrower selection.`);
     if (removed) {
       io.out('');
       io.out(renderRemoved(removed));

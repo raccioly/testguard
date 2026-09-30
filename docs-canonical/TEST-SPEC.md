@@ -1,8 +1,8 @@
 # Test Specification
 
-<!-- docguard:version 1.0.0 -->
+<!-- docguard:version 1.1.0 -->
 <!-- docguard:status approved -->
-<!-- docguard:last-reviewed 2026-09-22 -->
+<!-- docguard:last-reviewed 2026-09-30 -->
 <!-- docguard:owner @raccioly -->
 <!-- docguard:quality negation-load off — the governing rule is a prohibition (a test that would pass with the behaviour broken is not a test), and the verdict rules are defined by what does not count as detection. -->
 
@@ -21,7 +21,7 @@ the test that defends it, and CI fails if any injected fault survives.
 | Conformance | `spec/conformance/` | Every valid example validates; every must-reject document is rejected for the defect its filename names | ~1 s |
 | Anchor preflight | `test/claims-anchors.test.mjs` | Exact anchors still locate, supported replacements parse, the check stays below one second, and CI reaches it before self-probe | <1 s |
 | Fixture acceptance | `test/probe.fixture.test.mjs`, `test/probe.jest.test.mjs`, `test/probe.playwright.test.mjs` | The whole pipeline reproduces a known-answer oracle, one per runner. The Playwright fixture carries its own dependencies: without `npm ci --prefix fixtures/known-answer-playwright` that file skips, and a skipped acceptance is not a passing one | 10–50 s each |
-| Self-verification | `testguard.claims.json`, run by `npm run self:probe` | The tool's own invariants survive fault injection | **20.2 min** cold (measured by the v0.10.1 release job on 2026-09-19 at `70e9d61`: 154 faults, 924 defender runs, 1210 s); seconds when verdicts are reused, which is why PR CI restores previous evidence from cache. Budgeted at 1440 s in `testguard.cost-budget.json` for the additional four-fault live-tap claim and **gated** in CI — cost growth is reviewed instead of disappearing into a passing log |
+| Self-verification | `testguard.claims.json`, run by `npm run self:probe` | The tool's own invariants survive fault injection | Historical cold measurement: **20.2 min** in the v0.10.1 release job on 2026-09-19 at `70e9d61` (154 faults, 924 defender runs, 1210 s). PR CI restores previous evidence for reuse. Current committed ceilings in `testguard.cost-budget.json`: 2250 s total and 100 s per claim; both gate CI, and neither changes for fault-specific selection |
 | Install smoke | `.github/scripts/install-smoke.mjs` | The **packed tarball** runs with production dependencies only | ~20 s |
 | Runtime budget | `ci.yml` | The suite has not silently started walking the wrong tree | gate, not a test |
 
@@ -31,7 +31,7 @@ the test that defends it, and CI fails if any injected fault survives.
 `durationMs` already on every run in an evidence document. They re-measure
 nothing.
 
-A probe's wall clock is, per claim,
+A probe's historical wall-clock model, before fault-specific selection, was per claim:
 `(baseline runs + faults × --confirm) × the cost of that claim's defender
 SET`. One slow acceptance test named by several claims is therefore paid for
 once per claim, which is what made the gate take 24 minutes: a single 49.5 s
@@ -39,8 +39,15 @@ fixture test defended five claims. Those claims now point at pure functions
 with unit-test defenders (issue #67), and the gate measures **9.6 minutes**
 from scratch, serially, for 68 faults.
 
+Fault-specific selection runs each fault's selected set. Baselines are cached
+by that set, not claim identity; per-fault cost records expose which files
+actually ran. Repeated confirmations alone are not shared-defender usage.
+`test/fault-defenders.test.mjs` covers inheritance, overrides, explicit-empty
+discovery, origin-sensitive reuse, dirty-input refusal, runner ownership,
+narrowing warnings and admission through the actual selected set.
+
 Per-file cost figures are an **upper bound, not a share**: a run executes a
-claim's whole defender set at once, so the runner never attributes time to
+fault's whole selected defender set at once, so the runner never attributes time to
 one file. They overlap and do not sum to the total.
 
 ## Coverage Rules
@@ -69,7 +76,7 @@ What is gated instead:
 | `src/probe/classify.mjs` | `test/classify.test.mjs`, `test/negative-control.test.mjs` |
 | `src/probe/inject.mjs` | `test/inject.test.mjs` |
 | `src/claims/anchors.mjs` | `test/claims-anchors.test.mjs` |
-| `src/probe/probe.mjs` | `test/probe.fixture.test.mjs`, `test/probe-preconditions.test.mjs`, `test/probe-error.test.mjs` |
+| `src/probe/probe.mjs` | `test/probe.fixture.test.mjs`, `test/probe-preconditions.test.mjs`, `test/probe-error.test.mjs`, `test/fault-defenders.test.mjs` |
 | `src/probe/discover.mjs`, `src/probe/mocks.mjs` | `test/discover.test.mjs`, `test/mocks.test.mjs` |
 | `src/probe/rank.mjs` | `test/rank-aliases.test.mjs`, `test/discover.test.mjs` |
 | `src/probe/runners/` | `test/runner-vitest.test.mjs`, `test/runner-command.test.mjs`, `test/runner-playwright.test.mjs` |

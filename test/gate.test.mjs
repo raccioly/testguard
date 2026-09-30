@@ -54,6 +54,21 @@ describe('gate --changed: claim coverage of a change', () => {
   beforeEach(() => { r = repo(); });
   afterEach(() => rmSync(r.root, { recursive: true, force: true }));
 
+  it('covers selected fault overrides, not an unused inherited claim defender', () => {
+    const path = join(r.project, 'testguard.claims.json');
+    const claims = JSON.parse(readFileSync(path, 'utf8'));
+    const c = claims.claims[0];
+    c.defendedBy = ['test/unused.test.mjs'];
+    for (const f of c.faults) f.defendedBy = ['test/selected.test.mjs'];
+    r.write('test/unused.test.mjs', '// unused\n');
+    r.write('test/selected.test.mjs', '// selected\n');
+    r.write('testguard.claims.json', JSON.stringify(claims));
+    const doc = computeChangedGate({ projectDir: r.project, ref: 'HEAD', includeDirty: true });
+    expect(doc.covered).toContainEqual({ file: 'test/selected.test.mjs', by: 'defender', claimIds: [c.id] });
+    expect(doc.uncovered.map((u) => u.file)).toContain('test/unused.test.mjs');
+    expect(validate('gate', doc).errors).toEqual([]);
+  });
+
   it('a new source file with no claim is uncovered, points at the same-directory claim, and exits 1; the document conforms', () => {
     r.write('src/newfeature.mjs', 'export const f = () => 1;\n');
     const doc = computeChangedGate({ projectDir: r.project, ref: 'HEAD', includeDirty: true, toolVersion: 't' });

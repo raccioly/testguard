@@ -6,6 +6,7 @@ import { gate } from '../baseline/baseline.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
+import { defenderSelection } from '../probe/attribution.mjs';
 import { coAuthorshipWarning, sortForReport } from '../render.mjs';
 import { computeChangedGate, defaultIgnorePath } from '../gate/changed.mjs';
 import { headSha, isAncestor } from '../git.mjs';
@@ -171,7 +172,12 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
     }
     const target = join(projectDir, cur.fault.file);
     if (existsSync(target) && hashFile(target) !== r.inputs.targetHash) doc.stale.push(`${cur.fault.file} changed since ${key} was probed`);
-    const defenders = cur.claim.defendedBy?.length ? resolveDefenders(projectDir, cur.claim.defendedBy) : discoverDefenders(projectDir, cur.fault.file);
+    const selection = defenderSelection(cur.claim, cur.fault);
+    const defenders = selection.requested.length ? resolveDefenders(projectDir, selection.requested) : discoverDefenders(projectDir, cur.fault.file);
+    const priorOrigin = r.defenders.selectionSource ?? (r.defenders.requested.length ? 'claim' : 'discovery');
+    if (priorOrigin !== selection.selectionSource || JSON.stringify(r.defenders.requested) !== JSON.stringify(selection.requested) || JSON.stringify([...r.defenders.resolved].sort()) !== JSON.stringify([...defenders].sort())) {
+      doc.stale.push(`defender selection for ${key} changed since it was probed`);
+    }
     for (const d of defenders) {
       const h = r.inputs.defenderHashes[d];
       if (!h) doc.stale.push(`${d} now defends ${key} but was not probed`);
@@ -224,7 +230,8 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   if (top) {
     doc.state = 'unproven';
     const cur = faultIndex.get(`${top.claimId}/${top.subjectId}`);
-    const defenders = cur.claim.defendedBy?.length ? resolveDefenders(projectDir, cur.claim.defendedBy) : discoverDefenders(projectDir, cur.fault.file);
+    const { requested } = defenderSelection(cur.claim, cur.fault);
+    const defenders = requested.length ? resolveDefenders(projectDir, requested) : discoverDefenders(projectDir, cur.fault.file);
     const where = defenders[0] ?? `a new test file that imports ${cur.fault.file}`;
     const whyByVerdict = {
       survived: `${top.claimId}/${top.subjectId} (${top.severity}) survived: "${cur.claim.statement}" can be false with the suite green.`,
