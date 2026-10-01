@@ -14,6 +14,20 @@ const here = dirname(fileURLToPath(import.meta.url));
 const load = (dir, f) => JSON.parse(readFileSync(join(here, dir, f), 'utf8'));
 
 describe('claimspec v1 — conformance', () => {
+  it('binds the builtin runner source to an actual supported Node version', () => {
+    const evidence = load('examples', 'evidence.json');
+    evidence.run.runner = { name: 'node-test', source: 'builtin', version: '20.0.0' };
+    evidence.run.runners?.push({ name: 'node-test', version: '20.0.0' });
+    expect(validate('evidence', evidence).errors).toEqual([]);
+    for (const runner of [
+      { name: 'node-test', source: 'builtin' },
+      { name: 'node-test', source: 'builtin', version: '18.20.8' },
+      { name: 'vitest', source: 'builtin', version: '24.18.0' },
+    ]) {
+      evidence.run.runner = runner;
+      expect(validate('evidence', evidence).ok).toBe(false);
+    }
+  });
   it('admits per-fault cost output in status and rejects invalid selection origins', () => {
     const status = load('examples', 'status.json');
     const evidence = load('examples', 'evidence.json');

@@ -122,6 +122,9 @@ jobs:
             console.log('jest fixture verdicts match expected.json:', ev.records.length);
           "
 
+      - name: probe the native Node fixture without test dependencies
+        run: node .github/scripts/check-node-fixture.mjs
+
       # ── The MCP server, driven as a client would: handshake, list, call.
       #    A harness-independent surface is only worth having if it actually
       #    speaks the protocol from a cold start. ──
@@ -243,6 +246,20 @@ jobs:
           name: testguard-self-evidence
           path: .testguard/ci-self-evidence.json
           if-no-files-found: warn
+
+  native-node-floor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20.0.0'
+      - name: Install production dependencies only
+        run: npm ci --omit=dev
+      - name: Verify the native Node floor against the independent oracle
+        run: node .github/scripts/check-node-fixture.mjs
 
   # ── Python: two engines, one oracle. The stdlib leg runs FIRST and with no
   #    pip install of any kind, because "a project with no test dependencies

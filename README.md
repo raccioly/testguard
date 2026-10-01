@@ -302,7 +302,16 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    version, its own bin script — and only then from an executable on PATH,
    which the evidence records as `runner.source: "path"`; `npx` is never
    asked, because its cache answers for packages a project does not have.
-   Anything else goes through `--runner-cmd`. Each runner is proven against
+   **Node's built-in framework** uses explicit `--runner node-test` with plain
+   JavaScript test files and default Node collection. It uses the Node executable
+   running TestGuard, records `runner.source: "builtin"` and its actual version,
+   and installs nothing. Discovery loads test modules with test bodies filtered
+   out, so top-level code can run. Custom loaders, `NODE_OPTIONS`, `NODE_PATH`
+   and module-mocking configurations are outside this initial adapter's scope.
+   `auto` keeps its existing runner order. Each confirmation uses fresh isolated
+   processes and the same worker, timeout and confirmation rules.
+
+   Other frameworks go through `--runner-cmd`. Each runner is proven against
    its own copy of the known-answer fixture.
 
    **Python** runs under `pytest` when the project's interpreter can import

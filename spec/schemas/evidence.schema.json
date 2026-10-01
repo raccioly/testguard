@@ -81,10 +81,11 @@
               "maxLength": 64
             },
             "source": {
-              "description": "`project`: the runner package resolved from the project and its own bin script ran. `path`: no such package in the project; an executable of that name on PATH ran instead (a legitimate monorepo setup, but not the project's pinned version).",
+              "description": "`project`: the runner package resolved from the project. `path`: an executable on PATH ran instead. `builtin`: the explicitly selected node-test engine uses the Node executable running TestGuard; its version is required.",
               "enum": [
                 "project",
-                "path"
+                "path",
+                "builtin"
               ]
             }
           },

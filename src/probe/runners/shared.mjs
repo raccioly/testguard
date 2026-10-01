@@ -241,7 +241,7 @@ export function parseReport(report, durationMs) {
  * runner's command line; `command` (tests) or `commandTemplate` (--runner-cmd)
  * override it.
  */
-export function runProcess({ projectDir, files, budgetMs = 120_000, command, commandTemplate, argv, env = {}, parse = parseReport }) {
+export function runProcess({ projectDir, files, budgetMs = 120_000, command, commandTemplate, argv, env = {}, parse = parseReport, cleanupOnClose = false }) {
   assertNotCancelled();
   const outFile = join(tmpdir(), `testguard-run-${randomBytes(6).toString('hex')}.json`);
   const [cmd, ...args] = command
@@ -268,6 +268,7 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
 
     child.on('close', () => {
       clearTimeout(timer);
+      if (cleanupOnClose) terminateProcessTree(child);
       const durationMs = Date.now() - started;
       let result;
       if (killed) {

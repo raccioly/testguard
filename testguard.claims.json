@@ -3,6 +3,222 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-NODE-REPORT-FAILS-CLOSED",
+      "statement": "Native Node reports never invent assertion kills from incomplete reports, timeouts, hooks or empty executed bodies.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/runner-node-report.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Accept an incomplete native report as finished.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/node-test.mjs",
+          "find": "report.complete !== true",
+          "replace": "false",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Credit a native timeout as an assertion rejection.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/node-test.mjs",
+          "find": "t.error?.failureType === 'testCodeFailure' && !t.error.fileExit",
+          "replace": "['testCodeFailure', 'testTimeoutFailure'].includes(t.error?.failureType) && !t.error.fileExit",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Ignore hook/load failure beside an assertion rejection.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/node-test.mjs",
+          "find": "loadErrors.length ? 'error'",
+          "replace": "false ? 'error'",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Treat a skipped-only native file as a green defender.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/node-test.mjs",
+          "find": "if (!tests.length || !report.entries.length) loadErrors.push({ error: { message: 'node-test executed no test bodies' } });",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-NODE-STREAM-COMPLETE-AND-ATTRIBUTED",
+      "statement": "Every started native result must complete, skipped bodies never count, imported suite ancestry is preserved, and escaped attribution is refused.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/runner-node-report.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Finish while a started test is still pending.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/node/report.mjs",
+          "find": "if (pending.size) throw new Error('node-test stopped before every started result finished');",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Discard empty native skip directives.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/node/report.mjs",
+          "find": "Object.hasOwn(data, key) && data[key] !== false",
+          "replace": "Boolean(data[key])",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Omit parent suite identity for nested results.",
+          "faultClass": "other",
+          "file": "src/probe/runners/node/report.mjs",
+          "find": "[...names.slice(0, data.nesting), data.name].join(' > ')",
+          "replace": "[data.name].join(' > ')",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Accept source attribution outside the selected project.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/node/report.mjs",
+          "find": "rel === '..' || rel.startsWith('../') || isAbsolute(rel)",
+          "replace": "false",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-NODE-ENTRY-RECEIPTS-PRECEDE-EVALUATION",
+      "statement": "Native collection records actual isolated entry files before project evaluation, including empty entries and excluding imported helper declarations.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/runner-node-controller.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Disable worker entry receipts so an empty file can disappear.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/node/entry.mjs",
+          "find": "if (process.env.NODE_TEST_CONTEXT?.startsWith('child'))",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-NODE-CONTROLLER-FRESH-AND-CAPPED",
+      "statement": "Native controllers clear inherited worker context, cap actual file-worker concurrency, and suppress test bodies during native collection.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/runner-node-controller.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Inherit nested-worker context and silently execute no native tests.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/node/runner.mjs",
+          "find": "delete process.env.NODE_TEST_CONTEXT;",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Let native workers use unrestricted parallelism.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/node/runner.mjs",
+          "find": "concurrency: workers",
+          "replace": "concurrency: true",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Run test bodies during collection on both floor and current Node.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/node/runner.mjs",
+          "find": "if (collect) process.execArgv.push('--test-name-pattern=(?!)');\nconst cancellation = new AbortController();\nconst stream = run({ signal: cancellation.signal, concurrency: workers, ...(files.length ? { files } : {}), ...(collect ? { testNamePatterns: ['(?!)'] } : {}) });",
+          "replace": "if (collect) process.execArgv.push('--test-name-pattern=.*');\nconst cancellation = new AbortController();\nconst stream = run({ signal: cancellation.signal, concurrency: workers, ...(files.length ? { files } : {}) });",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-PUBLIC-PROJECTIONS-PRESERVE-REFUSALS",
       "statement": "Public projections preserve recorded policy and origin caveats, while negative control keeps unexecuted subjects unproven.",
       "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },

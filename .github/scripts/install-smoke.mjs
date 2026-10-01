@@ -30,6 +30,19 @@ try {
 
   const bin = join(consumer, 'node_modules', '.bin', process.platform === 'win32' ? 'testguard.cmd' : 'testguard');
   const version = run(bin, ['--version'], consumer).trim();
+  const nativeProject = join(scratch, 'native-node');
+  mkdirSync(join(nativeProject, 'test'), { recursive: true });
+  writeFileSync(join(nativeProject, 'package.json'), '{"type":"module"}');
+  writeFileSync(join(nativeProject, 'test', 'native.test.mjs'), "import {test} from 'node:test';import assert from 'node:assert/strict';test('installed native runner',()=>assert.equal(2+2,4));");
+  const installedNodeRunner = join(consumer, 'node_modules', 'testguard-cli', 'src', 'probe', 'runners', 'node-test.mjs');
+  run(process.execPath, ['--input-type=module', '-e',
+    `import {pathToFileURL} from 'node:url'; const {discoverTests,run}=await import(pathToFileURL(process.argv[1]));
+     const projectDir=process.argv[2];const manifest=await discoverTests({projectDir,version:process.versions.node});
+     if(JSON.stringify(manifest.files)!==JSON.stringify(['test/native.test.mjs']))throw new Error('installed native entry discovery failed');
+     const result=await run({projectDir,files:manifest.files,budgetMs:5000});
+     if(result.run.outcome!=='pass'||result.run.tests.passed!==1)throw new Error('production-only native Node runner failed');`,
+    installedNodeRunner, nativeProject,
+  ], consumer);
   const emptyProject = join(scratch, 'empty-adoption');
   mkdirSync(emptyProject);
   writeFileSync(join(emptyProject, 'testguard.claims.json'), JSON.stringify({ schemaVersion: 1, claims: [] }));
