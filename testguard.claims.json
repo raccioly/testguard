@@ -3,6 +3,120 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-INTENT-HANDOFF-REQUIRES-INDEPENDENT-SUPPLY",
+      "statement": "Scaffold and no-claims status instruct authors to supply intended observable behavior independently of implementation rather than treating inferred output as authenticated intent.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/intent-authoring.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Replace independent-intent guidance with implementation-derived guidance.",
+          "faultClass": "other",
+          "file": "src/scaffold/intent.mjs",
+          "find": "independently of the implementation",
+          "replace": "from the current implementation",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-INTENT-REQUEST-IS-EXPLICIT-AND-BOUNDED",
+      "statement": "Intent input admission refuses ambiguous document/fix mode combinations and nonliteral fix identities before reading inputs.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/intent-input-request.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Choose one input mode silently when both were supplied.",
+          "faultClass": "other",
+          "file": "src/scaffold/request.mjs",
+          "find": "  if (modes.length !== 1) throw new Error('select exactly one input mode');",
+          "replace": "  if (false) throw new Error('select exactly one input mode');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Admit revision expressions instead of a literal complete fix identity.",
+          "faultClass": "other",
+          "file": "src/scaffold/request.mjs",
+          "find": "  if (mode === 'from-fix' && !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(selector)) throw new Error('intent input requires full-object-id');",
+          "replace": "  if (false) throw new Error('intent input requires full-object-id');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-INTENT-PLAN-DEADLINE-NEVER-RETURNS-PARTIAL",
+      "statement": "Read-only intent input planning refuses an exhausted original budget before opening inputs and after serialization instead of returning a plan outside its deadline.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/intent-input-plan.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Open document or Git inputs after the original budget expires.",
+          "faultClass": "other",
+          "file": "src/scaffold/plan-intent-input.mjs",
+          "find": "  if (remaining < 1) throw new Error('intent input deadline');",
+          "replace": "  if (false) throw new Error('intent input deadline');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Return captured plan bytes after serialization consumes the deadline.",
+          "faultClass": "other",
+          "file": "src/scaffold/plan-intent-input.mjs",
+          "find": "  if (performance.now() - started >= budgetMs) throw new Error('intent input deadline');",
+          "replace": "  if (false) throw new Error('intent input deadline');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-NATIVE-UNIVERSE-HASH-IS-CANONICAL",
       "statement": "Native test-universe hashing is independent of owning-runner collection order and rejects manifests whose declared identity no longer matches their configured membership.",
       "source": {
