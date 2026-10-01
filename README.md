@@ -357,9 +357,11 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    `--runner-cmd "<cmd> {files} … {out}"`; if the scratch worktree cannot
    see your `node_modules`, pass `--node-modules <dir>`.
 3. **Baseline** freezes every non-passing fingerprint. Later probes suppress
-   what was already known and exit non-zero only on what is new. Claims whose
-   source and defenders are unchanged reuse their prior verdict, so a probe
-   in CI costs only what changed. A baseline frozen from `--include-dirty`
+   what was already known and exit non-zero only on what is new. Prior verdicts
+   can be reused when their recorded inputs and runner policy still match.
+   Cold runs, changed discovery/configuration or `--no-reuse` can require a
+   full probe; unchanged target and defender files alone do not guarantee reuse.
+   A baseline frozen from `--include-dirty`
    evidence records the snapshot and points at the *parent* of the commit
    that will carry your tests; after you commit, a clean `probe` plus
    `baseline --restamp` moves it to that commit — only when the fingerprints
@@ -1022,16 +1024,20 @@ said what they want.
 
 ### What the probe costs, and why a gate gets slow
 
-A probe's wall clock is not a function of how many claims you have. Per claim
-it is roughly
+A fresh probe grows with the selected faults, confirmation count and the cost
+of their defenders. Shared baselines and valid verdict reuse avoid some repeated
+work. Roughly, the fresh work is
 
 ```
-(baseline runs + faults × --confirm) × the cost of that claim's defender SET
+fresh baseline runs × defender-set cost
++ Σ (fault confirmations × that fault's defender-set cost)
++ survivor diagnostics and setup/discovery work
 ```
 
-so one slow acceptance test, named as a defender by five claims, is paid for
-thirty times. The symptom is a gate that takes twenty minutes; the cause is a
-single line in the claims file, and nothing in the output used to say which.
+One slow acceptance test selected by several faults can therefore be executed
+many times. The symptom can be a gate that takes twenty minutes; the selected
+defender sets determine how much each fault costs. Historical attributed totals
+are reported separately from measured fresh elapsed time and runner invocations.
 
 ```bash
 npx testguard-cli claims . --cost     # read back from the last probe's evidence

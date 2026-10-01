@@ -42,6 +42,8 @@ Automated weekly release — everything merged since `v0.16.0`.
 
 ### Fixed
 
+- Clarify that cold probes and changed discovery/configuration can require full verification; unchanged target and defender files alone do not guarantee a cheap CI run.
+
 - Status marks evidence stale when a recorded automatic-discovery dependency (including a negative candidate, barrel or resolver config) changes or becomes unavailable. Previously unchanged defender lists could hide this drift. Native test-universe policy freshness remains pending.
 
 - Annotation scanning and placement ID admission avoid excessive regex backtracking on long alphanumeric tokens without a hyphen; status advice uses bounded, failure-aware scanning so unrelated source failures cannot prevent its verification decision.
