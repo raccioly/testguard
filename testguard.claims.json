@@ -3,6 +3,109 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-NATIVE-UNIVERSE-HASH-IS-CANONICAL",
+      "statement": "Native test-universe hashing is independent of owning-runner collection order and rejects manifests whose declared identity no longer matches their configured membership.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/native-universe.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Make the native universe digest depend on runner collection order.",
+          "faultClass": "other",
+          "file": "src/probe/universe.mjs",
+          "find": "  }).sort((a, b) => a.runner.localeCompare(b.runner));",
+          "replace": "  });",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Accept altered manifest membership or runner identity without rebinding.",
+          "faultClass": "other",
+          "file": "src/probe/universe.mjs",
+          "find": "    if (canonical.testUniverseHash !== manifest.testUniverseHash || runner.name !== manifest.runner.name) throw new DiscoveryError('native universe manifest binding is inconsistent');",
+          "replace": "    if (false) throw new DiscoveryError('native universe manifest binding is inconsistent');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SWEEP-POOL-PRESERVES-DISTINCT-DRAFTS",
+      "statement": "Pooling same-identity per-file drafts produces unique valid claim identities while preserving every draft source, statement and fault, and never mutates the caller's drafts.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/sweep-pool.test.mjs",
+        "spec/conformance/origins.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Mutate caller-owned draft identities and metadata.",
+          "faultClass": "other",
+          "file": "src/sweep/pool.mjs",
+          "find": "  const pooled = structuredClone(drafts);",
+          "replace": "  const pooled = drafts;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/sweep-pool.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "Retain colliding claim identities across pooled draft files.",
+          "faultClass": "other",
+          "file": "src/sweep/pool.mjs",
+          "find": "    if (used.has(id)) {",
+          "replace": "    if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Overwrite an already reserved suffixed identity.",
+          "faultClass": "other",
+          "file": "src/sweep/pool.mjs",
+          "find": "      } while (reserved.has(id) || used.has(id));",
+          "replace": "      } while (false);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/sweep-pool.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
       "id": "TG-ORIGIN-POLICY-REQUIRES-COMPLETE-CURRENT-PROOF",
       "statement": "An explicit origin policy rejects stale or incomplete evidence and provisional or partial requests, and cannot excuse non-killed faults through source eligibility.",
       "source": {
