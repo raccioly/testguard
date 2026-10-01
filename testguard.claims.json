@@ -3,6 +3,136 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-FIX-HISTORY-IS-EXACT-AND-SCOPED",
+      "statement": "Historical fix input requires one literal single-parent commit and an exact selected project scope; nested marker changes during historical reads invalidate the inventory rather than granting current source authority.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/fix-input.test.mjs",
+        "test/fix-inventory.test.mjs",
+        "test/fix-nested.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Choose an arbitrary merge parent or accept a root commit.",
+          "faultClass": "other",
+          "file": "src/scaffold/fix-input.mjs",
+          "find": "  if (parents.length !== 1 || !OBJECT_ID.test(parents[0]) || parents[0].length !== commit.length) refuse('single-parent-required');",
+          "replace": "  if (false) refuse('single-parent-required');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/fix-input.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "Expand a nested root-mode selection to the parent repository.",
+          "faultClass": "other",
+          "file": "src/scaffold/fix-input.mjs",
+          "find": "    if (!toplevel.endsWith('\\n') || toplevel.slice(0, -1) !== context.root) refuse('project-root-required');",
+          "replace": "    if (false) refuse('project-root-required');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/fix-inventory.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "Accept a selected nested marker replaced during historical reads.",
+          "faultClass": "other",
+          "file": "src/scaffold/fix-input.mjs",
+          "find": "    if (current.projectDir !== selected.projectDir || current.marker.hash !== selected.marker.hash ||\n      Object.entries(selected.marker.identity).some(([key, value]) => current.marker.identity[key] !== value)) refuse('project-marker-changed');",
+          "replace": "    if (false) refuse('project-marker-changed');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/fix-nested.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-FIX-PATH-PARTITION-IS-COMPLETE",
+      "statement": "Historical fix path parsing retains the union of parent and commit project boundaries and refuses duplicate or out-of-selected-scope path records instead of hiding or inflating them.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/fix-projects.test.mjs",
+        "test/fix-paths.test.mjs",
+        "test/fix-nested.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Lose project boundaries removed in the selected fix.",
+          "faultClass": "other",
+          "file": "src/scaffold/fix-paths.mjs",
+          "find": "  for (const raw of [parentRaw, commitRaw]) {",
+          "replace": "  for (const raw of [commitRaw]) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/fix-projects.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "Accept duplicate changed paths as multiple input records.",
+          "faultClass": "other",
+          "file": "src/scaffold/fix-paths.mjs",
+          "find": "    if (seen.has(file)) refuse('duplicate-path');",
+          "replace": "    if (false) refuse('duplicate-path');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/fix-paths.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "Accept a returned path outside the selected project prefix.",
+          "faultClass": "other",
+          "file": "src/scaffold/fix-paths.mjs",
+          "find": "    if (projectPrefix && !repositoryFile.startsWith(`${projectPrefix}/`)) refuse('out-of-scope-path');",
+          "replace": "    if (false) refuse('out-of-scope-path');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/fix-nested.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
       "id": "TG-AUTHORING-ADMISSION-REFUSES-ALIASED-INPUTS",
       "statement": "Authoring input admission rejects symlinked or private inputs and protected verification destinations before granting a read-only input snapshot.",
       "source": {
