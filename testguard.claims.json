@@ -3,6 +3,114 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-AUTHORING-ADMISSION-REFUSES-ALIASED-INPUTS",
+      "statement": "Authoring input admission rejects symlinked or private inputs and protected verification destinations before granting a read-only input snapshot.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/draft-admission.test.mjs",
+        "test/intent-document.test.mjs",
+        "test/intent-project.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Follow symlinked input ancestors.",
+          "faultClass": "other",
+          "file": "src/scaffold/admission.mjs",
+          "find": "    if (stat.isSymbolicLink()) refuse('symlink');",
+          "replace": "    if (false) refuse('symlink');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/draft-admission.test.mjs",
+            "test/intent-document.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "Open marker inputs inside private/tooling roots.",
+          "faultClass": "other",
+          "file": "src/scaffold/admission.mjs",
+          "find": "  if (root.split(sep).some(part => ['.local', '.wolf', '.git', '.testguard', 'graphify-out'].includes(part))) refuse('excluded-project');",
+          "replace": "  if (false) refuse('excluded-project');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/intent-project.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "Authorize append onto protected claims or verification evidence.",
+          "faultClass": "other",
+          "file": "src/scaffold/admission.mjs",
+          "find": "  if (basename(draftFile) === 'testguard.claims.json' || (draftFile.startsWith('.testguard/') && PROTECTED.has(basename(draftFile)))) refuse('protected-destination');",
+          "replace": "  if (false) refuse('protected-destination');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/draft-admission.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-DRAFT-PUBLICATION-REQUIRES-CURRENT-INPUTS-AND-RELEASE",
+      "statement": "Draft publication cannot report success after its source or path binding changes following a write, or when owned resource release fails; recovery is retained without optimistic rollback.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/draft-append-apply.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Accept source drift or a foreign draft path after writing.",
+          "faultClass": "other",
+          "file": "src/scaffold/apply-append.mjs",
+          "find": "        if (current.projectDir !== handle.plan.projectDir || current.draft.source !== output || current.draft.identity.dev !== identity.dev || current.draft.identity.ino !== identity.ino || current.draft.identity.mode !== identity.mode || !isDeepStrictEqual(current.sources, handle.plan.sources)) throw new Error('draft or sources changed after write');",
+          "replace": "        if (false) throw new Error('draft or sources changed after write');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Return success despite owned descriptor or lock release failure.",
+          "faultClass": "other",
+          "file": "src/scaffold/apply-append.mjs",
+          "find": "      if (!report.release.released) { stage = 'release'; fail(new Error(report.release.reason || 'resource release failed')); }",
+          "replace": "      if (false) { stage = 'release'; fail(new Error(report.release.reason || 'resource release failed')); }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-DRAFT-APPEND-PRESERVES-OWNED-INTENT",
       "statement": "Pure draft append preserves supplied metadata and caller-owned input, and deduplicates equivalent fault proposals rather than accumulating repeated measurements.",
       "source": {
