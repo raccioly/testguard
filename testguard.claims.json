@@ -3,6 +3,58 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-SCAFFOLD-ADMISSION-IS-BOUNDED-AND-UNFINISHED",
+      "statement": "Scaffold refuses excess proposals instead of truncating a draft, and reserves annotated and supplied identifiers before assigning unfinished placeholders.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "severity": "high",
+      "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/scaffold-admitted-source.test.mjs", "test/scaffold-placeholder.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "Silently truncate an excess proposal draft rather than refusing it.",
+          "faultClass": "other", "file": "src/scaffold/scaffold.mjs",
+          "find": "    if (maxProposals !== undefined && accepted >= maxProposals) throw new Error('scaffold proposal limit exceeded');",
+          "replace": "    if (maxProposals !== undefined && accepted >= maxProposals) return false;",
+          "producedBy": { "producer": "agent", "by": "codex" },
+          "defendedBy": ["test/scaffold-admitted-source.test.mjs"]
+        },
+        {
+          "id": "F2", "description": "Allocate a placeholder already owned by an annotation or supplied intent.",
+          "faultClass": "other", "file": "src/scaffold/scaffold.mjs",
+          "find": "      do { id = `TODO-CLAIM-${placeholder++}`; } while (reservedIds.has(id) || usedIds.has(id));",
+          "replace": "      do { id = `TODO-CLAIM-${placeholder++}`; } while (usedIds.has(id));",
+          "producedBy": { "producer": "agent", "by": "codex" },
+          "defendedBy": ["test/scaffold-placeholder.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-ANNOTATION-PLANS-REFUSE-INVALID-ANCHORS-AND-MUTATION",
+      "statement": "Annotation authoring refuses an invalid target anchor and deeply freezes its prepared independent plan before application.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
+      "severity": "critical",
+      "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/annotation-placement.test.mjs", "test/annotation-apply.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "Place annotations despite an invalid target anchor.",
+          "faultClass": "condition-forced", "file": "src/claims/annotation-placement.mjs",
+          "find": "    if (invalid) { refuse(invalid.status); continue; }",
+          "replace": "    if (false) { refuse(invalid.status); continue; }",
+          "producedBy": { "producer": "agent", "by": "codex" },
+          "defendedBy": ["test/annotation-placement.test.mjs"]
+        },
+        {
+          "id": "F2", "description": "Expose mutable nested prepared plan containers.",
+          "faultClass": "statement-deleted", "file": "src/claims/annotation-placement.mjs",
+          "find": "    for (const child of Object.values(value)) freezePrepared(child);",
+          "replace": "",
+          "producedBy": { "producer": "agent", "by": "codex" },
+          "defendedBy": ["test/annotation-apply.test.mjs"]
+        }
+      ]
+    },
+    {
       "id": "TG-ORIGIN-PROJECTIONS-ARE-SEMANTICALLY-BOUND",
       "statement": "Conforming origin summaries reproduce recorded declarations exactly, and policy projections cannot certify a provisional invocation.",
       "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
