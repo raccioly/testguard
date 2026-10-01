@@ -3,6 +3,48 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-NODE-ENTRY-SELECTION-AND-LOADING",
+      "statement": "Explicit native runs select files within the admitted canonical project root and refuse inherited alternative module loading before launching.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/runner-node.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Select test files under the parent rather than the admitted project root.",
+          "faultClass": "other",
+          "file": "src/probe/runners/node-test.mjs",
+          "find": "resolve(realpathSync(projectDir), file)",
+          "replace": "resolve(dirname(realpathSync(projectDir)), file)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Accept inherited alternative module loading.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/node-test.mjs",
+          "find": "process.env.NODE_OPTIONS || process.env.NODE_PATH",
+          "replace": "false",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-NODE-REPORT-FAILS-CLOSED",
       "statement": "Native Node reports never invent assertion kills from incomplete reports, timeouts, hooks or empty executed bodies.",
       "source": {

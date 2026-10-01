@@ -129,7 +129,7 @@ await measure('vitest', 'warmup'); await measure('node-test', 'warmup');
 for (let i = 0; i < pairs; i++) {
   const pair = [];
   for (const engine of i % 2 ? ['node-test', 'vitest'] : ['vitest', 'node-test']) pair.push(await measure(engine, `pair-${i + 1}`));
-  assert.deepStrictEqual(pair[0].projection, pair[1].projection, 'every verdict, count and killer must agree');
+  assert.deepStrictEqual(pair[0].projection, pair[1].projection, 'every verdict and run count must agree');
   assert.deepStrictEqual(pair[0].testProjection, pair[1].testProjection, 'every baseline, failed test identity and passed test must agree');
   results.push(...pair);
 }
