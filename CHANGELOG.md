@@ -7,10 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Reduce repeated self-probe setup with focused defenders for 40 existing fault checks, retaining the complete native integration regressions, all 327 fault recipes, three-run confirmation and existing cost budgets.
-
 ## [0.17.0] - 2026-10-01
 
 Automated weekly release — everything merged since `v0.16.0`.
@@ -54,6 +50,7 @@ Automated weekly release — everything merged since `v0.16.0`.
 
 ### Changed
 
+- Reduce repeated self-probe setup with focused defenders for 40 existing fault checks, retaining the complete native integration regressions, all 327 fault recipes, three-run confirmation and existing cost budgets.
 - Bound built-in runner concurrency to one worker by default, with `--workers` overrides, and cap outer regression workers at two (one on a two-core machine).
 - Drain noisy runner stdout, bound diagnostics and report reads, and terminate owned runners before restoring mutations and scratch worktrees on cancellation.
 - Run the project-pinned Playwright CLI directly instead of spawning npm for each confirmation, and reset Python interpreter caches at measurement boundaries.
