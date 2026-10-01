@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-01
+
+Automated weekly release — everything merged since `v0.16.0`.
+
+### Changed
+
+- feat: integrate adoption guidance and machine-safe probing (#189)
+- chore(deps-dev): bump vitest from 5.0.1 to 5.0.2 in the all-npm group (#187)
+- chore(homebrew): sha256 for v0.16.0 (#186)
+
+
 ### Added
 
 - Unannotated scaffold defaults use unfinished `TODO-CLAIM-N` identifiers rather than file/function-shaped claim names. Allocation avoids supplied IDs; explicit IDs/annotations and existing evidence remain unchanged, while sweep pooling preserves distinct candidates.
