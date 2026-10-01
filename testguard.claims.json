@@ -46,7 +46,7 @@
         "by": "codex"
       },
       "defendedBy": [
-        "test/runner-node.test.mjs"
+        "test/runner-node-admission.test.mjs"
       ],
       "faults": [
         {

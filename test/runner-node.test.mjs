@@ -4,7 +4,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
-import { run, discoverTests, check } from '../src/probe/runners/node-test.mjs';
+import { run, discoverTests } from '../src/probe/runners/node-test.mjs';
 import { selectRunner } from '../src/probe/runners/index.mjs';
 
 const owned = [];
@@ -25,14 +25,6 @@ const alive = (pid) => {
 };
 
 describe('native Node admission, collection and execution', () => {
-  it('runs without node_modules and records the actual built-in runtime', async () => {
-    expect(await check()).toEqual({ ok: true, version: process.versions.node, source: 'builtin' });
-    const dir = project({ 'test/a.test.mjs': body("test('real', () => assert.equal(2+2,4));") });
-    const selected = await selectRunner({ projectDir: dir, name: 'node-test' });
-    expect(selected.runner.name).toBe('node-test'); expect(selected.testFiles).toBe(1);
-    expect((await execute(dir)).run.outcome).toBe('pass');
-  });
-
   it('refuses an explicitly selected empty universe', async () => {
     const selected = await selectRunner({ projectDir: project({}), name: 'node-test' });
     expect(selected.error).toMatch(/no test files/);
@@ -74,13 +66,6 @@ describe('native Node admission, collection and execution', () => {
     }
   });
 
-  it('refuses non-default loading and never silently routes a Node project through auto', async () => {
-    const original = process.env.NODE_OPTIONS; process.env.NODE_OPTIONS = '--import=unsupported';
-    try { expect((await check()).ok).toBe(false); } finally { if(original===undefined)delete process.env.NODE_OPTIONS;else process.env.NODE_OPTIONS=original; }
-    const dir = project({ 'test/a.test.mjs': body("test('case',()=>{});") });
-    const selected = await selectRunner({ projectDir: dir, name: 'auto', budgetMs: 2000 });
-    expect(selected.runner?.name).not.toBe('node-test');
-  });
   it('binds configuration edits to the native universe and rejects symlink escapes', async () => {
     const dir = project({ 'test/a.test.mjs': body("test('case',()=>{});") });
     const before = await discover(dir); writeFileSync(join(dir,'package.json'),'{"type":"module","description":"changed"}');

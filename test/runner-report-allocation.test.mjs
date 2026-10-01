@@ -47,7 +47,7 @@ describe('bounded report allocation', () => {
 
   it('reads growth after the size snapshot instead of accepting a valid truncated prefix', () => {
     const path = reportFile('{}');
-    race.afterStat = () => appendFileSync(path, 'x');
+    race.afterStat = () => appendFileSync(path, ' x');
     expect(() => readBoundedJsonFile(path, 32)).toThrow(/not valid JSON/);
   });
 
