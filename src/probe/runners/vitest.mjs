@@ -10,7 +10,7 @@ const DISCOVERY_CONFIG_FILES = [
   'vitest.workspace.json',
 ];
 /** Ask Vitest itself to load config and enumerate the files it would collect. */
-export const discoveryArgvFor = (projectDir) => [...runnerArgv(projectDir, 'vitest', 'vitest'), 'list', '--filesOnly', '--passWithNoTests'];
+export const discoveryArgvFor = (projectDir) => [...runnerArgv(projectDir, 'vitest', 'vitest'), 'list', '--filesOnly', '--passWithNoTests', '--maxWorkers=1'];
 
 export function parseDiscoveryOutput(stdout) {
   if (typeof stdout !== 'string') throw new TypeError('Vitest discovery output must be text');
@@ -27,8 +27,8 @@ export async function discoverTests({ projectDir, version, timeoutMs, maxOutputB
 }
 // --serial: one file at a time in one process, so a contended machine cannot turn a slow suite into a TIMEOUT verdict.
 /** The command line, as data. Exported so it is falsifiable without spawning anything. */
-export const argvFor = (projectDir, files, outFile, { serial = false } = {}) =>
-  [...runnerArgv(projectDir, 'vitest', 'vitest'), 'run', ...files, '--reporter=json', `--outputFile=${outFile}`, ...(serial ? ['--no-file-parallelism'] : [])];
+export const argvFor = (projectDir, files, outFile, { serial = false, workers = 1 } = {}) =>
+  [...runnerArgv(projectDir, 'vitest', 'vitest'), 'run', ...files, '--reporter=json', `--outputFile=${outFile}`, `--maxWorkers=${serial ? 1 : workers}`, ...(serial || workers === 1 ? ['--no-file-parallelism'] : [])];
 export const run = (opts) => runProcess({ ...opts, argv: (files, outFile) => argvFor(opts.projectDir, files, outFile, opts) });
 
 /**

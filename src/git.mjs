@@ -7,7 +7,7 @@ import { randomBytes } from 'node:crypto';
 export class GitError extends Error {}
 
 export function gitRaw(args, cwd, env) {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8', env: env ? { ...process.env, ...env } : process.env });
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: 30_000, maxBuffer: 16 * 1024 * 1024, env: env ? { ...process.env, ...env } : process.env });
   if (r.status !== 0) throw new GitError(`git ${args.join(' ')}: ${(r.stderr || r.stdout).trim()}`);
   return r.stdout;
 }
@@ -27,7 +27,7 @@ export function headSha(dir, ref = 'HEAD') {
 
 /** Is `ancestor` reachable from `ref`? False when either does not resolve. */
 export function isAncestor(dir, ancestor, ref = 'HEAD') {
-  return spawnSync('git', ['merge-base', '--is-ancestor', ancestor, ref], { cwd: dir }).status === 0;
+  return spawnSync('git', ['merge-base', '--is-ancestor', ancestor, ref], { cwd: dir, timeout: 30_000 }).status === 0;
 }
 
 /** True when any of `paths` (repo-relative; empty = whole tree) has uncommitted changes. */
@@ -59,7 +59,7 @@ export function snapshotWorkingTree(repo) {
 }
 
 export function removeWorktree(repo, dest) {
-  spawnSync('git', ['worktree', 'remove', '--force', dest], { cwd: repo });
+  spawnSync('git', ['worktree', 'remove', '--force', dest], { cwd: repo, timeout: 30_000 });
   rmSync(dest, { recursive: true, force: true });
-  spawnSync('git', ['worktree', 'prune'], { cwd: repo });
+  spawnSync('git', ['worktree', 'prune'], { cwd: repo, timeout: 30_000 });
 }

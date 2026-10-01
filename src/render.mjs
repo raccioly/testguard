@@ -1,4 +1,14 @@
+import { recordedOriginSummary } from '../spec/lib/origins.mjs';
+
 const ORDER = ['survived', 'nocover', 'unverifiable', 'fault-invalid', 'timeout', 'flaky-defender', 'killed'];
+
+/** Informational declarations only; never a verdict or an eligibility gate. */
+export function renderOrigins(origins) {
+  const split = (counts) => Object.entries(counts).filter(([, n]) => n > 0).map(([kind, n]) => `${kind}: ${n}`).join(', ') || 'none';
+  return `origins (${origins.basis}): ${origins.claims.total} distinct claims (${split(origins.claims.byKind)}; mixed: ${origins.claims.mixed})` +
+    (origins.records ? `; ${origins.records.total} records (${split(origins.records.byKind)})` : '') +
+    ' — declared origins, not authenticated independence';
+}
 
 /** Non-passing verdicts shout; the one pass does not. */
 export const formatVerdict = (v, provisional = false) => (v === 'killed' ? 'killed' : v.toUpperCase()) + (provisional ? '?' : '');
@@ -37,7 +47,13 @@ export function renderSummary(records, run) {
   const kills = records.filter((r) => r.verdict === 'killed');
   const coAuthored = kills.filter((r) => r.detail.independence?.class === 'co-authored').length;
   const quality = coAuthored ? `\n${coAuthorshipWarning(coAuthored, kills.length)}` : '';
-  return `${run?.provisional ? 'PROVISIONAL: ' : ''}${records.length} faults probed: ${parts.join(', ')}. ${unproven.length} unproven fault${unproven.length === 1 ? '' : 's'} across ${claims} claim${claims === 1 ? '' : 's'}.${where}${quality}`;
+  return `${run?.provisional ? 'PROVISIONAL: ' : ''}${records.length} faults probed: ${parts.join(', ')}. ${unproven.length} unproven fault${unproven.length === 1 ? '' : 's'} across ${claims} claim${claims === 1 ? '' : 's'}.${where}${quality}\n${renderOrigins(recordedOriginSummary(records))}`;
+}
+
+/** Distinguish current admission, offline audit and recorded-run policy. */
+export function renderOriginPolicy(policy, { basis = 'recorded' } = {}) {
+  const label = basis === 'offline' ? 'current declarations; offline freshness unavailable' : basis === 'current' ? 'current inputs' : 'recorded run';
+  return `origin policy (${label}): ${policy.state}; eligible declarations: ${policy.eligibleKinds.join(', ')}; ${policy.claims} claims / ${policy.faults} faults; ${policy.ineligibleClaims.length} ineligible claims; ${policy.nonKilledFaults.length} non-killed faults${policy.unavailableReasons.length ? `; unavailable: ${policy.unavailableReasons.join(', ')}` : ''} — declared origins, not authenticated independence${basis === 'recorded' ? '; not current freshness' : ''}`;
 }
 
 /** Survivors first, then by rank score; killed last. */

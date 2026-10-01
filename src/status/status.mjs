@@ -1,17 +1,21 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { existsSync, readFileSync, lstatSync, realpathSync } from 'node:fs';
+import { join, relative, isAbsolute, sep } from 'node:path';
 import { readSpecDoc } from '../evidence/writer.mjs';
 import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
 import { gate } from '../baseline/baseline.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
-import { defenderSelection } from '../probe/attribution.mjs';
-import { coAuthorshipWarning, sortForReport } from '../render.mjs';
+import { defenderSelection, sameClaimMetadata } from '../probe/attribution.mjs';
+import { coAuthorshipWarning, sortForReport, renderOrigins, renderOriginPolicy } from '../render.mjs';
+import { evaluateOriginPolicy } from '../probe/origin-policy.mjs';
+import { declaredOriginSummary } from '../../spec/lib/origins.mjs';
+import { intentHandoff } from '../scaffold/intent.mjs';
 import { computeChangedGate, defaultIgnorePath } from '../gate/changed.mjs';
 import { headSha, isAncestor } from '../git.mjs';
 import { checkAnchorLocations } from '../claims/anchors.mjs';
 import { computeClaimedSurface, needsClaimExpansion } from './surface.mjs';
+import { projectAnnotationAdvisory } from '../claims/annotations.mjs';
 
 export const faultContentHash = (fault) => sha256(`${fault.find}\n${fault.replace}`);
 
@@ -44,7 +48,7 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
     tool: { name: 'testguard', version: toolVersion },
     generatedAt,
     state: 'no-claims',
-    next: { action: 'scaffold', command: 'testguard scaffold <source-file>', why: 'No testguard.claims.json in this project. Scaffold proposes faults for a file; state what each guarantees, then probe.' },
+    next: { action: 'scaffold', command: 'testguard scaffold <source-file>', why: `No testguard.claims.json in this project. Scaffold proposes mechanical faults, not intent. ${intentHandoff}` },
     provisional: false,
     counts: { claims: 0, faults: 0 },
     stale: [],
@@ -71,14 +75,14 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   }
   const unclaimedWhy = () => {
     const files = changes.uncovered.map((u) => u.file);
-    return `${files.length} changed file${files.length === 1 ? '' : 's'} since ${changes.ref} carr${files.length === 1 ? 'ies' : 'y'} no claim and no excusing ignore entry: ${files.slice(0, 3).join(', ')}${files.length > 3 ? ', …' : ''}. State the claim before writing more code — TestGuard is silent about unclaimed code by construction.`;
+    return `${files.length} changed file${files.length === 1 ? '' : 's'} since ${changes.ref} carr${files.length === 1 ? 'ies' : 'y'} no claim and no excusing ignore entry: ${files.slice(0, 3).join(', ')}${files.length > 3 ? ', …' : ''}. State the claim before writing more code — TestGuard is silent about unclaimed code by construction. ${intentHandoff}`;
   };
 
   if (!existsSync(paths.claims)) {
     doc.surface = computeClaimedSurface({ projectDir });
     const candidate = doc.surface.rankedUnclaimed[0];
     if (candidate && !changes?.uncovered.length) {
-      doc.next = { action: 'scaffold', command: `testguard scaffold ${candidate.file}`, why: `${doc.surface.sourceModules} source module${doc.surface.sourceModules === 1 ? '' : 's'} exist and none carries a claim. Start with ${candidateReason(doc.surface, candidate)}.`, file: candidate.file };
+      doc.next = { action: 'scaffold', command: `testguard scaffold ${candidate.file}`, why: `${doc.surface.sourceModules} source module${doc.surface.sourceModules === 1 ? '' : 's'} exist and none carries a claim. Start with ${candidateReason(doc.surface, candidate)}. ${intentHandoff}`, file: candidate.file };
     }
     if (changes?.uncovered.length) {
       const u = changes.uncovered[0];
@@ -89,11 +93,13 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   doc.paths.claims = rel(paths.claims);
 
   const claims = loadClaims(paths.claims);
+  doc.origins = declaredOriginSummary(claims.claims);
+  if (claims.claims.length) doc.notes.push(...projectAnnotationAdvisory(projectDir, claims, { customClaims: paths.claims !== defaultClaimsPath(projectDir) }).notes);
   doc.counts.claims = claims.claims.length;
   doc.counts.faults = claims.claims.reduce((n, c) => n + c.faults.length, 0);
   doc.surface = computeClaimedSurface({ projectDir, claims });
   if (claims.claims.length === 0 && !changes?.uncovered.length) {
-    doc.next = { action: 'scaffold', command: 'testguard scaffold <source-file>', why: 'No claims have been declared; no verification was performed. State a claim before probing.' };
+    doc.next = { action: 'scaffold', command: 'testguard scaffold <source-file>', why: `No claims have been declared; no verification was performed. ${intentHandoff}` };
     return doc;
   }
   const faultIndex = new Map();
@@ -140,6 +146,9 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   doc.paths.evidence = rel(evidenceFile);
   doc.evidenceSource = evidenceOverride ? 'provided' : 'local';
   const evidence = readSpecDoc('evidence', evidenceFile);
+  // Offline status cannot collect native runner/configuration membership.
+  // Only reuse the selection; a saved pass is never current freshness proof.
+  if (evidence.originPolicy) doc.originPolicy = evaluateOriginPolicy({ claims, evidence, eligibleKinds: evidence.originPolicy.eligibleKinds, fresh: false });
   // A verdict is about a commit. When the evidence describes a different one,
   // say both: "looks right and is not" is the failure mode this prevents.
   doc.evidenceHead = evidence.run.repo.snapshot ?? evidence.run.repo.head;
@@ -162,10 +171,24 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
 
   // ── Staleness: does the evidence still describe this claims file and this tree? ──
   const probed = new Map(evidence.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]));
+  const discoveryHashCache = new Map();
   for (const key of faultIndex.keys()) if (!probed.has(key)) doc.stale.push(`fault ${key} has never been probed`);
   for (const [key, r] of probed) {
     const cur = faultIndex.get(key);
     if (!cur) { doc.stale.push(`fault ${key} was probed but is no longer in the claims file`); continue; }
+    if (!sameClaimMetadata(r.claim, cur.claim)) doc.stale.push(`claim metadata for ${key} changed since it was probed`);
+    for (const [file, recordedHash] of Object.entries(r.inputs.discoveryHashes ?? {})) {
+      if (!discoveryHashCache.has(file)) {
+        let currentHash = null;
+        try {
+          const path = join(projectDir, file);
+          const inside = relative(realpathSync(projectDir), realpathSync(path));
+          if (!isAbsolute(inside) && inside !== '..' && !inside.startsWith(`..${sep}`) && lstatSync(path).isFile()) currentHash = hashFile(path);
+        } catch { /* Missing/unreadable discovery inputs are stale, not fresh. */ }
+        discoveryHashCache.set(file, currentHash);
+      }
+      if (discoveryHashCache.get(file) !== recordedHash) doc.stale.push(`${file} discovery input changed or became unavailable since ${key} was probed`);
+    }
     if (r.subject.contentHash && r.subject.contentHash !== faultContentHash(cur.fault)) {
       doc.changedFaults.push({ claimId: cur.claim.id, subjectId: cur.fault.id, previousVerdict: r.verdict, file: cur.fault.file });
       doc.stale.push(`fault ${key} changed since it was probed (was ${r.verdict})`);
@@ -264,7 +287,7 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
     doc.next = {
       action: 'claim',
       command: `testguard scaffold ${candidate.file}`,
-      why: `The existing claims are defended, but only ${doc.surface.claimedModules} of ${doc.surface.sourceModules} source modules carry a claim. Expand the denominator at ${candidateReason(doc.surface, candidate)}.`,
+      why: `The existing claims are defended, but only ${doc.surface.claimedModules} of ${doc.surface.sourceModules} source modules carry a claim. Expand the denominator at ${candidateReason(doc.surface, candidate)}. ${intentHandoff}`,
       file: candidate.file,
     };
   }
@@ -278,6 +301,8 @@ export function renderStatus(doc) {
   }
   lines.push(`state: ${doc.state}${doc.provisional ? ' (provisional)' : ''} — ${doc.counts.claims} claims / ${doc.counts.faults} faults` + (doc.counts.byVerdict ? `; ${Object.entries(doc.counts.byVerdict).map(([k, v]) => `${v} ${k}`).join(', ')}; ${doc.counts.new ?? 0} new, ${doc.counts.baselined ?? 0} baselined` : '')
   );
+  if (doc.origins) lines.push(renderOrigins(doc.origins));
+  if (doc.originPolicy) lines.push(renderOriginPolicy(doc.originPolicy, { basis: 'offline' }));
   if (doc.surface) {
     const s = doc.surface;
     const history = s.history.available ? `last ${s.history.commitsRead} commit${s.history.commitsRead === 1 ? '' : 's'}` : 'git history unavailable';

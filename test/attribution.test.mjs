@@ -159,6 +159,26 @@ describe('reuse — a prior verdict may only stand for the fault that produced i
     expect(isReusable(prior(), current())).toBe(true);
   });
 
+  it('binds reuse to the recorded claim metadata instead of promoting changed declarations', () => {
+    const claim = { id: 'ORIGIN-001', statement: 'A required operation persists.', severity: 'high', source: { kind: 'comment', ref: 'src/save.mjs' }, producedBy: { producer: 'human', by: 'reviewer' } };
+    const measured = prior({ claim });
+    const changes = [
+      { id: 'ORIGIN-002' },
+      { statement: 'A different requirement.' },
+      { severity: 'critical' },
+      { source: { ...claim.source, kind: 'spec' } },
+      { source: { ...claim.source, ref: 'requirements.md' } },
+      { producedBy: { ...claim.producedBy, by: 'another reviewer' } },
+      { producedBy: undefined },
+    ];
+    for (const change of changes) expect(isReusable(measured, { ...current(), claim: { ...claim, ...change } })).toBe(false);
+    expect(isReusable(prior(), { ...current(), claim })).toBe(false);
+    expect(isReusable(measured, { ...current(), claim: { ...claim, source: { ref: 'src/save.mjs', kind: 'comment' }, producedBy: { by: 'reviewer', producer: 'human' } } })).toBe(true);
+    const legacy = { ...claim }; delete legacy.producedBy;
+    expect(isReusable(prior({ claim: legacy }), { ...current(), claim: legacy })).toBe(true);
+    expect(isReusable(prior({ claim: legacy }), { ...current(), claim })).toBe(false);
+  });
+
   it('re-probes when an identical set changes origin, including legacy evidence', () => {
     const selected = { ...current(), selectionSource: 'fault' };
     expect(isReusable(prior(), selected)).toBe(false);

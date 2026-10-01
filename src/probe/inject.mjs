@@ -1,3 +1,4 @@
+import { registerCleanup } from './runners/lifecycle.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -19,12 +20,7 @@ function restoreAll() {
 function installHandlers() {
   if (handlersInstalled) return;
   handlersInstalled = true;
-  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
-    process.on(sig, () => {
-      restoreAll();
-      process.exit(130);
-    });
-  }
+  registerCleanup(restoreAll, { priority: 1 });
   process.on('uncaughtException', (err) => {
     restoreAll();
     throw err;

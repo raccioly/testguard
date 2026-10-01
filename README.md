@@ -127,9 +127,9 @@ raises coverage. TestGuard admits it because it fails when the claim is false.
 | npm | `npm i -D testguard-cli` then `npx testguard probe` |
 | pip | `pip install testguard-cli` then `testguard probe` (needs Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.16.0` — see [`action.yml`](./action.yml) |
+| GitHub Action | `uses: raccioly/testguard@v0.17.0` — see [`action.yml`](./action.yml) |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
-| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.16.0/packaging/gitlab/testguard.gitlab-ci.yml` with `inputs:` — see [`packaging/gitlab/`](./packaging/gitlab/testguard.gitlab-ci.yml) |
+| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.17.0/packaging/gitlab/testguard.gitlab-ci.yml` with `inputs:` — see [`packaging/gitlab/`](./packaging/gitlab/testguard.gitlab-ci.yml) |
 
 Projects that set `min-release-age` in `.npmrc` cannot see a version published
 less than that many days ago (`ENOVERSIONS`); install that one with
@@ -142,6 +142,7 @@ npx testguard-cli init                      # install the agent layer at the git
 npx testguard-cli status --json             # where the project is, and the ONE next action
 npx testguard-cli claims                    # what does this project claim, and is each claim probeable?
 npx testguard-cli claims --check-anchors    # fail fast if an exact anchor moved or a replacement no longer parses
+npx testguard-cli claims --annotate --claim AUTH-ADMIN --json # read-only file-header placement preview
 npx testguard-cli scaffold src/auth.ts      # propose faults for a file, as a draft to keep or drop
 npx testguard-cli probe                     # try to falsify each claim; report what the tests missed
 npx testguard-cli admit test/auth.test.ts --claim AUTH-ADMIN   # does this test satisfy the two-gate rule?
@@ -157,6 +158,54 @@ Exit codes are the contract: `0` nothing new to prove, `1` unproven claims,
 unclaimed changes or invalid fault anchors, `2` a precondition failed and
 nothing was probed, `3` usage.
 Every command accepts `--json`.
+
+### Intent-first drafts
+
+Scaffold drafts propose mechanical faults, not intended behavior. New claims
+declare `inferred` origin even with an annotation. Supply the intended observable
+behavior from a requirement, ADR, bug or incident independently of the code:
+inputs, expected outcome and forbidden outcome. Record the supplied source
+kind/ref; when unavailable keep inferred. References are not authenticated or
+fetched, and passing tests do not establish independent intent. Review proposals
+against the supplied intent before adopting and probing; existing `--claim`
+metadata is preserved.
+
+### Optional annotation placement
+
+Ordinary `claims` output and status notes identify missing scanned source links
+as advisories. Counts are distinct claim IDs, not faults. They do not change
+verification state, its next action or exit codes; annotation-sourced missing
+IDs still produce the existing claims drift error. Scanned text is a lexical
+link, not authenticated intent or source ownership.
+Status advice uses a bounded scan (10,000 entries, 1,000 files, 64 directory
+levels, 256 KiB per file, 2 MiB total); incomplete scans report unavailable
+advice without concluding an ID is absent. Keep the original `--claims`
+argument for preview when inspecting a custom claims selection.
+
+`testguard claims --annotate` previews JavaScript/TypeScript or Python
+file-header links for declared claims; repeat `--claim` or use comma-separated
+IDs to select claims. Add `--apply` only after reviewing the selection to
+explicitly write annotations. Each invocation recomputes its plan: an earlier
+preview is not a saved approval token. No `--out` or unrelated inspection
+switches are accepted with authoring. JSON conforms to the `annotations`
+authoring schema; it contains no source/proposed contents or probe verdicts.
+
+This is file-level placement, not symbol ownership or proof of correctness.
+Missing annotations do not disable exact fault-anchor validation, and placement
+does not change claim origins, evidence or baselines. Unsupported, ambiguous or
+unsafe targets block the complete selection. Original/proposed files are capped
+at 2 MiB and the aggregate at 16 MiB. Preserve BOM, shebang, Python encoding
+cookie, newline style and permissions. A preview exits 0 when applicable, 2 when
+refused; apply exits 0 only after verified completion, 2 for refusal/partial
+failure; malformed options exit 3.
+
+Apply uses an exclusive owned lock and retains fsynced originals in an owner-only
+recovery directory outside the checkout (the result reports its location).
+External claims files can be previewed but cannot authorize writes. It never
+reclaims an existing lock or automatically rolls back over editor changes.
+This is recoverable, not a cross-file atomic transaction: interruption or
+arbitrary concurrent edits can leave partial content. Compare retained originals
+manually before recovery; inspect ownership before removing a leftover lock.
 
 ## How it works
 
@@ -253,7 +302,23 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    version, its own bin script — and only then from an executable on PATH,
    which the evidence records as `runner.source: "path"`; `npx` is never
    asked, because its cache answers for packages a project does not have.
-   Anything else goes through `--runner-cmd`. Each runner is proven against
+   **Node's built-in framework** uses explicit `--runner node-test` with plain
+   JavaScript test files and default Node collection. It uses the Node executable
+   running TestGuard, records `runner.source: "builtin"` and its actual version,
+   and installs nothing. Discovery loads test modules with test bodies filtered
+   out, so top-level code can run. Custom loaders, `NODE_OPTIONS`, `NODE_PATH`
+   and module-mocking configurations are outside this initial adapter's scope.
+   `auto` keeps its existing runner order. Each confirmation uses fresh isolated
+   processes and the same worker, timeout and confirmation rules.
+
+   To reproduce the narrow native-runner comparison, run
+   `node .github/scripts/benchmark-node-runner.mjs --out /absolute/receipt-dir`
+   from this repository after installing its pinned development dependencies.
+   It compares 17 identical classifier inputs and four existing faults through
+   complete probes, with three confirmations, fresh worker receipts and
+   reversed execution order. Results describe that workload and runtime only.
+
+   Other frameworks go through `--runner-cmd`. Each runner is proven against
    its own copy of the known-answer fixture.
 
    **Python** runs under `pytest` when the project's interpreter can import
@@ -308,9 +373,11 @@ npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD 
    `--runner-cmd "<cmd> {files} … {out}"`; if the scratch worktree cannot
    see your `node_modules`, pass `--node-modules <dir>`.
 3. **Baseline** freezes every non-passing fingerprint. Later probes suppress
-   what was already known and exit non-zero only on what is new. Claims whose
-   source and defenders are unchanged reuse their prior verdict, so a probe
-   in CI costs only what changed. A baseline frozen from `--include-dirty`
+   what was already known and exit non-zero only on what is new. Prior verdicts
+   can be reused when their recorded inputs and runner policy still match.
+   Cold runs, changed discovery/configuration or `--no-reuse` can require a
+   full probe; unchanged target and defender files alone do not guarantee reuse.
+   A baseline frozen from `--include-dirty`
    evidence records the snapshot and points at the *parent* of the commit
    that will carry your tests; after you commit, a clean `probe` plus
    `baseline --restamp` moves it to that commit — only when the fingerprints
@@ -493,6 +560,11 @@ proposed 510 faults, probed 10 (cap 10), deferred 350.
 ```
 
 Three rules make it safe to run on a repository that has never seen this tool:
+
+Pooled draft IDs are unique even when source files share basenames/functions or
+annotation IDs. Sweep reserves original IDs and suffixes collisions before
+selection, keeping every fault, its metadata and defenders attached to its own
+draft. These are proposal identities, not authenticated claims.
 
 - **It never writes `testguard.claims.json`**, and never will. A claim is a
   sentence someone is willing to stand behind; a sentence nobody wrote is not
@@ -713,12 +785,12 @@ detected base that does not resolve is a warning for `status` and `brief`
 # GitHub Actions
 - uses: actions/checkout@v4
   with: { fetch-depth: 0 }
-- uses: raccioly/testguard@v0.16.0
+- uses: raccioly/testguard@v0.17.0
   with: { command: gate }
 
 # GitLab CI — the component-shaped template: gate + probe, brief as an artifact and, opted in, as a merge-request note
 include:
-  - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.16.0/packaging/gitlab/testguard.gitlab-ci.yml'
+  - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.17.0/packaging/gitlab/testguard.gitlab-ci.yml'
     inputs: { dir: backend, post_note: true }   # post_note needs TESTGUARD_GITLAB_TOKEN (api scope); one note, updated in place
 ```
 
@@ -968,16 +1040,20 @@ said what they want.
 
 ### What the probe costs, and why a gate gets slow
 
-A probe's wall clock is not a function of how many claims you have. Per claim
-it is roughly
+A fresh probe grows with the selected faults, confirmation count and the cost
+of their defenders. Shared baselines and valid verdict reuse avoid some repeated
+work. Roughly, the fresh work is
 
 ```
-(baseline runs + faults × --confirm) × the cost of that claim's defender SET
+fresh baseline runs × defender-set cost
++ Σ (fault confirmations × that fault's defender-set cost)
++ survivor diagnostics and setup/discovery work
 ```
 
-so one slow acceptance test, named as a defender by five claims, is paid for
-thirty times. The symptom is a gate that takes twenty minutes; the cause is a
-single line in the claims file, and nothing in the output used to say which.
+One slow acceptance test selected by several faults can therefore be executed
+many times. The symptom can be a gate that takes twenty minutes; the selected
+defender sets determine how much each fault costs. Historical attributed totals
+are reported separately from measured fresh elapsed time and runner invocations.
 
 ```bash
 npx testguard-cli claims . --cost     # read back from the last probe's evidence
@@ -1031,7 +1107,36 @@ so `scaffold` proposes them for you:
 ```bash
 npx testguard-cli scaffold src/auth.ts          # → .testguard/scaffold-auth.json (a draft, never your claims file)
 npx testguard-cli scaffold src/auth.ts --claim AUTH-ADMIN   # every proposal under one claim; copies it if it exists
+npx testguard-cli scaffold src/auth.ts src/session.ts --into draft.json --claim AUTH-ADMIN --json  # read-only merged preview
+npx testguard-cli scaffold src/auth.ts src/session.ts --into draft.json --claim AUTH-ADMIN         # explicit recoverable draft update
+npx testguard-cli scaffold --from-document requirements.md --json  # read-only input metadata, no document text
+npx testguard-cli scaffold --from-fix <full-commit-ID> --json        # read-only fixed historical inventory
 ```
+
+Input inspection uses exactly one `--from-document` or `--from-fix`, with no
+positional sources or other options except JSON/help/version. Fix IDs must be
+full lowercase SHA-1/SHA-256 commit IDs with exactly one parent. Plain-text
+documents are bounded to 2 MiB; local Git inspection is offline and bounded.
+Both output modes are stdout-only and say verification was not performed.
+Metadata retains historical exclusions, not private/delegated filenames.
+Input text and commit subjects are untrusted data, not instructions or an
+authenticated claim. Supply independent intended behavior, review faults and
+probe afterward; inspection does not create claims or prove coverage.
+
+Without a supplied ID or annotation, generated groups use unfinished
+`TODO-CLAIM-N` placeholders rather than module/function names. Replace them with
+intent-shaped identities when authoring; mechanical grouping does not establish
+an invariant boundary. Existing claims/evidence are never automatically renamed.
+
+`--into` requires an existing disposable draft and exactly one existing claim
+ID. It preserves supplied intent, metadata and prior faults; multiple source
+paths append in deterministic order. `--json` is a read-only preview. Without
+it, the tool keeps private recovery outside the checkout and reports updated
+or unchanged **unproven** draft status. Review and probe are still required.
+Canonical claims/evidence/baseline paths, unsafe aliases and conflicting options
+are refused; partial writes never become success or trigger automatic rollback.
+Limits: 32 sources, 2 MiB per input/output draft or source, 16 MiB source total,
+4096 generated proposals. These limits are not a performance guarantee.
 
 | Shape | What it proposes |
 |---|---|
@@ -1105,6 +1210,30 @@ verdicts.
 
 ## Status
 
+Origin summaries are informational: status counts current declared claim
+origins even when evidence is stale; probe evidence and briefs count recorded
+origins across all records before filtering or truncation. Distinct claims and
+records have separate totals; conflicting recorded kinds or references count
+as mixed claims. Labels such as `spec`, `bug` or `incident` do not authenticate
+independence and never waive a failed measurement or change default gates.
+References remain opaque and are not echoed in these summaries. Older strict
+readers reject these additive fields; use the matching candidate reader for
+unreleased formats. The candidate `probe --require-origin spec,adr,bug,incident`
+option selects declared kinds for a complete confirmed current-project probe.
+Repeat the option or use comma-separated kinds; partial, provisional, explicit
+historical and ignore-dirty combinations are refused. Failed policy exits 1
+even when baseline debt or a severity floor hides ordinary findings; unavailable
+current bindings exit 2. The command rechecks native runner/configuration
+membership, current claims, targets, defenders and discovery dependencies before
+publishing. Custom/static runner universes cannot certify this boundary. This is
+a declaration check, not authenticated independence or an atomic disk snapshot.
+Offline status recomputes a current-declaration audit using the recorded eligible
+selection, always marking native freshness unavailable without launching a
+runner. It does not implicitly activate a new gate or replace status's next
+action. Briefs preserve the recorded-run policy before caps and baseline
+filtering, explicitly not current freshness. A zero-item cap never turns
+survivors into an all-defended message.
+
 **v0.5.** Eleven commands (`status`, `init`, `claims`, `probe`, `admit`,
 `replay`, `baseline`, `brief`, `gate`, `scaffold`, `sweep`, `mcp`), vitest, jest,
 Playwright and Python (pytest / stdlib unittest) runners, hand-authored faults
@@ -1119,6 +1248,32 @@ half stays the agent's), runners beyond those four, AST-aware producers, and
 the transfer of a calibration between repositories — `replay` measures it now;
 whether it carries to a repository with no history is unproven. Each is
 designed for; none is claimed.
+
+### Keeping developer machines responsive
+
+Built-in probe, sweep, replay and admission runners default to one worker. Use
+`--workers 2` for a larger Vitest/Jest/Playwright worker ceiling; `--serial` always
+uses one. Python remains serial. Faults and mixed-runner groups run sequentially.
+Custom `--runner-cmd` commands, browser subprocesses, native library threads and
+test-created processes are not an OS resource sandbox. The regression suite also
+caps outer workers at two, or one when fewer than three CPUs are available
+in an interactive run; dedicated CI uses at most two because its acceptance tests start nested runners.
+
+`--budget` bounds each runner invocation; `--command-budget` bounds a complete
+command cooperatively and refuses partial result publication. Cancellation kills
+owned runners before restoring mutations and removing scratch worktrees. Already
+reparented daemons remain outside the portable cleanup guarantee. No runner output
+limit can count as an assertion failure or detection.
+
+New probe evidence includes actual elapsed time, unique fresh runner time and
+setup/discovery/other overhead. `probe --cost` and `claims --cost` display this
+separately from historical attributed record costs. Existing cost ceilings are
+unchanged; old evidence does not supply a measured breakdown.
+
+Playwright confirmations run the same project-resolved CLI used for discovery,
+avoiding an npm subprocess per run. Python projects whose configuration requires
+pytest-xdist must support serial execution; an incompatible configuration remains
+unproven rather than bypassing the worker policy.
 
 ## Licence
 

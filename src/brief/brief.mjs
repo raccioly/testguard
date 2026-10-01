@@ -1,5 +1,6 @@
 import { gate } from '../baseline/baseline.mjs';
-import { coAuthorshipWarning, summarize, formatVerdict } from '../render.mjs';
+import { coAuthorshipWarning, summarize, formatVerdict, renderOrigins, renderOriginPolicy } from '../render.mjs';
+import { recordedOriginSummary } from '../../spec/lib/origins.mjs';
 
 export const HEADING = '## TEST BLINDSPOT CONTEXT';
 /** First line of every markdown brief, so a poster can find and update its own note instead of adding another. */
@@ -72,10 +73,12 @@ export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Dat
     new: g.new.length + g.belowFloor.length,
     baselined: g.baselined.length,
   };
+  const origins = recordedOriginSummary(evidence.records);
   const kills = evidence.records.filter((r) => r.verdict === 'killed');
   const coAuthored = kills.filter((r) => r.detail.independence?.class === 'co-authored').length;
   const unclaimed = changes?.uncovered?.length ? { ref: changes.ref, files: changes.uncovered } : undefined;
-  const doc = { schemaVersion: 1, tool: evidence.tool, generatedAt, head: evidence.run.repo.head, heading: HEADING, summary, ...(next ? { next: { action: next.action, command: next.command, why: next.why } } : {}), ...(unclaimed ? { unclaimed } : {}), items, text: '' };
+  const doc = { schemaVersion: 1, tool: evidence.tool, generatedAt, head: evidence.run.repo.head, heading: HEADING, summary, origins, ...(next ? { next: { action: next.action, command: next.command, why: next.why } } : {}), ...(unclaimed ? { unclaimed } : {}), items, text: '' };
+  if (evidence.originPolicy) doc.originPolicy = structuredClone(evidence.originPolicy);
   doc.text = renderBriefText({ ...doc, provisional: Boolean(evidence.run.provisional), install }, { hasBaseline: Boolean(baseline), total: evidence.records.length, independence: kills.length ? { coAuthored, kills: kills.length } : undefined });
   return doc;
 }
@@ -89,6 +92,8 @@ export function renderBriefText(brief, { hasBaseline, total, independence }) {
     `testguard ${brief.tool.version}${brief.install ? ` (${brief.install})` : ''}${brief.head ? ` @ ${brief.head.slice(0, 12)}` : ''} — ${brief.summary.claims} claims, ${total} faults probed, ${unproven} unproven` +
       (unproven === 0 ? '.' : hasBaseline ? ` (${brief.summary.new} new since baseline).` : ' (no baseline; everything is new).'),
   ];
+  if (brief.origins) lines.push(renderOrigins(brief.origins));
+  if (brief.originPolicy) lines.push(renderOriginPolicy(brief.originPolicy));
   // Unclaimed changes come before everything else: the claim is written
   // before more code, and TestGuard is silent about unclaimed code otherwise.
   if (brief.unclaimed) {
@@ -101,7 +106,7 @@ export function renderBriefText(brief, { hasBaseline, total, independence }) {
   if (independence?.coAuthored) lines.push('', coAuthorshipWarning(independence.coAuthored, independence.kills));
   if (brief.next) lines.push('', `NEXT [${brief.next.action}]: ${brief.next.command}`, `  why: ${brief.next.why}`);
   if (brief.items.length === 0) {
-    lines.push('', 'Every probed claim is defended. Keep it that way: new claims need a fault and a test that fails on it.');
+    lines.push('', unproven === 0 ? 'Every probed claim is defended. Keep it that way: new claims need a fault and a test that fails on it.' : `${unproven} unproven faults remain; no items shown at the current cap. See the full evidence file.`);
     return lines.join('\n') + '\n';
   }
   lines.push(
@@ -149,6 +154,8 @@ export function renderBriefMarkdown(brief, { hasBaseline, total, install } = {})
   if (brief.provisional) lines.push('**PROVISIONAL** — fewer than three confirmation runs; nothing below is confirmed. Re-probe with `--confirm 3`.', '');
   lines.push(`\`testguard ${brief.tool.version}${install ? ` (${install})` : ''}\`${brief.head ? ` @ \`${brief.head.slice(0, 12)}\`` : ''} — **${brief.summary.claims}** claims, **${total}** faults probed, **${unproven}** unproven` +
     (unproven === 0 ? '.' : hasBaseline ? ` (**${brief.summary.new}** new since baseline).` : ' (no baseline; everything is new).'));
+  if (brief.origins) lines.push('', renderOrigins(brief.origins));
+  if (brief.originPolicy) lines.push('', renderOriginPolicy(brief.originPolicy));
   if (brief.unclaimed) {
     const n = brief.unclaimed.files.length;
     lines.push('', `### Unclaimed changes since \`${brief.unclaimed.ref}\``, '', `${n} changed file${n === 1 ? '' : 's'} carr${n === 1 ? 'ies' : 'y'} no claim. State the claim first; nothing below can see this code.`, '');
@@ -156,7 +163,7 @@ export function renderBriefMarkdown(brief, { hasBaseline, total, install } = {})
   }
   if (brief.next) lines.push('', `**Next** \`[${brief.next.action}]\`: \`${brief.next.command}\``, '', `> ${brief.next.why}`);
   if (brief.items.length === 0) {
-    lines.push('', 'Every probed claim is defended. Keep it that way: new claims need a fault and a test that fails on it.');
+    lines.push('', unproven === 0 ? 'Every probed claim is defended. Keep it that way: new claims need a fault and a test that fails on it.' : `${unproven} unproven faults remain; no items shown at the current cap. See the full evidence file.`);
     return lines.join('\n') + '\n';
   }
   lines.push('', 'Where the test suite is blind, ranked. A **SURVIVED** fault means its defenders stayed green while the claim was false. Do not close these by asserting current behaviour; write a test that fails on the described fault and passes on HEAD.', '');

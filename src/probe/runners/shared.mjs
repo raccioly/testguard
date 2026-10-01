@@ -1,4 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { registerChild, assertNotCancelled } from './lifecycle.mjs';
+import { readBoundedJsonFile } from './discovery.mjs';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
@@ -16,7 +18,7 @@ export const NODE_NOISE = /MODULE_TYPELESS_PACKAGE_JSON|ExperimentalWarning|--tr
 
 function descendantPids(rootPid) {
   if (process.platform === 'win32') return [];
-  const result = spawnSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' });
+  const result = spawnSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8', timeout: 1000, maxBuffer: 4 * 1024 * 1024 });
   if (result.status !== 0) return [];
   const children = new Map();
   for (const line of result.stdout.split('\n')) {
@@ -43,7 +45,7 @@ export const TIMEOUT_CLEANUP_WARNING = 'cleanup-unverified: TestGuard hard-kille
 export function terminateProcessTree(child) {
   if (!child.pid) return;
   if (process.platform === 'win32') {
-    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore', timeout: 1000 });
     try { child.kill('SIGKILL'); } catch {}
     return;
   }
@@ -147,11 +149,12 @@ export function checkRunner({ projectDir, pkg, bin, budgetMs = 60_000, env = pro
     } catch (e) {
       return resolve({ ok: false, message: e.message });
     }
+    registerChild(child, () => terminateProcessTree(child));
     let out = '';
     let err = '';
     child.on('error', () => resolve({ ok: false, message: `${pkg} is not installed in the project and \`${bin}\` is not on PATH (npm i -D ${pkg})` }));
-    child.stdout.on('data', (d) => (out += d));
-    child.stderr.on('data', (d) => (err += d));
+    child.stdout.on('data', (d) => (out = (out + d).slice(-65536)));
+    child.stderr.on('data', (d) => (err = (err + d).slice(-65536)));
     const timer = setTimeout(() => terminateProcessTree(child), budgetMs);
     child.on('close', (code) => {
       clearTimeout(timer);
@@ -238,7 +241,8 @@ export function parseReport(report, durationMs) {
  * runner's command line; `command` (tests) or `commandTemplate` (--runner-cmd)
  * override it.
  */
-export function runProcess({ projectDir, files, budgetMs = 120_000, command, commandTemplate, argv, env = {}, parse = parseReport }) {
+export function runProcess({ projectDir, files, budgetMs = 120_000, command, commandTemplate, argv, env = {}, parse = parseReport, cleanupOnClose = false }) {
+  assertNotCancelled();
   const outFile = join(tmpdir(), `testguard-run-${randomBytes(6).toString('hex')}.json`);
   const [cmd, ...args] = command
     ?? (commandTemplate ? expandCommand(commandTemplate, files, outFile) : argv(files, outFile));
@@ -248,11 +252,13 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
 
   return new Promise((resolve) => {
     const child = spawn(cmd, args, { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32', env: { ...process.env, CI: '1', FORCE_COLOR: '0', ...extraEnv } });
+    registerChild(child, () => terminateProcessTree(child));
+    child.stdout.resume(); // Reports are read from the file; drain logs to prevent pipe backpressure.
     let stderr = '';
     // Node prints MODULE_TYPELESS_PACKAGE_JSON (and friends) for the PROBED
     // project's config, not for anything the fault did. Keep it out of the
     // stream and out of `loadMessage`, which names the cause of a load error.
-    child.stderr.on('data', (d) => (stderr += String(d).split('\n').filter((l) => !NODE_NOISE.test(l)).join('\n')));
+    child.stderr.on('data', (d) => (stderr = (stderr + String(d).split('\n').filter((l) => !NODE_NOISE.test(l)).join('\n')).slice(-65536)));
     child.on('error', (e) => (stderr += e.message));
     let killed = false;
     const timer = setTimeout(() => {
@@ -262,6 +268,7 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
 
     child.on('close', () => {
       clearTimeout(timer);
+      if (cleanupOnClose) terminateProcessTree(child);
       const durationMs = Date.now() - started;
       let result;
       if (killed) {
@@ -270,7 +277,7 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
         result = { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs }, timeouts: 0, loadMessage: stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? 'runner produced no report', failedTests: [] };
       } else {
         try {
-          result = parse(JSON.parse(readFileSync(outFile, 'utf8')), durationMs);
+          result = parse(readBoundedJsonFile(outFile), durationMs);
         } catch (e) {
           result = { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs }, timeouts: 0, loadMessage: `unreadable report: ${e.message}`, failedTests: [] };
         }

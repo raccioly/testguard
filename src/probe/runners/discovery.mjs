@@ -1,3 +1,4 @@
+import { registerChild } from './lifecycle.mjs';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpathSync, rmSync, statSync } from 'node:fs';
@@ -155,6 +156,7 @@ export function runDiscoveryProcess({
   timeoutMs = DISCOVERY_TIMEOUT_MS,
   maxOutputBytes = MAX_DISCOVERY_OUTPUT_BYTES,
   env = {},
+  cleanupOnClose = false,
 }) {
   validateArgv(argv);
   if (typeof projectDir !== 'string' || projectDir.length === 0 || projectDir.includes('\0')) throw new DiscoveryError('projectDir must be a non-empty path');
@@ -177,6 +179,7 @@ export function runDiscoveryProcess({
       return;
     }
 
+    registerChild(child, () => terminateProcessTree(child));
     const started = Date.now();
     const stdout = [];
     const stderr = [];
@@ -221,6 +224,7 @@ export function runDiscoveryProcess({
 
     child.on('close', (code, signal) => {
       clearTimeout(timer);
+      if (cleanupOnClose) terminateProcessTree(child);
       if (settled) return;
       if (terminalError) {
         reject(terminalError);

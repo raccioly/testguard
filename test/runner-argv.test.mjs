@@ -74,7 +74,10 @@ describe('the command line starts with the binary resolved for THIS project', ()
     expect(argv).toContain('test/a.test.mjs');
     expect(argv).toContain('--reporter=json');
     expect(argv).toContain('--outputFile=/tmp/out.json');
-    expect(argv).not.toContain('--no-file-parallelism');
+    expect(argv).toContain('--no-file-parallelism');
+    expect(argv).toContain('--maxWorkers=1');
+    expect(vitestRunner.argvFor(dir, [], '/tmp/o.json', { workers: 2 })).toContain('--maxWorkers=2');
+    expect(vitestRunner.argvFor(dir, [], '/tmp/o.json', { workers: 2 })).not.toContain('--no-file-parallelism');
     expect(vitestRunner.argvFor(dir, [], '/tmp/o.json', { serial: true })).toContain('--no-file-parallelism');
   });
 

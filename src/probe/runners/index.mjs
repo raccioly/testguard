@@ -2,6 +2,7 @@ import * as vitest from './vitest.mjs';
 import * as jest from './jest.mjs';
 import * as playwright from './playwright.mjs';
 import * as pythonRunner from './python.mjs';
+import * as nodeTest from './node-test.mjs';
 import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs } from './discovery.mjs';
 
 export const RUNNERS = {
@@ -14,9 +15,10 @@ export const RUNNERS = {
   // evidence means.
   pytest: pythonRunner.pinned('pytest'),
   unittest: pythonRunner.pinned('unittest'),
+  'node-test': nodeTest,
 };
 
-export const RUNNER_NAMES = ['vitest', 'jest', 'playwright', 'python', 'pytest', 'unittest'];
+export const RUNNER_NAMES = ['vitest', 'jest', 'playwright', 'python', 'pytest', 'unittest', 'node-test'];
 
 /**
  * Runners that own files rather than projects: a defender under Playwright's

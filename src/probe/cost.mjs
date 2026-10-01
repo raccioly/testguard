@@ -92,10 +92,11 @@ export function defenderCosts(records) {
  * turns a twenty-four-minute gate into a one-minute one, and until a report
  * names the file nobody knows which test to split.
  */
-export function costReport(records) {
+export function costReport(records, { run } = {}) {
   const claims = claimCosts(records);
   const defenders = defenderCosts(records);
   return {
+    ...(run?.measurements ? { measurements: { ...run.measurements } } : {}),
     totalMs: claims.reduce((a, c) => a + c.ms, 0),
     totalRuns: claims.reduce((a, c) => a + c.runs, 0),
     reusedRecords: records.filter((r) => r.reusedFrom).length,
@@ -118,6 +119,10 @@ export const formatMs = secs;
  */
 export function renderCost(report, { limit = 10 } = {}) {
   const out = [];
+  if (report.measurements) {
+    const m = report.measurements;
+    out.push(`actual elapsed ${secs(m.elapsedMs)}; fresh runners ${secs(m.runnerMs)} across ${m.runnerInvocations} invocations; setup/discovery/other overhead ${secs(m.overheadMs)}`);
+  }
   if (!report.records) return 'no evidence records — run `testguard probe` first; cost is read back from the runs it records.';
   out.push(`${report.records} fault record${report.records === 1 ? '' : 's'} cost ${secs(report.totalMs)} across ${report.totalRuns} defender runs${report.reusedRecords ? ` (${report.reusedRecords} reused; their runs are what they cost when reuse does not apply)` : ''}.`);
   out.push('');
