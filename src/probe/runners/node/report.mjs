@@ -54,7 +54,8 @@ export function createReport({ projectDir, version, collect = false }) {
     const name = [...names.slice(0, data.nesting), data.name].join(' > ');
     const rel = file ? relative(projectDir, file).split(sep).join('/') : '';
     // Refuse ambiguous/escaped attribution rather than invent a killer id.
-    if (!container && (!rel || rel === '..' || rel.startsWith('../') || isAbsolute(rel) || !name || name.length > 1000)) throw new Error('node-test result has unavailable or unsupported attribution');
+    const outside = rel === '..' || rel.startsWith('../') || isAbsolute(rel);
+    if (!container && (!rel || outside || !name || name.length > 1000)) throw new Error(outside ? 'node-test result attribution is outside the selected project' : 'node-test result has unavailable or unsupported attribution');
     add({ file: rel, name, container, suite, skipped, passed: type === 'test:pass', ...(error ? { error } : {}) });
   };
   const finish = (entries) => {
