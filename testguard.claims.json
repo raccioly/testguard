@@ -3,6 +3,169 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-ORIGIN-POLICY-REQUIRES-COMPLETE-CURRENT-PROOF",
+      "statement": "An explicit origin policy rejects stale or incomplete evidence and provisional or partial requests, and cannot excuse non-killed faults through source eligibility.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/origin-policy.test.mjs",
+        "test/origin-policy-request.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Accept stale policy inputs.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/origin-policy.mjs",
+          "find": "  if (fresh !== true) reasons.add('stale-inputs');",
+          "replace": "  if (false) reasons.add('stale-inputs');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/origin-policy.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "Accept missing declared fault records.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/origin-policy.mjs",
+          "find": "  if ([...expected.keys()].some((identity) => !seen.has(identity))) reasons.add('missing-record');",
+          "replace": "  if (false) reasons.add('missing-record');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/origin-policy.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "Drop survivors from explicit policy failure.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/origin-policy.mjs",
+          "find": "records.filter((r) => r.verdict !== 'killed')",
+          "replace": "records.filter((r) => false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/origin-policy.test.mjs"
+          ]
+        },
+        {
+          "id": "F4",
+          "description": "Admit provisional policy requests.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/origin-policy.mjs",
+          "find": "  if (!Number.isInteger(n) || n < 3) throw new TypeError('--require-origin requires --confirm of at least 3');",
+          "replace": "  if (false) throw new TypeError('--require-origin requires --confirm of at least 3');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/origin-policy-request.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-ORIGIN-POLICY-FRESHNESS-BINDS-LIVE-INPUTS",
+      "statement": "Origin policy freshness requires matching native universe identity and every current target/defender/discovery binding; unchanged verdict labels cannot excuse changed inputs.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/policy-freshness.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Accept a self-inconsistent native universe digest.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/policy-freshness.mjs",
+          "find": "    if (universe.testUniverseHash !== testUniverseHash) return false;",
+          "replace": "    if (false) return false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Ignore changed live input binding.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/policy-freshness.mjs",
+          "find": "      if (!isReusable(record, { claim, requested, resolved, selectionSource, contentHash: subject.contentHash, inputs })) return false;",
+          "replace": "      if (false) return false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-AUTHORING-INPUT-PARTITION-IS-NON-OPTIMISTIC",
+      "statement": "Read-only authoring input validation rejects contradictory fix denominators and unsupported document formats instead of reporting a valid complete input.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "spec/conformance/authoring-input.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Accept an incomplete or invented fix partition.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/authoring-input.mjs",
+          "find": "  if (total !== supported + deleted + unsupported + excluded || input.paths.length !== supported + deleted + unsupported) fail('/input/counts', 'complete path partition must retain excluded/deleted/unsupported denominators');",
+          "replace": "  if (false) fail('/input/counts', 'complete path partition must retain excluded/deleted/unsupported denominators');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Accept source files as declared document inputs.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/authoring-input.mjs",
+          "find": "    if (!['.md', '.txt', '.rst', '.adoc'].includes(extname(input.file))) fail('/input/file', 'document format is unsupported');",
+          "replace": "    if (false) fail('/input/file', 'document format is unsupported');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-ORIGIN-SUMMARY-NEVER-PROMOTES-DECLARATIONS",
       "statement": "Origin summaries count distinct claim identities separately from actual records, refuse duplicate current declarations and retain conflicting recorded declarations as mixed rather than selecting an apparently consistent source.",
       "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
