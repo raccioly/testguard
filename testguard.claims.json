@@ -3,6 +3,90 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-PUBLIC-PROJECTIONS-PRESERVE-REFUSALS",
+      "statement": "Public projections preserve recorded policy and origin caveats, while negative control keeps unexecuted subjects unproven.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "severity": "critical", "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/origin-policy-projections.test.mjs", "test/origin-reporting.test.mjs", "test/negative-control.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "Drop recorded policy from the capped brief projection.",
+          "faultClass": "statement-deleted", "file": "src/brief/brief.mjs",
+          "find": "  if (evidence.originPolicy) doc.originPolicy = structuredClone(evidence.originPolicy);", "replace": "",
+          "producedBy": { "producer": "agent", "by": "codex" },
+          "defendedBy": ["test/origin-policy-projections.test.mjs"]
+        },
+        {
+          "id": "F2", "description": "Advertise declared origins as authenticated independence.",
+          "faultClass": "other", "file": "src/render.mjs",
+          "find": "    ' — declared origins, not authenticated independence';",
+          "replace": "    ' — authenticated independent origins';",
+          "producedBy": { "producer": "agent", "by": "codex" },
+          "defendedBy": ["test/origin-reporting.test.mjs"]
+        },
+        {
+          "id": "F3", "description": "Report an unexecuted subject as a genuine survivor.",
+          "faultClass": "condition-forced", "file": "src/probe/classify.mjs",
+          "find": "    if (subjectReached === false) return { verdict: 'unverifiable', reason: 'subject-not-executed' };",
+          "replace": "    if (false) return { verdict: 'unverifiable', reason: 'subject-not-executed' };",
+          "producedBy": { "producer": "agent", "by": "codex" },
+          "defendedBy": ["test/negative-control.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-CLI-AUTHORING-REPORTS-FAILURE-HONESTLY",
+      "statement": "The CLI reports failed draft publication as a refusal and read-only intent inspection as unverified, without success-shaped output.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "severity": "critical", "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/draft-append-cli.test.mjs", "test/intent-input-cli.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "Print successful draft output after a failed publication.",
+          "faultClass": "condition-forced", "file": "src/commands/scaffold.mjs",
+          "find": "      if (!report.ok) {", "replace": "      if (false) {",
+          "producedBy": { "producer": "agent", "by": "codex" },
+          "defendedBy": ["test/draft-append-cli.test.mjs"]
+        },
+        {
+          "id": "F2", "description": "Promote read-only input inspection to completed verification in human output.",
+          "faultClass": "other", "file": "src/commands/scaffold.mjs",
+          "find": "        io.out(`authoring input inspection (${input.kind}); verification not performed`);",
+          "replace": "        io.out(`authoring input inspection (${input.kind}); verification completed`);",
+          "producedBy": { "producer": "agent", "by": "codex" },
+          "defendedBy": ["test/intent-input-cli.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-CLI-POLICY-ADMISSION-PRECEDES-CLAIM-READS",
+      "statement": "The CLI refuses incompatible origin policy usage before attempting to read claims, preserving a usage refusal instead of unrelated input failure.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "severity": "critical", "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/origin-policy-cli.test.mjs"],
+      "faults": [{
+        "id": "F1", "description": "Skip early origin policy request admission before reading claims.",
+        "faultClass": "statement-deleted", "file": "src/cli.mjs",
+        "find": "  try { originPolicyRequest(values, command); }",
+        "replace": "  try { /* skipped early policy admission */ }",
+        "producedBy": { "producer": "agent", "by": "codex" }
+      }]
+    },
+    {
+      "id": "TG-MCP-NEXT-COMMAND-RETAINS-STATUS-ACTION",
+      "statement": "The read-only MCP next-command tool returns the same required action as status, rather than falsely declaring unprobed work complete.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "severity": "high", "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/mcp.test.mjs"],
+      "faults": [{
+        "id": "F1", "description": "Advertise completion instead of the status-required next action.",
+        "faultClass": "other", "file": "src/mcp/tools.mjs",
+        "find": "return { state: doc.state, action: doc.next.action, command: doc.next.command,",
+        "replace": "return { state: doc.state, action: 'done', command: doc.next.command,",
+        "producedBy": { "producer": "agent", "by": "codex" }
+      }]
+    },
+    {
       "id": "TG-ACCEPTANCE-HELPERS-PRESERVE-OBSERVABLE-ORACLES",
       "statement": "Acceptance helpers retain a value-specific assertion, nested project layout and actual formula digest observation rather than substituting weaker observations.",
       "source": { "kind": "manual", "ref": "Test fixture helper contracts" },
