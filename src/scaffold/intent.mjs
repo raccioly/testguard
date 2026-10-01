@@ -1,0 +1,2 @@
+// Authoring advice, not an authenticated origin or a verification result.
+export const intentHandoff = 'Supply intended observable behavior from a requirement, ADR, bug or incident independently of the implementation: name inputs, expected outcome and forbidden outcome. Record the supplied source kind/ref; when unavailable, keep inferred. Source references and annotations are not authenticated intent. Review each proposal against that intent before probing.';

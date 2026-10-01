@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { basename, extname, join } from 'node:path';
+import { join } from 'node:path';
 import { proposalsForLine, functionHead, functionParams } from './producers.mjs';
 import * as py from './producers.python.mjs';
 import { locate } from '../probe/inject.mjs';
@@ -14,8 +14,6 @@ const NO_FIELD_DROPS = /\.(test|spec)\.[cm]?[jt]sx?$|(^|\/)(__tests__|__fixtures
 // rule would not recognise one. Kept separate so adding Python cannot quietly
 // change which proposals a JavaScript file gets.
 const NO_FIELD_DROPS_PY = /(^|\/)(test[^/]*\.py|[^/]*_test\.py|conftest\.py)$|(^|\/)(tests?|__fixtures__|fixtures|migrations)\//;
-
-const idPart = (s) => s.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').toUpperCase();
 
 const isPython = (file) => file.endsWith('.py');
 
@@ -136,10 +134,13 @@ function anchorFor(source, find, offset) {
  * with `producedBy: { producer: "derived" }` and TODO statements a human must
  * replace. Never touches the real claims file.
  */
-export function scaffoldFile({ projectDir, file, claimId, existingClaims, toolVersion = '0.0.0' }) {
-  const source = readFileSync(join(projectDir, file), 'utf8');
+export function scaffoldFile({ projectDir, file, claimId, existingClaims, toolVersion = '0.0.0', source: admittedSource, maxProposals }) {
+  if (maxProposals !== undefined && (!Number.isSafeInteger(maxProposals) || maxProposals < 0)) throw new Error('maxProposals must be a non-negative safe integer');
+  if (admittedSource !== undefined && typeof admittedSource !== 'string') throw new Error('source must be a string');
+  // Internal authoring can scan bytes already admitted through a descriptor.
+  // Legacy callers still read the file; supplied empty text never falls back.
+  const source = admittedSource === undefined ? readFileSync(join(projectDir, file), 'utf8') : admittedSource;
   const lines = source.split('\n');
-  const stem = idPart(basename(file, extname(file)));
   const producedBy = { producer: 'derived', by: `testguard scaffold ${toolVersion}` };
 
   const groups = new Map(); // key → { id, proposals[] , annotated }
@@ -150,28 +151,40 @@ export function scaffoldFile({ projectDir, file, claimId, existingClaims, toolVe
 
   const fieldDrops = !(isPython(file) ? NO_FIELD_DROPS_PY : NO_FIELD_DROPS).test(file);
   const scan = isPython(file) ? scanPython : scanJs;
-  const proposals = scan({ source, lines, fieldDrops, keep: (fault) => usableProposal(source, fault), anchor: (find, offset) => anchorFor(source, find, offset) });
+  let accepted = 0;
+  const keep = (fault) => {
+    if (!usableProposal(source, fault)) return false;
+    if (maxProposals !== undefined && accepted >= maxProposals) throw new Error('scaffold proposal limit exceeded');
+    accepted++;
+    return true;
+  };
+  const proposals = scan({ source, lines, fieldDrops, keep, anchor: (find, offset) => anchorFor(source, find, offset) });
 
   const existing = new Map((existingClaims?.claims ?? []).map((c) => [c.id, c]));
   const usedIds = new Set();
   for (const p of proposals) {
     const key = claimId ? '__all__' : p.annotation ?? p.fn ?? '__file__';
-    let id = claimId ?? p.annotation ?? `${stem}-${p.fn ? idPart(p.fn) : 'FILE'}`;
+    let id = claimId ?? p.annotation ?? null;
     groupFor(key, id).proposals.push(p);
   }
 
   const defendedBy = discoverDefenders(projectDir, file);
   const claims = [];
+  const reservedIds = new Set([...existing.keys(), ...[...groups.values()].map(g => g.id).filter(id => id !== null)]);
+  let placeholder = 1;
   for (const g of groups.values()) {
     let id = g.id;
+    if (id === null) {
+      do { id = `TODO-CLAIM-${placeholder++}`; } while (reservedIds.has(id) || usedIds.has(id));
+    }
     while (usedIds.has(id)) id += '-2';
     usedIds.add(id);
     const base = existing.get(id);
     const fnLabel = g.proposals[0].fn ? `\`${g.proposals[0].fn}\`` : 'this file';
     const claim = {
       id,
-      statement: base?.statement ?? `TODO: state what ${fnLabel} in ${file} guarantees (${g.proposals.length} proposed fault${g.proposals.length === 1 ? '' : 's'}; keep or drop each)`,
-      source: base?.source ?? { kind: 'manual', ref: `testguard scaffold ${file}` },
+      statement: base?.statement ?? `TODO: supply intended observable behavior for ${fnLabel} in ${file} from a requirement, ADR, bug or incident: inputs, expected outcome and forbidden outcome (${g.proposals.length} proposed fault${g.proposals.length === 1 ? '' : 's'}; keep or drop each against that intent)`,
+      source: base?.source ?? { kind: 'inferred', ref: `testguard scaffold ${file}` },
       severity: base?.severity ?? 'medium',
       producedBy: base?.producedBy ?? producedBy,
       ...(base?.defendedBy?.length ? { defendedBy: base.defendedBy } : defendedBy.length ? { defendedBy } : {}),

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "tool": { "name": "testguard", "version": "0.0.0" },
+  "purpose": "authoring-input",
+  "verification": "not-performed",
+  "next": "supply-independent-intent",
+  "input": {
+    "kind": "document",
+    "file": "requirements.md",
+    "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

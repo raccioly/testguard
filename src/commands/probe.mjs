@@ -4,13 +4,16 @@ import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
 import { probe } from '../probe/probe.mjs';
 import { writeSpecDoc, readSpecDoc } from '../evidence/writer.mjs';
 import { gate } from '../baseline/baseline.mjs';
-import { renderRecord, renderSummary, sortForReport, PROVISIONAL_WARNING } from '../render.mjs';
+import { renderRecord, renderSummary, sortForReport, PROVISIONAL_WARNING, renderOriginPolicy } from '../render.mjs';
 import { computeStatus } from '../status/status.mjs';
 import { resolveChangedRef, withChangedRef } from '../gate/changed.mjs';
 import { costReport, renderCost } from '../probe/cost.mjs';
 import { progressMode, stageReporter, clearStageLine, recordEvent, isProgressMode, progressStream } from '../probe/progress.mjs';
 import { validate } from '../../spec/lib/validate.mjs';
 import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
+import { originPolicyRequest, evaluateOriginPolicy } from '../probe/origin-policy.mjs';
+import { readNativeTestUniverse } from '../probe/universe.mjs';
+import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
 export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
@@ -35,8 +38,16 @@ export function partialScope(only, records) {
 }
 
 export async function probeCommand({ projectDir, values, version }, io) {
+  let eligibleKinds;
+  try { eligibleKinds = originPolicyRequest(values); }
+  catch (e) { io.err(e.message); return 3; }
   const confirmRuns = Number(values.confirm);
   const budgetMs = Number(values.budget);
+  const workers = Number(values.workers ?? 1);
+  if (!Number.isSafeInteger(workers) || workers < 1) {
+    io.err('--workers must be a positive safe integer');
+    return 3;
+  }
   const commandBudgetMs = parseCommandBudget(values['command-budget']);
   if (!Number.isInteger(confirmRuns) || confirmRuns < 1 || !Number.isInteger(budgetMs) || budgetMs < 1000) {
     io.err('--confirm must be a positive integer and --budget at least 1000');
@@ -94,12 +105,13 @@ export async function probeCommand({ projectDir, values, version }, io) {
     previous,
     confirmRuns,
     budgetMs,
+    workers,
+    serial: values.serial || workers === 1,
     commandBudget,
     mode: values['in-place'] ? 'in-place' : 'worktree',
     ref: values.ref ?? 'HEAD',
     refExplicit: values.ref !== undefined,
     ignoreDirty: values['ignore-dirty'],
-    serial: values.serial,
     onWarn: (m) => io.err(`warning: ${m}`),
     runnerCommand: values['runner-cmd'],
     runnerName: values.runner,
@@ -123,17 +135,47 @@ export async function probeCommand({ projectDir, values, version }, io) {
     },
   });
   commandBudget?.assertOpen();
+  if (eligibleKinds) {
+    let universe;
+    // Custom commands carry a static universe, which cannot establish this
+    // native policy boundary. Discovery failures are unavailability, not kills.
+    if (!values['runner-cmd']) {
+      try {
+        universe = await readNativeTestUniverse({
+          projectDir, sourceDir: projectDir, runnerName: values.runner,
+          python: values.python ? resolve(values.python) : undefined,
+          budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs,
+          budgetFor: () => commandBudget?.runBudget(budgetMs) ?? budgetMs,
+          assertOpen: () => commandBudget?.assertOpen(),
+        });
+      } catch { /* An absent binding can never pass policy. */ }
+    }
+    commandBudget?.assertOpen();
+    const currentClaims = loadClaims(values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir));
+    const fresh = originPolicyInputsFresh({ projectDir, claims: currentClaims, evidence, universe });
+    evidence.originPolicy = evaluateOriginPolicy({ claims: currentClaims, evidence, eligibleKinds, fresh });
+  }
+  commandBudget?.assertOpen();
   writeSpecDoc('evidence', outPath, evidence);
 
   const g = gate(evidence.records, baseline, { severityFloor: values.severity });
+  const policy = evidence.originPolicy;
+  const exitCode = policy?.state === 'unavailable' ? 2 : policy?.state === 'failed' || g.new.length > 0 ? 1 : 0;
   const scope = partialScope(only, evidence.records);
   if (values.json) {
-    const status = withChangedRef(resolveChangedRef({ explicit: values.changed, projectDir }), (changedRef) => computeStatus({ projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'], evidence: outPath }), io.err);
-    const doc = { ...status, run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode: g.new.length > 0 ? 1 : 0, ...(scope ? { scope } : {}) }, ...(values.cost ? { cost: costReport(evidence.records) } : {}) };
+    const status = withChangedRef(resolveChangedRef({ explicit: values.changed, projectDir }), (changedRef) => computeStatus({
+      projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'], evidence: outPath,
+      paths: {
+        claims: values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir),
+        evidence: outPath, provisional: provisionalEvidencePath(projectDir),
+        baseline: values.baseline ? resolve(values.baseline) : baselinePath(projectDir),
+      },
+    }), io.err);
+    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode, ...(policy ? { originPolicy: policy } : {}), ...(scope ? { scope } : {}) }, ...(values.cost ? { cost: costReport(evidence.records, { run: evidence.run }) } : {}) };
     const result = validate('status', doc);
     if (!result.ok) throw new Error(`probe JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
     io.out(JSON.stringify(doc, null, 2));
-    return g.new.length > 0 ? 1 : 0;
+    return exitCode;
   }
   if (!values.quiet && baseline) {
     io.out('');
@@ -146,12 +188,13 @@ export async function probeCommand({ projectDir, values, version }, io) {
     if (killed) io.out(`  ${killed} killed (not listed; --verbose to see them)`);
   }
   io.out(renderSummary(evidence.records, evidence.run) + (baseline ? ` ${g.new.length} new since baseline, ${g.baselined.length} baselined.` : ' No baseline.'));
+  if (policy) io.out(renderOriginPolicy(policy, { basis: 'current' }));
   if (values.cost) {
     io.out('');
-    io.out(renderCost(costReport(evidence.records)));
+    io.out(renderCost(costReport(evidence.records, { run: evidence.run })));
     io.out('');
   }
   io.out(`evidence: ${outPath}${scope ? ` (partial: ${scope.requestedCount} claim${scope.requestedCount === 1 ? '' : 's'} requested, ${scope.probedCount} probed: --claim ${scope.requestedClaims.join(',')}; not the canonical evidence file)` : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
-  return g.new.length > 0 ? 1 : 0;
+  return exitCode;
 }

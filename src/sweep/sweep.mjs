@@ -34,6 +34,7 @@ import { existsSync } from 'node:fs';
 import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
 import { computeChangedGate } from '../gate/changed.mjs';
 import { scaffoldFile } from '../scaffold/scaffold.mjs';
+import { poolDrafts } from './pool.mjs';
 import { selectFaults, onWritePath, capFor } from '../supply/select.mjs';
 import { learnedProductivity } from '../supply/feedback.mjs';
 import { loadConcerns, concernById, targetsFor, filterByConcern } from '../supply/concerns.mjs';
@@ -163,6 +164,8 @@ export async function sweep({
   confirmRuns = 3,
   budgetMs = 120_000,
   commandBudget,
+  workers = 1,
+  serial = workers === 1,
   runnerCommand,
   runnerName,
   nodeModules,
@@ -206,9 +209,8 @@ export async function sweep({
   const cPath = claimsPath ?? defaultClaimsPath(projectDir);
   const existingClaims = existsSync(cPath) ? loadClaims(cPath) : { claims: [] };
 
-  const candidates = [];
   const skipped = [];
-  const drafts = [];
+  const rawDrafts = [];
   for (const file of targets) {
     commandBudget?.assertOpen();
     let result;
@@ -225,9 +227,10 @@ export async function sweep({
       skipped.push({ file, reason: 'no line in this file matches a fault producer' });
       continue;
     }
-    drafts.push(result.doc);
-    for (const claim of result.doc.claims) for (const fault of claim.faults) candidates.push({ claim, fault });
+    rawDrafts.push(result.doc);
   }
+  const drafts = poolDrafts(rawDrafts);
+  const candidates = drafts.flatMap((draft) => draft.claims.flatMap((claim) => claim.faults.map((fault) => ({ claim, fault }))));
 
   // What the defenders of this surface are CAPABLE of proving, before anything
   // is probed. A test that replaced the database can prove the call shape and
@@ -259,6 +262,8 @@ export async function sweep({
       claims: { schemaVersion: 1, claims },
       confirmRuns,
       budgetMs,
+      workers,
+      serial,
       commandBudget,
       mode: 'worktree',
       includeDirty,

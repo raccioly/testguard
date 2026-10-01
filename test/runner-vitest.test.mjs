@@ -226,7 +226,7 @@ describe('each runner invokes the binary resolved for the project, not a bare na
     expect(argv).toContain('--reporter=json');
     expect(argv).toContain('--outputFile=/tmp/out.json');
     expect(vitestArgv(ROOT, [], '/tmp/o.json', { serial: true })).toContain('--no-file-parallelism');
-    expect(vitestArgv(ROOT, [], '/tmp/o.json')).not.toContain('--no-file-parallelism');
+    expect(vitestArgv(ROOT, [], '/tmp/o.json')).toContain('--no-file-parallelism');
   });
 
   it('jest: same rule, plus exact paths rather than regexes', () => {

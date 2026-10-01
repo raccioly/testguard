@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Unannotated scaffold defaults use unfinished `TODO-CLAIM-N` identifiers rather than file/function-shaped claim names. Allocation avoids supplied IDs; explicit IDs/annotations and existing evidence remain unchanged, while sweep pooling preserves distinct candidates.
+
+- Read-only `scaffold --from-document <local-text-path>` and `--from-fix <full-commit-ID>` inspection, backed by the closed `authoring-input` report contract. Validation retains historical partition counts and rejects unsafe/private paths, inconsistent identities and optimistic verification labels. Stdout-only output emits no document text or claims; input inspection requires independent intent and is not verification.
+
+- Explicit `scaffold <source...> --into <existing-draft.json> --claim <ID>` appends mechanically proposed faults while preserving supplied intent and existing faults. `--json` previews without writes; ordinary scaffold remains compatible. Draft updates use bounded admission, owned locking and private recovery, and refuse stale/unsafe inputs or unconfirmed writes rather than claiming verified coverage.
+
+- Sweep keeps equal-basename and repeated-annotation drafts distinct before selection, assigning collision-free pooled claim IDs without changing fault content, metadata or defenders.
+
+- New mechanical scaffold drafts declare `inferred` origin and ask for intended observable behavior from a requirement, ADR, bug or incident. CLI/status/skill guidance explains the source handoff without authenticating references or promoting annotations/tests into independent intent. Existing supplied scaffold metadata is preserved.
+
+- Explicit `probe --require-origin <kinds>` checks declared origins on complete confirmed current-project probes, rechecks native universe and file bindings, and reports failed/unavailable policy without suppressing survivors through baselines or severity floors. Kinds do not authenticate independence; custom/static universes are unavailable. Offline status audits current declarations without certifying freshness; brief retains labeled recorded-run policy before caps and filtering.
+
+- Candidate evidence/status/brief schemas accept a closed optional declared-origin policy result, with unsuppressed fault identities, refusal reasons, consistent states and probe exit codes. This is an audit contract, not authenticated independence.
+
+- Claim sources share a closed origin vocabulary across claims and evidence, adding `doc`, `bug`, `incident`, `review` and `inferred`. Status reports current declared origins; evidence and briefs summarize all recorded origins before filtering/caps, separating distinct claims from records and reporting conflicting declarations. Human output labels these as unauthenticated declarations. Labels do not change default gates; origin policy requires explicit selection.
+
+- Claims/status missing-source-link advisories identify distinct claim IDs and suggest read-only annotation preview without changing verification state, next action or exit codes; annotation-sourced claims retain their existing drift error.
+
+- Explicit `claims --annotate` read-only file-header preview and `--apply` authoring for JavaScript/TypeScript and Python, with claim selection, bounded all-target admission, owned locking, private recoverable originals and truthful partial-failure reporting. Authoring JSON uses a closed `annotations` contract; placement is not verification or authentication of intent.
+
+### Fixed
+
+- Status marks evidence stale when a recorded automatic-discovery dependency (including a negative candidate, barrel or resolver config) changes or becomes unavailable. Previously unchanged defender lists could hide this drift. Native test-universe policy freshness remains pending.
+
+- Annotation scanning and placement ID admission avoid excessive regex backtracking on long alphanumeric tokens without a hyphen; status advice uses bounded, failure-aware scanning so unrelated source failures cannot prevent its verification decision.
+
+- Claim statement, severity, source and producer edits now invalidate cached probe evidence and appear as stale in status. Old kills cannot silently carry an edited requirement or provenance declaration.
+
+### Changed
+
+- Bound built-in runner concurrency to one worker by default, with `--workers` overrides, and cap outer regression workers at two (one on a two-core machine).
+- Drain noisy runner stdout, bound diagnostics and report reads, and terminate owned runners before restoring mutations and scratch worktrees on cancellation.
+- Run the project-pinned Playwright CLI directly instead of spawning npm for each confirmation, and reset Python interpreter caches at measurement boundaries.
+- Record actual probe elapsed time and unique fresh runner invocations separately from historical attributed costs; preserve all confirmation and cost gates, and invalidate reuse when native worker policy changes.
+
 ## [0.16.0] - 2026-09-30
 
 Automated weekly release — everything merged since `v0.15.1`.

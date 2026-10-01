@@ -67,7 +67,7 @@ describe('the command line', () => {
   it('always neutralises a project addopts `-x`, because it would truncate the failing-test list', () => {
     const argv = argvFor({ engine: 'pytest', interpreter: '/v/bin/python', files: ['tests/test_a.py'], serial: false });
     expect(argv).toContain('--maxfail=0');
-    expect(argv).toEqual(['/v/bin/python', '-m', 'pytest', '-p', '_testguard_pytest_plugin', '-p', 'no:cacheprovider', '--maxfail=0', '-q', 'tests/test_a.py']);
+    expect(argv).toEqual(['/v/bin/python', '-m', 'pytest', '-p', '_testguard_pytest_plugin', '-p', 'no:cacheprovider', '--maxfail=0', '-q', '-p', 'no:xdist', 'tests/test_a.py']);
   });
   it('serial disables xdist; unittest runs the injected module and takes files as arguments', () => {
     expect(argvFor({ engine: 'pytest', interpreter: 'p', files: ['a.py'], serial: true })).toEqual(

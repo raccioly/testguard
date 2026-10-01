@@ -47,6 +47,20 @@ describe('sweep: findings on changed code that carries no claim', () => {
   beforeEach(() => { r = repo(); });
   afterEach(() => rmSync(r.root, { recursive: true, force: true }));
 
+  it('reports both equal-basename untested files under separate pooled identities', async () => {
+    for (const dir of ['a', 'b']) r.write(`src/${dir}/guard.mjs`, 'export function guard(x) {\n  if (!x) return false;\n}\n');
+    r.commit('add equal-basename guards');
+    const { code } = await run(r.root, ['--changed', 'HEAD~1', '--cap', '2', '--quiet']);
+    expect(code).toBe(1);
+    const result = readSpecDoc('sweep', join(r.root, '.testguard', 'sweep.json'));
+    expect(result.selection.selected).toBe(2);
+    expect(result.findings.map((f) => f.file).sort()).toEqual(['src/a/guard.mjs', 'src/b/guard.mjs']);
+    expect(result.findings.every((f) => f.verdict === 'nocover')).toBe(true);
+    const evidence = readSpecDoc('evidence', join(r.root, '.testguard', 'sweep-evidence.json'));
+    expect(new Set(evidence.records.map((record) => `${record.claim.id}/${record.subject.id}`)).size).toBe(2);
+    expect(new Set(result.drafts.flatMap((draft) => draft.claims).map((claim) => claim.id)).size).toBe(2);
+  }, 30_000);
+
   it('a new unclaimed module whose test asserts too little yields a SURVIVED finding and exits 1', async () => {
     // `action` is asserted; `email` is not. Dropping the field that carries the
     // data is invisible — the pathology this project reports from the field,

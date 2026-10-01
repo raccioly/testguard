@@ -1,3 +1,4 @@
+import { registerCleanup } from './runners/lifecycle.mjs';
 import { existsSync, mkdtempSync, readdirSync, symlinkSync, mkdirSync, statSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, dirname } from 'node:path';
@@ -53,6 +54,7 @@ export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase 
     throw new PreconditionError(ref === 'HEAD' ? 'repository has no commits; commit first, or run with --in-place' : `ref ${ref} does not resolve to a commit`);
   }
   const dest = mkdtempSync(join(scratchBase, 'testguard-'));
+  const unregister = registerCleanup(() => removeWorktree(repoRoot, dest));
   addWorktree(repoRoot, dest, sha);
   const links = findNodeModules(repoRoot);
   if (nodeModules) {
@@ -71,7 +73,7 @@ export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase 
     sha,
     root: dest,
     projectDir: join(dest, relative(repoRoot, projectDir)),
-    cleanup: () => removeWorktree(repoRoot, dest),
+    cleanup: () => { removeWorktree(repoRoot, dest); unregister(); },
   };
 }
 

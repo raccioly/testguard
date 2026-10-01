@@ -11,7 +11,16 @@
  * worktree is. Everything it needs is passed in.
  */
 
+import { isDeepStrictEqual } from 'node:util';
+
 const isKill = (r) => r.outcome === 'fail' && (r.assertionFailures ?? 0) > 0;
+
+/** Compare only the claim metadata actually recorded in evidence. */
+export function sameClaimMetadata(recorded, current) {
+  if (!recorded || !current) return false;
+  const metadata = ({ id, statement, severity, source, producedBy }) => ({ id, statement, severity, source, producedBy });
+  return isDeepStrictEqual(metadata(recorded), metadata(current));
+}
 
 /**
  * Fold one escalation run into the running attribution state.
@@ -118,6 +127,7 @@ export function defenderSelection(claim, fault) {
 
 export function isReusable(prior, current) {
   if (!prior || !prior.subject?.contentHash) return false;
+  if (current.claim && !sameClaimMetadata(prior.claim, current.claim)) return false;
   // A record that exists because the probe threw is a statement about the run,
   // not about the code. Reusing it would make one disturbed run permanent.
   if (prior.detail?.reason === 'probe-error') return false;

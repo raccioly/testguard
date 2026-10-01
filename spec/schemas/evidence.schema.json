@@ -11,6 +11,8 @@
     "records"
   ],
   "properties": {
+    "originPolicy": { "$ref": "urn:claimspec:v1:common#/$defs/originPolicy" },
+    "origins": { "$ref": "urn:claimspec:v1:common#/$defs/originSummary" },
     "$schema": {
       "type": "string"
     },
@@ -168,6 +170,39 @@
         },
         "method": {
           "$ref": "urn:claimspec:v1:common#/$defs/method"
+        },
+        "measurements": {
+          "type": "object",
+          "required": [
+            "elapsedMs",
+            "runnerMs",
+            "overheadMs",
+            "runnerInvocations"
+          ],
+          "properties": {
+            "elapsedMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "runnerMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "overheadMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "runnerInvocations": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "workers": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Requested built-in runner worker ceiling; Python is serial. Absent for custom commands, whose concurrency is user-managed."
         }
       },
       "additionalProperties": false,
@@ -309,13 +344,7 @@
               ],
               "properties": {
                 "kind": {
-                  "enum": [
-                    "spec",
-                    "adr",
-                    "annotation",
-                    "comment",
-                    "manual"
-                  ]
+                  "$ref": "urn:claimspec:v1:common#/$defs/claimSourceKind"
                 },
                 "ref": {
                   "type": "string",
@@ -664,7 +693,7 @@
           "additionalProperties": false
         },
         "reusedFrom": {
-          "description": "Run id whose verdict was reused because `inputs` were unchanged.",
+          "description": "Run id whose verdict was reused because fault, defender and recorded claim metadata inputs were unchanged. A changed claim statement, severity, source or producer requires a fresh probe.",
           "$ref": "urn:claimspec:v1:common#/$defs/identifier"
         },
         "rank": {

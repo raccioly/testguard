@@ -47,8 +47,8 @@ describe('scaffold on the known-answer fixture', () => {
   });
 
   it('groups the guard under its @claim annotation and everything else by enclosing function', () => {
-    expect(doc.claims.map((c) => c.id).sort()).toEqual(['REDACT-003', 'REDACT-COMPILERULES', 'REDACT-FINDRULE', 'REDACT-MASK', 'REDACT-REDACT']);
-    expect(doc.claims.find((c) => c.id === 'REDACT-MASK').statement).toMatch(/^TODO: state what `mask`/);
+    expect(doc.claims.map((c) => c.id).sort()).toEqual(['REDACT-003', 'TODO-CLAIM-1', 'TODO-CLAIM-2', 'TODO-CLAIM-3', 'TODO-CLAIM-4']);
+    expect(doc.claims.find((c) => c.statement.includes('for `mask`')).statement).toMatch(/^TODO: supply intended observable behavior for `mask`/);
   });
 
   it('prefills defendedBy from discovery, marks provenance derived, never touches the claims file', () => {

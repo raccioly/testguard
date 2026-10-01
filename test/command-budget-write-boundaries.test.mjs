@@ -44,6 +44,19 @@ describe('whole-command result-write boundaries', () => {
     mocks.replay.mockResolvedValue({ schemaVersion: 1, commits: [], records: [] });
   });
 
+  it('probe refuses publication when expiry follows its post-measurement check', async () => {
+    // The post-measurement guard is still open. Only the final write-boundary
+    // guard observes expiry; an earlier refusal cannot defend that boundary.
+    mocks.assertOpen.mockImplementationOnce(() => {});
+    await expect(probeCommand({
+      projectDir: process.cwd(),
+      values: { confirm: '3', budget: '1000', 'command-budget': '1000', progress: 'none', quiet: true },
+      version: 'test',
+    }, io)).rejects.toThrow('no partial result was written');
+    expect(mocks.writeSpecDoc).not.toHaveBeenCalled();
+    expect(io.out).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['probe', () => probeCommand({
       projectDir: process.cwd(),

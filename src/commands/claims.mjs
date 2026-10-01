@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
-import { scanAnnotations, reconcile } from '../claims/annotations.mjs';
+import { scanAnnotations, reconcile, annotationAdvisory } from '../claims/annotations.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefendersDetailed } from '../probe/discover.mjs';
 import { classifyDefenders } from '../probe/mocks.mjs';
@@ -11,6 +11,7 @@ import { readSpecDoc } from '../evidence/writer.mjs';
 import { existsSync } from 'node:fs';
 import { checkAnchors, renderAnchorChecks } from '../claims/anchors.mjs';
 import { defenderSelection } from '../probe/attribution.mjs';
+import { annotationsCommand } from './annotations.mjs';
 
 /** A selection warning is not a verdict: only a fresh probe can defend it. */
 export function defenderNarrowing(projectDir, claims, records) {
@@ -32,11 +33,13 @@ export function defenderNarrowing(projectDir, claims, records) {
   return warnings;
 }
 
-export async function claimsCommand({ projectDir, values, version }, io) {
+export async function claimsCommand({ projectDir, values, suppliedOptions, version }, io) {
   const path = values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir);
+  if (values.annotate || values.apply) return annotationsCommand({ projectDir, path, values, suppliedOptions, version }, io);
   const claims = loadClaims(path);
   const annotations = scanAnnotations(projectDir);
   const drift = reconcile(claims, annotations);
+  const advisory = annotationAdvisory(claims, annotations, { customClaims: Boolean(values.claims) });
   const anchorChecks = values['check-anchors']
     ? await checkAnchors(projectDir, claims, { python: values.python ? resolve(values.python) : undefined })
     : undefined;
@@ -54,16 +57,17 @@ export async function claimsCommand({ projectDir, values, version }, io) {
   const prior = (values.cost || hasOverrides) && existsSync(ev) ? readSpecDoc('evidence', ev) : undefined;
   const narrowedDefenders = hasOverrides && prior ? defenderNarrowing(projectDir, claims, prior.records) : [];
   if (values.cost) {
-    cost = prior ? costReport(prior.records) : undefined;
+    cost = prior ? costReport(prior.records, { run: prior.run }) : undefined;
     if (!cost && !values.json) io.err(`no evidence at ${ev} — run \`testguard probe\` first; cost is derived from the run durations it records`);
   }
 
   if (values.json) {
-    io.out(JSON.stringify({ path, claims, annotations, drift, ...(hasOverrides ? { narrowedDefenders } : {}), ...(anchorChecks ? { anchorChecks } : {}), ...(removed ? { removed } : {}), ...(cost ? { cost } : {}) }, null, 2));
+    io.out(JSON.stringify({ path, claims, annotations, drift, annotationAdvisory: advisory, ...(hasOverrides ? { narrowedDefenders } : {}), ...(anchorChecks ? { anchorChecks } : {}), ...(removed ? { removed } : {}), ...(cost ? { cost } : {}) }, null, 2));
   } else {
     const annotated = new Set(drift.annotated);
     io.out(`${claims.claims.length} claims in ${path} — ${annotated.size} carry a @claim annotation in source (test files are not scanned)`);
     io.out('');
+    for (const note of advisory.notes) io.out(note);
     const signalLines = [];
     for (const c of claims.claims) {
       const declared = c.defendedBy?.length > 0;
