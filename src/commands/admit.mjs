@@ -1,3 +1,4 @@
+import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
 import { existsSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
@@ -45,6 +46,14 @@ export async function admitCommand({ file, values, version }, io) {
   }
   const confirmRuns = Number(values.confirm);
   const budgetMs = Number(values.budget);
+  const commandBudgetMs = parseCommandBudget(values['command-budget']);
+  if (commandBudgetMs === null) { io.err('--command-budget must be at least 1000 milliseconds'); return 3; }
+  const commandBudget = createCommandBudget(commandBudgetMs);
+  const workers = Number(values.workers ?? 1);
+  if (!Number.isSafeInteger(workers) || workers < 1) {
+    io.err('--workers must be a positive safe integer');
+    return 3;
+  }
   if (!Number.isInteger(confirmRuns) || confirmRuns < 1 || !Number.isInteger(budgetMs) || budgetMs < 1000) {
     io.err('--confirm must be a positive integer and --budget at least 1000');
     return 3;
@@ -84,6 +93,9 @@ export async function admitCommand({ file, values, version }, io) {
     claims: { ...all, claims: [{ ...claim, faults }] },
     confirmRuns,
     budgetMs,
+    commandBudget,
+    workers,
+    serial: values.serial || workers === 1,
     mode: 'worktree',
     includeDirty: true,
     only: [claimId],
@@ -96,6 +108,7 @@ export async function admitCommand({ file, values, version }, io) {
   });
   if (process.stderr.isTTY && !values.quiet && !values.json) process.stderr.write('\r\x1b[K');
   const outPath = values.out ? resolve(values.out) : join(projectDir, '.testguard', 'evidence-partial.json');
+  commandBudget?.assertOpen();
   writeSpecDoc('evidence', outPath, evidence);
 
   const decision = decideAdmission(evidence.records);

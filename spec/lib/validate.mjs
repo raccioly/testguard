@@ -183,6 +183,11 @@ const semantic = {
 
   evidence(doc) {
     const errors = [];
+    if (doc.run.measurements) {
+      const m = doc.run.measurements;
+      if (Math.abs(m.elapsedMs - m.runnerMs - m.overheadMs) > 0.001) errors.push({ path: '/run/measurements', message: 'elapsedMs must equal runnerMs plus overheadMs' });
+    }
+    if (doc.run.serial && doc.run.workers !== undefined && doc.run.workers !== 1) errors.push({ path: '/run/workers', message: 'serial execution requires one worker' });
     const injection = isInjection(doc.run);
     const n = doc.run.confirmRuns;
     // N-run agreement is what fault injection means by "confirmed". A method
@@ -378,6 +383,10 @@ const semantic = {
 
   status(doc) {
     const errors = [];
+    if (doc.cost?.measurements) {
+      const m = doc.cost.measurements;
+      if (Math.abs(m.elapsedMs - m.runnerMs - m.overheadMs) > 0.001) errors.push({ path: '/cost/measurements', message: 'elapsedMs must equal runnerMs plus overheadMs' });
+    }
     if (doc.changes?.nested) {
       errors.push(...nestedErrors(doc.changes.nested, '/changes/nested', doc.changes.uncovered.map((file) => file.file)));
       const nestedCount = doc.changes.nested.reduce((count, entry) => count + entry.files.length, 0);

@@ -37,9 +37,13 @@ export function processList({ platform = process.platform, run = spawnSync } = {
   try {
     const r = platform === 'win32'
       ? run('wmic', ['process', 'get', 'ProcessId,CommandLine', '/format:csv'], { encoding: 'utf8', timeout: 5000 })
-      : run('ps', ['-Ao', 'pid=,args='], { encoding: 'utf8', timeout: 5000 });
+      : run('ps', ['-Ao', 'pid=,ppid=,stat=,args='], { encoding: 'utf8', timeout: 5000 });
     if (r.status !== 0 || !r.stdout) return [];
     return r.stdout.split('\n').map((line) => {
+      if (platform !== 'win32') {
+        const row = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
+        if (row) return { pid: Number(row[1]), ppid: Number(row[2]), stat: row[3], command: row[4].trim() };
+      }
       const m = platform === 'win32' ? /^[^,]*,(.*),(\d+)\s*$/.exec(line) : /^\s*(\d+)\s+(.*)$/.exec(line);
       if (!m) return null;
       const [pid, command] = platform === 'win32' ? [m[2], m[1]] : [m[1], m[2]];
@@ -57,8 +61,22 @@ export function processList({ platform = process.platform, run = spawnSync } = {
  */
 export function detectContention({ self = process.pid, alive = defaultAlive, ...opts } = {}) {
   const rows = processList(opts);
+  const owned = new Set([self]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const row of rows) {
+      if (owned.has(row.ppid) && !owned.has(row.pid)) { owned.add(row.pid); changed = true; }
+    }
+  }
+  const ancestors = new Set();
+  let parent = rows.find((row) => row.pid === self)?.ppid;
+  while (parent && !ancestors.has(parent)) {
+    ancestors.add(parent);
+    parent = rows.find((row) => row.pid === parent)?.ppid;
+  }
   const runners = rows
-    .filter((p) => p.pid !== self && RUNNER_RE.test(p.command) && !SELF_RE.test(p.command))
+    .filter((p) => !owned.has(p.pid) && !ancestors.has(p.pid) && !p.stat?.startsWith('Z') && RUNNER_RE.test(p.command) && (p.ppid !== undefined || !SELF_RE.test(p.command)))
     // `ps` lists the grep/ps itself and any shell wrapper; a runner's command
     // line always names its own binary, so require it to look like an exec.
     .filter((p) => !/^\s*(ps|grep|wmic)\b/.test(p.command))

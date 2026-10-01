@@ -57,7 +57,7 @@ export async function claimsCommand({ projectDir, values, suppliedOptions, versi
   const prior = (values.cost || hasOverrides) && existsSync(ev) ? readSpecDoc('evidence', ev) : undefined;
   const narrowedDefenders = hasOverrides && prior ? defenderNarrowing(projectDir, claims, prior.records) : [];
   if (values.cost) {
-    cost = prior ? costReport(prior.records) : undefined;
+    cost = prior ? costReport(prior.records, { run: prior.run }) : undefined;
     if (!cost && !values.json) io.err(`no evidence at ${ev} — run \`testguard probe\` first; cost is derived from the run durations it records`);
   }
 

@@ -43,6 +43,11 @@ export async function probeCommand({ projectDir, values, version }, io) {
   catch (e) { io.err(e.message); return 3; }
   const confirmRuns = Number(values.confirm);
   const budgetMs = Number(values.budget);
+  const workers = Number(values.workers ?? 1);
+  if (!Number.isSafeInteger(workers) || workers < 1) {
+    io.err('--workers must be a positive safe integer');
+    return 3;
+  }
   const commandBudgetMs = parseCommandBudget(values['command-budget']);
   if (!Number.isInteger(confirmRuns) || confirmRuns < 1 || !Number.isInteger(budgetMs) || budgetMs < 1000) {
     io.err('--confirm must be a positive integer and --budget at least 1000');
@@ -100,12 +105,13 @@ export async function probeCommand({ projectDir, values, version }, io) {
     previous,
     confirmRuns,
     budgetMs,
+    workers,
+    serial: values.serial || workers === 1,
     commandBudget,
     mode: values['in-place'] ? 'in-place' : 'worktree',
     ref: values.ref ?? 'HEAD',
     refExplicit: values.ref !== undefined,
     ignoreDirty: values['ignore-dirty'],
-    serial: values.serial,
     onWarn: (m) => io.err(`warning: ${m}`),
     runnerCommand: values['runner-cmd'],
     runnerName: values.runner,
@@ -165,7 +171,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
         baseline: values.baseline ? resolve(values.baseline) : baselinePath(projectDir),
       },
     }), io.err);
-    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode, ...(policy ? { originPolicy: policy } : {}), ...(scope ? { scope } : {}) }, ...(values.cost ? { cost: costReport(evidence.records) } : {}) };
+    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode, ...(policy ? { originPolicy: policy } : {}), ...(scope ? { scope } : {}) }, ...(values.cost ? { cost: costReport(evidence.records, { run: evidence.run }) } : {}) };
     const result = validate('status', doc);
     if (!result.ok) throw new Error(`probe JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
     io.out(JSON.stringify(doc, null, 2));
@@ -185,7 +191,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
   if (policy) io.out(renderOriginPolicy(policy, { basis: 'current' }));
   if (values.cost) {
     io.out('');
-    io.out(renderCost(costReport(evidence.records)));
+    io.out(renderCost(costReport(evidence.records, { run: evidence.run })));
     io.out('');
   }
   io.out(`evidence: ${outPath}${scope ? ` (partial: ${scope.requestedCount} claim${scope.requestedCount === 1 ? '' : 's'} requested, ${scope.probedCount} probed: --claim ${scope.requestedClaims.join(',')}; not the canonical evidence file)` : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);

@@ -194,6 +194,7 @@
       "type": "object",
       "required": ["totalMs", "totalRuns", "reusedRecords", "records", "claims", "defenders", "sharedDefenders"],
       "properties": {
+        "measurements": {"type": "object", "required": ["elapsedMs", "runnerMs", "overheadMs", "runnerInvocations"], "properties": {"elapsedMs": {"type": "number", "minimum": 0}, "runnerMs": {"type": "number", "minimum": 0}, "overheadMs": {"type": "number", "minimum": 0}, "runnerInvocations": {"type": "integer", "minimum": 0}}, "additionalProperties": false},
         "totalMs": { "type": "number", "minimum": 0 },
         "totalRuns": { "type": "integer", "minimum": 0 },
         "reusedRecords": { "type": "integer", "minimum": 0 },

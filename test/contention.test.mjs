@@ -89,3 +89,11 @@ describe('a runner that has already exited is not contention', () => {
     expect(c.runners.map((r) => r.pid)).toEqual([4242, 4243]);
   });
 });
+
+ describe('process state and ownership', () => {
+  it('ignores zombies, current descendants and ancestors but reports an active reparented runner', () => {
+    const ps = fakePs('10 1 S node vitest\n20 10 S node testguard probe\n21 20 R node vitest --outputFile=/tmp/testguard-run.json\n30 1 Z node vitest\n40 1 R node vitest\n');
+    const result = detectContention({ platform: 'darwin', run: ps, self: 20, alive: () => true });
+    expect(result.runners.map((row) => row.pid)).toEqual([40]);
+  });
+});

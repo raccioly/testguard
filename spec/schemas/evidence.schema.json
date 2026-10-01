@@ -170,6 +170,39 @@
         },
         "method": {
           "$ref": "urn:claimspec:v1:common#/$defs/method"
+        },
+        "measurements": {
+          "type": "object",
+          "required": [
+            "elapsedMs",
+            "runnerMs",
+            "overheadMs",
+            "runnerInvocations"
+          ],
+          "properties": {
+            "elapsedMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "runnerMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "overheadMs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "runnerInvocations": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "workers": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Requested built-in runner worker ceiling; Python is serial. Absent for custom commands, whose concurrency is user-managed."
         }
       },
       "additionalProperties": false,

@@ -32,6 +32,11 @@ export async function sweepCommand({ projectDir, values, version }, io) {
   const mode = values['save-paths'] ? 'save-paths' : 'changed';
   const confirmRuns = Number(values.confirm);
   const budgetMs = Number(values.budget);
+  const workers = Number(values.workers ?? 1);
+  if (!Number.isSafeInteger(workers) || workers < 1) {
+    io.err('--workers must be a positive safe integer');
+    return 3;
+  }
   const commandBudgetMs = parseCommandBudget(values['command-budget']);
   if (!Number.isInteger(confirmRuns) || confirmRuns < 1 || !Number.isInteger(budgetMs) || budgetMs < 1000) {
     io.err('--confirm must be a positive integer and --budget at least 1000');
@@ -77,6 +82,8 @@ export async function sweepCommand({ projectDir, values, version }, io) {
       cap,
       confirmRuns,
       budgetMs,
+      workers,
+      serial: values.serial || workers === 1,
       commandBudget,
       runnerCommand: values['runner-cmd'],
       runnerName: values.runner,

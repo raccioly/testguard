@@ -163,8 +163,13 @@ try {
        r.defenders.selectionSource = r.defenders.requested.length ? 'claim' : 'discovery';
        if (!r.defenders.requested.length) r.defenders.discovered = true;
      }
+     candidate.run.workers = 1;
+     candidate.run.measurements = { elapsedMs: 12, runnerMs: 9, overheadMs: 3, runnerInvocations: 6 };
      const result = validate('evidence', candidate);
      if (!result.ok) throw new Error(result.errors.map((error) => \`${'${error.path}: ${error.message}'}\`).join('; '));
+     candidate.run.measurements.overheadMs = 4;
+     if (validate('evidence', candidate).ok) throw new Error('installed package accepted inconsistent resource timing');
+     candidate.run.measurements.overheadMs = 3;
      const claims = JSON.parse(readFileSync(process.argv[4], 'utf8'));
      claims.claims[0].faults[0].defendedBy = [];
      if (!validate('claims', claims).ok) throw new Error('installed package rejected a fault discovery override');

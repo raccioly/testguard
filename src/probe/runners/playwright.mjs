@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { npx, runProcess, listTestFiles, firstInformativeLine, runnerArgv } from './shared.mjs';
+import { runProcess, listTestFiles, firstInformativeLine, runnerArgv } from './shared.mjs';
 import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs, normalizeDiscoveredFiles, runDiscoveryReportProcess } from './discovery.mjs';
 import { globToRegExp } from '../../util/glob.mjs';
 
@@ -185,7 +185,7 @@ export function parseReport(report, durationMs) {
 
 export const run = (opts) => {
   const env = { PLAYWRIGHT_JSON_OUTPUT_FILE: '{out}', PLAYWRIGHT_JSON_OUTPUT_NAME: '{out}' };
-  return runProcess({ ...opts, env, parse: parseReport, argv: (files) => [npx, 'playwright', 'test', '--reporter=json', ...(opts.serial ? ['--workers=1'] : []), ...files] });
+  return runProcess({ ...opts, env, parse: parseReport, argv: (files) => argvFor(opts.projectDir, files, opts) });
 };
 
 /**
@@ -196,3 +196,7 @@ export const run = (opts) => {
  * contained before.
  */
 export const fatalEdit = () => '/* testguard negative control: this file must not parse */\n(\n';
+
+/** Run the project-pinned CLI directly, avoiding an npm subprocess per confirmation. */
+export const argvFor = (projectDir, files, { serial = false, workers = 1 } = {}) =>
+  [...runnerArgv(projectDir, '@playwright/test', 'playwright'), 'test', '--reporter=json', `--workers=${serial ? 1 : workers}`, ...files];

@@ -46,7 +46,7 @@ probe
   --claims <path>      claims file             (default: <dir>/testguard.claims.json)
   --confirm <n>        runs per verdict        (default: 3)
   --budget <ms>        wall clock per run      (default: 120000)
-  --command-budget <ms> cooperative measurement deadline for probe, sweep, or replay. Caps async children; expiry exits 2 and writes no partial result
+  --command-budget <ms> cooperative measurement deadline for probe, sweep, replay, or admit. Caps async children; expiry exits 2 and writes no partial result
   --out <path>         evidence file           (default: <dir>/.testguard/evidence.json)
   --baseline <path>    baseline to gate against (default: <dir>/.testguard/baseline.json if present)
   --severity <level>   gate only at or above   (default: low)
@@ -73,6 +73,7 @@ probe
   --node-modules <dir> node_modules to link into the scratch worktree (or TESTGUARD_NODE_MODULES)
   --python <path>      Python interpreter for .py defenders (or TESTGUARD_PYTHON; default: $VIRTUAL_ENV, then the project's
                        .venv/venv, then python3 on PATH). Resolved against your working tree, never the scratch worktree.
+  --workers <n>        maximum built-in runner workers (default: 1); Python remains serial
   --serial             run one test file at a time (vitest --no-file-parallelism, jest --runInBand, playwright --workers=1,
                        pytest -p no:xdist);
                        use it when another test runner is already running — probe warns and records the contention either way
@@ -96,7 +97,7 @@ sweep      --changed <ref> (required unless --save-paths; CI bases and a safe lo
            --save-paths      sweep every file that WRITES TO STORAGE instead of the diff, and report the surface as the
                              denominator: "120 writes across 38 files, swept 12". A clean sweep over an unstated
                              denominator is a sample of unknown size, not a guarantee that saving works
-           --include-dirty  --exclude <glob>  --confirm <n>  --budget <ms>  --command-budget <ms>  --max <n>  --out <path>  --json
+           --include-dirty  --exclude <glob>  --confirm <n>  --budget <ms>  --command-budget <ms>  --workers <n>  --serial  --max <n>  --out <path>  --json
            the cold start: no claim and no concern needed. Everything it proposes is a DRAFT — it never writes testguard.claims.json,
            and its evidence never replaces .testguard/evidence.json. exit 1 on a fault that survived, or a file no test imports
            shapes: if-guard → if (false) · single-line guard/mutation removed · return <check> → return true
@@ -105,14 +106,16 @@ sweep      --changed <ref> (required unless --save-paths; CI bases and a safe lo
 mcp        no options. JSON-RPC 2.0 over stdio; five READ-ONLY tools (status, brief, claims, evidence, next_command).
            Nothing here runs a probe: next_command hands back the shell line for you to run where the person can see it.
            Register it with your harness — testguard init --mcp prints the config for Claude Code, Cursor and Codex.
-replay     --since <range>   commit range to search for fix commits (HEAD~50..HEAD, a tag, origin/main..HEAD)
+replay     --workers <n> (default 1)  --serial  --budget <ms> (per run)
+           --since <range>   commit range to search for fix commits (HEAD~50..HEAD, a tag, origin/main..HEAD)
            --max <n>         replay at most n fixes (they are slow: one worktree and N runs each)
            --confirm <n>     runs per verdict (default 3); a flaky failure reads as "the suite caught it", so mixed runs are never caught
            --command-budget <ms> cooperative measurement deadline; expiry writes neither replay nor calibration, so an unmeasured suffix cannot look clean
            --out <path>       replay document (default: <dir>/.testguard/replay.json); the calibration goes beside it
            reports, never gates: a bug that escaped is history, not a regression in this change
                    · one-line JSX element removed · on<Event> handler prop dropped
-admit      --claim <ID> (required)  --fault <FID> (one fault only)  --confirm <n>  --json
+admit      --workers <n> (default 1)  --serial  --budget <ms>  --command-budget <ms>
+           --claim <ID> (required)  --fault <FID> (one fault only)  --confirm <n>  --json
            ADMITTED (exit 0) only when every fault of the claim is killed N/N by defenders that are green N/N; anything else is NOT ADMITTED (exit 1) and names the first blocking fault
            the test must be a declared or discovered defender of the claim (exit 3 otherwise); evidence goes to .testguard/evidence-partial.json
 gate       --changed <ref>   measure the change since merge-base(ref, HEAD); auto-detected in GitHub Actions / GitLab CI
@@ -191,6 +194,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         max: { type: 'string', default: '20' },
         ref: { type: 'string' },
         'ignore-dirty': { type: 'boolean', default: false },
+        workers: { type: 'string', default: '1' },
         serial: { type: 'boolean', default: false },
         claim: { type: 'string', multiple: true },
         'require-origin': { type: 'string', multiple: true },

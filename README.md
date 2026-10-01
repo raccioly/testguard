@@ -1227,6 +1227,32 @@ the transfer of a calibration between repositories — `replay` measures it now;
 whether it carries to a repository with no history is unproven. Each is
 designed for; none is claimed.
 
+### Keeping developer machines responsive
+
+Built-in probe, sweep, replay and admission runners default to one worker. Use
+`--workers 2` for a larger Vitest/Jest/Playwright worker ceiling; `--serial` always
+uses one. Python remains serial. Faults and mixed-runner groups run sequentially.
+Custom `--runner-cmd` commands, browser subprocesses, native library threads and
+test-created processes are not an OS resource sandbox. The regression suite also
+caps outer workers at two, or one when fewer than three CPUs are available
+in an interactive run; dedicated CI uses at most two because its acceptance tests start nested runners.
+
+`--budget` bounds each runner invocation; `--command-budget` bounds a complete
+command cooperatively and refuses partial result publication. Cancellation kills
+owned runners before restoring mutations and removing scratch worktrees. Already
+reparented daemons remain outside the portable cleanup guarantee. No runner output
+limit can count as an assertion failure or detection.
+
+New probe evidence includes actual elapsed time, unique fresh runner time and
+setup/discovery/other overhead. `probe --cost` and `claims --cost` display this
+separately from historical attributed record costs. Existing cost ceilings are
+unchanged; old evidence does not supply a measured breakdown.
+
+Playwright confirmations run the same project-resolved CLI used for discovery,
+avoiding an npm subprocess per run. Python projects whose configuration requires
+pytest-xdist must support serial execution; an incompatible configuration remains
+unproven rather than bypassing the worker policy.
+
 ## Licence
 
 MIT.

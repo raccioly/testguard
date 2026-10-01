@@ -1,4 +1,6 @@
+import { performance } from 'node:perf_hooks';
 import { existsSync, readFileSync } from 'node:fs';
+import { registerChild } from './lifecycle.mjs';
 import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -120,9 +122,10 @@ function ask(path, budgetMs) {
     } catch {
       return resolve(null);
     }
+    registerChild(child, () => terminateProcessTree(child));
     let out = '';
     child.on('error', () => resolve(null));
-    child.stdout.on('data', (d) => (out += d));
+    child.stdout.on('data', (d) => (out = (out + d).slice(-65536)));
     child.stderr.on('data', () => {});
     const timer = setTimeout(() => terminateProcessTree(child), budgetMs);
     child.on('close', (code) => {
@@ -276,10 +279,10 @@ export function environment(targets) {
  * the configured value; the rest of the project's `addopts` is left alone,
  * because TestGuard runs a project's tests the way the project runs them.
  */
-export function argvFor({ engine, interpreter, files, serial }) {
+export function argvFor({ engine, interpreter, files, serial = true }) {
   if (engine === 'pytest') {
     return [interpreter, '-m', 'pytest', '-p', '_testguard_pytest_plugin', '-p', 'no:cacheprovider',
-      '--maxfail=0', '-q', ...(serial ? ['-p', 'no:xdist'] : []), ...files];
+      '--maxfail=0', '-q', '-p', 'no:xdist', ...files];
   }
   return [interpreter, '-m', '_testguard_unittest_main', ...files];
 }
@@ -287,12 +290,15 @@ export function argvFor({ engine, interpreter, files, serial }) {
 export function makeRun(pinned) {
   const check = makeCheck(pinned);
   return async (opts) => {
-    const resolved = await check({ projectDir: opts.sourceDir ?? opts.projectDir, python: opts.python });
+    const deadline = performance.now() + (opts.budgetMs ?? 120_000);
+    const remaining = () => Math.max(1, Math.floor(deadline - performance.now()));
+    const resolved = await check({ projectDir: opts.sourceDir ?? opts.projectDir, python: opts.python, budgetMs: remaining(), budgetFor: remaining });
     if (!resolved.ok) {
       return { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs: 0 }, timeouts: 0, loadMessage: resolved.message, failedTests: [], provenance: {} };
     }
     return runProcess({
       ...opts,
+      budgetMs: remaining(),
       env: environment(opts.targets),
       parse: parseReport,
       argv: (files) => argvFor({ engine: resolved.engine, interpreter: resolved.interpreter, files, serial: opts.serial }),
