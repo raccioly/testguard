@@ -4,6 +4,13 @@
   "entries": [
     {
       "kind": "path",
+      "pattern": "test/probe.node.test.mjs",
+      "reason": "Independent native Node acceptance oracle plus real CLI cancellation and restoration checks. Mandatory in npm test and CI; focused native report/controller claims retain their own mutation defenders. Naming this complete ten-fault acceptance fixture as a self-probe defender would repeatedly pay for unrelated nested probes, as with the existing known-answer fixture exception.",
+      "by": "maintainer",
+      "at": "2026-10-01T19:15:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "src/cli.mjs",
       "reason": "Argument parsing and dispatch only. Every behaviour it routes to is claimed where it lives (src/gate, src/status, src/probe, src/scaffold). Re-evaluate if logic moves here.",
       "by": "maintainer",

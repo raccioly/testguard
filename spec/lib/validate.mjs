@@ -183,6 +183,9 @@ const semantic = {
 
   evidence(doc) {
     const errors = [];
+    if (doc.run.runner?.source === 'builtin' && (doc.run.runner.name !== 'node-test' || !/^(?:[2-9]\d|[1-9]\d{2,})\.\d+\.\d+(?:[-+].+)?$/.test(doc.run.runner.version ?? ''))) {
+      errors.push({ path: '/run/runner', message: 'builtin source requires node-test and its actual Node version (20 or newer)' });
+    }
     if (doc.run.measurements) {
       const m = doc.run.measurements;
       if (Math.abs(m.elapsedMs - m.runnerMs - m.overheadMs) > 0.001) errors.push({ path: '/run/measurements', message: 'elapsedMs must equal runnerMs plus overheadMs' });

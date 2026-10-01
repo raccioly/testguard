@@ -311,6 +311,27 @@ Rules that follow from the table:
    competing owned runners or a declared defender absent from every manifest
    are precondition failures, never heuristic routing decisions.
 
+   The explicit `node-test` adapter uses Node's native collection with test
+   bodies excluded by a never-matching name pattern. Collection still loads
+   test modules and may run their top-level code; a load error, incomplete
+   collection or budget expiry refuses discovery. An injected child preload
+   records each actual entry file before project evaluation, so imported test
+   declarations cannot masquerade as additional entry files. No filename
+   fallback or inferred npm-script configuration is permitted. This adapter
+   supports plain JavaScript under Node's default collection, without custom
+   loaders, `NODE_OPTIONS` or `NODE_PATH`; it is never selected by `auto`.
+   Each confirmation uses fresh, isolated Node test processes under the
+   existing worker ceiling. Reports count executed test results, not individual
+   assertion calls: suite and file-container summaries are not extra tests,
+   and skipped/TODO results cannot establish a green defender by themselves.
+   A test-body failure counts as a rejection; a load error, hook failure,
+   cancellation or timeout never counts as an assertion kill. Malformed or
+   unfinished reports are load errors. Evidence names `node-test`, records
+   `source: builtin` and the actual Node version, and binds the executable and
+   reporter strategy to its discovery hash. Another framework's evidence
+   cannot supply its confirmations. Native module-mocking configurations are
+   outside this adapter's initial admission boundary.
+
    Static string literals are conservative dependency candidates, not proof
    of a filesystem dependency. Missing candidates and ordinary directories
    (including `/` in URL bases and string separators) are ignored. An existing

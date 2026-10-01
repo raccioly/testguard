@@ -85,7 +85,7 @@ other tools, and it must remain portable out of this repository.
 | Runtime | Node.js >= 20, ESM | `node:util.parseArgs` is the floor; the first target runners are JavaScript |
 | Runtime dependencies | exactly one, `ajv` 8.20.0, exact-pinned | Every document is validated before it is written; everything else is standard library |
 | Test runner (ours) | vitest | Also our first supported runner, so we dogfood it |
-| Supported runners | vitest, jest (project runners); Playwright (per file) | They share a JSON report shape; Playwright is selected per file, not per project |
+| Supported runners | vitest, jest, explicit node-test (project runners); Playwright and Python (per file) | Native Node uses an injected entry preload and bounded structured reporter, reusing shared process budgets; auto selection does not infer Node eligibility from its availability |
 | Schemas | JSON Schema 2020-12 | Readable without the tool; portable to other languages |
 | Distribution | npm, PyPI, Homebrew, GitHub Action, pre-commit, GitLab component | Meet teams in the pipeline they already run |
 | Publishing | OIDC for npm/PyPI; tap-scoped SSH deploy key for Homebrew | Registry credentials remain tokenless; the only stored publishing secret cannot access any repository except the tap |

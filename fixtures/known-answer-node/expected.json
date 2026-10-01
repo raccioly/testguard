@@ -1,0 +1,51 @@
+{
+  "confirmRuns": 3,
+  "expected": {
+    "NODE-ALLOW/F1": {
+      "verdict": "killed",
+      "why": "Manually applied fault: public/private assertions fail in all three native CLI runs; baseline/restored run green three times."
+    },
+    "NODE-AUDIT/F1": {
+      "verdict": "survived",
+      "why": "Manually applied exposed content: kind-only assertion remains green in all three native runs."
+    },
+    "NODE-READY/F1": {
+      "verdict": "timeout",
+      "why": "Native CLI explicitly reports testTimeoutFailure in all three faulted runs, not assertion rejection."
+    },
+    "NODE-UNUSED/F1": {
+      "verdict": "nocover",
+      "why": "No native test entry imports the unused module; no defender is declared."
+    },
+    "NODE-ANCHOR/F1": {
+      "verdict": "unverifiable",
+      "reason": "anchor-missing",
+      "why": "Exact find has zero occurrences in independently inspected source."
+    },
+    "NODE-ANCHOR/F2": {
+      "verdict": "unverifiable",
+      "reason": "anchor-ambiguous",
+      "why": "Exact return true anchor occurs twice and expects one hit."
+    },
+    "NODE-SYNTAX/F1": {
+      "verdict": "fault-invalid",
+      "reason": "replacement-does-not-compile",
+      "why": "Manual replacement makes native CLI fail while importing, before test-body assertions."
+    },
+    "NODE-FLAKY/F1": {
+      "verdict": "flaky-defender",
+      "reason": "defenders-not-green",
+      "why": "Unmodified native baseline exits 1,0,1; fault detection cannot be confirmed on that baseline."
+    },
+    "NODE-MIXED/F1": {
+      "verdict": "flaky-defender",
+      "reason": "inconsistent-probe",
+      "why": "Three healthy native baselines pass; faulted native runs exit 1,0,1."
+    },
+    "NODE-REACH/F1": {
+      "verdict": "unverifiable",
+      "reason": "subject-not-executed",
+      "why": "Manual fatal syntax in the unused target still leaves all three declared-defender runs green."
+    }
+  }
+}

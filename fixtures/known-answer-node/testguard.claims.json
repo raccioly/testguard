@@ -1,0 +1,285 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "NODE-ALLOW",
+      "statement": "Only the public kind is allowed.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/policy.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Exercise the stated behavior.",
+          "faultClass": "other",
+          "file": "src/policy.mjs",
+          "find": "return kind === 'public';",
+          "replace": "return kind === 'private';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NODE-AUDIT",
+      "statement": "Audit rows never expose content.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/policy.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Exercise the stated behavior.",
+          "faultClass": "other",
+          "file": "src/policy.mjs",
+          "find": "content: null",
+          "replace": "content: row.content",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NODE-READY",
+      "statement": "Readiness resolves.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/policy.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Exercise the stated behavior.",
+          "faultClass": "other",
+          "file": "src/policy.mjs",
+          "find": "export async function ready() {\n  return true;",
+          "replace": "export async function ready() {\n  return new Promise(() => {});",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NODE-UNUSED",
+      "statement": "The unused constant stays seven.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Exercise the stated behavior.",
+          "faultClass": "other",
+          "file": "src/unused.mjs",
+          "find": "export const unused = 7;",
+          "replace": "export const unused = 8;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NODE-ANCHOR",
+      "statement": "Ambiguous and missing anchors are refused.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/policy.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Exercise the stated behavior.",
+          "faultClass": "other",
+          "file": "src/policy.mjs",
+          "find": "NOT PRESENT",
+          "replace": "ALSO ABSENT",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Exercise the stated behavior.",
+          "faultClass": "other",
+          "file": "src/policy.mjs",
+          "find": "return true;",
+          "replace": "return false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NODE-SYNTAX",
+      "statement": "An invalid replacement never counts as detection.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/policy.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Exercise the stated behavior.",
+          "faultClass": "other",
+          "file": "src/policy.mjs",
+          "find": "return kind === 'public';",
+          "replace": "return (;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NODE-FLAKY",
+      "statement": "An unstable baseline never proves detection.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/flaky.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Exercise the stated behavior.",
+          "faultClass": "other",
+          "file": "src/policy.mjs",
+          "find": "return 1;",
+          "replace": "return 2;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NODE-MIXED",
+      "statement": "Mixed confirmations never prove detection.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/mixed.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Exercise the stated behavior.",
+          "faultClass": "other",
+          "file": "src/policy.mjs",
+          "find": "return 1;",
+          "replace": "return 2;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NODE-REACH",
+      "statement": "A declared defender that never imports the target is unproven.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/policy.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Exercise the stated behavior.",
+          "faultClass": "other",
+          "file": "src/unused.mjs",
+          "find": "export const unused = 7;",
+          "replace": "export const unused = 8;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    }
+  ]
+}

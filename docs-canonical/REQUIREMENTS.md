@@ -21,7 +21,7 @@
 | FR-07 | Report where the suite is blind to an agent before it writes code (`brief`, `status`, MCP) | P1 |
 | FR-08 | Fail when a changed source file carries no claim and no excusing ignore entry (`gate --changed`) | P1 |
 | FR-09 | Exclude tests that mock the subject from defender discovery, and report them | P1 |
-| FR-10 | Support vitest and jest as project runners, and Playwright per file | P2 |
+| FR-10 | Support vitest, jest and explicit native Node as project runners, plus Playwright and Python per file; native Node initially admits default JavaScript collection without custom loaders | P2 |
 | FR-11 | Propose faults mechanically for a source file, as a draft a human keeps or drops (`scaffold`) | P2 |
 | FR-12 | Answer whether one test satisfies the two-gate rule for a claim (`admit`) | P2 |
 | FR-13 | Replay historical fix commits to measure whether the suite would have caught them, and calibrate by fault class | P3 |
@@ -47,7 +47,7 @@
 
 | Criterion | Target | Status at v0.6.0 |
 |---|---|---|
-| Reproduces a known-answer oracle for every verdict, per runner | 3 runners | met — vitest, jest, Playwright fixtures |
+| Reproduces a known-answer oracle for every verdict, per runner | Every supported engine | vitest, jest, Playwright, Python and native Node fixtures; native Node expected outcomes verified through direct Node CLI runs |
 | Self-verification gates the release | every fault killed | met — 62 faults, all killed |
 | Finds real blind spots in real code | field evidence, not synthetic | met — two independent field reports on AI-authored codebases; 8 of 9 historical bugs invisible to a 4,900-test suite; 21 of 39 faults survived a green suite on a second codebase |
 | Every field-report defect closed | 11 of 11 | met at v0.6.0 |

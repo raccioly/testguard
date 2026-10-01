@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Explicit `--runner node-test` support for plain JavaScript projects using
+  Node's built-in test framework, with native entry-file discovery, fresh
+  process confirmations and bounded structured reports. No runner is installed
+  and existing automatic runner selection is unchanged.
+
 ## [0.17.0] - 2026-10-01
 
 Automated weekly release — everything merged since `v0.16.0`.
