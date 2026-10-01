@@ -1,7 +1,7 @@
 // @req FR-07
 // Requirements live in docs-canonical/REQUIREMENTS.md; the matrix there must agree with these.
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, cpSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, cpSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,7 +57,7 @@ function project() {
       const runs = verdict === 'killed' ? [fail, fail, fail] : verdict === 'survived' ? [pass, pass, pass] : [];
       return {
         fingerprint: fingerprint({ claimId: c.id, subjectId: f.id, file: f.file, verdict }),
-        claim: { id: c.id, statement: c.statement, severity: c.severity, source: c.source },
+        claim: { id: c.id, statement: c.statement, severity: c.severity, source: c.source, ...(c.producedBy ? { producedBy: c.producedBy } : {}) },
         subject: { kind: 'fault', id: f.id, file: f.file, faultClass: f.faultClass, contentHash: faultContentHash(f) },
         verdict,
         detail: { ...(verdict === 'nocover' ? {} : verdict === 'unverifiable' ? { reason: 'anchor-missing' } : {}), baselineRuns: runs.length ? [pass, pass, pass] : [], probeRuns: runs },
@@ -71,6 +71,75 @@ function project() {
 }
 
 describe('computeStatus — every state, with a conforming document', () => {
+  it('refuses a discovery path redirected outside the project even with unchanged bytes', () => {
+    const { dir, evidence } = project();
+    const outside = mkdtempSync(join(tmpdir(), 'tg-status-discovery-outside-'));
+    mkdirSync(join(dir, 'alias'));
+    writeFileSync(join(dir, 'alias/input.mjs'), '// identical neutral bytes\n');
+    writeFileSync(join(outside, 'input.mjs'), '// identical neutral bytes\n');
+    const ev = evidence(() => 'killed');
+    ev.records[0].inputs.discoveryHashes = { 'alias/input.mjs': hashFile(join(dir, 'alias/input.mjs')) };
+    writeSpecDoc('evidence', join(dir, '.testguard/evidence.json'), ev);
+    try {
+      expect(computeStatus({ projectDir: dir }).state).toBe('clean');
+      rmSync(join(dir, 'alias'), { recursive: true });
+      symlinkSync(outside, join(dir, 'alias'), 'dir');
+      const status = computeStatus({ projectDir: dir });
+      expect(status.state).toBe('evidence-stale');
+      expect(status.stale.some((s) => s.startsWith('alias/input.mjs discovery input'))).toBe(true);
+      expect(validate('status', status).errors).toEqual([]);
+    } finally { rmSync(dir, { recursive: true, force: true }); rmSync(outside, { recursive: true, force: true }); }
+  });
+  it.each(['barrel-edited', 'barrel-deleted', 'config-edited', 'negative-candidate-edited'])('invalidates a recorded discovery dependency: %s', (change) => {
+    const { dir, evidence } = project();
+    const file = change.startsWith('config') ? 'vitest.config.mjs' : change.startsWith('negative') ? 'test/negative.test.mjs' : 'src/barrel.mjs';
+    const path = join(dir, file);
+    writeFileSync(path, '// recorded discovery input\n');
+    const ev = evidence(() => 'killed');
+    ev.records[0].inputs.discoveryHashes = { [file]: hashFile(path) };
+    const out = join(dir, '.testguard', 'evidence.json');
+    writeSpecDoc('evidence', out, ev);
+    try {
+      expect(computeStatus({ projectDir: dir }).state).toBe('clean');
+      if (change.endsWith('deleted')) rmSync(path);
+      else writeFileSync(path, '// changed discovery input\n');
+      const status = computeStatus({ projectDir: dir });
+      expect(status.state).toBe('evidence-stale');
+      expect(status.next.action).toBe('probe');
+      expect(status.stale).toContain(`${file} discovery input changed or became unavailable since ${ev.records[0].claim.id}/${ev.records[0].subject.id} was probed`);
+      expect(status.counts.byVerdict.killed).toBe(ev.records.length);
+      expect(validate('status', status).errors).toEqual([]);
+      expect(readFileSync(out, 'utf8')).toContain('"verdict": "killed"');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+  it('marks changed recorded claim metadata stale without changing fault verdicts', () => {
+    const { dir, claims, evidence } = project();
+    const path = join(dir, 'testguard.claims.json');
+    const original = structuredClone(claims.claims[0]);
+    const ev = evidence(() => 'killed');
+    writeSpecDoc('evidence', join(dir, '.testguard', 'evidence.json'), ev);
+    const changes = [
+      { statement: `${original.statement} A changed requirement.` },
+      { severity: original.severity === 'critical' ? 'high' : 'critical' },
+      { source: { ...original.source, kind: original.source.kind === 'spec' ? 'comment' : 'spec' } },
+      { source: { ...original.source, ref: 'requirements.md' } },
+      { producedBy: { producer: 'human', by: 'reviewer' } },
+    ];
+    try {
+      for (const change of changes) {
+        claims.claims[0] = { ...original, ...change };
+        writeFileSync(path, JSON.stringify(claims));
+        const doc = computeStatus({ projectDir: dir });
+        expect(doc.state).toBe('evidence-stale');
+        expect(doc.stale).toContain(`claim metadata for ${original.id}/${original.faults[0].id} changed since it was probed`);
+        expect(doc.counts.byVerdict.killed).toBe(ev.records.length);
+        expect(validate('status', doc).errors).toEqual([]);
+      }
+      claims.claims[0] = original;
+      writeFileSync(path, JSON.stringify(claims));
+      expect(computeStatus({ projectDir: dir }).stale.some((s) => s.startsWith('claim metadata'))).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
   it('invalidates evidence when only the selection origin changes or an inherited defender is removed', () => {
     const { dir, claims, evidence } = project();
     const c = claims.claims[0];
@@ -220,17 +289,18 @@ describe('computeStatus — every state, with a conforming document', () => {
     writeSpecDoc('baseline', join(dir, '.testguard', 'baseline.json'), { ...b, head: 'a'.repeat(40), dirty: true, snapshot: 'b'.repeat(40) });
     const s = computeStatus({ projectDir: dir });
     expect(s.state).toBe('clean');
-    expect(s.notes).toHaveLength(1);
-    expect(s.notes[0]).toMatch(/frozen from a working-tree snapshot at aaaaaaa; HEAD is [0-9a-f]{7}.*baseline --restamp/);
+    const baselineNotes = (status) => status.notes.filter((note) => /baseline/.test(note));
+    expect(baselineNotes(s)).toHaveLength(1);
+    expect(baselineNotes(s)[0]).toMatch(/frozen from a working-tree snapshot at aaaaaaa; HEAD is [0-9a-f]{7}.*baseline --restamp/);
     expect(validate('status', s).errors).toEqual([]);
     // a clean baseline at HEAD itself: no note
     const { spawnSync } = require('node:child_process');
     const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
     writeSpecDoc('baseline', join(dir, '.testguard', 'baseline.json'), { ...b, head, dirty: false });
-    expect(computeStatus({ projectDir: dir }).notes).toEqual([]);
+    expect(baselineNotes(computeStatus({ projectDir: dir }))).toEqual([]);
     // a clean baseline at a commit that is NOT in HEAD's history (rewritten or foreign): a different note
     writeSpecDoc('baseline', join(dir, '.testguard', 'baseline.json'), { ...b, head: 'd'.repeat(40), dirty: false });
-    expect(computeStatus({ projectDir: dir }).notes).toEqual([expect.stringMatching(/baseline head ddddddd is not an ancestor of HEAD/)]);
+    expect(baselineNotes(computeStatus({ projectDir: dir }))).toEqual([expect.stringMatching(/baseline head ddddddd is not an ancestor of HEAD/)]);
   });
 });
 

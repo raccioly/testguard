@@ -6,6 +6,8 @@
   "type": "object",
   "required": ["schemaVersion", "tool", "generatedAt", "heading", "summary", "items", "text"],
   "properties": {
+    "originPolicy": { "$ref": "urn:claimspec:v1:common#/$defs/originPolicy" },
+    "origins": { "$ref": "urn:claimspec:v1:common#/$defs/originSummary" },
     "$schema": { "type": "string" },
     "schemaVersion": { "const": 1 },
     "tool": { "$ref": "urn:claimspec:v1:common#/$defs/tool" },

@@ -54,6 +54,21 @@ sections already listing this project.
 
 ## The one source of truth
 
+Missing source-link advisories in claims/status never replace `next`, change
+verdicts or prove intent. Exact anchors remain checked without annotations.
+Origin summaries are likewise informational: status counts current declared
+claims; evidence/briefs count recorded declarations and records, including
+mixed sources. Source kinds are not authenticated independence. Never use an
+origin label to waive a survivor.
+Optional source links: `testguard claims --annotate --claim <ID>` is a read-only
+file-header preview. Only with explicit permission to edit source, rerun with
+`--apply`; each invocation recomputes its plan. Review refusals and partial
+failures, and retain the reported private recovery originals. Never automatically
+remove an existing lock or roll back over user edits. Placement is file-level,
+not symbol ownership, verified behavior or authenticated intent. Missing links
+do not disable exact fault-anchor checks. Authoring never replaces the status
+operating loop or writes canonical claims/evidence/baselines.
+
 ```bash
 testguard status --json
 ```
@@ -75,6 +90,18 @@ which files exist. `state` is one of:
 Exit codes: `0` clean · `1` unproven claims (or drift, or unclaimed changes) · `2` precondition failed / nothing to do yet · `3` usage.
 
 ## Every change needs a claim
+
+Scaffold proposes mechanical faults, not intended behavior. New drafts declare
+`source.kind: inferred` even when grouped by an annotation. Before adopting a
+draft, ask for the intended observable behavior from a requirement, ADR, bug or
+incident independently of the implementation: inputs, expected outcome and
+forbidden outcome. Record the supplied source kind/ref; when unavailable, keep
+inferred and say the intent remains unestablished. Do not promote origin because
+an annotation exists or tests pass. References are opaque, not authenticated;
+verification commands never fetch them. Preserve existing supplied metadata.
+Review each proposal against that intent, then probe. Do not paraphrase the code
+and call that independent intent, or automatically move drafts into canonical
+claims.
 
 `probe` verifies only the claims that exist; it is silent about unclaimed
 code by construction. So, for every source file you create or change:
@@ -107,6 +134,14 @@ code by construction. So, for every source file you create or change:
 | `FLAKY-DEFENDER` | defenders not green 3/3, or disagreed across runs | fix the flake first; no verdict is trustworthy until then |
 
 ## The fix loop
+
+For independently supplied intent in an existing disposable draft, use
+`testguard scaffold <source...> --into <draft.json> --claim <existing-ID> --json`
+to preview appended faults without writes. Omit `--json` only when explicitly
+authorized to update that draft; private recovery is retained. Never use a
+canonical claims/evidence/baseline path. Preserve intended behavior and declared
+origin; generated faults are not independent intent or verification. Review the
+faults and probe the selected draft before promoting it to canonical claims.
 
 1. `testguard status --json` → take `next.target`.
 2. Write the test. It must **fail when the fault is applied and pass on HEAD**. To check the first half by hand: apply `find` → `replace` in the target file, run the defender, restore.

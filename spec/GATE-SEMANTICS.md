@@ -1,5 +1,108 @@
 # Gate semantics
 
+## Declared claim origins
+
+Status rechecks every recorded automatic-discovery dependency hash, including
+negative candidate tests, barrels and resolver configuration. Edited, deleted,
+unreadable or non-regular/escaping inputs make the evidence stale without
+rewriting its verdicts. Legacy omission remains readable but does not establish
+a complete origin-policy freshness binding. Rechecking recorded dependencies
+alone does not detect a newly added test/configuration: native test-universe
+recomputation remains required before origin-policy activation.
+
+Canonical and recorded claim sources share the closed kinds `spec`, `adr`,
+`annotation`, `comment`, `manual`, `doc`, `bug`, `incident`, `review`, `inferred`.
+These are declarations, not authentication of independence, chronology,
+production occurrence or correctness. The optional reference remains opaque
+metadata (at most 512 characters); verification does not fetch it. Producer
+provenance and measured test independence are separate signals.
+Adding kinds does not change verdicts, baseline/fingerprint identity or default
+gates. Existing ranking weights stay unchanged; new kinds use the existing 0.9
+fallback, not an invented strength hierarchy. Existing documents remain valid
+under the candidate reader; older closed-schema readers reject new kinds.
+Optional `origins` summaries on evidence, status and brief have closed kind
+buckets and safe nonnegative integer counts. Distinct claim buckets plus
+`mixed` equal the claim total; record buckets equal the record total. Status
+uses `basis: declared`, omits records, has zero mixed claims and binds its
+total to current `counts.claims`, even when evidence is stale. Evidence and
+brief use `basis: recorded` and require record counts. Evidence validation
+recomputes from every actual record regardless of verdict: each claim ID
+counts once, with conflicting source kind OR reference counted as one mixed
+claim. Object-key order is not a conflict; absent and empty references differ.
+Brief totals bind to the complete summary, not its capped/filtered items.
+Status and brief omit the source projections needed to independently validate
+their kind split; arithmetic validity is not source authentication. Legacy
+documents without summaries remain valid; old closed readers reject them.
+Status supplies current declared origins once validated claims are available,
+including empty, unprobed, invalid-anchor and stale-evidence states. Probe
+evidence and evidence-backed briefs supply recorded origins from all records,
+including killed and non-killed records, before caps or baseline/floor filtering.
+Human status/probe/brief text and Markdown label the basis and print "declared
+origins, not authenticated independence". Evidence-free briefs and projects
+without a claims file omit the summary rather than inventing declarations.
+Probe JSON retains status's current declared basis; saved evidence has its own
+recorded basis. These informational fields do not change states, next actions,
+exit codes, fingerprints or default gates. Opt-in origin policy remains pending.
+
+## Explicit annotation authoring
+
+Ordinary `claims` reports a separate `annotationAdvisory` with distinct sorted
+`missingIds` and informational `notes`; status uses its existing informational
+`notes`. Missing links reduce discoverability and annotation reconciliation,
+not exact-anchor validation. Advice supplies `testguard claims --annotate` for
+read-only preview; it never changes state, next verification action, verdicts,
+source kinds or exit codes. Annotation-sourced missing IDs still retain the
+existing claims drift error. Scanned occurrences are lexical links, not proof
+of intent, source ownership or authenticated provenance.
+Status advisory scanning is bounded to 10,000 directory entries, 1,000 files,
+64 directory levels, 256 KiB per file and 2 MiB total read bytes. Read failures,
+unsafe file identities or limits produce unavailable advice, never a claim
+that an ID is absent from an incomplete scan. Verification state/next still
+comes from its existing inputs. For custom claims, preserve the original
+`--claims` argument when following the preview suggestion.
+Scanner and placement ID prefixes use mandatory separators between repeated
+alphanumeric groups, avoiding overlapping quantifiers on tokens lacking a
+hyphen without changing the supported identifier vocabulary.
+
+`claims --annotate` previews file-header placement without writes. Add `--apply`
+to explicitly apply a newly computed plan; a previous invocation's preview is
+not a saved approval token. Repeated/comma-separated `--claim` selects IDs;
+unknown or empty IDs are usage errors, never an implicit all-claims selection.
+Authoring flags are valid only on `claims`; `--apply` requires `--annotate`.
+Authoring rejects unrelated inspection/output switches and writes results only
+to stdout. It never updates claims metadata, evidence or baselines.
+
+The closed `annotations` document describes authoring, not verification. It
+contains selected IDs, admitted target/action summaries, refusals and, for
+apply, touched/verified/unchanged files and explicit failure/recovery details.
+It excludes source/proposed contents, inode identities, hashes and absolute
+source/root paths. Preview exits 0 when applicable, 2 when refused. Apply exits
+0 only for a fully verified apply (including idempotent no-op), 2 for refusal or
+partial failure. Invalid invocation exits 3. No authoring result changes probe
+verdicts, rank, coverage, source-kind declarations or authentication of intent.
+Failure reasons are stage-specific public summaries: raw syscall details can
+contain absolute input paths and remain private, never passed through to JSON.
+
+Placement supports JavaScript/TypeScript and Python file-level line-comment
+headers, not symbol ownership. Exact anchors remain checked without annotations.
+Every selected target must pass conservative path, regular-file, UTF-8/newline,
+anchor and size admission: 2 MiB per original/proposed file and 16 MiB aggregate
+charged before reads plus proposal growth. Any refusal blocks all writes.
+Preserve BOM, shebang, Python encoding cookies, newline style, inode and mode.
+Only leading line-comment headers are placement witnesses, not string contents.
+
+Apply reloads actual claims under an exclusive owned lock, replays all targets,
+and fsyncs owner-only originals/manifest outside the canonical project before
+writing. Recheck claims and targets immediately before each non-truncating
+descriptor write; verify output, distinguish potentially touched from verified
+files, and retain private recovery on partial failure. Reject the actual claims
+file as a target, root/descendant symlinks and recovery inside the checkout.
+Resolve parent aliases to bind the actual root. Never reclaim another writer's
+lock or automatically roll back over an editor's changes. Stage and fsync the
+final recovery journal before final naming. This is recoverable, not atomic:
+arbitrary same-inode editors and process/power failure can race or interrupt
+writes; directory durability across power loss is not guaranteed.
+
 ## Fault-specific defender selection
 
 A fault's `defendedBy`, when present, overrides its claim's declaration.
@@ -107,6 +210,17 @@ Rules that follow from the table:
    keep `unverifiable`. Where the prior record has no content hash to compare,
    the fault is probed again: the cost of re-measuring is a run, the cost of
    the other direction is a verdict nobody measured.
+
+   **Claim metadata is also an input to reuse.** The recorded claim id,
+   statement, severity, source (including its reference), and optional
+   producer must match the current claim. Object-key order is not a change;
+   field values and producer presence are. Metadata edits make `status`
+   stale and require a fresh probe, even when the fault and defender inputs
+   are identical. A reused record must never be silently relabelled as a
+   different requirement or origin. Legacy records remain readable; missing
+   metadata cannot establish equality with a current declaration. This
+   does not change verdicts or baseline fingerprints, and a source label
+   still does not authenticate independent intent.
 
 9. **The fault must be the code that ran.** A green baseline proves the
    harness is not reporting everything as broken. It proves nothing about the
@@ -467,6 +581,69 @@ Security- and money-shaped path names are explicit tie-breaking signals, never
 semantic claims about a file. Churn, path risk and claim coverage remain raw
 facts: they are never collapsed into one health score.
 
+### Intent-first scaffold authoring
+
+Unannotated generated draft groups use unfinished `TODO-CLAIM-N` identifiers,
+not file/function-shaped names. Allocation is deterministic in scan order and
+reserves explicit annotations and supplied existing IDs before choosing ordinals.
+It never copies unrelated existing metadata into a generated placeholder. Explicit
+claim IDs/annotations retain their existing behavior; neither annotations nor
+placeholder IDs authenticate intent. Grouping remains mechanical candidate
+organization, not invariant ownership. Sweep's pooled allocator keeps repeated
+per-file placeholders distinct without changing fault content. Existing claims
+and recorded evidence are not renamed. The claims schema/validator is unchanged:
+these are valid draft IDs and still require supplied intent and review/probing.
+
+Explicit `scaffold <source...> --into <existing-draft.json> --claim <ID>` appends
+mechanically derived faults only to that existing selected claim. Preview JSON
+is a conforming claims document (the existing claims schema and validator), not
+verification evidence. `--json` creates no files, locks or recovery. Without it,
+only the explicitly selected disposable draft is updated; unchanged repeats
+preserve exact bytes/mtime. Supplied statements/origins/metadata and existing
+faults/sibling claims remain intact. Review and probe are still required.
+
+`--into` is scaffold-only, singular and requires one nonempty existing claim ID
+and at least one source. Repeated/comma selections, `--out`, `--claims` and any
+explicit unrelated option refuse with usage exit 3 before reading/writing.
+Help/version retain their normal early-exit behavior. Ordinary scaffold remains
+one-file; annotation `--apply` retains its separate claims-only meaning.
+
+Refuse canonical `testguard.claims.json` names and built-in evidence/baseline
+destinations, unsafe aliases/symlinks/hardlinks/nested projects and nonregular
+inputs. Admission limits are 32 sources, 2 MiB per source/draft, 16 MiB aggregate
+source bytes, 4096 generated proposals and 2 MiB serialized output. Caps refuse,
+never truncate proposals. These are not whole-command performance guarantees.
+
+Changed drafts require a cooperative owned exclusive lock, current input replay,
+external private original/started/result recovery journals, nofollow descriptor
+publication through `writeSpecDoc`, short-write handling, fsync and exact
+byte/schema/path/source verification. Refusal, stale inputs, partial writes,
+verification or cleanup/journal failure exit 2, report recovery when available,
+and never print updated success. No automatic rollback, stale-lock reclamation,
+atomic multi-file snapshot or power-loss transaction is promised. Exit 0 means
+authoring completed, not defended coverage. Private recovery is not evidence.
+
+Sweep pools per-file drafts before selection. Repeated claim IDs from equal
+basenames/functions or annotations do not merge unrelated claims: reserve all
+original IDs, then allocate unused numeric suffixes to collisions in full
+target-path/original-ID order, within the existing 128-character limit. Metadata,
+fault IDs, injection anchors and defenders are preserved. Drafts, selected probe
+claims and finding lookup share these identities. This affects fresh collision
+cases only; existing documents, verdicts, caps and exit rules remain compatible.
+
+Scaffold's mechanically generated new claims declare `source.kind: inferred`,
+including proposals grouped by an annotation. Their TODO asks for intended
+observable behavior from a requirement, ADR, bug or incident: inputs, expected
+outcome and forbidden outcome. Existing supplied claim metadata retains its
+statement and declared origin under the existing `--claim` rules. Derived fault
+provenance remains derived. No automatic source promotion or canonical write.
+
+Human CLI, status authoring actions and the installed skill hand off independent
+intent authoring. Record a supplied source kind/ref; when unavailable keep
+inferred. References and annotations do not authenticate intent and are never
+fetched. Passing tests do not establish independent intent. State, next action,
+verdict and exit-code semantics are unchanged; this is authoring guidance.
+
 When existing evidence is clean but more source modules are unclaimed than
 claimed, the next action is to scaffold the highest-churn unclaimed module.
 Earlier correctness states still win: invalid anchors, stale evidence and
@@ -580,6 +757,48 @@ evidence; they simply do not turn CI red.
 
 ## Exit codes
 
+### Explicit declared-origin policy result contract
+
+Optional `originPolicy` on evidence, status and brief (and status's probe `run`)
+records an explicitly selected eligible-kind set, not authenticated independence.
+Legacy absence is not a pass. `probe --require-origin <kinds>` selects a
+repeatable comma-separated nonempty set from the closed source vocabulary.
+It requires a complete current-project run with confirm >= 3 and refuses
+`--claim`, `--allow-empty`, explicit `--ref` and `--ignore-dirty` as usage errors
+before loading or writing. No policy is inferred when the option is absent.
+After measurement, the command reloads current claims and collects the current
+native runner universe under the same command budget, then binds targets,
+resolved defenders and current discovery dependencies. Missing bindings or
+discovery failure yields unavailable; custom/static runner universes cannot
+certify this boundary. Expired command budgets still write no partial result.
+This is point-in-time admission, not an atomic filesystem snapshot. Stored
+results are not freshness authority. Offline status reuses only the recorded
+eligible-kind selection, recomputes current declarations/complete identities,
+and marks freshness unavailable without executing native discovery. This is
+an audit projection, not implicit activation of a new gate: the existing
+status state, next action and exit remain unchanged. Briefs preserve the
+recorded policy before baseline filtering or item caps, labeled recorded-run
+only and not current freshness. No absent policy is synthesized. A zero-item
+cap cannot turn unproven faults into an all-defended message.
+
+The closed result carries `state` (`passed`, `failed`, `unavailable`), sorted
+unique `eligibleKinds`, current `claims`/`faults` denominators, sorted unique
+`ineligibleClaims`, unique `nonKilledFaults` (`claimId`, `faultId` only), and
+sorted unique `unavailableReasons`. References and paths are excluded.
+Refusal reasons require unavailable; otherwise any ineligible claim or
+non-killed fault requires failed. Only a nonempty failure-free universe can
+pass. Baseline debt and severity floors cannot suppress policy failures.
+
+Evidence validation binds actual non-killed identities, and, for an available
+policy, unique recorded denominators, recorded eligibility, unmixed origins and
+confirmed injection. Validation cannot authenticate current metadata or disk
+freshness: evaluation must separately bind the complete current fault universe
+and existing input freshness. Projected status/brief bind denominators, not
+hidden source declarations. Brief policy describes its recorded run only.
+Completed probe JSON with unavailable policy exits 2; failed policy or ordinary
+new findings exits 1; passed policy without ordinary findings exits 0.
+Partial/provisional invocations cannot carry an origin policy.
+
 | Code | Meaning |
 |---|---|
 | `0` | No new gating findings at or above the severity floor. |
@@ -598,3 +817,35 @@ output is the existing `no-claims` status document, without run metadata;
 it never reports a clean measurement. Missing or invalid claims still fail,
 and selected claims cannot be silently skipped. Run `gate` separately to
 enforce coverage of changed files during adoption. Integrations must opt in.
+
+## Read-only authoring input (candidate)
+
+`authoring-input` is metadata-only inspection, never claims or evidence. Its
+closed purpose/verification/next fields explicitly state that verification was
+not performed and independent intent remains to be supplied. Documents expose
+only bounded project-relative file/hash/byte metadata, not text or absolute
+roots. A digest or schema-valid report does not authenticate intent or freshness.
+
+Fix inputs retain exact same-width commit/parent/path identities, untrusted
+single-line subjects, selected root/nested scope and full partition accounting.
+Visible rows exclude private/delegated names; their count stays in the total.
+Deleted and unsupported rows cannot become supported source. Validators reject
+duplicate/unsafe/private paths, inconsistent status/mode/zero-ID relations,
+disposition/count mismatches, unsafe subjects and resource overruns. Empty
+documents/inventories are admitted input metadata, not successful verification.
+Readers cannot infer actual history completeness or current input admission
+from shape alone; the runtime must use admitted local inputs without promotion.
+
+`scaffold --from-document <local-text-path>` or `--from-fix <full-commit-ID>`
+selects exactly one read-only authoring input. Both token dispatch and direct
+handler entry reject repetition, mixed modes, positional sources and unrelated
+explicit options (only JSON/help/version may accompany selection). Normal
+help/version early exits remain unchanged. Usage refusal exits 3; input admission
+or validated planning failure exits 2 with no success stdout. Success exits 0
+for inspection only, never coverage. Both JSON and human modes are stdout-only.
+JSON uses the validated metadata-only report; human rendering omits text,
+subjects, absolute roots and historical filenames while retaining full fix
+partition counts. Both name verification as not performed and require supplied
+independent intent before reviewing/probing faults. One elapsed budget covers
+input reads and validated serialization; scope resolution never retries with
+fresh time. Existing ordinary scaffold/append/probe behavior is unchanged.

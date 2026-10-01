@@ -4,6 +4,79 @@
   "title": "claimspec v1 \u2014 shared definitions",
   "description": "Definitions shared by every Guard-spec format. Referenced as urn:claimspec:v1:common#/$defs/<name>.",
   "$defs": {
+    "originPolicy": {
+      "description": "An explicitly selected declared-origin policy, not authenticated independence. Stored results describe their run, not current freshness authority.",
+      "type": "object",
+      "required": ["state", "eligibleKinds", "claims", "faults", "ineligibleClaims", "nonKilledFaults", "unavailableReasons"],
+      "properties": {
+        "state": { "enum": ["passed", "failed", "unavailable"] },
+        "eligibleKinds": { "type": "array", "minItems": 1, "maxItems": 10, "uniqueItems": true, "items": { "$ref": "#/$defs/claimSourceKind" } },
+        "claims": { "$ref": "#/$defs/originCount" },
+        "faults": { "$ref": "#/$defs/originCount" },
+        "ineligibleClaims": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/identifier" } },
+        "nonKilledFaults": {
+          "type": "array", "uniqueItems": true,
+          "items": {
+            "type": "object", "required": ["claimId", "faultId"],
+            "properties": { "claimId": { "$ref": "#/$defs/identifier" }, "faultId": { "$ref": "#/$defs/identifier" } },
+            "additionalProperties": false
+          }
+        },
+        "unavailableReasons": {
+          "type": "array", "uniqueItems": true,
+          "items": { "enum": ["invalid-claims", "invalid-evidence", "empty-universe", "stale-inputs", "provisional-evidence", "incompatible-method", "missing-record", "extra-record", "duplicate-record", "claim-metadata-mismatch", "fault-mismatch"] }
+        }
+      },
+      "additionalProperties": false
+    },
+    "originCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "originCounts": {
+      "type": "object",
+      "required": ["spec", "adr", "annotation", "comment", "manual", "doc", "bug", "incident", "review", "inferred"],
+      "properties": {
+        "spec": { "$ref": "#/$defs/originCount" },
+        "adr": { "$ref": "#/$defs/originCount" },
+        "annotation": { "$ref": "#/$defs/originCount" },
+        "comment": { "$ref": "#/$defs/originCount" },
+        "manual": { "$ref": "#/$defs/originCount" },
+        "doc": { "$ref": "#/$defs/originCount" },
+        "bug": { "$ref": "#/$defs/originCount" },
+        "incident": { "$ref": "#/$defs/originCount" },
+        "review": { "$ref": "#/$defs/originCount" },
+        "inferred": { "$ref": "#/$defs/originCount" }
+      },
+      "additionalProperties": false
+    },
+    "originSummary": {
+      "description": "Declared origins, not authenticated independence. Distinct claim identities and actual recorded projections have separate denominators. Evidence validation recomputes this from every record; projected status/brief documents can only bind arithmetic and totals.",
+      "type": "object",
+      "required": ["basis", "claims"],
+      "properties": {
+        "basis": { "enum": ["declared", "recorded"] },
+        "claims": {
+          "type": "object", "required": ["total", "byKind", "mixed"],
+          "properties": {
+            "total": { "$ref": "#/$defs/originCount" },
+            "byKind": { "$ref": "#/$defs/originCounts" },
+            "mixed": { "$ref": "#/$defs/originCount" }
+          },
+          "additionalProperties": false
+        },
+        "records": {
+          "type": "object", "required": ["total", "byKind"],
+          "properties": {
+            "total": { "$ref": "#/$defs/originCount" },
+            "byKind": { "$ref": "#/$defs/originCounts" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "claimSourceKind": {
+      "description": "Declared origin of claim intent, not authenticated independence or an evidence-strength order. References remain opaque; producer provenance and measured test independence are separate.",
+      "enum": ["spec", "adr", "annotation", "comment", "manual", "doc", "bug", "incident", "review", "inferred"]
+    },
     "nestedProject": {
       "description": "Changed files delegated to a separately validated descendant TestGuard project. This is not coverage or evidence; run that project's gate separately.",
       "type": "object",

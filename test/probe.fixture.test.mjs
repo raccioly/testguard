@@ -199,6 +199,29 @@ describe('probe reproduces the known-answer fixture', () => {
       }
     }, 60_000);
 
+    it('measures again after a claim source changes instead of relabelling reused evidence', async () => {
+      const claimsPath = join(scratch, 'testguard.claims.json');
+      const original = readFileSync(claimsPath, 'utf8');
+      const claims = JSON.parse(original);
+      const claim = claims.claims.find((c) => c.id === 'REDACT-001');
+      claim.source = { kind: 'comment', ref: 'changed-origin' };
+      const out = join(scratch, 'changed-origin.json');
+      cpSync(join(scratch, '.testguard', 'evidence.json'), out);
+      writeFileSync(claimsPath, JSON.stringify(claims));
+      try {
+        const { io } = capture();
+        await main(['probe', scratch, '--budget', '30000', '--claim', claim.id, '--no-escalate', '--out', out], io);
+        const after = readSpecDoc('evidence', out);
+        expect(after.records).toHaveLength(claim.faults.length);
+        for (const record of after.records) {
+          expect(record.reusedFrom).toBeUndefined();
+          expect(record.claim.source).toEqual(claim.source);
+          expect(record.detail.baselineRuns).toHaveLength(3);
+          expect(record.detail.probeRuns).toHaveLength(3);
+        }
+      } finally { writeFileSync(claimsPath, original); }
+    }, 60_000);
+
     it('brief --text: prints the block without writing a file; new-since-baseline is zero', async () => {
       const { lines, io } = capture();
       expect(await main(['brief', scratch, '--text'], io)).toBe(0);

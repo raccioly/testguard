@@ -4,10 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { fingerprint } from './fingerprint.mjs';
 import { reproduces, decimals, MAX_PLACES } from './wilson.mjs';
+import { isDeepStrictEqual } from 'node:util';
+import { recordedOriginSummary } from './origins.mjs';
+import { authoringInputErrors } from './authoring-input.mjs';
 
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 
-export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate', 'replay', 'sweep', 'concerns']);
+export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate', 'replay', 'sweep', 'concerns', 'annotations', 'authoring-input']);
 /**
  * How a document says it tried to falsify its claims. Absent means
  * `fault-injection`, so every document written before the field existed is
@@ -46,8 +49,113 @@ const nestedErrors = (nested = [], prefix = '/nested', occupied = []) => {
   return errors;
 };
 
+// A projected summary is not source authority. Only evidence retains the
+// complete claim projections needed to reproduce each kind and mixed count.
+function originPolicyErrors(kind, doc) {
+  const errors = [];
+  const policies = [[doc.originPolicy, '/originPolicy'], [kind === 'status' ? doc.run?.originPolicy : undefined, '/run/originPolicy']];
+  const identities = (rows) => rows.map((r) => JSON.stringify([r.claimId, r.faultId])).sort();
+  for (const [p, path] of policies) {
+    if (!p) continue;
+    const fail = (message) => errors.push({ path, message });
+    for (const field of ['eligibleKinds', 'ineligibleClaims', 'unavailableReasons']) {
+      if (!isDeepStrictEqual(p[field], [...p[field]].sort())) fail(`${field} must be normalized in sorted order`);
+    }
+    const failures = p.ineligibleClaims.length + p.nonKilledFaults.length;
+    const expectedState = p.unavailableReasons.length ? 'unavailable' : failures ? 'failed' : 'passed';
+    if (p.state !== expectedState) fail('policy state must match refusal reasons and unsuppressed failures');
+    if (p.state !== 'unavailable' && (!p.claims || !p.faults)) fail('an evaluated policy requires a nonempty claim and fault universe');
+    if (p.ineligibleClaims.length > p.claims) fail('ineligible claims exceed the current claim denominator');
+    if (p.state !== 'unavailable' && p.nonKilledFaults.length > p.faults) fail('non-killed faults exceed the complete fault denominator');
+    if (kind === 'evidence') {
+      const actual = [...new Set(doc.records.filter((r) => r.verdict !== 'killed').map((r) => JSON.stringify([r.claim.id, r.subject.id])))].sort();
+      if (!isDeepStrictEqual(identities(p.nonKilledFaults), actual)) fail('policy must retain every actual non-killed fault identity');
+      if (p.state !== 'unavailable') {
+        const claims = new Set(doc.records.map((r) => r.claim.id));
+        const faults = new Set(doc.records.map((r) => JSON.stringify([r.claim.id, r.subject.id])));
+        if (p.claims !== claims.size || p.faults !== faults.size || faults.size !== doc.records.length) fail('evaluated policy denominators require complete unique recorded identities');
+        const ineligible = [...new Set(doc.records.filter((r) => !p.eligibleKinds.includes(r.claim.source.kind)).map((r) => r.claim.id))].sort();
+        if (!isDeepStrictEqual(p.ineligibleClaims, ineligible)) fail('policy eligibility must match recorded declarations');
+        if (!isInjection(doc.run) || doc.run.provisional || doc.run.confirmRuns < 3) fail('evaluated policy requires confirmed fault-injection evidence');
+        if (recordedOriginSummary(doc.records).claims.mixed) fail('evaluated policy cannot use mixed recorded origins');
+      }
+    }
+    if (kind === 'status' && (p.claims !== doc.counts.claims || p.faults !== doc.counts.faults)) fail('policy denominators must match current status claims and faults');
+    if (kind === 'brief' && p.state !== 'unavailable' && (p.claims !== doc.summary.claims || p.faults !== Object.values(doc.summary.byVerdict).reduce((a, b) => a + b, 0))) fail('recorded policy denominators must match the uncapped brief summary');
+  }
+  if (kind === 'status' && doc.run) {
+    const p = doc.run.originPolicy;
+    const expected = p?.state === 'unavailable' ? 2 : p?.state === 'failed' || doc.run.newSinceBaseline > 0 ? 1 : 0;
+    if (p && doc.run.exitCode !== expected) errors.push({ path: '/run/exitCode', message: 'exit code must preserve policy refusal/failure before baseline findings' });
+    if (!p && doc.run.exitCode === 2) errors.push({ path: '/run/exitCode', message: 'completed probe exit 2 requires an unavailable origin policy' });
+    if (p && (doc.run.scope || doc.run.provisional)) errors.push({ path: '/run/originPolicy', message: 'origin policy cannot certify a partial or provisional invocation' });
+  }
+  return errors;
+}
+
+function originErrors(kind, doc) {
+  if (!doc.origins) return [];
+  const errors = [], o = doc.origins;
+  const fail = (message) => errors.push({ path: '/origins', message });
+  const sum = (counts) => Object.values(counts).reduce((a, b) => a + b, 0);
+  if (sum(o.claims.byKind) + o.claims.mixed !== o.claims.total) fail('claim origin buckets plus mixed must equal the distinct claim total');
+  if (o.records && sum(o.records.byKind) !== o.records.total) fail('record origin buckets must equal the record total');
+  if (kind === 'status') {
+    if (o.basis !== 'declared' || o.records || o.claims.mixed !== 0) fail('status origins must describe unmixed current declarations without recorded counts');
+    if (o.claims.total !== doc.counts.claims) fail('declared origin total must equal current claim count');
+  } else {
+    if (o.basis !== 'recorded' || !o.records) fail('evidence and brief origins require recorded basis and record counts');
+    if (kind === 'evidence' && !isDeepStrictEqual(o, recordedOriginSummary(doc.records))) fail('recorded origins must reproduce every actual record and distinct claim declaration');
+    if (kind === 'brief' && (o.claims.total !== doc.summary.claims || o.records?.total !== sum(doc.summary.byVerdict))) fail('brief origin totals must match the complete summary, not capped items');
+  }
+  return errors;
+}
+
 // Rules JSON Schema cannot express. Each returns an array of {path, message}.
 const semantic = {
+  'authoring-input': authoringInputErrors,
+  annotations(doc) {
+    const errors = [];
+    const fail = (path, message) => errors.push({ path, message });
+    const selected = new Set(doc.selected), seenFiles = new Set(), seenIds = new Set();
+    for (const [bucket, entries] of [['targets', doc.targets], ['refused', doc.refused]]) {
+      for (const [i, entry] of entries.entries()) {
+        if (seenFiles.has(entry.file)) fail(`/${bucket}/${i}/file`, 'target must occur in exactly one admission bucket');
+        if (bucket === 'targets' && (entry.file.includes('\\') || /^[A-Za-z]:/.test(entry.file) || entry.file.split('/').some((part) => !part || part === '.' || part === '..'))) fail(`/${bucket}/${i}/file`, 'admitted target must be a canonical relative path');
+        seenFiles.add(entry.file);
+        for (const id of entry.claimIds) {
+          if (!selected.has(id)) fail(`/${bucket}/${i}/claimIds`, 'target claim must be selected');
+          seenIds.add(id);
+        }
+      }
+    }
+    if (doc.selected.some((id) => !seenIds.has(id))) fail('/selected', 'every selected claim must have a target or explicit refusal');
+    if (doc.mode === 'preview') {
+      if (doc.outcome) fail('/outcome', 'preview never has a write outcome');
+      if (doc.state !== (doc.refused.length ? 'refused' : 'preview')) fail('/state', 'preview state must reflect all admission refusals');
+      return errors;
+    }
+    if (!doc.outcome) { fail('/outcome', 'apply requires a write outcome'); return errors; }
+    if (doc.refused.length && doc.state !== 'refused') fail('/state', 'any admission refusal blocks all writes');
+    const o = doc.outcome;
+    const adds = doc.targets.filter((t) => t.action === 'add').map((t) => t.file);
+    const unchanged = doc.targets.filter((t) => t.action === 'unchanged').map((t) => t.file);
+    const same = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
+    if (o.touched.some((file) => !adds.includes(file))) fail('/outcome/touched', 'only admitted add targets can be touched');
+    if (o.changed.some((file) => !o.touched.includes(file))) fail('/outcome/changed', 'verified changes must be touched');
+    if (!same(o.unchanged, unchanged)) fail('/outcome/unchanged', 'unchanged files must match unchanged targets');
+    for (const [i, failure] of o.failed.entries()) {
+      if (failure.file !== null && !doc.targets.some((t) => t.file === failure.file)) fail(`/outcome/failed/${i}/file`, 'failed file must be an admitted target or null');
+    }
+    if (doc.state === 'applied') {
+      if (doc.refused.length || o.failed.length || !same(o.changed, adds) || !same(o.touched, adds) || !o.recoveryDir || o.lockRelease?.released !== true) fail('/state', 'applied requires every admitted target verified, no refusals/failures, recovery and released owned lock');
+    } else if (doc.state === 'refused') {
+      if (o.touched.length || o.changed.length || (!doc.refused.length && !o.failed.length)) fail('/state', 'refused requires no touched files and an explicit refusal/failure');
+    } else if (doc.state === 'partial') {
+      if (!o.touched.length || !o.failed.length || !o.recoveryDir) fail('/state', 'partial requires touched files, explicit failure and retained recovery');
+    } else fail('/state', 'apply cannot be a preview');
+    return errors;
+  },
   claims(doc) {
     const errors = [];
     const seenClaim = new Set();
@@ -472,5 +580,7 @@ export function validate(kind, doc) {
     };
   }
   const errors = semantic[kind] ? semantic[kind](doc) : [];
+  errors.push(...originErrors(kind, doc));
+  errors.push(...originPolicyErrors(kind, doc));
   return { ok: errors.length === 0, errors };
 }

@@ -1,0 +1,67 @@
+{
+  "$id": "urn:claimspec:v1:authoring-input",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "claimspec v1 — read-only authoring input",
+  "description": "Metadata-only input handoff. Not claims, verification, freshness authority or authenticated intent. No source text or absolute roots.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "tool", "purpose", "verification", "next", "input"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "tool": { "$ref": "urn:claimspec:v1:common#/$defs/tool" },
+    "purpose": { "const": "authoring-input" },
+    "verification": { "const": "not-performed" },
+    "next": { "const": "supply-independent-intent" },
+    "input": { "oneOf": [{ "$ref": "#/$defs/document" }, { "$ref": "#/$defs/fix" }] }
+  },
+  "$defs": {
+    "objectId": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "document": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "file", "hash", "bytes"],
+      "properties": {
+        "kind": { "const": "document" },
+        "file": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" },
+        "hash": { "$ref": "urn:claimspec:v1:common#/$defs/sha256" },
+        "bytes": { "type": "integer", "minimum": 0, "maximum": 2097152 }
+      }
+    },
+    "fix": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "commit", "parent", "subject", "scope", "paths", "counts"],
+      "properties": {
+        "kind": { "const": "fix" },
+        "commit": { "$ref": "#/$defs/objectId" },
+        "parent": { "$ref": "#/$defs/objectId" },
+        "subject": { "type": "string", "maxLength": 1024 },
+        "scope": { "enum": ["project-root", "selected-nested-project"] },
+        "paths": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/path" } },
+        "counts": {
+          "type": "object", "additionalProperties": false,
+          "required": ["total", "supported", "deleted", "unsupported", "excluded"],
+          "properties": {
+            "total": { "$ref": "#/$defs/count" },
+            "supported": { "$ref": "#/$defs/count" },
+            "deleted": { "$ref": "#/$defs/count" },
+            "unsupported": { "$ref": "#/$defs/count" },
+            "excluded": { "$ref": "#/$defs/count" }
+          }
+        }
+      }
+    },
+    "count": { "type": "integer", "minimum": 0, "maximum": 256 },
+    "path": {
+      "type": "object", "additionalProperties": false,
+      "required": ["file", "status", "oldMode", "newMode", "oldId", "newId", "disposition"],
+      "properties": {
+        "file": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" },
+        "status": { "enum": ["A", "M", "D", "T"] },
+        "oldMode": { "type": "string", "pattern": "^[0-7]{6}$" },
+        "newMode": { "type": "string", "pattern": "^[0-7]{6}$" },
+        "oldId": { "$ref": "#/$defs/objectId" },
+        "newId": { "$ref": "#/$defs/objectId" },
+        "disposition": { "enum": ["supported", "deleted", "unsupported"] }
+      }
+    }
+  }
+}

@@ -46,20 +46,14 @@
           "maxLength": 2000
         },
         "source": {
-          "description": "Where the claim comes from. Spec- and ADR-sourced claims are human-governed; annotation- and comment-sourced claims may have been written by the same agent that wrote the tests, and should be ranked accordingly.",
+          "description": "Declared origin of claim intent. A source label or opaque reference does not authenticate independence, chronology or correctness. Producer provenance and measured test independence are separate.",
           "type": "object",
           "required": [
             "kind"
           ],
           "properties": {
             "kind": {
-              "enum": [
-                "spec",
-                "adr",
-                "annotation",
-                "comment",
-                "manual"
-              ]
+              "$ref": "urn:claimspec:v1:common#/$defs/claimSourceKind"
             },
             "ref": {
               "type": "string",

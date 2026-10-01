@@ -13,6 +13,8 @@
     "counts"
   ],
   "properties": {
+    "originPolicy": { "$ref": "urn:claimspec:v1:common#/$defs/originPolicy" },
+    "origins": { "$ref": "urn:claimspec:v1:common#/$defs/originSummary" },
     "$schema": {
       "type": "string"
     },
@@ -157,12 +159,13 @@
       "type": "object",
       "required": ["id", "evidence", "provisional", "records", "newSinceBaseline", "exitCode"],
       "properties": {
+        "originPolicy": { "$ref": "urn:claimspec:v1:common#/$defs/originPolicy" },
         "id": { "type": "string", "minLength": 1, "maxLength": 128 },
         "evidence": { "type": "string", "minLength": 1, "maxLength": 4096 },
         "provisional": { "type": "boolean" },
         "records": { "type": "integer", "minimum": 0 },
         "newSinceBaseline": { "type": "integer", "minimum": 0 },
-        "exitCode": { "enum": [0, 1] },
+        "exitCode": { "enum": [0, 1, 2] },
         "scope": {
           "type": "object",
           "required": ["requestedClaims", "requestedCount", "probedClaims", "probedCount"],
@@ -301,7 +304,7 @@
       }
     },
     "notes": {
-      "description": "Informational lines that never change `state`: e.g. a baseline frozen from a snapshot whose head predates the commit that carries its tests, with the way to re-stamp it.",
+      "description": "Informational lines that never change state or next verification action: e.g. annotation-link advice (not verification or authenticated provenance), or a baseline snapshot with the way to re-stamp it.",
       "type": "array",
       "items": { "type": "string", "minLength": 1, "maxLength": 512 }
     },

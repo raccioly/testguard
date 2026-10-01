@@ -16,7 +16,9 @@ import { classifyIndependence } from './independence.mjs';
 import { escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf, isReusable, defenderSelection } from './attribution.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
 import { fingerprint } from '../../spec/lib/fingerprint.mjs';
+import { recordedOriginSummary } from '../../spec/lib/origins.mjs';
 import { persistenceSignalsFor } from '../supply/persistence.mjs';
+import { collectOwnedManifests, hashNativeTestUniverse } from './universe.mjs';
 
 
 /** Is `child` the same file as `root`, or under it? Both must already be real paths. */
@@ -218,20 +220,16 @@ export async function probe({
     // project runner is; it must resolve before the first such defender runs.
     const owned = OWNED_RUNNERS.filter((r) => r !== runner
       && !(r.name === 'python' && ['python', 'pytest', 'unittest'].includes(runner.name)));
-    const ownedChecked = new Map();
-    const manifests = new Map(primaryManifest ? [[runner, primaryManifest]] : []);
+    let ownedChecked = new Map();
+    let manifests = new Map(primaryManifest ? [[runner, primaryManifest]] : []);
     if (!commandTemplate) {
-      for (const r of owned) {
-        const check = await r.check({ projectDir: iso.projectDir, sourceDir: projectDir, python, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, budgetFor: () => commandBudget?.runBudget(budgetMs) ?? budgetMs });
-        commandBudget?.assertOpen();
-        ownedChecked.set(r, check);
-        if (!check.ok) continue;
-        try {
-          manifests.set(r, await discoverRunnerManifest(r, check, iso.projectDir, commandBudget?.runBudget(budgetMs) ?? budgetMs));
-        } catch (error) {
-          throw new PreconditionError(`${r.name}: test discovery failed: ${error.message}`);
-        }
-      }
+      try {
+        ({ ownedChecked, manifests } = await collectOwnedManifests(runner, primaryManifest, {
+          projectDir: iso.projectDir, sourceDir: projectDir, python, budgetMs,
+          budgetFor: () => commandBudget?.runBudget(budgetMs) ?? budgetMs,
+          assertOpen: () => commandBudget?.assertOpen(),
+        }));
+      } catch (error) { throw new PreconditionError(`test discovery failed: ${error.message}`); }
     }
     const ensureOwned = async (r, file) => {
       if (!ownedChecked.has(r)) {
@@ -265,9 +263,7 @@ export async function probe({
       : [...ownerByFile.keys()]).sort());
     const testUniverseHash = commandTemplate
       ? sha256(JSON.stringify({ schemaVersion: 1, source: 'custom-command-static', files: allTests }))
-      : sha256(JSON.stringify([...manifests]
-        .map(([r, manifest]) => ({ runner: r.name, hash: manifest.testUniverseHash }))
-        .sort((a, b) => a.runner.localeCompare(b.runner))));
+      : hashNativeTestUniverse(manifests);
     const baselineCache = new Map();
     const discoveryHashCache = new Map();
     // The negative control is charged per (target file, defender set): two
@@ -394,6 +390,7 @@ export async function probe({
       mode: iso.mode,
     },
     records,
+    origins: recordedOriginSummary(records),
   };
 }
 
@@ -520,7 +517,7 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
   const subject = subjectOf(fault, sha256);
 
   // Same source, same defenders, same N, same fault: the verdict cannot have changed.
-  if (isReusable(prior, { inputs, ...defenderSelection(claim, fault), resolved: defenders, contentHash: subject.contentHash })) {
+  if (isReusable(prior, { claim, inputs, ...defenderSelection(claim, fault), resolved: defenders, contentHash: subject.contentHash })) {
     return { ...prior, defenders: { ...prior.defenders, ...defenderSelection(claim, fault) }, reusedFrom: prior.reusedFrom ?? priorRunId };
   }
 

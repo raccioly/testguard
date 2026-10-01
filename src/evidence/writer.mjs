@@ -13,18 +13,24 @@ function describe(kind, path, result) {
  * Write a spec document — but only if it conforms. The tool is held to its
  * own spec at the moment of output, not by a separate test someone might skip.
  */
-export function writeSpecDoc(kind, path, doc) {
+export function writeSpecDoc(kind, path, doc, { publish } = {}) {
   const result = validate(kind, doc);
   if (!result.ok) throw new SpecDocError('refusing to write: ' + describe(kind, path, result));
+  const output = JSON.stringify(doc, null, 2) + '\n';
+  if (publish !== undefined) {
+    if (typeof publish !== 'function') throw new TypeError('publish must be a function');
+    return publish(output);
+  }
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(doc, null, 2) + '\n');
+  writeFileSync(path, output);
 }
 
 /** Read a spec document, refusing one that does not conform. */
-export function readSpecDoc(kind, path) {
+export function readSpecDoc(kind, path, { source } = {}) {
   let doc;
   try {
-    doc = JSON.parse(readFileSync(path, 'utf8'));
+    if (source !== undefined && typeof source !== 'string') throw new Error('source must be a string');
+    doc = JSON.parse(source === undefined ? readFileSync(path, 'utf8') : source);
   } catch (e) {
     throw new SpecDocError(`cannot read ${kind} document ${path}: ${e.message}`);
   }

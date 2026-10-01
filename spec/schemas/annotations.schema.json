@@ -1,0 +1,65 @@
+{
+  "$id": "urn:claimspec:v1:annotations",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "claimspec v1 — annotation authoring",
+  "description": "File-level authoring only. Not verification or intent authentication. No source contents or reusable approval token.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "tool", "mode", "state", "selected", "targets", "refused"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "tool": { "$ref": "urn:claimspec:v1:common#/$defs/tool" },
+    "mode": { "enum": ["preview", "apply"] },
+    "state": { "enum": ["preview", "applied", "refused", "partial"] },
+    "selected": { "$ref": "#/$defs/ids" },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["file", "claimIds", "action"],
+        "properties": {
+          "file": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" },
+          "claimIds": { "type": "array", "$ref": "#/$defs/ids", "minItems": 1 },
+          "action": { "enum": ["add", "unchanged"] }
+        }
+      }
+    },
+    "refused": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["file", "claimIds", "reason"],
+        "properties": {
+          "file": { "type": "string", "minLength": 1 },
+          "claimIds": { "type": "array", "$ref": "#/$defs/ids", "minItems": 1 },
+          "reason": { "enum": ["unsupported-claim-id", "unsupported-method", "unsafe-path", "excluded-target", "unsupported-source", "symlink-target", "not-regular-file", "nested-project", "source-too-large", "target-missing", "target-unreadable", "target-changed", "invalid-encoding", "mixed-newlines", "plan-source-budget", "proposed-source-too-large", "anchor-missing", "anchor-ambiguous"] }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object", "additionalProperties": false, "required": ["changed", "touched", "unchanged", "failed"],
+      "properties": {
+        "changed": { "$ref": "#/$defs/files" },
+        "touched": { "$ref": "#/$defs/files" },
+        "unchanged": { "$ref": "#/$defs/files" },
+        "failed": {
+          "type": "array", "items": {
+            "type": "object", "additionalProperties": false, "required": ["file", "stage", "reason"],
+            "properties": {
+              "file": { "type": ["string", "null"] },
+              "stage": { "enum": ["preparation", "all-target-preflight", "started-journal", "target-preflight", "source-write", "write-verification", "completion-journal", "lock-release", "result-journal"] },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "recoveryDir": { "type": "string", "minLength": 1 },
+        "lockRelease": {
+          "type": "object", "additionalProperties": false, "required": ["released"],
+          "properties": { "released": { "type": "boolean" }, "reason": { "type": "string", "minLength": 1 } }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ids": { "type": "array", "uniqueItems": true, "items": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" } },
+    "files": { "type": "array", "uniqueItems": true, "items": { "$ref": "urn:claimspec:v1:common#/$defs/repoPath" } }
+  }
+}

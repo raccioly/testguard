@@ -3,6 +3,112 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-ANNOTATION-PLACEMENT-IS-TARGET-LOCAL",
+      "statement": "Explicit file-header placement uses each actual fault target, not global lexical links or annotation-like strings, preserves unrelated files and becomes idempotent after application.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
+      "severity": "high", "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/annotation-cli.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "Treat selected IDs as already placed without checking their target headers.", "faultClass": "other", "file": "src/claims/annotation-placement.mjs", "find": "    const missing = ids.filter((id) => !hasAnnotation(input.source, id, python));", "replace": "    const missing = [];", "producedBy": { "producer": "agent", "by": "codex" } }
+      ]
+    },
+    {
+      "id": "TG-ANNOTATION-ADVICE-RESOURCE-LIMITS",
+      "statement": "Status annotation advice refuses incomplete scans at declared byte, file, directory-entry and depth ceilings, including stale-size growth, without asserting missing links.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
+      "severity": "high", "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/annotation-advisory-limits.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "Ignore cumulative descriptor byte consumption.", "faultClass": "other", "file": "src/claims/annotations.mjs", "find": "            const limit = Math.min(256 * 1024, 2 * 1024 * 1024 - bytes);", "replace": "            const limit = 256 * 1024;", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F2", "description": "Disable source-file count admission.", "faultClass": "condition-forced", "file": "src/claims/annotations.mjs", "find": "          if (++files > 1000) throw new Error('scan incomplete');", "replace": "          if (false) throw new Error('scan incomplete');", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F3", "description": "Disable streamed directory-entry admission.", "faultClass": "condition-forced", "file": "src/claims/annotations.mjs", "find": "        if (++entries > 10000) throw new Error('scan incomplete');", "replace": "        if (false) throw new Error('scan incomplete');", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F4", "description": "Disable directory-depth admission.", "faultClass": "condition-forced", "file": "src/claims/annotations.mjs", "find": "    if (depth > 64) throw new Error('scan incomplete');", "replace": "    if (false) throw new Error('scan incomplete');", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F5", "description": "Accept descriptor growth beyond the read ceiling despite stale stat size.", "faultClass": "condition-forced", "file": "src/claims/annotations.mjs", "find": "              if (read > limit) throw new Error('scan incomplete');", "replace": "              if (false) throw new Error('scan incomplete');", "producedBy": { "producer": "agent", "by": "codex" } }
+      ]
+    },
+    {
+      "id": "TG-ANNOTATION-ID-MATCHING-IS-BOUNDED",
+      "statement": "Lexical scanning and placement ID admission promptly reject long alphanumeric tokens without a required hyphen rather than exponentially backtracking.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
+      "severity": "high", "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/annotation-advisory.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "Restore overlapping nested prefix quantifiers in scanning.", "faultClass": "other", "file": "src/claims/annotations.mjs", "find": "const RE = /@claim\\s+([A-Za-z0-9]+(?:[._][A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9])\\b/g;", "replace": "const RE = /@claim\\s+([A-Za-z0-9]+(?:[._]?[A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9])\\b/g;", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F2", "description": "Restore overlapping nested prefix quantifiers in placement admission.", "faultClass": "other", "file": "src/claims/annotation-placement.mjs", "find": "const CLAIM_ID = /^[A-Za-z0-9]+(?:[._][A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9]$/;", "replace": "const CLAIM_ID = /^[A-Za-z0-9]+(?:[._]?[A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9]$/;", "producedBy": { "producer": "agent", "by": "codex" } }
+      ]
+    },
+    {
+      "id": "TG-ANNOTATION-ADVICE-IS-INFORMATIONAL",
+      "statement": "Missing lexical source links are reported as advisory guidance without replacing verification state or the existing annotation-sourced drift error.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
+      "severity": "high", "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/annotation-advisory.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "Hide missing declared lexical source links.", "faultClass": "other", "file": "src/claims/annotations.mjs", "find": "  const missingIds = [...new Set(claims.claims.map((c) => c.id))].filter((id) => !linked.has(id)).sort();", "replace": "  const missingIds = [];", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F2", "description": "Omit missing-link advice from status while leaving its verification state unchanged.", "faultClass": "condition-forced", "file": "src/status/status.mjs", "find": "  if (claims.claims.length) doc.notes.push(...projectAnnotationAdvisory(projectDir, claims, { customClaims: paths.claims !== defaultClaimsPath(projectDir) }).notes);", "replace": "  if (false) doc.notes.push(...projectAnnotationAdvisory(projectDir, claims, { customClaims: paths.claims !== defaultClaimsPath(projectDir) }).notes);", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F3", "description": "Discard ordinary claims advisory information.", "faultClass": "other", "file": "src/commands/claims.mjs", "find": "  const advisory = annotationAdvisory(claims, annotations, { customClaims: Boolean(values.claims) });", "replace": "  const advisory = { missingIds: [], notes: [] };", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F4", "description": "Use the unbounded legacy scan for status advice.", "faultClass": "other", "file": "src/claims/annotations.mjs", "find": "  try { visit(projectDir, '', 0); return annotationAdvisory(claims, annotations, options); }", "replace": "  try { return annotationAdvisory(claims, scanAnnotations(projectDir), options); }", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F5", "description": "Let advisory read failures prevent status reporting.", "faultClass": "other", "file": "src/claims/annotations.mjs", "find": "  catch {\n    return { missingIds: [], notes: ['ANNOTATION ADVISORY unavailable:", "replace": "  catch (error) { throw error;\n    return { missingIds: [], notes: ['ANNOTATION ADVISORY unavailable:", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F6", "description": "Lose the custom claims selection in preview guidance.", "faultClass": "other", "file": "src/claims/annotations.mjs", "find": "      ...(customClaims ? ['Preserve the original --claims argument when running that preview; the default claims file is not this selection.'] : []),", "replace": "      ...(false ? ['Preserve the original --claims argument when running that preview; the default claims file is not this selection.'] : []),", "producedBy": { "producer": "agent", "by": "codex" } }
+      ]
+    },
+    {
+      "id": "TG-ANNOTATION-CLI-IS-EXPLICIT",
+      "statement": "Annotation authoring defaults to read-only preview, rejects unsafe invocation and selections, and never returns success for a refused apply.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
+      "severity": "critical", "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/annotation-cli.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "Perform apply even for a read-only preview.", "faultClass": "condition-forced", "file": "src/commands/annotations.mjs", "find": "  if (values.apply) {", "replace": "  if (true) {", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F2", "description": "Accept authoring without annotate or with unsafe combined switches.", "faultClass": "condition-forced", "file": "src/commands/annotations.mjs", "find": "  if (!values.annotate || suppliedOptions.some((key) => !allowed.has(key))) {", "replace": "  if (false) {", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F3", "description": "Accept empty or unknown selected claim IDs.", "faultClass": "condition-forced", "file": "src/commands/annotations.mjs", "find": "  if (claimIds.some((id) => !id || !claims.claims.some((claim) => claim.id === id))) {", "replace": "  if (false) {", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F4", "description": "Return success for a refused apply.", "faultClass": "other", "file": "src/commands/annotations.mjs", "find": "  return doc.state === 'preview' || doc.state === 'applied' ? 0 : 2;", "replace": "  return 0;", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F5", "description": "Expose authoring flags on a different command.", "faultClass": "condition-forced", "file": "src/cli.mjs", "find": "  if ((values.annotate || values.apply) && command !== 'claims') {", "replace": "  if (false) {", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F6", "description": "Leak raw filesystem failure paths through the public authoring result.", "faultClass": "other", "file": "src/commands/annotations.mjs", "find": "          failed: report.failed.map(publicFailure), recoveryDir: report.recoveryDir,", "replace": "          failed: report.failed, recoveryDir: report.recoveryDir,", "producedBy": { "producer": "agent", "by": "codex" } }
+      ]
+    },
+    {
+      "id": "TG-ANNOTATION-RESULT-IS-NON-OPTIMISTIC",
+      "statement": "Annotation authoring validation rejects applied results without complete verified targets, recovery and owned-lock release.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
+      "severity": "critical", "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["spec/conformance/annotations.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "Accept an applied result despite missing verified targets, failures or failed release.", "faultClass": "condition-forced", "file": "spec/lib/validate.mjs", "find": "      if (doc.refused.length || o.failed.length || !same(o.changed, adds) || !same(o.touched, adds) || !o.recoveryDir || o.lockRelease?.released !== true) fail('/state', 'applied requires every admitted target verified, no refusals/failures, recovery and released owned lock');", "replace": "      if (false) fail('/state', 'applied requires every admitted target verified, no refusals/failures, recovery and released owned lock');", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F2", "description": "Accept writes despite an admission refusal.", "faultClass": "condition-forced", "file": "spec/lib/validate.mjs", "find": "    if (doc.refused.length && doc.state !== 'refused') fail('/state', 'any admission refusal blocks all writes');", "replace": "    if (false) fail('/state', 'any admission refusal blocks all writes');", "producedBy": { "producer": "agent", "by": "codex" } }
+      ]
+    },
+    {
+      "id": "TG-CLAIM-METADATA-BOUND",
+      "statement": "Changed recorded claim intent, severity, source or producer metadata cannot reuse a prior verdict or appear current in status.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "severity": "critical",
+      "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/attribution.test.mjs", "test/status.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Ignore changed claim metadata when deciding whether a measured verdict may be reused.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/attribution.mjs",
+          "defendedBy": ["test/attribution.test.mjs"],
+          "find": "  if (current.claim && !sameClaimMetadata(prior.claim, current.claim)) return false;",
+          "replace": "  if (false) return false;",
+          "producedBy": { "producer": "agent", "by": "codex" }
+        },
+        {
+          "id": "F2",
+          "description": "Suppress claim metadata staleness while keeping measured verdicts unchanged.",
+          "faultClass": "condition-forced",
+          "file": "src/status/status.mjs",
+          "defendedBy": ["test/status.test.mjs"],
+          "find": "    if (!sameClaimMetadata(r.claim, cur.claim)) doc.stale.push(`claim metadata for ${key} changed since it was probed`);",
+          "replace": "    if (false) doc.stale.push(`claim metadata for ${key} changed since it was probed`);",
+          "producedBy": { "producer": "agent", "by": "codex" }
+        }
+      ]
+    },
+    {
       "id": "TG-FAULT-DEFENDER-ORCHESTRATION",
       "statement": "Probing selects and measures each fault's defenders rather than silently running its claim's broader inherited set.",
       "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#fault-specific-defender-selection" },

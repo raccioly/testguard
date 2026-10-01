@@ -20,6 +20,8 @@ import { mcpCommand } from './commands/mcp.mjs';
 import { admitCommand } from './commands/admit.mjs';
 import { sweepCommand } from './commands/sweep.mjs';
 import { concernsCommand } from './commands/concerns.mjs';
+import { originPolicyRequest } from './probe/origin-policy.mjs';
+import { draftAppendRequest, intentInputRequest } from './scaffold/request.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
 const ISSUES = 'https://github.com/raccioly/testguard/issues';
@@ -48,6 +50,8 @@ probe
   --out <path>         evidence file           (default: <dir>/.testguard/evidence.json)
   --baseline <path>    baseline to gate against (default: <dir>/.testguard/baseline.json if present)
   --severity <level>   gate only at or above   (default: low)
+  --require-origin <kinds> complete confirmed probe only; repeatable comma-separated declared source kinds.
+                       No kind authenticates independence. Policy failures ignore baseline debt and severity floors.
   --ref <commit>       probe this commit in the scratch worktree (default: HEAD). An explicit --ref is honoured even when
                        defender/target files are dirty: a warning names them, the evidence records them (repo.ignoredDirty)
   --ignore-dirty       probe HEAD as committed although defender/target files are dirty (same warning and record)
@@ -80,6 +84,12 @@ probe
   --json               the status document plus this run's result (records, newSinceBaseline, exitCode)
 
 scaffold   --claim <ID> (put every proposal under this claim; copies it if it exists)  --out <path>  --json
+           --from-document <local-text-path> OR --from-fix <full-commit-ID> inspects read-only authoring inputs;
+           no positional sources or other options except --json/help/version. Stdout only; verification not performed.
+           Document text is not emitted; fix counts retain exclusions. Next: supply independent intent, then review/probe.
+           <source...> --into <existing-draft.json> --claim <ID> appends faults to supplied intent;
+           --json previews without writes. Without --json, updates only that draft with private recovery.
+           No --out/--claims or unrelated options; never canonical claims/evidence/baseline. Unproven until reviewed/probed.
 sweep      --changed <ref> (required unless --save-paths; CI bases and a safe local default are detected)  --cap <n>
            --concern <ID>    aim the sweep by one of this project's concerns: its targets and its fault classes.
                              testguard concerns lists them. --save-paths is sugar for the built-in SAVE-PERSISTS
@@ -112,6 +122,9 @@ gate       --changed <ref>   measure the change since merge-base(ref, HEAD); aut
            --ignore <path>   ignore file (default: <dir>/testguard.ignore.json; kind=path entries excuse files, with a reason)
            exit 0 every changed source file is claimed or excused · 1 unclaimed file · 2 cannot evaluate · 3 no reference
 claims     --check-anchors   locate every fault without running tests; JS/MJS and Python replacements are syntax-checked in memory
+           --annotate       read-only file-header preview (JS/TS/Python); --claim <ID,ID> selects claims
+           --apply          explicit annotation writes, only with --annotate; retains private recovery on partial failure
+           authoring is not verification; each invocation recomputes its plan. Results are stdout-only, never --out
            --json includes anchorChecks; exit 1 when an anchor is missing/ambiguous or a supported replacement does not compile
 status     --json (exit 0 clean · 1 unproven/stale/unclaimed/invalid anchors · 2 nothing to probe yet)
            --evidence <path>  read this evidence instead of .testguard/evidence.json (e.g. CI's, fetched as an artifact); staleness is still computed from the recorded input hashes, and both commits are named
@@ -162,8 +175,12 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
     parsed = parseArgs({
       args: argv,
       allowPositionals: true,
+      tokens: true,
       options: {
         claims: { type: 'string' },
+        into: { type: 'string', multiple: true },
+        'from-document': { type: 'string', multiple: true },
+        'from-fix': { type: 'string', multiple: true },
         confirm: { type: 'string', default: '3' },
         budget: { type: 'string', default: '120000' },
         'command-budget': { type: 'string' },
@@ -176,6 +193,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         'ignore-dirty': { type: 'boolean', default: false },
         serial: { type: 'boolean', default: false },
         claim: { type: 'string', multiple: true },
+        'require-origin': { type: 'string', multiple: true },
         fault: { type: 'string' },
         'include-dirty': { type: 'boolean', default: false },
         changed: { type: 'string' },
@@ -209,6 +227,8 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         markdown: { type: 'boolean', default: false },
         cost: { type: 'boolean', default: false },
         'check-anchors': { type: 'boolean', default: false },
+        annotate: { type: 'boolean', default: false },
+        apply: { type: 'boolean', default: false },
         progress: { type: 'string' },
         help: { type: 'boolean', short: 'h', default: false },
         version: { type: 'boolean', short: 'v', default: false },
@@ -239,6 +259,17 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
     io.out(commandUsage(command));
     return 0;
   }
+  if ((values.annotate || values.apply) && command !== 'claims') {
+    io.err('--annotate and --apply are only valid on claims');
+    return 3;
+  }
+  try { originPolicyRequest(values, command); }
+  catch (e) { io.err(e.message); return 3; }
+  const suppliedOptions = parsed.tokens.filter((token) => token.kind === 'option').map((token) => token.name);
+  try { intentInputRequest({ command, values, suppliedOptions, files: positionals.slice(1) }); }
+  catch (e) { io.err(e.message); return 3; }
+  try { draftAppendRequest({ command, values, suppliedOptions, files: positionals.slice(1) }); }
+  catch (e) { io.err(e.message); return 3; }
   if (![...RUNNER_NAMES, 'auto'].includes(values.runner)) {
     io.err(`--runner must be one of ${RUNNER_NAMES.join(', ')} or auto`);
     return 3;
@@ -249,7 +280,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
   }
   try {
     const projectDir = command === 'scaffold' || command === 'admit' ? resolve('.') : resolve(dirArg ?? '.');
-    return await handler({ projectDir, file: dirArg, values, version: VERSION }, io);
+    return await handler({ projectDir, file: dirArg, files: positionals.slice(1), values, suppliedOptions, version: VERSION }, io);
   } catch (e) {
     if (e instanceof ClaimsError || e instanceof PreconditionError || e instanceof GitError || e instanceof SpecDocError) {
       io.err(`error: ${e.message}`);

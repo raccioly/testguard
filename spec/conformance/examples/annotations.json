@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "tool": { "name": "testguard", "version": "0.16.0" },
+  "mode": "preview",
+  "state": "preview",
+  "selected": ["ACCESS-001"],
+  "targets": [{ "file": "src/access.mjs", "claimIds": ["ACCESS-001"], "action": "add" }],
+  "refused": []
+}

@@ -1,7 +1,14 @@
 # claimspec — the contract spine
 
-Nine formats for declaring what must be true about a codebase, recording the
-evidence that tried to falsify it, and gating only what is new.
+The candidate optional `originPolicy` result is a closed declared-origin policy
+audit on evidence/status/brief. It is not independent-origin authentication or
+current freshness authority. `probe --require-origin` explicitly evaluates it
+against current native/input bindings. Offline status recomputes declarations
+without certifying freshness; brief preserves labeled recorded-run policy
+before filtering/caps. See GATE-SEMANTICS.md.
+
+Shared formats for declaring what must be true about a codebase, recording the
+evidence that tried to falsify it, gating only what is new, and explicit authoring.
 
 They are shared as *formats*, not as code. The first tools to adopt them are
 [`docguard-cli`](https://www.npmjs.com/package/docguard-cli) (Node ESM) and
@@ -33,6 +40,8 @@ that carry claims, baselines, scoping and briefs do not care.
 | `status` | [`schemas/status.schema.json`](schemas/status.schema.json) | Where the project is and what happens next — the single machine-readable truth every human rendering derives from. Surfaces faults whose content changed since they were probed, and changed files that carry no claim. |
 | `replay` | [`schemas/replay.schema.json`](schemas/replay.schema.json) | Would this suite have caught the bugs that already escaped? Replays real fix commits: revert the source, remove the test the fix shipped, run what remains. A replayed bug is ground truth — a human already confirmed it was a defect — which is what a fault model is calibrated against. |
 | `gate` | [`schemas/gate.schema.json`](schemas/gate.schema.json) | Claim coverage of one change: which changed files carry a claim, which are excused (and by which ignore entry), which are unclaimed. The delta gate for code that has no claim yet. |
+| `annotations` | [`schemas/annotations.schema.json`](schemas/annotations.schema.json) | Explicit file-header authoring preview/apply, refusals and recoverable partial failures. Never verification, a probe verdict, or authentication of intent; internal source contents are excluded. |
+| `authoring-input` | [`schemas/authoring-input.schema.json`](schemas/authoring-input.schema.json) | Candidate metadata-only document/fix input handoff. No source text, origin assignment, claims or verification; historical partitions retain excluded/deleted/unsupported counts. CLI exposure remains pending. |
 
 Shared definitions (verdicts, fault classes, provenance, annotations) live in
 [`schemas/common.schema.json`](schemas/common.schema.json). Gate behaviour —
@@ -47,6 +56,22 @@ Synchronous setup may overrun but cannot authorize a partial result. The exact
 rule is in `GATE-SEMANTICS.md`.
 
 Schemas are JSON Schema 2020-12 and identified as `urn:claimspec:v1:<kind>`.
+
+Claim sources share `common#/$defs/claimSourceKind`: `spec`, `adr`, `annotation`,
+`comment`, `manual`, `doc`, `bug`, `incident`, `review`, `inferred`. They declare
+intent origin, not authenticated independence or an evidence-strength ranking.
+References remain opaque metadata; producer provenance is separate. Existing
+documents remain readable, but old closed-schema readers reject the new kinds.
+Optional `origins` contracts on status, evidence and brief separate distinct
+claim counts from record counts. Evidence validation recomputes every kind and
+mixed declaration from all records; status/brief can validate only arithmetic
+and document totals because source projections are omitted. References are
+never echoed in these summaries. Legacy documents without them remain valid;
+older closed readers reject the additive field. Status emits current declared
+origins; probe evidence and evidence-backed briefs emit recorded origins before
+filtering/caps. Human renderings label these declarations as unauthenticated.
+Opt-in origin policy is available on complete confirmed candidate probes;
+offline projections remain audits, never current native freshness. See `GATE-SEMANTICS.md`.
 
 ## Conformance
 

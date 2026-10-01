@@ -144,7 +144,7 @@ describe('scaffoldFile on a Python file', () => {
 
     const ids = doc.claims.map((c) => c.id);
     expect(ids).toContain('AUTH-001');       // the annotation, read from a # comment
-    expect(ids).toContain('AUTH-EMIT');      // scoped by indentation, not braces
+    expect(ids).toContain('TODO-CLAIM-1');   // generated groups are unfinished placeholders
     expect(doc.claims.every((c) => c.defendedBy?.includes('tests/test_auth.py'))).toBe(true);
     expect(stats.byClass['field-dropped']).toBe(2);
     expect(stats.byClass['condition-forced']).toBe(1);
