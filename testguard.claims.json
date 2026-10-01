@@ -3,6 +3,55 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-ORIGIN-PROJECTIONS-ARE-SEMANTICALLY-BOUND",
+      "statement": "Conforming origin summaries reproduce recorded declarations exactly, and policy projections cannot certify a provisional invocation.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "severity": "critical",
+      "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["spec/conformance/origin-summaries.test.mjs", "spec/conformance/origin-policy.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Accept an arithmetically plausible invented recorded origin split.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "    if (kind === 'evidence' && !isDeepStrictEqual(o, recordedOriginSummary(doc.records))) fail('recorded origins must reproduce every actual record and distinct claim declaration');",
+          "replace": "    if (false) fail('recorded origins must reproduce every actual record and distinct claim declaration');",
+          "producedBy": { "producer": "agent", "by": "codex" },
+          "defendedBy": ["spec/conformance/origin-summaries.test.mjs"]
+        },
+        {
+          "id": "F2",
+          "description": "Certify a provisional status invocation through an origin policy projection.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "    if (p && (doc.run.scope || doc.run.provisional)) errors.push({ path: '/run/originPolicy', message: 'origin policy cannot certify a partial or provisional invocation' });",
+          "replace": "    if (false) errors.push({ path: '/run/originPolicy', message: 'origin policy cannot certify a partial or provisional invocation' });",
+          "producedBy": { "producer": "agent", "by": "codex" },
+          "defendedBy": ["spec/conformance/origin-policy.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-APPEND-CONTRACT-RETAINS-SUPPLIED-STATEMENT",
+      "statement": "Appending generated fault proposals retains the supplied claim statement rather than replacing intent with producer text.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "severity": "critical",
+      "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["spec/conformance/draft-append.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Replace supplied intent while appending generated proposals.",
+          "faultClass": "other",
+          "file": "src/scaffold/append.mjs",
+          "find": "  const candidates = proposals.claims.flatMap((claim) => claim.faults);",
+          "replace": "  target.statement = 'Generated proposal replaces supplied intent';\n  const candidates = proposals.claims.flatMap((claim) => claim.faults);",
+          "producedBy": { "producer": "agent", "by": "codex" }
+        }
+      ]
+    },
+    {
       "id": "TG-FIX-HISTORY-IS-EXACT-AND-SCOPED",
       "statement": "Historical fix input requires one literal single-parent commit and an exact selected project scope; nested marker changes during historical reads invalidate the inventory rather than granting current source authority.",
       "source": {
