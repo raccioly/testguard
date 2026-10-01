@@ -598,3 +598,47 @@ output is the existing `no-claims` status document, without run metadata;
 it never reports a clean measurement. Missing or invalid claims still fail,
 and selected claims cannot be silently skipped. Run `gate` separately to
 enforce coverage of changed files during adoption. Integrations must opt in.
+
+## Resource controls and measurement
+
+Built-in runners default to one worker. `--workers N` raises the worker ceiling
+for Vitest, Jest and Playwright; `--serial` overrides it to one. Python remains
+serial and disables pytest-xdist without installing or enabling any plugin.
+Faults and mixed-runner partitions remain sequential. This is a worker ceiling,
+not OS CPU/memory containment; test-created threads, native libraries and custom
+`--runner-cmd` commands manage their own concurrency. Native discovery is bounded
+and uses one worker where applicable.
+
+Runner stdout is drained without retention; stderr retains only its last 65,536
+characters. Complete JSON reports are read under the existing 16 MiB discovery
+report admission limit. An oversized, unreadable or incomplete report is an error,
+never an assertion kill. No confirmation count or verdict rule changes.
+
+Cancellation terminates only registered children and their attributable process
+trees, waits up to one second for close, restores live mutations and removes the
+registered scratch worktrees. It exits 130 without publishing partial evidence.
+Reparented daemons remain outside the portable containment guarantee. Git
+subprocesses have a 30-second hard deadline; the whole-command budget remains
+cooperative around synchronous setup, and bounded OS cleanup can outlive it.
+
+Optional `run.measurements` records monotonic elapsed time, fresh runner execution
+time, invocation count and remaining setup/discovery/other overhead. Each real
+runner invocation is charged once, including negative controls and mixed-runner
+partitions; reused records and cached baselines create no invocation charge.
+`elapsedMs = runnerMs + overheadMs`. Optional `run.workers` records the built-in
+worker ceiling and must be one for serial execution; custom commands omit it.
+Native evidence reuse requires the same recorded worker ceiling and serial policy.
+Older native evidence with no worker ceiling is remeasured; native and opaque
+custom-command policies are not interchangeable.
+`status.cost.measurements` copies these measurements when available. Historical
+`totalMs` and cost gates retain their existing record attribution, including
+reused durations and repeated shared baseline durations. Older evidence has no
+measured breakdown; consumers must not infer it from record totals.
+
+The existing Python interpreter cache is reset at probe and replay entry and
+reused within that invocation. Uncached adapter resolution consumes the same
+live per-run deadline as test execution.
+
+The regression suite caps outer concurrency at two workers in CI. Interactive
+runs reserve one available CPU and use at most two workers; a two-core machine
+therefore uses one. Nested built-in runners retain their one-worker default.

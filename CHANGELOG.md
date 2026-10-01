@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Bound built-in runner concurrency to one worker by default, with `--workers` overrides, and cap outer regression workers at two (one on a two-core machine).
+- Drain noisy runner stdout, bound diagnostics and report reads, and terminate owned runners before restoring mutations and scratch worktrees on cancellation.
+- Run the project-pinned Playwright CLI directly instead of spawning npm for each confirmation, and reset Python interpreter caches at measurement boundaries.
+- Record actual probe elapsed time and unique fresh runner invocations separately from historical attributed costs; preserve all confirmation and cost gates, and invalidate reuse when native worker policy changes.
+
 ## [0.16.0] - 2026-09-30
 
 Automated weekly release — everything merged since `v0.15.1`.

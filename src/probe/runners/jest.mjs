@@ -38,8 +38,8 @@ export async function discoverTests({ projectDir, version, timeoutMs, maxOutputB
 }
 // --runTestsByPath: positionals are exact paths, not regexes — a path with `+` or `(` would otherwise silently match nothing.
 /** The command line, as data. Exported so it is falsifiable without spawning anything. */
-export const argvFor = (projectDir, files, outFile, { serial = false } = {}) =>
-  [...runnerArgv(projectDir, 'jest', 'jest'), '--ci', '--json', `--outputFile=${outFile}`, ...(serial ? ['--runInBand'] : []), '--runTestsByPath', ...files];
+export const argvFor = (projectDir, files, outFile, { serial = false, workers = 1 } = {}) =>
+  [...runnerArgv(projectDir, 'jest', 'jest'), '--ci', '--json', `--outputFile=${outFile}`, ...(serial || workers === 1 ? ['--runInBand'] : [`--maxWorkers=${workers}`]), '--runTestsByPath', ...files];
 export const run = (opts) => runProcess({ ...opts, argv: (files, outFile) => argvFor(opts.projectDir, files, outFile, opts) });
 
 /**

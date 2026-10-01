@@ -37,6 +37,11 @@ export function partialScope(only, records) {
 export async function probeCommand({ projectDir, values, version }, io) {
   const confirmRuns = Number(values.confirm);
   const budgetMs = Number(values.budget);
+  const workers = Number(values.workers ?? 1);
+  if (!Number.isSafeInteger(workers) || workers < 1) {
+    io.err('--workers must be a positive safe integer');
+    return 3;
+  }
   const commandBudgetMs = parseCommandBudget(values['command-budget']);
   if (!Number.isInteger(confirmRuns) || confirmRuns < 1 || !Number.isInteger(budgetMs) || budgetMs < 1000) {
     io.err('--confirm must be a positive integer and --budget at least 1000');
@@ -94,12 +99,13 @@ export async function probeCommand({ projectDir, values, version }, io) {
     previous,
     confirmRuns,
     budgetMs,
+    workers,
+    serial: values.serial || workers === 1,
     commandBudget,
     mode: values['in-place'] ? 'in-place' : 'worktree',
     ref: values.ref ?? 'HEAD',
     refExplicit: values.ref !== undefined,
     ignoreDirty: values['ignore-dirty'],
-    serial: values.serial,
     onWarn: (m) => io.err(`warning: ${m}`),
     runnerCommand: values['runner-cmd'],
     runnerName: values.runner,
@@ -129,7 +135,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
   const scope = partialScope(only, evidence.records);
   if (values.json) {
     const status = withChangedRef(resolveChangedRef({ explicit: values.changed, projectDir }), (changedRef) => computeStatus({ projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'], evidence: outPath }), io.err);
-    const doc = { ...status, run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode: g.new.length > 0 ? 1 : 0, ...(scope ? { scope } : {}) }, ...(values.cost ? { cost: costReport(evidence.records) } : {}) };
+    const doc = { ...status, run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode: g.new.length > 0 ? 1 : 0, ...(scope ? { scope } : {}) }, ...(values.cost ? { cost: costReport(evidence.records, { run: evidence.run }) } : {}) };
     const result = validate('status', doc);
     if (!result.ok) throw new Error(`probe JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
     io.out(JSON.stringify(doc, null, 2));
@@ -148,7 +154,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
   io.out(renderSummary(evidence.records, evidence.run) + (baseline ? ` ${g.new.length} new since baseline, ${g.baselined.length} baselined.` : ' No baseline.'));
   if (values.cost) {
     io.out('');
-    io.out(renderCost(costReport(evidence.records)));
+    io.out(renderCost(costReport(evidence.records, { run: evidence.run })));
     io.out('');
   }
   io.out(`evidence: ${outPath}${scope ? ` (partial: ${scope.requestedCount} claim${scope.requestedCount === 1 ? '' : 's'} requested, ${scope.probedCount} probed: --claim ${scope.requestedClaims.join(',')}; not the canonical evidence file)` : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);

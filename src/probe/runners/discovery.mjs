@@ -1,3 +1,4 @@
+import { registerChild } from './lifecycle.mjs';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpathSync, rmSync, statSync } from 'node:fs';
@@ -177,6 +178,7 @@ export function runDiscoveryProcess({
       return;
     }
 
+    registerChild(child, () => terminateProcessTree(child));
     const started = Date.now();
     const stdout = [];
     const stderr = [];

@@ -1,3 +1,4 @@
+import { assertNotCancelled } from '../probe/runners/lifecycle.mjs';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { validate } from '../../spec/lib/validate.mjs';
@@ -14,6 +15,7 @@ function describe(kind, path, result) {
  * own spec at the moment of output, not by a separate test someone might skip.
  */
 export function writeSpecDoc(kind, path, doc) {
+  assertNotCancelled();
   const result = validate(kind, doc);
   if (!result.ok) throw new SpecDocError('refusing to write: ' + describe(kind, path, result));
   mkdirSync(dirname(path), { recursive: true });

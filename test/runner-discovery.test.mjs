@@ -282,7 +282,7 @@ describe('normalization and the deterministic discovery manifest', () => {
 
 describe('runner-specific native listing adapters', () => {
   it('uses runner-native commands and parses only their documented shapes', () => {
-    expect(vitest.discoveryArgvFor(ROOT).slice(-3)).toEqual(['list', '--filesOnly', '--passWithNoTests']);
+    expect(vitest.discoveryArgvFor(ROOT).slice(-4)).toEqual(['list', '--filesOnly', '--passWithNoTests', '--maxWorkers=1']);
     expect(jest.discoveryArgvFor(ROOT).slice(-3)).toEqual(['--listTests', '--json', '--runInBand']);
     expect(playwright.discoveryArgvFor(ROOT).slice(-3)).toEqual(['test', '--list', '--reporter=json']);
 

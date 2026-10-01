@@ -1,3 +1,6 @@
+import { resetInterpreterCache } from './runners/python.mjs';
+import { assertNotCancelled } from './runners/lifecycle.mjs';
+import { performance } from 'node:perf_hooks';
 import { existsSync, readFileSync, realpathSync as fsRealpathSync } from 'node:fs';
 import { gitRaw } from '../git.mjs';
 import { createRequire } from 'node:module';
@@ -51,6 +54,12 @@ export function selectClaims(claims, only) {
   return only.map((id) => byId.get(id));
 }
 
+/** Reuse cannot stand in for a measurement under a different worker policy. */
+export function sameWorkerPolicy(previousRun, { workers = 1, serial = workers === 1, runnerCommand } = {}) {
+  if (runnerCommand) return previousRun?.workers === undefined && !previousRun?.serial;
+  return previousRun?.workers === (serial ? 1 : workers) && Boolean(previousRun?.serial) === serial;
+}
+
 /**
  * Probe every fault of every claim. Returns a spec-conformant evidence
  * document; writing it is the caller's job.
@@ -63,7 +72,8 @@ export async function probe({
   ref = 'HEAD',
   refExplicit = false,
   ignoreDirty = false,
-  serial = false,
+  workers = 1,
+  serial = workers === 1,
   onWarn = () => {},
   budgetMs = 120_000,
   commandBudget,
@@ -80,6 +90,18 @@ export async function probe({
   previous,
   onProgress = () => {},
 }) {
+  if (!Number.isSafeInteger(workers) || workers < 1) throw new PreconditionError('workers must be a positive safe integer');
+  resetInterpreterCache(); // Cache only within this measurement, never across commands.
+  const measuredStart = performance.now();
+  const startedAt = new Date().toISOString();
+  const measurements = { elapsedMs: 0, runnerMs: 0, overheadMs: 0, runnerInvocations: 0 };
+  const timedRun = async (runner, opts) => {
+    assertNotCancelled();
+    const start = performance.now();
+    measurements.runnerInvocations++;
+    try { return await runner.run(opts); }
+    finally { measurements.runnerMs += performance.now() - start; }
+  };
   commandBudget?.assertOpen();
   // realpath: git reports the repository root by its real path (/private/var
   // on macOS, not /var); every relative() below must start from the same place.
@@ -183,7 +205,6 @@ export async function probe({
   const contention = detectContention();
   if (contention.detected) onWarn(contentionWarning(contention));
 
-  const startedAt = new Date().toISOString();
   const iso = mode === 'worktree' ? createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules }) : inPlace({ repoRoot: root, projectDir });
   const isoReal = realpathSync(iso.projectDir);
   const records = [];
@@ -277,6 +298,7 @@ export async function probe({
     // runner — a `.py` source file is Python's whatever the project runs.
     const fatalEditFor = (file) => runnerFor(iso.projectDir, file, runner).fatalEdit?.();
     const prior = previous && previous.run.confirmRuns === confirmRuns
+      && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand })
       ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
       : new Map();
     const partitionConfigured = (files) => {
@@ -295,7 +317,7 @@ export async function probe({
     // file the interpreter actually loaded (Python) reports it back.
     const runDefenders = async (files, targets = []) => {
       if (commandTemplate) {
-        const result = await runner.run({ projectDir: iso.projectDir, sourceDir: projectDir, python, files, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, commandTemplate, serial, targets });
+        const result = await timedRun(runner, { projectDir: iso.projectDir, sourceDir: projectDir, python, files, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, commandTemplate, serial, workers, targets });
         commandBudget?.assertOpen();
         return result;
       }
@@ -304,7 +326,7 @@ export async function probe({
       for (const [r, group] of groups) {
         commandBudget?.assertOpen();
         if (r !== runner) await ensureOwned(r, group[0]);
-        parts.push(await r.run({ projectDir: iso.projectDir, sourceDir: projectDir, python, files: group, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, serial, targets }));
+        parts.push(await timedRun(r, { projectDir: iso.projectDir, sourceDir: projectDir, python, files: group, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, serial, workers, targets }));
         commandBudget?.assertOpen();
       }
       return mergeRuns(parts);
@@ -373,6 +395,10 @@ export async function probe({
 
   commandBudget?.assertOpen();
 
+  assertNotCancelled();
+  const dirty = isDirty(root);
+  measurements.elapsedMs = performance.now() - measuredStart;
+  measurements.overheadMs = measurements.elapsedMs - measurements.runnerMs;
   return {
     schemaVersion: 1,
     tool: { name: 'testguard', version: toolVersion },
@@ -380,11 +406,13 @@ export async function probe({
       id: `run-${startedAt.replace(/[-:.]/g, '').slice(0, 15)}`,
       startedAt,
       finishedAt: new Date().toISOString(),
-      repo: { head, dirty: isDirty(root), ...(snapshot ? { snapshot } : {}), ...(ignoredDirty.length ? { ignoredDirty } : {}) },
+      repo: { head, dirty, ...(snapshot ? { snapshot } : {}), ...(ignoredDirty.length ? { ignoredDirty } : {}) },
       runner: { name: labelOf(runner), ...((runnerVersion ?? readRunnerVersion(projectDir, runner.name)) ? { version: runnerVersion ?? readRunnerVersion(projectDir, runner.name) } : {}) },
       ...(runnersUsed.size > 1 ? { runners: [...runnersUsed].map(([n, v]) => ({ name: n, ...(v ? { version: v } : {}) })) } : {}),
       confirmRuns,
-      ...(serial ? { serial: true } : {}),
+      measurements,
+      ...(!runnerCommand ? { workers: serial ? 1 : workers } : {}),
+      ...(serial && !runnerCommand ? { serial: true } : {}),
       ...(contention.detected ? { contention } : {}),
       ...(confirmRuns < 3 ? { provisional: true } : {}),
       // The isolation that was actually created, not the mode that was asked

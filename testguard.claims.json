@@ -770,7 +770,7 @@
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/gate.test.mjs"
+        "test/gate-ref.test.mjs"
       ],
       "faults": [
         {
@@ -802,7 +802,7 @@
         "at": "2026-09-20T00:00:00Z"
       },
       "defendedBy": [
-        "test/gate.test.mjs"
+        "test/gate-ref.test.mjs"
       ],
       "faults": [
         {
@@ -848,7 +848,7 @@
     },
     {
       "id": "TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT",
-      "statement": "The release version check exits non-zero when any version surface is out of step with package.json \u2014 including a Homebrew formula whose sha256 is the known-stale placeholder or, checked online, does not match the published tarball \u2014 the sha256 mode writes the hash of the registry tarball into the formula, and --list-surfaces names every file a release writes so the release workflows allow exactly those; a release can never ship with drifting version strings, an unverifiable formula, or be blocked by a surface its own allow-list forgot.",
+      "statement": "The release version check exits non-zero when any version surface is out of step with package.json — including a Homebrew formula whose sha256 is the known-stale placeholder or, checked online, does not match the published tarball — the sha256 mode writes the hash of the registry tarball into the formula, and --list-surfaces names every file a release writes so the release workflows allow exactly those; a release can never ship with drifting version strings, an unverifiable formula, or be blocked by a surface its own allow-list forgot.",
       "source": {
         "kind": "spec",
         "ref": "CONTRIBUTING.md#releases"
@@ -874,7 +874,10 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
-          }
+          },
+          "defendedBy": [
+            "test/release-version.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -887,7 +890,10 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-18T00:00:00Z"
-          }
+          },
+          "defendedBy": [
+            "test/release-version.test.mjs"
+          ]
         },
         {
           "id": "F3",
@@ -926,7 +932,10 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-18T00:00:00Z"
-          }
+          },
+          "defendedBy": [
+            "test/release-version.test.mjs"
+          ]
         }
       ]
     },
@@ -944,7 +953,7 @@
         "at": "2026-09-19T00:00:00Z"
       },
       "defendedBy": [
-        "test/release-sync.test.mjs"
+        "test/release-tap.test.mjs"
       ],
       "faults": [
         {
@@ -1374,7 +1383,7 @@
           "description": "Every commit counts as an ancestor; a rewritten or foreign baseline head is never noticed.",
           "faultClass": "return-altered",
           "file": "src/git.mjs",
-          "find": "  return spawnSync('git', ['merge-base', '--is-ancestor', ancestor, ref], { cwd: dir }).status === 0;",
+          "find": "  return spawnSync('git', ['merge-base', '--is-ancestor', ancestor, ref], { cwd: dir, timeout: 30_000 }).status === 0;",
           "replace": "  return true;",
           "producedBy": {
             "producer": "human",
@@ -2258,7 +2267,7 @@
           "description": "Our own process and our own runner children are counted, so every probe reports contention with itself.",
           "faultClass": "condition-forced",
           "file": "src/probe/contention.mjs",
-          "find": "    .filter((p) => p.pid !== self && RUNNER_RE.test(p.command) && !SELF_RE.test(p.command))",
+          "find": "    .filter((p) => !owned.has(p.pid) && !ancestors.has(p.pid) && !p.stat?.startsWith('Z') && RUNNER_RE.test(p.command) && (p.ppid !== undefined || !SELF_RE.test(p.command)))",
           "replace": "    .filter((p) => RUNNER_RE.test(p.command))",
           "producedBy": {
             "producer": "human",
@@ -2314,7 +2323,7 @@
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/mcp.test.mjs"
+        "test/mcp-protocol.test.mjs"
       ],
       "faults": [
         {
@@ -2346,7 +2355,7 @@
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/mcp.test.mjs"
+        "test/mcp-protocol.test.mjs"
       ],
       "faults": [
         {
@@ -3168,7 +3177,7 @@
         "by": "maintainer"
       },
       "defendedBy": [
-        "test/negative-control.test.mjs"
+        "test/probe-control.test.mjs"
       ],
       "faults": [
         {
@@ -3198,7 +3207,7 @@
         "by": "maintainer"
       },
       "defendedBy": [
-        "test/negative-control.test.mjs"
+        "test/negative-control-capabilities.test.mjs"
       ],
       "faults": [
         {
@@ -3228,7 +3237,7 @@
         "by": "maintainer"
       },
       "defendedBy": [
-        "test/negative-control.test.mjs"
+        "test/probe-control.test.mjs"
       ],
       "faults": [
         {
@@ -3258,7 +3267,7 @@
         "by": "maintainer"
       },
       "defendedBy": [
-        "test/negative-control.test.mjs"
+        "test/negative-control-capabilities.test.mjs"
       ],
       "faults": [
         {
@@ -3288,8 +3297,7 @@
         "by": "maintainer"
       },
       "defendedBy": [
-        "test/negative-control.test.mjs",
-        "test/worktree.test.mjs"
+        "test/probe-isolation.test.mjs"
       ],
       "faults": [
         {
@@ -5640,6 +5648,204 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-RUNNER-OUTPUT-IS-BOUNDED",
+      "statement": "Runner logs cannot block an otherwise completing run and oversized reports cannot be assertion kills.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#resource-controls-and-measurement"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/resource-safety.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Stop draining stdout so a noisy runner blocks before writing its report.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "    child.stdout.resume(); // Reports are read from the file; drain logs to prevent pipe backpressure.",
+          "replace": "    // stdout is not drained.",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Read an oversized report without enforcing its byte limit.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "          result = parse(readBoundedJsonFile(outFile), durationMs);",
+          "replace": "          result = parse(JSON.parse(readFileSync(outFile, 'utf8')), durationMs);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CANCELLATION-STOPS-OWNED-RUNNERS",
+      "statement": "Cancellation stops registered runners and restores mutations before removing isolation.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#resource-controls-and-measurement"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/resource-safety.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Cancel without stopping registered children.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/lifecycle.mjs",
+          "find": "        stop();",
+          "replace": "        // leave runner alive.",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Clean up isolation before restoring live mutations.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/lifecycle.mjs",
+          "find": "  for (const [fn] of [...cleanups].reverse().sort((a, b) => b[1] - a[1])) {",
+          "replace": "  for (const [fn] of [...cleanups].reverse().sort((a, b) => a[1] - b[1])) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-NATIVE-WORKERS-DEFAULT-TO-ONE",
+      "statement": "Built-in JavaScript runners default to one worker and serial overrides an explicit larger ceiling.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#resource-controls-and-measurement"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/resource-safety.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Ignore the worker ceiling.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/vitest.mjs",
+          "find": "`--maxWorkers=${serial ? 1 : workers}`",
+          "replace": "`--maxWorkers=8`",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Launch Playwright through npm rather than the project-resolved CLI.",
+          "faultClass": "call-removed",
+          "file": "src/probe/runners/playwright.mjs",
+          "find": "  [...runnerArgv(projectDir, '@playwright/test', 'playwright'), 'test', '--reporter=json', `--workers=${serial ? 1 : workers}`, ...files];",
+          "replace": "  ['npx', 'playwright', 'test', '--reporter=json', `--workers=${serial ? 1 : workers}`, ...files];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PROBE-MEASUREMENTS-COUNT-REAL-RUNS",
+      "statement": "Measured invocation counts charge each executed runner once and never charge baseline sharing or verdict reuse as new execution.",
+      "severity": "high",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#resource-controls-and-measurement"
+      },
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/resource-timing.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Do not count executed runner invocations.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "    measurements.runnerInvocations++;",
+          "replace": "    // ignore actual invocations.",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-WORKER-POLICY-BINDS-REUSE",
+      "statement": "Native evidence is reused only under the same recorded worker policy; evidence with an unknown policy cannot substitute for a fresh native measurement.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#resource-controls-and-measurement"
+      },
+      "severity": "high",
+      "defendedBy": [
+        "test/resource-timing.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Allow reuse under any worker policy.",
+          "faultClass": "return-altered",
+          "file": "src/probe/probe.mjs",
+          "find": "return previousRun?.workers === (serial ? 1 : workers) && Boolean(previousRun?.serial) === serial;",
+          "replace": "return true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Omit the worker-policy reuse admission check.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "      && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand })",
+          "replace": "      && true",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ],
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      }
     }
   ]
 }
