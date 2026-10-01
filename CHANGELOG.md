@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Reduce repeated self-probe setup with focused defenders for 40 existing fault checks, retaining the complete native integration regressions, all 327 fault recipes, three-run confirmation and existing cost budgets.
+
 ## [0.17.0] - 2026-10-01
 
 Automated weekly release — everything merged since `v0.16.0`.

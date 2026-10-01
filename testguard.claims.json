@@ -30,7 +30,7 @@
           "find": "    if (subjectReached === false) return { verdict: 'unverifiable', reason: 'subject-not-executed' };",
           "replace": "    if (false) return { verdict: 'unverifiable', reason: 'subject-not-executed' };",
           "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["test/negative-control.test.mjs"]
+          "defendedBy": ["test/classify.test.mjs"]
         }
       ]
     },
@@ -69,7 +69,8 @@
         "faultClass": "statement-deleted", "file": "src/cli.mjs",
         "find": "  try { originPolicyRequest(values, command); }",
         "replace": "  try { /* skipped early policy admission */ }",
-        "producedBy": { "producer": "agent", "by": "codex" }
+        "producedBy": { "producer": "agent", "by": "codex" },
+        "defendedBy": ["test/origin-policy-admission.test.mjs"]
       }]
     },
     {
@@ -83,7 +84,8 @@
         "faultClass": "other", "file": "src/mcp/tools.mjs",
         "find": "return { state: doc.state, action: doc.next.action, command: doc.next.command,",
         "replace": "return { state: doc.state, action: 'done', command: doc.next.command,",
-        "producedBy": { "producer": "agent", "by": "codex" }
+        "producedBy": { "producer": "agent", "by": "codex" },
+        "defendedBy": ["test/mcp-next.test.mjs"]
       }]
     },
     {
@@ -767,7 +769,8 @@
           "producedBy": {
             "producer": "agent",
             "by": "codex"
-          }
+          },
+          "defendedBy": ["test/native-universe-hash.test.mjs"]
         },
         {
           "id": "F2",
@@ -779,7 +782,8 @@
           "producedBy": {
             "producer": "agent",
             "by": "codex"
-          }
+          },
+          "defendedBy": ["test/native-universe-hash.test.mjs"]
         }
       ]
     },
@@ -1159,9 +1163,9 @@
       "producedBy": { "producer": "human", "by": "maintainer" },
       "defendedBy": ["test/runner-vitest.test.mjs"],
       "faults": [
-        { "id": "F1", "description": "Quoted timeout text is classified as an actual runner timeout.", "faultClass": "condition-forced", "file": "src/probe/runners/shared.mjs", "find": "  const timeouts = results.filter(isRunnerTimeout).length;", "replace": "  const timeouts = results.filter((t) => (t.failureMessages ?? []).some((m) => /timed out|exceeded timeout/i.test(m))).length;", "producedBy": { "producer": "human" } },
-        { "id": "F2", "description": "Actual runner timeouts are counted as assertion detections.", "faultClass": "condition-forced", "file": "src/probe/runners/shared.mjs", "find": "  const timeouts = results.filter(isRunnerTimeout).length;", "replace": "  const timeouts = 0;", "producedBy": { "producer": "human" } },
-        { "id": "F3", "description": "Structured assertion errors quoting native timeout headers lose their assertion identity.", "faultClass": "condition-forced", "file": "src/probe/runners/shared.mjs", "find": "    if (error?.name === 'AssertionError' || error?.code === 'ERR_ASSERTION' || error?.operator !== undefined) return false;", "replace": "    if (false) return false;", "producedBy": { "producer": "human" } }
+        { "id": "F1", "description": "Quoted timeout text is classified as an actual runner timeout.", "faultClass": "condition-forced", "file": "src/probe/runners/shared.mjs", "find": "  const timeouts = results.filter(isRunnerTimeout).length;", "replace": "  const timeouts = results.filter((t) => (t.failureMessages ?? []).some((m) => /timed out|exceeded timeout/i.test(m))).length;", "producedBy": { "producer": "human" }, "defendedBy": ["test/runner-report.test.mjs"] },
+        { "id": "F2", "description": "Actual runner timeouts are counted as assertion detections.", "faultClass": "condition-forced", "file": "src/probe/runners/shared.mjs", "find": "  const timeouts = results.filter(isRunnerTimeout).length;", "replace": "  const timeouts = 0;", "producedBy": { "producer": "human" }, "defendedBy": ["test/runner-report.test.mjs"] },
+        { "id": "F3", "description": "Structured assertion errors quoting native timeout headers lose their assertion identity.", "faultClass": "condition-forced", "file": "src/probe/runners/shared.mjs", "find": "    if (error?.name === 'AssertionError' || error?.code === 'ERR_ASSERTION' || error?.operator !== undefined) return false;", "replace": "    if (false) return false;", "producedBy": { "producer": "human" }, "defendedBy": ["test/runner-report.test.mjs"] }
       ]
     },
     {
@@ -1172,8 +1176,8 @@
       "producedBy": { "producer": "human", "by": "maintainer" },
       "defendedBy": ["test/runner-discovery.test.mjs"],
       "faults": [
-        { "id": "F1", "description": "Every absolute-looking string is rejected before determining whether it names a file.", "faultClass": "condition-forced", "file": "src/probe/runners/discovery.mjs", "find": "const existingConfigCandidate = (root, path) => {\n  let stat;", "replace": "const existingConfigCandidate = (root, path) => {\n  if (!inside(root, path)) throw new DiscoveryError('absolute literal rejected');\n  let stat;", "producedBy": { "producer": "human" } },
-        { "id": "F2", "description": "Existing config dependencies may escape the project root.", "faultClass": "condition-forced", "file": "src/probe/runners/discovery.mjs", "find": "  if (!inside(root, path)) throw new DiscoveryError(`discovery config dependency resolves outside the project: ${path}`);", "replace": "  if (false) throw new DiscoveryError(`discovery config dependency resolves outside the project: ${path}`);", "producedBy": { "producer": "human" } }
+        { "id": "F1", "description": "Every absolute-looking string is rejected before determining whether it names a file.", "faultClass": "condition-forced", "file": "src/probe/runners/discovery.mjs", "find": "const existingConfigCandidate = (root, path) => {\n  let stat;", "replace": "const existingConfigCandidate = (root, path) => {\n  if (!inside(root, path)) throw new DiscoveryError('absolute literal rejected');\n  let stat;", "producedBy": { "producer": "human" }, "defendedBy": ["test/discovery-config.test.mjs"] },
+        { "id": "F2", "description": "Existing config dependencies may escape the project root.", "faultClass": "condition-forced", "file": "src/probe/runners/discovery.mjs", "find": "  if (!inside(root, path)) throw new DiscoveryError(`discovery config dependency resolves outside the project: ${path}`);", "replace": "  if (false) throw new DiscoveryError(`discovery config dependency resolves outside the project: ${path}`);", "producedBy": { "producer": "human" }, "defendedBy": ["test/discovery-config.test.mjs"] }
       ]
     },
     {
@@ -1470,7 +1474,8 @@
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
-          }
+          },
+          "defendedBy": ["test/probe-dirty-admission.test.mjs"]
         }
       ]
     },
@@ -1597,7 +1602,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-18T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/attribution.test.mjs"]
         },
         {
           "id": "F2",
@@ -1610,7 +1616,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-18T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/attribution.test.mjs"]
         }
       ]
     },
@@ -2263,7 +2270,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/probe-dirty-admission.test.mjs"]
         }
       ]
     },
@@ -2609,7 +2617,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/runner-project-resolution.test.mjs"]
         }
       ]
     },
@@ -3134,7 +3143,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/replay-selection.test.mjs"]
         }
       ]
     },
@@ -3525,7 +3535,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/replay-selection.test.mjs"]
         }
       ]
     },
@@ -3557,7 +3568,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/replay-selection.test.mjs"]
         }
       ]
     },
@@ -3958,7 +3970,8 @@
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
-          }
+          },
+          "defendedBy": ["test/probe-records.test.mjs"]
         }
       ]
     },
@@ -4194,7 +4207,8 @@
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
-          }
+          },
+          "defendedBy": ["test/probe-error-boundary.test.mjs"]
         }
       ]
     },
@@ -4224,7 +4238,8 @@
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
-          }
+          },
+          "defendedBy": ["test/probe-error-boundary.test.mjs"]
         }
       ]
     },
@@ -4929,7 +4944,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-18T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/cli-unexpected-error.test.mjs"]
         }
       ],
       "tags": [
@@ -5147,7 +5163,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-19T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/anchor-admission.test.mjs"]
         },
         {
           "id": "F2",
@@ -5173,7 +5190,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-19T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/anchor-admission.test.mjs"]
         }
       ],
       "tags": [
@@ -5311,7 +5329,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-19T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/surface.test.mjs"]
         },
         {
           "id": "F2",
@@ -5324,7 +5343,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-19T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/surface.test.mjs"]
         },
         {
           "id": "F3",
@@ -5337,7 +5357,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-19T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/surface.test.mjs"]
         }
       ],
       "tags": [
@@ -5375,7 +5396,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-19T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/brief.test.mjs"]
         },
         {
           "id": "F2",
@@ -6376,7 +6398,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/discovery-config.test.mjs"]
         }
       ]
     },
@@ -6409,7 +6432,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/discover.test.mjs"]
         },
         {
           "id": "F2",
@@ -6422,7 +6446,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/probe-records.test.mjs"]
         }
       ]
     },
@@ -6499,7 +6524,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/discovery-config.test.mjs"]
         },
         {
           "id": "F2",
@@ -6512,7 +6538,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/discovery-config.test.mjs"]
         },
         {
           "id": "F3",
@@ -6525,7 +6552,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/discovery-config.test.mjs"]
         },
         {
           "id": "F4",
@@ -6538,7 +6566,8 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
-          }
+          },
+          "defendedBy": ["test/discovery-config.test.mjs"]
         }
       ]
     },
@@ -6799,7 +6828,8 @@
           "producedBy": {
             "producer": "agent",
             "by": "codex"
-          }
+          },
+          "defendedBy": ["test/runner-output-bounds.test.mjs"]
         },
         {
           "id": "F2",
@@ -6811,7 +6841,8 @@
           "producedBy": {
             "producer": "agent",
             "by": "codex"
-          }
+          },
+          "defendedBy": ["test/runner-output-bounds.test.mjs"]
         }
       ]
     },
@@ -6883,7 +6914,8 @@
           "producedBy": {
             "producer": "agent",
             "by": "codex"
-          }
+          },
+          "defendedBy": ["test/runner-worker-argv.test.mjs"]
         },
         {
           "id": "F2",
@@ -6895,7 +6927,8 @@
           "producedBy": {
             "producer": "agent",
             "by": "codex"
-          }
+          },
+          "defendedBy": ["test/runner-worker-argv.test.mjs"]
         }
       ]
     },
@@ -6951,7 +6984,8 @@
           "producedBy": {
             "producer": "agent",
             "by": "codex"
-          }
+          },
+          "defendedBy": ["test/worker-policy.test.mjs"]
         },
         {
           "id": "F2",
