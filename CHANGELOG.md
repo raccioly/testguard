@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-01
+
+Automated weekly release — everything merged since `v0.17.0`.
+
+### Changed
+
+- Merge branch 'main' into dependabot/github_actions/all-actions-d5b8684899
+- feat: native Node probes with measured startup savings (#192)
+- chore(homebrew): sha256 for v0.17.0 (#191)
+- chore(deps): bump actions/cache
+
+
 ### Added
 
 - Explicit `--runner node-test` support for plain JavaScript projects using
