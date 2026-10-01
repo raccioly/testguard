@@ -3,6 +3,40 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-ACCEPTANCE-HELPERS-PRESERVE-OBSERVABLE-ORACLES",
+      "statement": "Acceptance helpers retain a value-specific assertion, nested project layout and actual formula digest observation rather than substituting weaker observations.",
+      "source": { "kind": "manual", "ref": "Test fixture helper contracts" },
+      "severity": "high",
+      "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/probe-isolation.test.mjs", "test/gate.test.mjs", "test/release-sync.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "Replace the fixture's concrete value assertion with a type-only assertion.",
+          "faultClass": "other", "file": "test/helpers/probe-assertions.mjs",
+          "find": " : 'assert.equal(a(),1);' : 'assert.equal(b(),2);';",
+          "replace": " : \"assert.equal(typeof a(),'number');\" : 'assert.equal(b(),2);';",
+          "producedBy": { "producer": "agent", "by": "codex" },
+          "defendedBy": ["test/probe-isolation.test.mjs"]
+        },
+        {
+          "id": "F2", "description": "Move the fixture's nested project outside its declared pkg namespace.",
+          "faultClass": "other", "file": "test/helpers/gate-project.mjs",
+          "find": "  const project = nested ? join(root, 'pkg') : root;",
+          "replace": "  const project = nested ? join(root, 'other') : root;",
+          "producedBy": { "producer": "agent", "by": "codex" },
+          "defendedBy": ["test/gate.test.mjs"]
+        },
+        {
+          "id": "F3", "description": "Observe a fabricated formula digest instead of reading the written release surface.",
+          "faultClass": "other", "file": "test/helpers/release-project.mjs",
+          "find": "const formulaSha = (dir) => /^\\s*sha256 \"([^\"]*)\"/m.exec(readFileSync(join(dir, 'packaging/homebrew/testguard.rb'), 'utf8'))[1];",
+          "replace": "const formulaSha = (dir) => '0'.repeat(64);",
+          "producedBy": { "producer": "agent", "by": "codex" },
+          "defendedBy": ["test/release-sync.test.mjs"]
+        }
+      ]
+    },
+    {
       "id": "TG-SCAFFOLD-ADMISSION-IS-BOUNDED-AND-UNFINISHED",
       "statement": "Scaffold refuses excess proposals instead of truncating a draft, and reserves annotated and supplied identifiers before assigning unfinished placeholders.",
       "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
