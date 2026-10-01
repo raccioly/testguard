@@ -3,6 +3,19 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-ORIGIN-SUMMARY-NEVER-PROMOTES-DECLARATIONS",
+      "statement": "Origin summaries count distinct claim identities separately from actual records, refuse duplicate current declarations and retain conflicting recorded declarations as mixed rather than selecting an apparently consistent source.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "severity": "high", "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/origin-summary.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "Accept duplicate current claim identities as a consistent declaration.", "faultClass": "condition-forced", "file": "spec/lib/origins.mjs", "find": "    if (seen.has(claim.id)) throw new TypeError('duplicate declared claim identity');", "replace": "    if (false) throw new TypeError('duplicate declared claim identity');", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F2", "description": "Hide disagreement between recorded source declarations.", "faultClass": "condition-forced", "file": "spec/lib/origins.mjs", "find": "    else if (!isDeepStrictEqual(previous.source, source)) previous.mixed = true;", "replace": "    else if (false) previous.mixed = true;", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F3", "description": "Count one mixed claim both as mixed and as its first declared kind.", "faultClass": "condition-forced", "file": "spec/lib/origins.mjs", "find": "    else byKind[claim.source.kind]++;", "replace": "    byKind[claim.source.kind]++;", "producedBy": { "producer": "agent", "by": "codex" } },
+        { "id": "F4", "description": "Replace actual record multiplicity with the distinct claim count.", "faultClass": "other", "file": "spec/lib/origins.mjs", "find": "    records: { total: records.length, byKind: recordKinds },", "replace": "    records: { total: claims.size, byKind: recordKinds },", "producedBy": { "producer": "agent", "by": "codex" } }
+      ]
+    },
+    {
       "id": "TG-ANNOTATION-PLACEMENT-IS-TARGET-LOCAL",
       "statement": "Explicit file-header placement uses each actual fault target, not global lexical links or annotation-like strings, preserves unrelated files and becomes idempotent after application.",
       "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
