@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Runner report and discovery-config reads reserve memory for the observed
+  file size instead of the maximum allowed size, retaining the hard byte
+  ceiling and checking file growth before parsing.
+
 ## [0.18.0] - 2026-10-01
 
 Automated weekly release — everything merged since `v0.17.0`.
