@@ -3,6 +3,174 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-DRAFT-APPEND-PRESERVES-OWNED-INTENT",
+      "statement": "Pure draft append preserves supplied metadata and caller-owned input, and deduplicates equivalent fault proposals rather than accumulating repeated measurements.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/draft-append.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Mutate the caller's supplied draft while appending.",
+          "faultClass": "other",
+          "file": "src/scaffold/append.mjs",
+          "find": "  const doc = structuredClone(draft);",
+          "replace": "  const doc = draft;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Append duplicate proposals repeatedly.",
+          "faultClass": "other",
+          "file": "src/scaffold/append.mjs",
+          "find": "    if (seen.has(key)) continue;",
+          "replace": "    if (false) continue;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-DRAFT-PLAN-LIMITS-SPAN-ALL-FILES",
+      "statement": "Read-only append planning charges generated proposals across all files and refuses serialized output over its byte ceiling without publishing a partial draft.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/draft-append-plan.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Give every subsequent file a fresh proposal allowance.",
+          "faultClass": "other",
+          "file": "src/scaffold/plan-append.mjs",
+          "find": "    generated += proposed.stats.proposals;",
+          "replace": "    generated = 0;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Return an oversized draft output.",
+          "faultClass": "other",
+          "file": "src/scaffold/plan-append.mjs",
+          "find": "  if (Buffer.byteLength(output, 'utf8') > maxOutputBytes) throw new Error('draft append output byte limit exceeded');",
+          "replace": "  if (false) throw new Error('draft append output byte limit exceeded');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-DRAFT-PREPARE-REPLAYS-UNDER-OWNED-LOCK",
+      "statement": "Recoverable append preparation refuses forged or stale caller plans and rechecks current input after acquiring the shared lock without overwriting a concurrent edit.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/draft-append-prepare.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Accept a forged or stale caller plan before acquiring the lock.",
+          "faultClass": "other",
+          "file": "src/scaffold/prepare-append.mjs",
+          "find": "  if (!isDeepStrictEqual(initial, plan)) throw new Error('draft append plan changed');",
+          "replace": "  if (false) throw new Error('draft append plan changed');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Accept inputs changed during lock acquisition.",
+          "faultClass": "other",
+          "file": "src/scaffold/prepare-append.mjs",
+          "find": "    if (!isDeepStrictEqual(fresh, initial)) throw new Error('draft append plan changed under lock');",
+          "replace": "    if (false) throw new Error('draft append plan changed under lock');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-DRAFT-DESCRIPTOR-RECHECKS-CURRENT-PLAN",
+      "statement": "Draft write-descriptor admission refuses source or path changes after recovery and rejects a descriptor opened on a different file before authorizing a write.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/draft-append-open.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Open a write descriptor despite inputs changed during recovery.",
+          "faultClass": "other",
+          "file": "src/scaffold/open-append.mjs",
+          "find": "    if (!isDeepStrictEqual(planDraftAppend(request), prepared.plan)) throw new Error('draft append inputs changed before write');",
+          "replace": "    if (false) throw new Error('draft append inputs changed before write');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Authorize a descriptor opened on a different regular file.",
+          "faultClass": "other",
+          "file": "src/scaffold/open-append.mjs",
+          "find": "      if (!stat.isFile() || stat.nlink !== 1 || Object.entries(prepared.plan.draft.identity).some(([key, value]) => stat[key] !== value)) throw new Error('draft append descriptor changed');",
+          "replace": "      if (false) throw new Error('draft append descriptor changed');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-INTENT-HANDOFF-REQUIRES-INDEPENDENT-SUPPLY",
       "statement": "Scaffold and no-claims status instruct authors to supply intended observable behavior independently of implementation rather than treating inferred output as authenticated intent.",
       "source": {
