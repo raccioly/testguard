@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-01
+
+Automated weekly release — everything merged since `v0.16.0`.
+
+### Changed
+
+- feat: integrate adoption guidance and machine-safe probing (#189)
+- chore(deps-dev): bump vitest from 5.0.1 to 5.0.2 in the all-npm group (#187)
+- chore(homebrew): sha256 for v0.16.0 (#186)
+
+
 ### Added
 
 - Unannotated scaffold defaults use unfinished `TODO-CLAIM-N` identifiers rather than file/function-shaped claim names. Allocation avoids supplied IDs; explicit IDs/annotations and existing evidence remain unchanged, while sweep pooling preserves distinct candidates.
@@ -31,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Clarify that cold probes and changed discovery/configuration can require full verification; unchanged target and defender files alone do not guarantee a cheap CI run.
+
 - Status marks evidence stale when a recorded automatic-discovery dependency (including a negative candidate, barrel or resolver config) changes or becomes unavailable. Previously unchanged defender lists could hide this drift. Native test-universe policy freshness remains pending.
 
 - Annotation scanning and placement ID admission avoid excessive regex backtracking on long alphanumeric tokens without a hyphen; status advice uses bounded, failure-aware scanning so unrelated source failures cannot prevent its verification decision.
@@ -39,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reduce repeated self-probe setup with focused defenders for 40 existing fault checks, retaining the complete native integration regressions, all 327 fault recipes, three-run confirmation and existing cost budgets.
 - Bound built-in runner concurrency to one worker by default, with `--workers` overrides, and cap outer regression workers at two (one on a two-core machine).
 - Drain noisy runner stdout, bound diagnostics and report reads, and terminate owned runners before restoring mutations and scratch worktrees on cancellation.
 - Run the project-pinned Playwright CLI directly instead of spawning npm for each confirmation, and reset Python interpreter caches at measurement boundaries.
