@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.2] - 2026-10-02
+
+Automated weekly release — everything merged since `v0.18.1`.
+
+### Changed
+
+- perf: use one fresh process for single-entry native probes (#200)
+- perf: focus gate annotation and claim selection defenders (#198)
+- chore(homebrew): sha256 for v0.18.1 (#197)
+
+
 ### Performance
 
 - Eligible single-file native Node confirmations use one fresh process, avoiding a second process launch while preserving real CLI entry identity, ordinary tests beside `.only`, import and late-error refusals, budgets, and process cleanup. Discovery, multiple files and older runtimes keep the existing isolated route.
