@@ -1,10 +1,10 @@
-import { closeSync, mkdtempSync, openSync, readFileSync, readSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, readSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { runProcess } from './shared.mjs';
-import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs, normalizeDiscoveredFiles, runDiscoveryProcess } from './discovery.mjs';
+import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs, normalizeDiscoveredFiles, readBoundedJsonFile, runDiscoveryProcess } from './discovery.mjs';
 
 export const name = 'node-test';
 export const testGlobs = []; // Native collection is authoritative; never guess from globs.
@@ -12,6 +12,11 @@ const HERE = join(dirname(fileURLToPath(import.meta.url)), 'node');
 const RUNNER = join(HERE, 'runner.mjs');
 const ENTRY = join(HERE, 'entry.mjs');
 const VERSION = process.versions.node;
+/** Admit only maintained runtime families with the in-process public API. */
+export function supportsSingleProcess(version = VERSION) {
+  const [major, minor] = version.split('.').map(Number);
+  return major === 22 && minor >= 8 || major === 24 || major === 26;
+}
 const strategyHash = () => {
   const digest = createHash('sha256');
   const descriptor = openSync(process.execPath, 'r');
@@ -20,7 +25,7 @@ const strategyHash = () => {
     let length;
     while ((length = readSync(descriptor, bytes, 0, bytes.length, null)) > 0) digest.update(bytes.subarray(0, length));
   } finally { closeSync(descriptor); }
-  for (const file of [fileURLToPath(import.meta.url), ...['runner.mjs', 'entry.mjs', 'report.mjs'].map((file) => join(HERE, file)), ...['shared.mjs', 'discovery.mjs', 'lifecycle.mjs'].map((file) => join(HERE, '..', file))]) digest.update(readFileSync(file));
+  for (const file of [fileURLToPath(import.meta.url), ...['runner.mjs', 'direct.mjs', 'entry.mjs', 'report.mjs'].map((file) => join(HERE, file)), ...['shared.mjs', 'discovery.mjs', 'lifecycle.mjs'].map((file) => join(HERE, '..', file))]) digest.update(readFileSync(file));
   return digest.digest('hex');
 };
 const admissionError = () => Number(VERSION.split('.')[0]) < 20 ? 'node-test requires Node20 or newer'
@@ -37,15 +42,16 @@ const receipts = () => {
   writeFileSync(file, '{"entries":[', { mode: 0o600 });
   return { dir, file };
 };
-const environment = (file, collect, workers) => ({
+const environment = (file, collect, workers, direct = false) => ({
   TESTGUARD_NODE_ENTRIES: file,
   TESTGUARD_NODE_COLLECT: collect ? '1' : '0',
   TESTGUARD_NODE_WORKERS: String(workers),
   TESTGUARD_NODE_REPORT: '{out}',
+  TESTGUARD_NODE_DIRECT: direct ? '1' : '0',
   NODE_TEST_CONTEXT: '',
   NODE_DISABLE_COMPILE_CACHE: '1',
 });
-export const argvFor = (projectDir, files) => [process.execPath, `--import=${ENTRY}`, RUNNER, ...files.map((file) => resolve(realpathSync(projectDir), file))];
+export const argvFor = (projectDir, files, { direct = false } = {}) => [process.execPath, `--import=${ENTRY}`, ...(!direct ? [RUNNER] : []), ...files.map((file) => resolve(realpathSync(projectDir), file))];
 
 /** Reject unsupported/incomplete envelopes before deriving any verdict inputs. */
 export function validateReport(report) {
@@ -120,11 +126,19 @@ export async function run(opts) {
   const files = normalizeDiscoveredFiles(opts.projectDir, opts.files);
   const spool = receipts();
   try {
-    return await runProcess({ ...opts, files, cleanupOnClose: true, env: environment(spool.file, false, opts.serial ? 1 : opts.workers ?? 1), argv: (selected) => argvFor(opts.projectDir, selected), parse: (report, durationMs) => {
+    const direct = files.length === 1 && supportsSingleProcess();
+    const result = await runProcess({ ...opts, files, cleanupOnClose: true, env: environment(spool.file, false, opts.serial ? 1 : opts.workers ?? 1, direct), argv: (selected) => argvFor(opts.projectDir, selected, { direct }), parse: (report, durationMs) => {
       validateReport(report);
       const entries = normalizeDiscoveredFiles(opts.projectDir, report.entries.map((entry) => entry.file));
       if (entries.length !== report.entries.length || JSON.stringify(entries) !== JSON.stringify(files)) throw new DiscoveryError('node-test did not execute every selected entry exactly');
       return parseReport(report, durationMs);
     } });
+    // CLI loading can fail before a complete stream exists. Keep the actual
+    // bounded exception identity rather than Node's trailing version banner.
+    if (result.run.outcome === 'error' && existsSync(`${spool.file}.error`)) {
+      const diagnostic = readBoundedJsonFile(`${spool.file}.error`, 8192);
+      if (typeof diagnostic.name === 'string' && diagnostic.name.length <= 100 && typeof diagnostic.message === 'string' && diagnostic.message.length <= 1000) result.loadMessage = `${diagnostic.name}: ${diagnostic.message}`;
+    }
+    return result;
   } finally { rmSync(spool.dir, { recursive: true, force: true }); }
 }

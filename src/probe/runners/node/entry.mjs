@@ -9,3 +9,9 @@ if (process.env.NODE_TEST_CONTEXT?.startsWith('child')) {
   }
   appendFileSync(process.env.TESTGUARD_NODE_ENTRIES, `${receipt},`);
 }
+
+// A fresh single-entry process initializes reporting before its real CLI
+// entry. Inherited child context must not bootstrap a second reporter in a fork.
+if (process.env.TESTGUARD_NODE_DIRECT === '1' && process.env.NODE_TEST_CONTEXT === '') {
+  await import('./direct.mjs');
+}

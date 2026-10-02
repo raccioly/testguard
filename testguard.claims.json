@@ -3,6 +3,78 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-NODE-DIRECT-KEEPS-FAILURE-BOUNDARIES",
+      "statement": "Single-entry native confirmations preserve CLI entry identity and ordinary tests alongside only declarations, preserve owned reporting when project code edits its environment, and refuse import or out-of-test failures even beside completed assertion rejections.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/runner-node-direct.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F5",
+          "description": "Read the selected CLI entry from the wrong argv position.",
+          "faultClass": "other",
+          "file": "src/probe/runners/node/direct.mjs",
+          "find": "const file = process.argv[1];",
+          "replace": "const file = process.argv[2];",
+          "producedBy": { "producer": "agent", "by": "codex" }
+        },
+        {
+          "id": "F4",
+          "description": "Let project environment cleanup discard the owned report destination.",
+          "faultClass": "other",
+          "file": "src/probe/runners/node/direct.mjs",
+          "find": "writeFileSync(reportFile, text, { mode: 0o600 });",
+          "replace": "writeFileSync(process.env.TESTGUARD_NODE_REPORT, text, { mode: 0o600 });",
+          "producedBy": { "producer": "agent", "by": "codex" }
+        },
+        {
+          "id": "F1",
+          "description": "Lose isolated-worker context and silently filter ordinary tests on Node24.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/node/direct.mjs",
+          "find": "process.env.NODE_TEST_CONTEXT = 'child-v8';",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Ignore a late unhandled rejection beside an assertion rejection.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/node/direct.mjs",
+          "find": "process.on('unhandledRejection', () => { outsideFailure = true; process.exitCode = 1; });",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Publish an assertion rejection despite an additional out-of-test failure.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/node/direct.mjs",
+          "find": "!document || outsideFailure || code !== (document.failed ? 1 : 0)",
+          "replace": "!document || code !== (document.failed ? 1 : 0)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-REPORT-READ-ALLOCATION-TRACKS-FILE",
       "statement": "Bounded runner-report reads reserve memory for observed file bytes rather than the maximum allowance, and still read a file that grows within the allowance without accepting a truncated prefix.",
       "source": {
