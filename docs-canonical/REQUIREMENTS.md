@@ -97,7 +97,7 @@ fails the pull request naming the unclaimed file, and `status` reports
 | FR-07 | `src/brief/`, `src/status/`, `src/mcp/` | `test/brief.test.mjs`, `test/status.test.mjs`, `TG-MCP-IS-READ-ONLY` |
 | FR-08 | `src/gate/changed.mjs` | `test/gate.test.mjs`, `test/gate-coverage.test.mjs`, `TG-GATE-UNCLAIMED-EXITS-1` |
 | FR-09 | `src/probe/mocks.mjs` | `test/mocks.test.mjs`, `TG-MOCKING-FILE-IS-NOT-A-DEFENDER` |
-| FR-10 | `src/probe/runners/` | fixture acceptance per runner, `TG-RUNNER-FROM-PROJECT-FIRST` |
+| FR-10 | `src/probe/runners/` | fixture acceptance per runner, `TG-RUNNER-FROM-PROJECT-FIRST`, `test/runner-node-direct.test.mjs` and `TG-NODE-DIRECT-KEEPS-FAILURE-BOUNDARIES` |
 | FR-11 | `src/scaffold/producers.mjs` | `test/scaffold.test.mjs`, `test/scaffold.python.test.mjs`, `TG-SCAFFOLD-ANCHORS-HIT`, `TG-SCAFFOLD-NEVER-PROPOSES-A-NO-OP`, `TG-SCAFFOLD-LOOP-GUARD-IS-A-GUARD` |
 | FR-12 | `src/admit/admit.mjs` | `test/admit.test.mjs`, `TG-ADMIT-NEEDS-ALL-KILLED` |
 | FR-13 | `src/replay/` | `test/replay.test.mjs`, `test/calibration.test.mjs`, `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT`, `TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS`, `TG-CALIBRATION-COUNTS-ONLY-BUGS` |

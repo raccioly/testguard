@@ -321,7 +321,17 @@ Rules that follow from the table:
    supports plain JavaScript under Node's default collection, without custom
    loaders, `NODE_OPTIONS` or `NODE_PATH`; it is never selected by `auto`.
    Each confirmation uses fresh, isolated Node test processes under the
-   existing worker ceiling. Reports count executed test results, not individual
+   existing worker ceiling. On Node22.8+, Node24 and Node26, a single selected
+   entry can run inside one fresh process through the public in-process API;
+   this process serves no other entry or confirmation. Discovery, multiple
+   entries and other runtime families retain the isolated controller/worker
+   route. Single-entry execution preserves ordinary tests beside `.only`,
+   records entry provenance before import, explicitly catches import failures
+   after test registration, and publishes only at process exit when no
+   out-of-test failure or incompatible exit code occurred. A complete stream
+   cannot turn a later exception, rejection or retained-handle timeout into a
+   kill. Both routes bind their implementation to native discovery identity.
+   Reports count executed test results, not individual
    assertion calls: suite and file-container summaries are not extra tests,
    and skipped/TODO results cannot establish a green defender by themselves.
    A test-body failure counts as a rejection; a load error, hook failure,

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Performance
 
+- Eligible single-file native Node confirmations use one fresh process, avoiding a second process launch while preserving ordinary tests beside `.only`, import and late-error refusals, budgets, and process cleanup. Discovery, multiple files and older runtimes keep the existing isolated route.
 - Focus gate coverage, repeated claim selection and annotation ID bounds defenders on their relevant checks, retaining all original assertions in the mandatory acceptance suite and all fault recipes.
 
 ## [0.18.1] - 2026-10-01
