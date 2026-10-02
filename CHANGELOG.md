@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-10-01
+
+Automated weekly release — everything merged since `v0.18.0`.
+
+### Changed
+
+- test: consolidate native runtime acceptance checks
+- perf: isolate native admission mutation defenders
+- perf: size bounded report buffers to observed files
+- chore(homebrew): sha256 for v0.18.0 (#194)
+
+
 ### Changed
 
 - Runner report and discovery-config reads reserve memory for the observed
