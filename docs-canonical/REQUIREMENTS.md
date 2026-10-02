@@ -95,7 +95,7 @@ fails the pull request naming the unclaimed file, and `status` reports
 | FR-05 | `src/probe/classify.mjs` | `TG-TIMEOUT-NEVER-KILLS`, `TG-PW-TIMEOUT-NEVER-KILLS` |
 | FR-06 | `src/baseline/baseline.mjs` | `test/baseline.test.mjs`, `TG-RESTAMP-REQUIRES-SAME-FINGERPRINTS` |
 | FR-07 | `src/brief/`, `src/status/`, `src/mcp/` | `test/brief.test.mjs`, `test/status.test.mjs`, `TG-MCP-IS-READ-ONLY` |
-| FR-08 | `src/gate/changed.mjs` | `test/gate.test.mjs`, `TG-GATE-UNCLAIMED-EXITS-1` |
+| FR-08 | `src/gate/changed.mjs` | `test/gate.test.mjs`, `test/gate-coverage.test.mjs`, `TG-GATE-UNCLAIMED-EXITS-1` |
 | FR-09 | `src/probe/mocks.mjs` | `test/mocks.test.mjs`, `TG-MOCKING-FILE-IS-NOT-A-DEFENDER` |
 | FR-10 | `src/probe/runners/` | fixture acceptance per runner, `TG-RUNNER-FROM-PROJECT-FIRST` |
 | FR-11 | `src/scaffold/producers.mjs` | `test/scaffold.test.mjs`, `test/scaffold.python.test.mjs`, `TG-SCAFFOLD-ANCHORS-HIT`, `TG-SCAFFOLD-NEVER-PROPOSES-A-NO-OP`, `TG-SCAFFOLD-LOOP-GUARD-IS-A-GUARD` |
@@ -103,7 +103,7 @@ fails the pull request naming the unclaimed file, and `status` reports
 | FR-13 | `src/replay/` | `test/replay.test.mjs`, `test/calibration.test.mjs`, `TG-REPLAY-FLAKY-IS-NEVER-CAUGHT`, `TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS`, `TG-CALIBRATION-COUNTS-ONLY-BUGS` |
 | FR-14 | `src/mcp/` | `test/mcp.test.mjs` |
 | FR-15 | `src/claims/anchors.mjs`, `src/commands/claims.mjs`, `src/status/status.mjs` | `test/claims-anchors.test.mjs`, `test/status.test.mjs`, `TG-ANCHOR-PREFLIGHT-FAILS-FAST` |
-| FR-16 | `src/cli.mjs`, `src/commands/probe.mjs`, `src/probe/probe.mjs`, `src/commands/scaffold.mjs`, `src/commands/admit.mjs` | `test/claim-selection.test.mjs`, `test/probe.fixture.test.mjs`, `TG-REPEATED-CLAIMS-ARE-ALL-PROBED` |
+| FR-16 | `src/cli.mjs`, `src/commands/probe.mjs`, `src/probe/probe.mjs`, `src/commands/scaffold.mjs`, `src/commands/admit.mjs` | `test/claim-selection.test.mjs`, `test/claim-options.test.mjs`, `test/probe.fixture.test.mjs`, `TG-REPEATED-CLAIMS-ARE-ALL-PROBED` |
 | FR-17 | `src/probe/attribution.mjs`, `src/probe/probe.mjs`, `src/commands/claims.mjs`, `src/status/status.mjs`, `src/probe/cost.mjs` | `test/fault-defenders.test.mjs`, `test/attribution.test.mjs`, `test/status.test.mjs`, `test/cost.test.mjs`, `TG-FAULT-DEFENDER-SELECTION`, `TG-FAULT-DEFENDER-ORCHESTRATION` |
 | NFR-01 | `src/init/init.mjs`, runner resolution | `TG-INIT-HOOK-NO-NETWORK`, `TG-README-HOOK-MATCHES-THE-CODE` (every surface, not only the README), `TG-GITIGNORE-ADVICE-IS-ONE-LIST` |
 | NFR-02 | `package.json` | `npm run test:install` in CI |

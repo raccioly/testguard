@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance
+
+- Focus gate coverage, repeated claim selection and annotation ID bounds defenders on their relevant checks, retaining all original assertions in the mandatory acceptance suite and all fault recipes.
+
 ## [0.18.1] - 2026-10-01
 
 Automated weekly release — everything merged since `v0.18.0`.
