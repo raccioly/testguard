@@ -383,7 +383,7 @@
       "source": { "kind": "manual", "ref": "Test fixture helper contracts" },
       "severity": "high",
       "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/probe-isolation.test.mjs", "test/gate.test.mjs", "test/release-sync.test.mjs"],
+      "defendedBy": ["test/probe-isolation.test.mjs", "test/gate-coverage.test.mjs", "test/release-sync.test.mjs"],
       "faults": [
         {
           "id": "F1", "description": "Replace the fixture's concrete value assertion with a type-only assertion.",
@@ -399,7 +399,7 @@
           "find": "  const project = nested ? join(root, 'pkg') : root;",
           "replace": "  const project = nested ? join(root, 'other') : root;",
           "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["test/gate.test.mjs"]
+          "defendedBy": ["test/gate-coverage.test.mjs"]
         },
         {
           "id": "F3", "description": "Observe a fabricated formula digest instead of reading the written release surface.",
@@ -1342,7 +1342,7 @@
       "statement": "Lexical scanning and placement ID admission promptly reject long alphanumeric tokens without a required hyphen rather than exponentially backtracking.",
       "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
       "severity": "high", "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/annotation-advisory.test.mjs"],
+      "defendedBy": ["test/annotation-id-bounds.test.mjs"],
       "faults": [
         { "id": "F1", "description": "Restore overlapping nested prefix quantifiers in scanning.", "faultClass": "other", "file": "src/claims/annotations.mjs", "find": "const RE = /@claim\\s+([A-Za-z0-9]+(?:[._][A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9])\\b/g;", "replace": "const RE = /@claim\\s+([A-Za-z0-9]+(?:[._]?[A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9])\\b/g;", "producedBy": { "producer": "agent", "by": "codex" } },
         { "id": "F2", "description": "Restore overlapping nested prefix quantifiers in placement admission.", "faultClass": "other", "file": "src/claims/annotation-placement.mjs", "find": "const CLAIM_ID = /^[A-Za-z0-9]+(?:[._][A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9]$/;", "replace": "const CLAIM_ID = /^[A-Za-z0-9]+(?:[._]?[A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9]$/;", "producedBy": { "producer": "agent", "by": "codex" } }
@@ -1966,7 +1966,7 @@
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/gate.test.mjs"
+        "test/gate-coverage.test.mjs"
       ],
       "faults": [
         {
@@ -1998,7 +1998,7 @@
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/gate.test.mjs"
+        "test/gate-coverage.test.mjs"
       ],
       "faults": [
         {
@@ -2030,7 +2030,7 @@
         "at": "2026-09-17T00:00:00Z"
       },
       "defendedBy": [
-        "test/gate.test.mjs"
+        "test/gate-coverage.test.mjs"
       ],
       "faults": [
         {
@@ -5722,7 +5722,7 @@
         "at": "2026-09-19T00:00:00Z"
       },
       "defendedBy": [
-        "test/claim-selection.test.mjs"
+        "test/claim-options.test.mjs"
       ],
       "faults": [
         {
