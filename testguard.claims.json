@@ -4,7 +4,7 @@
   "claims": [
     {
       "id": "TG-NODE-DIRECT-KEEPS-FAILURE-BOUNDARIES",
-      "statement": "Single-entry native confirmations keep ordinary tests alongside only declarations, preserve owned reporting when project code edits its environment, and refuse import or out-of-test failures even beside completed assertion rejections.",
+      "statement": "Single-entry native confirmations preserve CLI entry identity and ordinary tests alongside only declarations, preserve owned reporting when project code edits its environment, and refuse import or out-of-test failures even beside completed assertion rejections.",
       "source": {
         "kind": "spec",
         "ref": "spec/GATE-SEMANTICS.md"
@@ -18,6 +18,15 @@
         "test/runner-node-direct.test.mjs"
       ],
       "faults": [
+        {
+          "id": "F5",
+          "description": "Read the selected CLI entry from the wrong argv position.",
+          "faultClass": "other",
+          "file": "src/probe/runners/node/direct.mjs",
+          "find": "const file = process.argv[1];",
+          "replace": "const file = process.argv[2];",
+          "producedBy": { "producer": "agent", "by": "codex" }
+        },
         {
           "id": "F4",
           "description": "Let project environment cleanup discard the owned report destination.",
@@ -41,10 +50,10 @@
         },
         {
           "id": "F2",
-          "description": "Discard an import failure after test declarations were registered.",
+          "description": "Ignore a late unhandled rejection beside an assertion rejection.",
           "faultClass": "guard-removed",
           "file": "src/probe/runners/node/direct.mjs",
-          "find": "    outsideFailure = true;\n    process.exitCode = 1;\n    process.stderr.write(`node-test entry load failed: ${String(error.message ?? error).slice(0, 1000)}\\n`);",
+          "find": "process.on('unhandledRejection', () => { outsideFailure = true; process.exitCode = 1; });",
           "replace": "",
           "producedBy": {
             "producer": "agent",

@@ -322,11 +322,13 @@ Rules that follow from the table:
    loaders, `NODE_OPTIONS` or `NODE_PATH`; it is never selected by `auto`.
    Each confirmation uses fresh, isolated Node test processes under the
    existing worker ceiling. On Node22.8+, Node24 and Node26, a single selected
-   entry can run inside one fresh process through the public in-process API;
-   this process serves no other entry or confirmation. Discovery, multiple
+   entry can run inside one fresh process through a reporting preload and the
+   public in-process API; Node evaluates the actual CLI entry, preserving
+   CommonJS `require.main`, ESM `import.meta.main` and argv identity. This process
+   serves no other entry or confirmation. Discovery, multiple
    entries and other runtime families retain the isolated controller/worker
    route. Single-entry execution preserves ordinary tests beside `.only`,
-   records entry provenance before import, explicitly catches import failures
+   records entry provenance before evaluation, monitors entry-load failures
    after test registration, and publishes only at process exit when no
    out-of-test failure or incompatible exit code occurred. A complete stream
    cannot turn a later exception, rejection or retained-handle timeout into a

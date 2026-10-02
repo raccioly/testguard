@@ -59,6 +59,12 @@ describe.skipIf(!supportsSingleProcess())('fresh single-process native confirmat
       expect(result.run.outcome).toBe('error'); expect(result.run.assertionFailures).toBe(0);
     }
   });
+  it('retains syntax-error identity when CLI loading fails before a complete report', async () => {
+    const dir = project({ 'test/a.test.mjs': '(' });
+    const result = await execute(dir);
+    expect(result.run.outcome).toBe('error'); expect(result.run.assertionFailures).toBe(0);
+    expect(result.loadMessage).toMatch(/SyntaxError/);
+  });
   it('executes every confirmation with a new PID, fresh globals and live source bytes', async () => {
     const dir = project({ 'src/value.mjs': 'export const value=1;', 'test/a.test.mjs': body("import {appendFileSync} from 'node:fs';import {value} from '../src/value.mjs';test('fresh',()=>{assert.equal(globalThis.previous,undefined);globalThis.previous=true;appendFileSync('pids.txt',process.pid+'\\n');assert.equal(value,1);});") });
     expect((await execute(dir)).run.outcome).toBe('pass');
@@ -76,6 +82,12 @@ describe.skipIf(!supportsSingleProcess())('fresh single-process native confirmat
   it('retains owned report destinations when project code changes its environment', async () => {
     const dir = project({ 'test/a.test.mjs': body("test('environment cleanup',()=>{delete process.env.TESTGUARD_NODE_REPORT;delete process.env.TESTGUARD_NODE_ENTRIES;assert.equal(1,1);});") });
     expect((await execute(dir)).run.outcome).toBe('pass');
+  });
+  it('preserves the actual CLI entry for CommonJS and ESM main-module checks', async () => {
+    const cjs = project({ 'test/main.test.cjs': "const {test}=require('node:test');const assert=require('node:assert/strict');test('main module',()=>assert.equal(require.main===module,true));" });
+    expect((await execute(cjs, { files: ['test/main.test.cjs'] })).run.outcome).toBe('pass');
+    const esm = project({ 'test/a.test.mjs': body("test('main module',()=>{if('main' in import.meta)assert.equal(import.meta.main,true);assert.equal(process.argv[1],new URL(import.meta.url).pathname);});") });
+    expect((await execute(esm)).run.outcome).toBe('pass');
   });
   it('keeps separate workers for multiple selected entry files', async () => {
     const source = body("test('fresh global',()=>{assert.equal(globalThis.previous,undefined);globalThis.previous=true;});");
