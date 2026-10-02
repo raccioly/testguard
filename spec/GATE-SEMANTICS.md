@@ -330,7 +330,9 @@ Rules that follow from the table:
    after test registration, and publishes only at process exit when no
    out-of-test failure or incompatible exit code occurred. A complete stream
    cannot turn a later exception, rejection or retained-handle timeout into a
-   kill. Both routes bind their implementation to native discovery identity.
+   kill. Report and entry destinations are captured before project evaluation;
+   project environment edits cannot redirect these owned outputs. Both routes
+   bind their implementation to native discovery identity.
    Reports count executed test results, not individual
    assertion calls: suite and file-container summaries are not extra tests,
    and skipped/TODO results cannot establish a green defender by themselves.

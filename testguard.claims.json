@@ -4,7 +4,7 @@
   "claims": [
     {
       "id": "TG-NODE-DIRECT-KEEPS-FAILURE-BOUNDARIES",
-      "statement": "Single-entry native confirmations keep ordinary tests alongside only declarations and refuse import or out-of-test failures even beside completed assertion rejections.",
+      "statement": "Single-entry native confirmations keep ordinary tests alongside only declarations, preserve owned reporting when project code edits its environment, and refuse import or out-of-test failures even beside completed assertion rejections.",
       "source": {
         "kind": "spec",
         "ref": "spec/GATE-SEMANTICS.md"
@@ -18,6 +18,15 @@
         "test/runner-node-direct.test.mjs"
       ],
       "faults": [
+        {
+          "id": "F4",
+          "description": "Let project environment cleanup discard the owned report destination.",
+          "faultClass": "other",
+          "file": "src/probe/runners/node/direct.mjs",
+          "find": "writeFileSync(reportFile, text, { mode: 0o600 });",
+          "replace": "writeFileSync(process.env.TESTGUARD_NODE_REPORT, text, { mode: 0o600 });",
+          "producedBy": { "producer": "agent", "by": "codex" }
+        },
         {
           "id": "F1",
           "description": "Lose isolated-worker context and silently filter ordinary tests on Node24.",

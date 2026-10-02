@@ -73,6 +73,10 @@ describe.skipIf(!supportsSingleProcess())('fresh single-process native confirmat
     const result = await execute(dir, { budgetMs: 500 });
     expect(result.run.outcome).toBe('timeout'); expect(result.run.assertionFailures).toBe(0);
   });
+  it('retains owned report destinations when project code changes its environment', async () => {
+    const dir = project({ 'test/a.test.mjs': body("test('environment cleanup',()=>{delete process.env.TESTGUARD_NODE_REPORT;delete process.env.TESTGUARD_NODE_ENTRIES;assert.equal(1,1);});") });
+    expect((await execute(dir)).run.outcome).toBe('pass');
+  });
   it('keeps separate workers for multiple selected entry files', async () => {
     const source = body("test('fresh global',()=>{assert.equal(globalThis.previous,undefined);globalThis.previous=true;});");
     const dir = project({ 'test/a.test.mjs': source, 'test/b.test.mjs': source });

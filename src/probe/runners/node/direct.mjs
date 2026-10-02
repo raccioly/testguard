@@ -8,6 +8,8 @@ import { createReport } from './report.mjs';
 const files = process.argv.slice(2);
 if (files.length !== 1) throw new Error('direct node-test requires exactly one entry');
 const file = files[0];
+const entriesFile = process.env.TESTGUARD_NODE_ENTRIES;
+const reportFile = process.env.TESTGUARD_NODE_REPORT;
 const report = createReport({ projectDir: process.cwd(), version: process.versions.node });
 let document;
 let outsideFailure = false;
@@ -19,7 +21,7 @@ process.on('exit', (code) => {
   if (!document || outsideFailure || code !== (document.failed ? 1 : 0)) return;
   const text = JSON.stringify(document);
   if (Buffer.byteLength(text) > 16 * 1024 * 1024) return;
-  writeFileSync(process.env.TESTGUARD_NODE_REPORT, text, { mode: 0o600 });
+  writeFileSync(reportFile, text, { mode: 0o600 });
 });
 
 // Node24+ otherwise enables implicit .only filtering for isolation:none,
@@ -30,7 +32,7 @@ const stream = run({ files: [], isolation: 'none', only: false, setup: async () 
   process.argv = [process.execPath, file];
   const receipt = JSON.stringify({ file, pid: process.pid, version: process.versions.node });
   if (Buffer.byteLength(receipt) > 8192) throw new Error('node-test entry receipt exceeded its byte bound');
-  appendFileSync(process.env.TESTGUARD_NODE_ENTRIES, `${receipt},`);
+  appendFileSync(entriesFile, `${receipt},`);
   // Loading through run({files:[file], isolation:'none'}) can lose an import
   // error after declarations were registered. Catch the actual import here.
   try { await import(pathToFileURL(file).href); }
@@ -42,8 +44,8 @@ const stream = run({ files: [], isolation: 'none', only: false, setup: async () 
 } });
 try {
   for await (const event of stream) report.accept(event);
-  appendFileSync(process.env.TESTGUARD_NODE_ENTRIES, 'null]}');
-  const entries = readBoundedJsonFile(process.env.TESTGUARD_NODE_ENTRIES).entries;
+  appendFileSync(entriesFile, 'null]}');
+  const entries = readBoundedJsonFile(entriesFile).entries;
   if (!Array.isArray(entries) || entries.length !== 2 || entries.pop() !== null) throw new Error('incomplete direct node-test entry receipt');
   document = report.finish(entries);
   if (document.failed) process.exitCode = 1;
