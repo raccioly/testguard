@@ -130,12 +130,21 @@ const readBoundedFile = (path, maxBytes, label, { optional = false } = {}) => {
     const stat = fstatSync(descriptor);
     if (!stat.isFile()) throw new DiscoveryError(`${label} is not a regular file`);
     if (stat.size > maxBytes) throw new DiscoveryError(`${label} exceeded ${maxBytes} bytes`);
-    const bytes = Buffer.alloc(maxBytes + 1);
+    // Reserve the observed file size, not the allowance for the largest report.
+    // The extra byte detects growth; a full buffer grows within the same hard
+    // ceiling so a concurrently appended suffix can never be silently dropped.
+    let bytes = Buffer.alloc(stat.size + 1);
     let length = 0;
     while (length < bytes.length) {
       const read = readSync(descriptor, bytes, length, bytes.length - length, null);
       if (read === 0) break;
       length += read;
+      if (length > maxBytes) throw new DiscoveryError(`${label} exceeded ${maxBytes} bytes`);
+      if (length === bytes.length) {
+        const grown = Buffer.alloc(Math.min(maxBytes + 1, Math.max(4096, bytes.length * 2)));
+        bytes.copy(grown, 0, 0, length);
+        bytes = grown;
+      }
     }
     if (length > maxBytes) throw new DiscoveryError(`${label} exceeded ${maxBytes} bytes`);
     return bytes.subarray(0, length);

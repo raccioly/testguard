@@ -3,6 +3,37 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-REPORT-READ-ALLOCATION-TRACKS-FILE",
+      "statement": "Bounded runner-report reads reserve memory for observed file bytes rather than the maximum allowance, and still read a file that grows within the allowance without accepting a truncated prefix.",
+      "source": {
+        "kind": "manual",
+        "ref": "test/runner-report-allocation.test.mjs"
+      },
+      "severity": "high",
+      "producedBy": { "producer": "agent", "by": "codex" },
+      "defendedBy": ["test/runner-report-allocation.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Reserve the maximum report allowance for every tiny file.",
+          "faultClass": "other",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    let bytes = Buffer.alloc(stat.size + 1);",
+          "replace": "    let bytes = Buffer.alloc(maxBytes + 1);",
+          "producedBy": { "producer": "agent", "by": "codex" }
+        },
+        {
+          "id": "F2",
+          "description": "Stop reading when the initial size-based buffer fills.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "      if (length === bytes.length) {",
+          "replace": "      if (false) {",
+          "producedBy": { "producer": "agent", "by": "codex" }
+        }
+      ]
+    },
+    {
       "id": "TG-NODE-ENTRY-SELECTION-AND-LOADING",
       "statement": "Explicit native runs select files within the admitted canonical project root and refuse inherited alternative module loading before launching.",
       "source": {
@@ -15,7 +46,7 @@
         "by": "codex"
       },
       "defendedBy": [
-        "test/runner-node.test.mjs"
+        "test/runner-node-admission.test.mjs"
       ],
       "faults": [
         {
