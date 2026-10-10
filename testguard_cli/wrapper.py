@@ -10,7 +10,12 @@ Resolution order:
   1. A locally installed `node_modules/testguard-cli/cli/testguard.mjs`,
      searched upward from the current directory — so a project that pins the
      package runs the PINNED version, offline and reproducibly.
-  2. `npx -y testguard-cli@latest`.
+  2. `npx -y testguard-cli@<version>`, where <version> is this wheel's own
+     version (read from the installed package metadata). The PyPI and npm
+     packages are released together at the same version, so pip pins the CLI
+     the same way the GitHub Action and the GitLab template do. It never asks
+     npx for `latest`: that would run whatever npm published last, not the
+     release that was installed.
 
 Usage:
     pip install testguard-cli
@@ -24,6 +29,7 @@ import subprocess
 import sys
 
 NODE_FLOOR = 20
+PACKAGE = "testguard-cli"
 
 
 def find_node():
@@ -56,6 +62,18 @@ def find_local_cli():
         directory = parent
 
 
+def pinned_package():
+    """`testguard-cli@<this wheel's version>`, or None when the metadata is unavailable."""
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+    except ImportError:  # Python < 3.8, below requires-python
+        return None
+    try:
+        return f"{PACKAGE}@{version(PACKAGE)}"
+    except PackageNotFoundError:
+        return None
+
+
 def main():
     """Entry point for the `testguard` command."""
     args = sys.argv[1:]
@@ -73,7 +91,17 @@ def main():
     if local_cli:
         cmd = [node, local_cli] + args
     elif npx:
-        cmd = [npx, "-y", "testguard-cli@latest"] + args
+        package = pinned_package()
+        if not package:
+            print(
+                f"Error: cannot determine the installed {PACKAGE} version, so there is no "
+                "release to pin npx to.\n"
+                f"Install the wrapper with `pip install {PACKAGE}`, or run "
+                f"`npx -y {PACKAGE}@<version>` directly.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        cmd = [npx, "-y", package] + args
     else:
         print("Error: npx not found. Install Node.js 20+, which includes npm/npx.", file=sys.stderr)
         sys.exit(1)

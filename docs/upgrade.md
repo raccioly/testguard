@@ -26,7 +26,7 @@ guide for that release.
 |---|---|---|
 | npm devDependency | `npm i -D testguard-cli@latest`, or `@<version>` | Commit the lockfile. This is the copy the session-start hook runs. |
 | npx | `npx testguard-cli@<version> <command>` | Name the version to be sure which one npx runs. |
-| pip | `pip install -U testguard-cli` | This upgrades the wrapper only. The CLI it runs is the project's `node_modules/testguard-cli` when there is one, otherwise `npx -y testguard-cli@latest`; see [installation](installation.md#pip). |
+| pip | `pip install -U testguard-cli` | This upgrades the wrapper only. The CLI it runs is the project's `node_modules/testguard-cli` when there is one, otherwise `npx -y testguard-cli@<version>` at the wrapper's own version, so upgrading the wrapper upgrades that CLI too; see [installation](installation.md#pip). |
 | Homebrew | `brew upgrade testguard` | |
 | GitHub Action | change the tag in `uses: raccioly/testguard@…` | The `version` input defaults to the CLI released with that tag. If you set `version` yourself, change it too. |
 | GitLab CI | change the tag in the `include: remote:` URL | Same rule for the template's `version` input. |

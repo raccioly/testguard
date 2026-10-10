@@ -87,12 +87,17 @@ The PyPI package does not contain the CLI. It installs a small wrapper
    `node_modules/testguard-cli/cli/testguard.mjs`. If it finds one, it runs
    that file, so a project that pins `testguard-cli` in npm runs the pinned
    version offline.
-3. Otherwise it runs `npx -y testguard-cli@latest`, which needs network access
-   and runs whatever version is latest on npm at that moment, not the version
-   of the pip package.
+3. Otherwise it runs `npx -y testguard-cli@<version>`, where `<version>` is
+   the pip package's own version, read from its installed metadata. The PyPI
+   and npm packages are released together at the same version, so
+   `pip install testguard-cli==X.Y.Z` runs CLI X.Y.Z. npx needs network
+   access the first time it fetches that version. If the wrapper cannot read
+   its own version (it was not installed through pip), it exits 1 rather than
+   run an unpinned CLI.
 
-If you need a fixed version from pip, also install `testguard-cli` with npm in
-the project (or a parent directory) so step 2 answers.
+To run the CLI offline, or at a version other than the wheel's, also install
+`testguard-cli` with npm in the project (or a parent directory) so step 2
+answers.
 
 ### Homebrew
 
@@ -184,7 +189,7 @@ npx --offline testguard --version
 entirely from the copied cache or fails.
 
 pip alone is not an offline channel: when the wrapper finds no local
-`node_modules/testguard-cli`, it falls back to `npx -y testguard-cli@latest`.
+`node_modules/testguard-cli`, it falls back to `npx -y testguard-cli@<its own version>`.
 Install the npm package offline as above and the wrapper runs it.
 
 ## Network and telemetry
@@ -196,7 +201,7 @@ What can reach the network is the channel around it, and only these:
 | Who | When |
 |---|---|
 | npm / npx | installing the package, or `npx` running a package the project does not have |
-| The pip wrapper | when no local `node_modules/testguard-cli` exists: `npx -y testguard-cli@latest` |
+| The pip wrapper | when no local `node_modules/testguard-cli` exists: `npx -y testguard-cli@<the pip package's version>` |
 | Homebrew | `brew install` / `brew upgrade` |
 | The GitHub Action and the GitLab template | every job runs `npx -y testguard-cli@<version>`; the GitLab template also installs the project's npm dependencies when `dir` has a `package.json` |
 | The GitLab template, with `post_note: true` | posts the markdown brief to the merge request through the GitLab API |
