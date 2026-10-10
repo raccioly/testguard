@@ -8,6 +8,8 @@
  *                            from the PUBLISHED tarball (release.yml, after npm)
  *   - packaging/gitlab/*.yml  the include URL tag and the `version` input default
  *   - README.md               the GitHub Action reference AND the GitLab include URL
+ *   - .pre-commit-hooks.yaml  the `rev:` in the consumer example
+ *   - docs/** (DOC_SURFACES)  every docs page that shows a pinned install
  *
  * A file may carry more than one form, and each needs its own entry: README
  * holds both the `raccioly/testguard@vX.Y.Z` action reference and the
@@ -102,7 +104,39 @@ const surfaces = [
   // Sync the two separately and they disagree — the failure that is worse than
   // being stale, because the document then contradicts itself.
   ['docs/testguard-explained.html', /(Technical Brief · v)\d+\.\d+\.\d+( · MIT)/, `$1${version}$2`],
+  // The consumer-facing example at the top of the hooks manifest. It read
+  // v0.1.0 for eighteen releases because nothing looked at it.
+  ['.pre-commit-hooks.yaml', /(raccioly\/testguard\n#\s+rev: )v\d+\.\d+\.\d+/, `$1v${version}`],
 ];
+
+/**
+ * The docs pages that show a pinned install. Each may carry any of the pin
+ * forms below but must carry at least one: a page registered here that pins
+ * nothing is a page someone moved the pin out of, and the list is stale.
+ * A pin in a page NOT listed here fails test/release-version.test.mjs, which
+ * finds pins by content — the README lesson above, applied to docs/.
+ */
+const DOC_SURFACES = [
+  'docs/installation.md',
+  'docs/guides/ci/github-actions.md',
+  'docs/guides/ci/gitlab.md',
+  'docs/guides/ci/pre-commit.md',
+  'docs/guides/monorepo.md',
+  // Translations of the README carry its install table, pins included.
+  'docs/i18n/pt-BR/README.md',
+  'docs/i18n/es/README.md',
+  'docs/i18n/zh-CN/README.md',
+];
+const DOC_PIN_FORMS = [
+  [/raccioly\/testguard@v\d+\.\d+\.\d+/g, `raccioly/testguard@v${version}`],
+  [/testguard\/v\d+\.\d+\.\d+\/packaging/g, `testguard/v${version}/packaging`],
+  [/(raccioly\/testguard\n\s*rev: )v\d+\.\d+\.\d+/g, `$1v${version}`],
+];
+for (const rel of DOC_SURFACES) {
+  const forms = DOC_PIN_FORMS.filter(([pattern]) => new RegExp(pattern.source).test(readFileSync(resolve(root, rel), 'utf8')));
+  if (!forms.length) throw new Error(`${rel}: registered as a docs version surface but pins no version`);
+  for (const [pattern, replacement] of forms) surfaces.push([rel, pattern, replacement]);
+}
 
 if (listSurfaces) {
   // Derived from the same table the writes use, so the two cannot disagree.

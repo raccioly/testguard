@@ -7365,6 +7365,34 @@
         "producer": "agent",
         "by": "codex"
       }
+    },
+    {
+      "id": "TG-DOCS-COVER-THE-CLI",
+      "statement": "Every command the CLI dispatches and every --runner value it accepts is documented on its reference page; a new one without documentation fails the suite.",
+      "source": { "kind": "doc", "ref": "CONTRIBUTING.md#changing-documentation" },
+      "severity": "low",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/docs.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A command is renamed in the help the CLI prints, so the dispatched set gains a name no reference page documents.",
+          "faultClass": "literal-changed",
+          "file": "src/cli.mjs",
+          "find": "  testguard concerns [dir]   the one-sentence scopes a sweep can be aimed by: where to look, and which shapes of break are relevant",
+          "replace": "  testguard concernz [dir]   the one-sentence scopes a sweep can be aimed by: where to look, and which shapes of break are relevant",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F2",
+          "description": "A runner value is added to --runner with no row in the languages and runners reference.",
+          "faultClass": "literal-changed",
+          "file": "src/cli.mjs",
+          "find": "  --runner <name>      vitest | jest | playwright | python | pytest | unittest | node-test | auto",
+          "replace": "  --runner <name>      vitest | jest | playwright | python | pytest | unittest | node-test | deno | auto",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        }
+      ]
     }
   ]
 }
