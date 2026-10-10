@@ -7365,6 +7365,54 @@
         "producer": "agent",
         "by": "codex"
       }
+    },
+    {
+      "id": "TG-SCRATCH-NEVER-RUNS-PROJECT-HOOKS",
+      "statement": "Files TestGuard checks out into its scratch tree are checked out with the project's git hooks disabled: a post-checkout hook never runs there, so a failing hook (Git LFS without git-lfs on PATH, husky, lefthook) cannot fail a probe or a replay that would otherwise succeed.",
+      "source": {
+        "kind": "spec",
+        "ref": "CHANGELOG [Unreleased]"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/worktree.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The scratch worktree is added with the project hooks enabled.",
+          "faultClass": "other",
+          "file": "src/git.mjs",
+          "find": "git([...NO_HOOKS, 'worktree', 'add', '--detach', dest, ref], repo)",
+          "replace": "git(['worktree', 'add', '--detach', dest, ref], repo)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/worktree.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "Replay's revert of a fixed file runs the project's post-checkout hook.",
+          "faultClass": "other",
+          "file": "src/replay/replay.mjs",
+          "find": "git([...NO_HOOKS, 'checkout', `${fix.commit}^`, '--', ...existedBefore.map(rel)], iso.projectDir)",
+          "replace": "git(['checkout', `${fix.commit}^`, '--', ...existedBefore.map(rel)], iso.projectDir)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/replay.test.mjs"
+          ]
+        }
+      ]
     }
   ]
 }

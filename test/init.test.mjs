@@ -7,8 +7,9 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { initProject, hookCommand } from '../src/init/init.mjs';
 import { USAGE } from '../src/cli.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
-const gitInit = (dir) => { const g = (...a) => spawnSync('git', ['-c', 'user.email=i@example.invalid', '-c', 'user.name=i', ...a], { cwd: dir }); g('init', '-q'); };
+const gitInit = (dir) => { const g = (...a) => spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=i@example.invalid', '-c', 'user.name=i', ...a], { cwd: dir }); g('init', '-q'); };
 
 describe('the README documents the hook the code actually emits', () => {
   const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');

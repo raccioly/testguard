@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { devNull, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 
@@ -33,7 +33,17 @@ export function isAncestor(dir, ancestor, ref = 'HEAD') {
 /** True when any of `paths` (repo-relative; empty = whole tree) has uncommitted changes. */
 export const isDirty = (dir, paths = []) => git(['status', '--porcelain', '--', ...paths], dir).length > 0;
 
-export const addWorktree = (repo, dest, ref = 'HEAD') => git(['worktree', 'add', '--detach', dest, ref], repo);
+/**
+ * Leading options for a git command that checks files out into TestGuard's own
+ * scratch tree. That tree is the instrument, not a checkout the user made, so
+ * their post-checkout hook (husky, lefthook, Git LFS) must not run on it: a
+ * failing one fails the whole command after the files are already written, and
+ * Git LFS's fails whenever git-lfs is not on PATH. Filters, LFS smudge
+ * included, are config, not hooks, and still apply.
+ */
+export const NO_HOOKS = Object.freeze(['-c', `core.hooksPath=${devNull}`]);
+
+export const addWorktree = (repo, dest, ref = 'HEAD') => git([...NO_HOOKS, 'worktree', 'add', '--detach', dest, ref], repo);
 
 /**
  * A dangling commit holding the working tree exactly as it is — tracked

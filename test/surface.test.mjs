@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { computeClaimedSurface, needsClaimExpansion } from '../src/status/surface.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const write = (root, file, text) => {
   mkdirSync(join(root, file, '..'), { recursive: true });
@@ -11,16 +12,16 @@ const write = (root, file, text) => {
 };
 
 const commit = (root, message) => {
-  const r = spawnSync('git', ['-c', 'user.email=s@example.invalid', '-c', 'user.name=s', 'add', '-A'], { cwd: root, encoding: 'utf8' });
+  const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=s@example.invalid', '-c', 'user.name=s', 'add', '-A'], { cwd: root, encoding: 'utf8' });
   if (r.status !== 0) throw new Error(r.stderr);
-  const c = spawnSync('git', ['-c', 'user.email=s@example.invalid', '-c', 'user.name=s', 'commit', '-qm', message], { cwd: root, encoding: 'utf8' });
+  const c = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=s@example.invalid', '-c', 'user.name=s', 'commit', '-qm', message], { cwd: root, encoding: 'utf8' });
   if (c.status !== 0) throw new Error(c.stderr);
 };
 
 describe('claimed source surface', () => {
   it('names a real denominator and ranks unclaimed modules by bounded churn, with path risk separate', () => {
     const root = mkdtempSync(join(tmpdir(), 'tg-surface-'));
-    spawnSync('git', ['init', '-q'], { cwd: root });
+    spawnSync('git', [...FIXTURE_GIT, 'init', '-q'], { cwd: root });
     write(root, 'src/auth/session.ts', 'export const session = 1;\n');
     write(root, 'src/claimed.ts', 'export const claimed = 1;\n');
     write(root, 'src/steady.ts', 'export const steady = 1;\n');

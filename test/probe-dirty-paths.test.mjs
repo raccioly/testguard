@@ -5,12 +5,13 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { probe } from '../src/probe/probe.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function dirtyRepo(defender = 'test/a.test.mjs') {
   const dir = mkdtempSync(join(tmpdir(), 'tg-dirty-paths-'));
-  const git = (...args) => spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...args], { cwd: dir, encoding: 'utf8' });
+  const git = (...args) => spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...args], { cwd: dir, encoding: 'utf8' });
   git('init', '-q');
   mkdirSync(join(dir, 'src'));
   mkdirSync(join(dir, 'test'));
@@ -37,8 +38,8 @@ describe('dirty preflight path parsing', () => {
     const { dir, claims } = dirtyRepo();
     const renamed = join(dir, 'test', 'a renamed.test.mjs');
     writeFileSync(renamed, "import { a } from '../src/a.mjs';\n// renamed while dirty\n");
-    spawnSync('git', ['rm', '-q', 'test/a.test.mjs'], { cwd: dir, encoding: 'utf8' });
-    spawnSync('git', ['add', 'test/a renamed.test.mjs'], { cwd: dir, encoding: 'utf8' });
+    spawnSync('git', [...FIXTURE_GIT, 'rm', '-q', 'test/a.test.mjs'], { cwd: dir, encoding: 'utf8' });
+    spawnSync('git', [...FIXTURE_GIT, 'add', 'test/a renamed.test.mjs'], { cwd: dir, encoding: 'utf8' });
     await expect(probe({ projectDir: dir, claims, mode: 'worktree', toolVersion: 't' }))
       .rejects.toThrow(/test\/a\.test\.mjs|test\/a renamed\.test\.mjs/);
   });

@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {handle,PROTOCOL_VERSION} from '../src/mcp/server.mjs';
 import {TOOLS,TOOL_NAMES} from '../src/mcp/tools.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 const FIXTURE=join(dirname(fileURLToPath(import.meta.url)),'..','fixtures','known-answer');
 
 describe('handle — the protocol, in process', () => {
@@ -53,7 +54,7 @@ describe('handle — the protocol, in process', () => {
     // A real failure: a claims file that exists, and a reference that does not.
     const dir = mkdtempSync(join(tmpdir(), 'tg-mcp-throw-'));
     cpSync(join(FIXTURE, 'testguard.claims.json'), join(dir, 'testguard.claims.json'));
-    spawnSync('git', ['init', '-q'], { cwd: dir });
+    spawnSync('git', [...FIXTURE_GIT, 'init', '-q'], { cwd: dir });
     const r = handle({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'testguard_claims', arguments: { dir, since: 'no-such-ref' } } });
     expect(r.error).toBeUndefined();
     expect(r.result.isError).toBe(true);

@@ -4,6 +4,7 @@ import { tmpdir, devNull } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseFixProjectMarkers } from '../src/scaffold/fix-paths.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const names = (...files) => Buffer.from(files.length ? `${files.join('\0')}\0` : '');
 const roots = [];
@@ -13,7 +14,7 @@ describe('complete historical fix project marker union', () => {
   it('retains removed and added delegation from actual parent/fix trees', () => {
     const root = mkdtempSync(join(tmpdir(), 'testguard-fix-projects-')); roots.push(root);
     const git = (...args) => {
-      const run = spawnSync('git', ['--no-lazy-fetch', '--no-replace-objects', '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', '-c', `core.hooksPath=${devNull}`, ...args], { cwd: root, timeout: 5000, maxBuffer: 128 * 1024 });
+      const run = spawnSync('git', [...FIXTURE_GIT, '--no-lazy-fetch', '--no-replace-objects', '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', '-c', `core.hooksPath=${devNull}`, ...args], { cwd: root, timeout: 5000, maxBuffer: 128 * 1024 });
       expect(run.status).toBe(0); return run.stdout;
     };
     git('init', '-q'); mkdirSync(join(root, 'removed')); mkdirSync(join(root, 'added'));
