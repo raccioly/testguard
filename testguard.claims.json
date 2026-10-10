@@ -7518,6 +7518,26 @@
         }
       ],
       "tags": ["init", "audit"]
+    },
+    {
+      "id": "TG-BRIEF-LABELS-RUNNER-CACHES",
+      "statement": "The brief's install label names a package runner's cache (npx, pnpm dlx, bunx) as such, never as a local install, so a stale cached CLI is visible at session start. The npx cache sits under node_modules/ and was labelled 'local install'.",
+      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "severity": "low",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/brief.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The npx cache is no longer recognised and is labelled a local install again.",
+          "faultClass": "field-dropped",
+          "file": "src/brief/brief.mjs",
+          "find": "  [/[\\\\/]_npx[\\\\/]/, 'npx cache'],",
+          "replace": "",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        }
+      ],
+      "tags": ["init", "audit"]
     }
   ]
 }

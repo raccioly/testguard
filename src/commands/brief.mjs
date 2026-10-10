@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { readSpecDoc, writeSpecDoc } from '../evidence/writer.mjs';
-import { buildBrief, buildUnclaimedBrief, renderBriefMarkdown, renderUnclaimedMarkdown } from '../brief/brief.mjs';
+import { buildBrief, buildUnclaimedBrief, renderBriefMarkdown, renderUnclaimedMarkdown, installLabel } from '../brief/brief.mjs';
 import { computeStatus } from '../status/status.mjs';
 import { evidencePath, baselinePath } from './probe.mjs';
 import { resolveChangedRef, withChangedRef } from '../gate/changed.mjs';
@@ -39,7 +39,7 @@ export async function briefCommand({ projectDir, values, version }, io) {
     return 3;
   }
   // Where this binary came from, so a stale install is visible in the session-start context.
-  const install = /[\\/]node_modules[\\/]/.test(process.argv[1] ?? '') ? 'local install' : 'global';
+  const install = installLabel(process.argv[1]);
   const brief = buildBrief(evidence, baseline, { max, next: status?.next, changes: status?.changes, install });
   if (!values.text && !values.markdown) writeSpecDoc('brief', values.out ? resolve(values.out) : join(projectDir, '.testguard', 'brief.json'), brief);
   if (values.markdown) io.out(renderBriefMarkdown({ ...brief, provisional: Boolean(evidence.run.provisional) }, { hasBaseline: Boolean(baseline), total: evidence.records.length, install }).trimEnd());
