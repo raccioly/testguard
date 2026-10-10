@@ -578,12 +578,42 @@ Adopting tools may reconcile an existing baseline format (for example a
 `{version, fingerprints:{hash:count}}` file) by mapping it onto this shape;
 the suppress-up-to-count semantics are identical.
 
+A baseline command's machine output is the status document plus an optional
+`baseline` result, exactly as a probe's is the status document plus `run`:
+`{path, frozen}` when it froze one (`frozen` counts the unproven findings it
+holds), `{path, restamped}` when it moved an existing baseline's head (the
+commit it now names). The document is validated before it is printed. One
+document carries at most one invocation result, never both `run` and
+`baseline`.
+
 ## Ignore and annotations
 
-- An ignore entry removes a subject from *scope* before probing. Every entry
+- An ignore entry excuses a *coverage* or *removal* finding; it never
+  removes anything from a probe and never touches a verdict. A probe reads no
+  ignore file: a claim that is in the claims file is probed, so an excuse can
+  never hide a survivor. A known finding is accepted in a baseline (above),
+  which is fingerprinted, counted and reported as baselined. Every entry
   carries a `reason` of at least eight characters; the structured form is what
-  an auditor reads. A plain gitignore-syntax file may be accepted as shorthand
-  for reasonless `path` entries.
+  an auditor reads. An entry past its `expires` excuses nothing and is
+  reported as expired. The kinds, and the only thing each does:
+  - `path` — a glob over project paths. Excuses a changed source file from
+    the change gate (below); every reliance is reported.
+  - `claim` — exactly one claim id. Excuses the removal of that claim, and of
+    any of its faults, when claims are compared against an earlier reference.
+  - `fault` — exactly `<claimId>/<faultId>`. Excuses the removal of that one
+    fault in the same comparison.
+
+  There is no fingerprint kind: suppressing a finding by fingerprint is what a
+  baseline does, and a second, uncounted channel for it would let debt be
+  accepted where no baseline report shows it. A `claim` or `fault` pattern
+  that is not an exact identity is invalid, because it would excuse nothing —
+  or, for a `fault` entry without its fault id, the whole claim. A plain
+  gitignore-syntax file may be accepted as shorthand for reasonless `path`
+  entries.
+- A concerns file is read like every other spec document: one that does not
+  parse or does not conform fails the command that reads it (exit `2`). It
+  never degrades to a concern that matches nothing — a sweep aimed at nothing
+  reports clean.
 - An annotation is **strictly additive**. It never changes, suppresses, or
   drops a finding. Ranking may read annotations; verdicts never do.
 - A **signal** is a static, annotation-grade fact about a defender, recorded

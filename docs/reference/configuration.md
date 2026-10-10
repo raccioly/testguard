@@ -11,7 +11,7 @@ rather than being guessed at.
 | File | Read by | Commit it |
 |---|---|---|
 | [`testguard.claims.json`](#claims-file) | every command | yes |
-| [`testguard.ignore.json`](#ignore-file) | `gate`, `sweep`, `claims --since` | yes |
+| [`testguard.ignore.json`](#ignore-file) | `gate`, `sweep`, `status`/`brief` with a reference, `claims --since` (never `probe`) | yes |
 | [`testguard.concerns.json`](#concerns-file) | `concerns`, `sweep --concern` | yes, when you have one |
 
 All three live in the project directory, beside each other. Each command has
@@ -201,7 +201,7 @@ TestGuard reads only this structured JSON form.
 | Field | Required | Meaning |
 |---|---|---|
 | `kind` | yes | What `pattern` names. See the table below. |
-| `pattern` | yes | A glob, a claim ID, or `<claimId>/<faultId>`, depending on `kind` (up to 512 characters). |
+| `pattern` | yes | A glob, a claim ID, or `<claimId>/<faultId>`, depending on `kind` (up to 512 characters). A `claim` or `fault` pattern is matched exactly, so anything but an exact identity is refused as invalid. |
 | `reason` | yes | At least 8 characters. Not optional: it is what a reviewer reads to accept the exception. |
 | `by` | no | Who added it. |
 | `at` | no | When, as an ISO 8601 date-time. |
@@ -209,13 +209,20 @@ TestGuard reads only this structured JSON form.
 
 | `kind` | `pattern` | Used by | Effect |
 |---|---|---|---|
-| `path` | glob over project paths | `gate`, `sweep` | A changed source file that matches counts as excused. Every reliance is printed. |
-| `claim` | claim ID | `claims --since` | Excuses the removal of that claim, and of any of its faults. |
-| `fault` | `<claimId>/<faultId>` | `claims --since` | Excuses the removal of that one fault. |
-| `fingerprint` | an evidence fingerprint | none | Valid in the schema; TestGuard does not read it. |
+| `path` | glob over project paths | `gate`, `sweep`, `status --changed`, `brief` | A changed source file that matches counts as excused from the change gate. Every reliance is printed. |
+| `claim` | one claim ID, exactly | `claims --since` | Excuses the removal of that claim, and of any of its faults. |
+| `fault` | `<claimId>/<faultId>`, exactly | `claims --since` | Excuses the removal of that one fault. |
 
-An ignore entry never touches a verdict. To accept a known finding, freeze it
-in a [baseline](cli.md#baseline) instead.
+These three are the only kinds. An entry of any other kind, including
+`fingerprint` (accepted by earlier versions of the schema, but read by nothing), makes
+the file invalid, and every command that reads it exits `2` naming the kinds
+that exist.
+
+An ignore entry never touches a verdict, and `probe` never reads the ignore
+file: a claim in the claims file is always probed, so no entry can hide a
+survivor. To accept a known finding, freeze it in a
+[baseline](cli.md#baseline) instead: a baseline is fingerprinted, counted, and
+every finding it covers is still reported as baselined.
 
 ## Concerns file
 
@@ -223,7 +230,9 @@ in a [baseline](cli.md#baseline) instead.
 aimed by. A concern names a *kind* of promise and where to look for it; it is
 never a claim and never becomes one. Schema:
 [`concerns.schema.json`](../../spec/schemas/concerns.schema.json).
-`testguard concerns` lists and validates it.
+`testguard concerns` lists and validates it. A file that is not valid JSON or
+does not conform makes `concerns` and `sweep` exit `2`, naming the file and
+the error; it is never read as "no concerns".
 
 ```json
 {

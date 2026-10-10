@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "kind": "claim",
+      "pattern": "REDACT-*",
+      "reason": "Claim entries are matched exactly; this glob would excuse nothing."
+    }
+  ]
+}

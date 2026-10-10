@@ -170,10 +170,10 @@ Labels that are not verdicts but still affect an exit code or the next action.
 | `INVALID` | `status` | An exact anchor is missing or ambiguous. State `invalid-anchors`, next action `repair-fault`. | `status` exits `1` |
 | `ANCHOR-MISSING`, `ANCHOR-AMBIGUOUS`, `FAULT-INVALID` | `claims --check-anchors` | The same anchor check run on demand; `FAULT-INVALID` here means a JavaScript or Python replacement no longer parses. Nothing is run. | `claims` exits `1` |
 | `CHANGED` | `status` | A fault's content changed since it was probed. If its last verdict was not `killed`, the state is `evidence-stale` and the next action is `review-fault-change`: weakening a fault is the cheapest way to make a survivor disappear. | `status` exits `1` |
-| `UNCLAIMED` | `gate` | A changed source file carries no claim and no excusing ignore entry. | `gate` exits `1` |
+| `UNCLAIMED` | `gate` | A changed source file carries no claim and no excusing `path` ignore entry. | `gate` exits `1` |
 | `EXPIRED` | `gate`, `claims --since` | An ignore entry past its `expires`; it excuses nothing. | none by itself |
 | `delegated` | `gate` | Changed files that belong to a nested project; run `gate` there. | none here |
-| `REMOVED` (`removed-claim`, `removed-fault`) | `claims --since` | A claim or fault that existed at the reference and does not now, with its last verdict where evidence exists. | `claims` exits `1` unless an ignore entry excuses it |
+| `REMOVED` (`removed-claim`, `removed-fault`) | `claims --since` | A claim or fault that existed at the reference and does not now, with its last verdict where evidence exists. | `claims` exits `1` unless a `claim` or `fault` ignore entry excuses it |
 | `renamed` (`renamed-claim`) | `claims --since` | A removed ID whose statement reappears verbatim under a new ID. | none |
 
 ## Next

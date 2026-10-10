@@ -71,12 +71,13 @@ probe
                        unittest pin that choice and fail rather than fall back. The engine that ran is what the evidence records.)
   --runner-cmd "<cmd>" custom runner; must contain {files} and {out}, e.g. "pnpm vitest run {files} --reporter=json --outputFile={out}"
   --node-modules <dir> node_modules to link into the scratch worktree (or TESTGUARD_NODE_MODULES)
-  --python <path>      Python interpreter for .py defenders (or TESTGUARD_PYTHON; default: $VIRTUAL_ENV, then the project's
-                       .venv/venv, then python3 on PATH). Resolved against your working tree, never the scratch worktree.
+  --python <path>      Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH.
+                       Default: $VIRTUAL_ENV, then the project's .venv, venv, .env, then python3, then python on PATH.
+                       Resolved against your working tree, never the scratch worktree.
   --workers <n>        maximum built-in runner workers (default: 1); Python remains serial
-  --serial             run one test file at a time (vitest --no-file-parallelism, jest --runInBand, playwright --workers=1,
-                       pytest -p no:xdist);
-                       use it when another test runner is already running — probe warns and records the contention either way
+  --serial             one worker, even when --workers is higher (vitest --no-file-parallelism, jest --runInBand,
+                       playwright --workers=1; pytest never loads xdist either way). Use it when another test runner
+                       is already running — probe warns and records the contention either way
   --in-place           mutate the working tree instead of a scratch worktree
   --no-escalate        do not re-run survivors against the whole suite
   --no-reuse           re-probe claims whose inputs have not changed
@@ -98,24 +99,32 @@ sweep      --changed <ref> (required unless --save-paths; CI bases and a safe lo
                              denominator: "120 writes across 38 files, swept 12". A clean sweep over an unstated
                              denominator is a sample of unknown size, not a guarantee that saving works
            --include-dirty  --exclude <glob>  --confirm <n>  --budget <ms>  --command-budget <ms>  --workers <n>  --serial  --max <n>  --out <path>  --json
+           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>   runner selection, as for probe
+           --python <path>   Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH
            the cold start: no claim and no concern needed. Everything it proposes is a DRAFT — it never writes testguard.claims.json,
            and its evidence never replaces .testguard/evidence.json. exit 1 on a fault that survived, or a file no test imports
            shapes: if-guard → if (false) · single-line guard/mutation removed · return <check> → return true
                    · security flag/window/cost literal weakened · verify/validate/check call removed
                    · field dropped from a payload/allow-list/schema/merge · parameter-derived argument swapped for undefined/{}
+                   · one-line JSX element removed · on<Event> handler prop dropped
 mcp        no options. JSON-RPC 2.0 over stdio; five READ-ONLY tools (status, brief, claims, evidence, next_command).
            Nothing here runs a probe: next_command hands back the shell line for you to run where the person can see it.
            Register it with your harness — testguard init --mcp prints the config for Claude Code, Cursor and Codex.
 replay     --workers <n> (default 1)  --serial  --budget <ms> (per run)
-           --since <range>   commit range to search for fix commits (HEAD~50..HEAD, a tag, origin/main..HEAD)
-           --max <n>         replay at most n fixes (they are slow: one worktree and N runs each)
+           --since <range>   commit range to search for fix commits (HEAD~50..HEAD, a tag, origin/main..HEAD);
+                             --changed <range> is accepted as an alias
+           --max <n>         replay at most n fixes (default 20; they are slow: one worktree and N runs each)
            --confirm <n>     runs per verdict (default 3); a flaky failure reads as "the suite caught it", so mixed runs are never caught
            --command-budget <ms> cooperative measurement deadline; expiry writes neither replay nor calibration, so an unmeasured suffix cannot look clean
            --out <path>       replay document (default: <dir>/.testguard/replay.json); the calibration goes beside it
+           --calibration-out <path>  write the calibration document here instead of beside the replay document
+           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>   runner selection, as for probe
+           --python <path>   Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH
            reports, never gates: a bug that escaped is history, not a regression in this change
-                   · one-line JSX element removed · on<Event> handler prop dropped
 admit      --workers <n> (default 1)  --serial  --budget <ms>  --command-budget <ms>
            --claim <ID> (required)  --fault <FID> (one fault only)  --confirm <n>  --json
+           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>   runner selection, as for probe
+           --python <path>   Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH
            ADMITTED (exit 0) only when every fault of the claim is killed N/N by defenders that are green N/N; anything else is NOT ADMITTED (exit 1) and names the first blocking fault
            the test must be a declared or discovered defender of the claim (exit 3 otherwise); evidence goes to .testguard/evidence-partial.json
 gate       --changed <ref>   measure the change since merge-base(ref, HEAD); auto-detected in GitHub Actions / GitLab CI
@@ -137,7 +146,7 @@ init       --force (replace an existing skill file)  --here (keep the agent laye
            agent layer (skill, SessionStart hook, AGENTS.md section) → git root; project layer (.gitignore lines) → [dir]
            the hook prefers a local install, then a testguard already on PATH, then nothing; it never reaches the network. exit 1 if a written file is gitignored
            --mcp             print the MCP server config for Claude Code, Cursor and Codex (printed, never written: a harness config is yours)
-every command accepts --json; probe/baseline emit the status document plus their own result
+every command except mcp accepts --json (mcp speaks JSON-RPC on stdio and refuses it); probe/baseline emit the status document plus their own result
 claims     --json
            --cost            what the last probe spent, per claim and per defender file, read back from the recorded run durations. Names the files more than one claim pays for, which is where a slow gate comes from
            --since <ref>     report every claim and fault that existed at <ref> and does not now; a claim entry in testguard.ignore.json (with a reason) excuses one. exit 1 on any unexcused removal
@@ -169,7 +178,9 @@ export function commandUsage(command) {
     scaffold: 'scaffold src/example.mjs --json', replay: 'replay . --since HEAD~10..HEAD --max 3',
     admit: 'admit test/example.test.mjs --claim EXAMPLE-001', sweep: 'sweep . --changed origin/main --cap 10',
   };
-  return `${lines[0]}\n\n${overview}\n\n${sections.join('\n').trim()}\n\nCommon: --json, --help, --version\nExample: testguard ${examples[command] ?? `${command}${command === 'mcp' ? '' : ' .'}`}\n`;
+  // mcp refuses --json (stdout is its protocol stream), so its help does not offer it.
+  const common = command === 'mcp' ? '--help, --version' : '--json, --help, --version';
+  return `${lines[0]}\n\n${overview}\n\n${sections.join('\n').trim()}\n\nCommon: ${common}\nExample: testguard ${examples[command] ?? `${command}${command === 'mcp' ? '' : ' .'}`}\n`;
 }
 
 export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') }) {
@@ -190,6 +201,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         out: { type: 'string' },
         evidence: { type: 'string' },
         baseline: { type: 'string' },
+        'calibration-out': { type: 'string' },
         severity: { type: 'string', default: 'low' },
         max: { type: 'string', default: '20' },
         ref: { type: 'string' },
@@ -262,6 +274,18 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
   if (values.help) {
     io.out(commandUsage(command));
     return 0;
+  }
+  // replay once took --baseline as the calibration output path, undocumented,
+  // sharing probe's flag for "the baseline to gate against". Refused rather
+  // than ignored: a silently dropped path would write the calibration where
+  // the caller did not ask.
+  if (command === 'replay' && values.baseline !== undefined) {
+    io.err('replay has no --baseline: a baseline gates probe findings, and replay never gates. To choose where the calibration is written, use --calibration-out <path>.');
+    return 3;
+  }
+  if (values['calibration-out'] !== undefined && command !== 'replay') {
+    io.err('--calibration-out is only valid on replay');
+    return 3;
   }
   if ((values.annotate || values.apply) && command !== 'claims') {
     io.err('--annotate and --apply are only valid on claims');
