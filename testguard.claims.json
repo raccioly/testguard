@@ -7393,6 +7393,130 @@
           "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
         }
       ]
+    },
+    {
+      "id": "TG-GITLAB-ARTIFACTS-UNDER-DIR",
+      "statement": "The GitLab template's artifact paths carry the dir input, so the files a job writes under a subdirectory project are kept; GitLab resolves artifact paths from the repository root, not from the directory the script changed into.",
+      "source": { "kind": "spec", "ref": "docs/guides/ci/gitlab.md" },
+      "severity": "high",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/gitlab-template.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "The gate artifact path drops the dir prefix; with dir set to a subdirectory GitLab keeps no gate.json.",
+          "faultClass": "literal-changed", "file": "packaging/gitlab/testguard.gitlab-ci.yml",
+          "find": "    paths: [\"$[[ inputs.dir ]]/.testguard/gate.json\"]",
+          "replace": "    paths: [\".testguard/gate.json\"]",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/gitlab-template.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-GITLAB-INSTALL-WITHOUT-LOCKFILE",
+      "statement": "The GitLab template runs npm ci only when dir has an npm lockfile; a project without one, or a Python-only project without a package.json, is not failed by the install step, and the CLI is never added to package.json.",
+      "source": { "kind": "spec", "ref": "docs/guides/ci/gitlab.md" },
+      "severity": "high",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/gitlab-template.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "The install step runs npm ci whatever the project has, which fails every job of a Python-only project before TestGuard runs.",
+          "faultClass": "condition-forced", "file": "packaging/gitlab/testguard.gitlab-ci.yml",
+          "find": "      if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then",
+          "replace": "      if true; then",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/gitlab-template.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-ACTION-EVIDENCE-OUTPUT-IS-WRITTEN-FILE",
+      "statement": "The GitHub Action's evidence output names the evidence file the run actually wrote (evidence.json, or evidence-provisional.json when confirm < 3) and is empty when the run wrote none; a pre-existing file the run did not rewrite is never named.",
+      "source": { "kind": "spec", "ref": "docs/guides/ci/github-actions.md#output" },
+      "severity": "medium",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/action.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "The output names .testguard/evidence.json whatever the command wrote, so a provisional run or a gate points a later upload step at a file that is absent or stale.",
+          "faultClass": "literal-changed", "file": "action.yml",
+          "find": "        echo \"evidence=${EVIDENCE}\" >> \"$GITHUB_OUTPUT\"",
+          "replace": "        echo \"evidence=$(pwd)/.testguard/evidence.json\" >> \"$GITHUB_OUTPUT\"",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/action.test.mjs"]
+        },
+        {
+          "id": "F2", "description": "Every evidence file present after the run is reported, so a cache-restored evidence.json from an earlier commit is named as this run's result.",
+          "faultClass": "condition-forced", "file": "action.yml",
+          "find": "          if ! grep -qxF -- \"$line\" <<<\"$BEFORE\"; then",
+          "replace": "          if true; then",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/action.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-ACTION-INPUTS-ARE-DATA",
+      "statement": "The GitHub Action passes its inputs to the run script as environment variables, so an input value containing quotes or command substitution reaches the CLI verbatim and is never executed as shell.",
+      "source": { "kind": "spec", "ref": "docs/guides/ci/github-actions.md#output" },
+      "severity": "high",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/action.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "The claims input is spliced into the script text again, so a value carrying a quote or $(...) runs as shell inside the workflow.",
+          "faultClass": "other", "file": "action.yml",
+          "find": "        [ -n \"$TG_CLAIMS\" ] && ARGS+=(--claims \"$TG_CLAIMS\")",
+          "replace": "        [ -n \"${{ inputs.claims }}\" ] && ARGS+=(--claims \"${{ inputs.claims }}\")",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/action.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-PIP-WRAPPER-PINS-OWN-VERSION",
+      "statement": "With no project-local install, the pip wrapper runs the npm CLI pinned to the wheel's own version, and refuses rather than run an unpinned CLI when it cannot read that version.",
+      "source": { "kind": "spec", "ref": "docs/installation.md#pip" },
+      "severity": "high",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/python-wrapper.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "The npx fallback asks for @latest, so the CLI that runs is whatever npm published last, not the installed release.",
+          "faultClass": "literal-changed", "file": "testguard_cli/wrapper.py",
+          "find": "        return f\"{PACKAGE}@{version(PACKAGE)}\"",
+          "replace": "        return f\"{PACKAGE}@latest\"",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/python-wrapper.test.mjs"]
+        },
+        {
+          "id": "F2", "description": "Missing package metadata falls back to @latest instead of refusing.",
+          "faultClass": "literal-changed", "file": "testguard_cli/wrapper.py",
+          "find": "    except PackageNotFoundError:\n        return None",
+          "replace": "    except PackageNotFoundError:\n        return f\"{PACKAGE}@latest\"",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/python-wrapper.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-YAML-TEST-HELPER-READS-EVERY-DOCUMENT",
+      "statement": "The tests' YAML helper returns every document in a file, so the GitLab template's job document is parsed and checked, not only its spec header.",
+      "source": { "kind": "manual", "ref": "test/helpers/yaml.mjs" },
+      "severity": "medium",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/gitlab-template.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "The helper returns only the first YAML document, so the template's jobs are never parsed.",
+          "faultClass": "other", "file": "test/helpers/yaml.mjs",
+          "find": "export function parseYaml(path) {",
+          "replace": "export function parseYaml(path) { return parseAll(path).slice(0, 1); }\nfunction parseAll(path) {",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/gitlab-template.test.mjs"]
+        }
+      ]
     }
   ]
 }
