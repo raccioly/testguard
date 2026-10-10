@@ -11,6 +11,7 @@ import { PreconditionError } from '../probe/worktree.mjs';
 import { hintFor } from '../brief/brief.mjs';
 import { formatVerdict, PROVISIONAL_WARNING } from '../render.mjs';
 import { decideAdmission } from '../admit/admit.mjs';
+import { runnerOptions } from './runner-options.mjs';
 
 /** The project is wherever the claims file is, walking up from the test file; else cwd. */
 function findProjectDir(testAbs, claimsFlag) {
@@ -42,6 +43,11 @@ export async function admitCommand({ file, values, version }, io) {
   const claimId = values.claim[0].trim();
   if (!claimId) {
     io.err('--claim must name one claim id');
+    return 3;
+  }
+  const runner = runnerOptions(values);
+  if (runner.error) {
+    io.err(runner.error);
     return 3;
   }
   const confirmRuns = Number(values.confirm);
@@ -100,9 +106,10 @@ export async function admitCommand({ file, values, version }, io) {
     includeDirty: true,
     only: [claimId],
     escalate: false,
-    runnerCommand: values['runner-cmd'],
+    runnerCommand: runner.runnerCommand,
     runnerName: values.runner,
     nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
+    python: runner.python,
     toolVersion: version,
     onStage: !values.quiet && !values.json && process.stderr.isTTY ? ({ claimId: c, faultId, stage, i, n }) => process.stderr.write(`\r\x1b[K  … ${c}/${faultId} ${stage} ${i}/${n}`) : undefined,
   });
