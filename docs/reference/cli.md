@@ -114,12 +114,15 @@ it never reaches the network.
 |---|---|---|
 | `--here` | off | Keep the agent layer in `[dir]` instead of the git root, for a subdirectory that is its own agent root. |
 | `--force` | off | Replace an existing skill file (and an existing `.testguard/fetch-ci-evidence.sh`). It does not refresh an `AGENTS.md` section that already lists the project. |
-| `--ci-evidence github\|gitlab` | none | Also write `.testguard/fetch-ci-evidence.sh`, an on-demand helper that downloads CI's evidence artifact and briefs from it. See [artifacts](artifacts.md#fetch-ci-evidencesh). Any other value fails with exit `2` after the agent layer has already been written. |
+| `--ci-evidence github\|gitlab` | none | Also write `.testguard/fetch-ci-evidence.sh`, an on-demand helper that downloads CI's evidence artifact and briefs from it. See [artifacts](artifacts.md#fetch-ci-evidencesh). Any other value is a usage error (exit `3`) and nothing is written. |
 | `--mcp` | off | Print the MCP server configuration for Claude Code, Cursor and Codex. Printed, never written. See [MCP](mcp.md#register-the-server). |
 | `--json` | off | Print `{done, skipped, warnings, agentRoot, dir, mcpConfig?}`. |
 
 **Exit:** `0`; `1` when a file it wrote is ignored by git (it is reported, not
-offered for commit); `2` when `.claude/settings.json` is not valid JSON.
+offered for commit); `2` when `.claude/settings.json` is not valid JSON or not
+an object init can add a hook to (the message names the file); `3` for a bad
+option. On `2` or `3` nothing is written: every check runs before the first
+write.
 
 **`--json` schema:** none published.
 
@@ -285,8 +288,8 @@ npx testguard-cli brief [dir] [--text | --markdown] [--max <n>] [--evidence <pat
 Turns evidence plus baseline into a ranked, capped `## TEST BLINDSPOT CONTEXT`
 block, with the next action and unclaimed changed files first. Without
 `--text` or `--markdown` it also writes `.testguard/brief.json`. The first line
-says which install answered (`local install` or `global`), so a stale one is
-visible.
+says which install answered (`local install`, `npx cache`, `pnpm dlx cache`,
+`bunx cache` or `global`), so a stale one is visible.
 
 | Flag | Default | Meaning |
 |---|---|---|

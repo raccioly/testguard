@@ -89,7 +89,7 @@ npx testguard-cli init packages/billing
 + .claude/skills/testguard/SKILL.md
 + .claude/settings.json: SessionStart hook → brief --text packages/billing (local install first, then a testguard on PATH, never a fetch)
 + AGENTS.md created with the TestGuard section
-+ packages/billing/.gitignore: 10 lines added
++ packages/billing/.gitignore: 12 lines added
 ```
 
 A second project adds one hook entry and one `AGENTS.md` bullet; it never
@@ -102,7 +102,7 @@ npx testguard-cli init packages/auth
 ```
 + .claude/settings.json: SessionStart hook → brief --text packages/auth (local install first, then a testguard on PATH, never a fetch)
 + AGENTS.md: TestGuard section now lists packages/auth
-+ packages/auth/.gitignore: 10 lines added
++ packages/auth/.gitignore: 12 lines added
 = .claude/skills/testguard/SKILL.md exists (use --force to replace)
 ```
 

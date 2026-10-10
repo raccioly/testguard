@@ -2235,10 +2235,10 @@
       "faults": [
         {
           "id": "F1",
-          "description": "The already-installed check is defeated; every init appends another hook.",
+          "description": "The already-installed check is defeated; every init rewrites the hook and reports a change that is not one.",
           "faultClass": "literal-changed",
           "file": "src/init/init.mjs",
-          "find": "  const hasCmd = settings.hooks.SessionStart.some((e) => JSON.stringify(e).includes(cmd));",
+          "find": "  const hasCmd = ours.length === 1 && ours[0].command === cmd;",
           "replace": "  const hasCmd = false;",
           "producedBy": {
             "producer": "human",
@@ -5373,7 +5373,7 @@
           "description": "The outputs that shipped after the advice was written fall off the list again, so a project is told to ignore a set that no longer matches what the tool writes.",
           "faultClass": "field-dropped",
           "file": "src/init/init.mjs",
-          "find": "export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json', '.testguard/replay.json', '.testguard/calibration.json', '.testguard/ci-self-evidence.json', '.testguard/ci/'];",
+          "find": "export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json', '.testguard/replay.json', '.testguard/calibration.json', '.testguard/ci-self-evidence.json', '.testguard/ci/', '.testguard/sweep.json', '.testguard/sweep-evidence.json'];",
           "replace": "export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json'];",
           "producedBy": {
             "producer": "human",
@@ -7592,6 +7592,160 @@
           "defendedBy": ["test/gitlab-template.test.mjs"]
         }
       ]
+    },
+    {
+      "id": "TG-INIT-REFUSES-BEFORE-WRITING",
+      "statement": "init checks every option and every file it must merge into before its first write. A bad --ci-evidence value is a usage error (exit 3) and an unmergeable .claude/settings.json is a precondition failure (exit 2) naming the file and the JSON error; either way the project is left exactly as it was. It used to print 'this is a bug in testguard' with a stack trace after it had already written the skill, the hook and the AGENTS.md section.",
+      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "severity": "medium",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/init.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The --ci-evidence value is no longer checked before the writes, so an unknown platform installs the whole agent layer and a helper for the wrong platform.",
+          "faultClass": "guard-removed",
+          "file": "src/init/init.mjs",
+          "find": "  if (ciEvidence !== undefined && !CI_PLATFORMS.includes(ciEvidence)) throw new InitUsageError(`--ci-evidence must be github or gitlab, not ${JSON.stringify(ciEvidence)}`);",
+          "replace": "",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F2",
+          "description": "An unparseable settings.json throws a plain Error again, which the CLI reports as a defect in testguard with a stack trace instead of a precondition naming the file.",
+          "faultClass": "other",
+          "file": "src/init/init.mjs",
+          "find": "    throw new PreconditionError(`${settingsPath} is not valid JSON (${e.message}); fix it before init can add the hook. Nothing was written.`);",
+          "replace": "    throw new Error(`${settingsPath} is not valid JSON (${e.message}); fix it before init can add the hook. Nothing was written.`);",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        }
+      ],
+      "tags": ["init", "audit"]
+    },
+    {
+      "id": "TG-INIT-REPLACES-ANY-TESTGUARD-HOOK",
+      "statement": "Re-running init leaves exactly one TestGuard session-start hook per project, in the position the earlier one had, whatever form an earlier release wrote it in; hooks for other projects and the user's own hooks are untouched. Matching only the current text and two npx forms meant any change to hookCommand() made the next init append a second hook, so every session briefed twice.",
+      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "severity": "low",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/init.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Only the old npx forms are recognised as TestGuard hooks, so a later change to hookCommand() appends a second hook beside the first.",
+          "faultClass": "literal-changed",
+          "file": "src/init/init.mjs",
+          "find": "  const m = /(?:^|[\\s/])testguard(?:-cli)?(?:@[^\\s\"|;&]+)?\\s+brief\\s+--text\\b(?:\\s+([^\\s\"|;&]+))?/.exec(command);",
+          "replace": "  const m = /npx\\s+(?:-y|--no-install)\\s+testguard(?:-cli)?(?:@[^\\s\"|;&]+)?\\s+brief\\s+--text\\b(?:\\s+([^\\s\"|;&]+))?/.exec(command);",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F2",
+          "description": "Duplicate TestGuard hooks an older init left for the same project are kept, so the session still briefs twice after the upgrade.",
+          "faultClass": "statement-deleted",
+          "file": "src/init/init.mjs",
+          "find": "      for (const { gi, hi } of extra.reverse()) groups[gi].hooks.splice(hi, 1);",
+          "replace": "",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        }
+      ],
+      "tags": ["init", "audit"]
+    },
+    {
+      "id": "TG-INIT-IGNORES-EVERY-WRITTEN-OUTPUT",
+      "statement": "Every regenerated file a command writes under .testguard/ is in the .gitignore block init writes, checked against the paths the code itself builds rather than a second list; re-running init after an upgrade adds only the new lines, inside the existing block, once. sweep.json and sweep-evidence.json shipped without their lines and were offered for commit.",
+      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "severity": "low",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/init.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The sweep outputs fall off init's list, so a project that sweeps sees sweep.json and sweep-evidence.json as files to commit.",
+          "faultClass": "field-dropped",
+          "file": "src/init/init.mjs",
+          "find": "export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json', '.testguard/replay.json', '.testguard/calibration.json', '.testguard/ci-self-evidence.json', '.testguard/ci/', '.testguard/sweep.json', '.testguard/sweep-evidence.json'];",
+          "replace": "export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json', '.testguard/replay.json', '.testguard/calibration.json', '.testguard/ci-self-evidence.json', '.testguard/ci/'];",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F2",
+          "description": "Re-running init after an upgrade appends a second TestGuard header and block instead of extending the first.",
+          "faultClass": "return-altered",
+          "file": "src/init/init.mjs",
+          "find": "  return [...lines.slice(0, last + 1), ...missing, ...lines.slice(last + 1)].join('\\n');",
+          "replace": "  return gi.replace(/\\s*$/, '\\n') + GITIGNORE_HEADER + '\\n' + missing.join('\\n') + '\\n';",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        }
+      ],
+      "tags": ["init", "audit"]
+    },
+    {
+      "id": "TG-CI-HELPER-RUNS-THE-HOOKS-CLI",
+      "statement": "fetch-ci-evidence.sh briefs with the same CLI the session-start hook runs (the project's node_modules/.bin, then the repository root's, then PATH), from the evidence file the GitHub Action or the GitLab template actually uploads (for GitLab, under the project's own path from the repository root, never another project's), and never from a file an earlier download left behind.",
+      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "severity": "low",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/init.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The project's own install is skipped, so a devDependency install is not found and the helper says no CLI exists or runs a different one.",
+          "faultClass": "field-dropped",
+          "file": "src/init/init.mjs",
+          "find": "for c in ./node_modules/.bin/testguard \"\\${ROOT:+$ROOT/node_modules/.bin/testguard}\"; do",
+          "replace": "for c in \"\\${ROOT:+$ROOT/node_modules/.bin/testguard}\"; do",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F2",
+          "description": "evidence.json, the file the action's evidence output names after a confirmed run, is not looked for, so the documented workflow's artifact briefs nothing.",
+          "faultClass": "field-dropped",
+          "file": "src/init/init.mjs",
+          "find": "    ? ['evidence.json', 'evidence-provisional.json', 'ci-self-evidence.json']",
+          "replace": "    ? ['evidence-provisional.json', 'ci-self-evidence.json']",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F3",
+          "description": "The download directory is not emptied first, so a failed or empty download briefs from the evidence an earlier run left there as if it were current.",
+          "faultClass": "statement-deleted",
+          "file": "src/init/init.mjs",
+          "find": "rm -rf \"$OUT\" && mkdir -p \"$OUT\" || exit 0",
+          "replace": "mkdir -p \"$OUT\" || exit 0",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F4",
+          "description": "The GitLab helper ignores the project's path from the repository root, so a project in a subdirectory finds nothing, or briefs from the root project's evidence in the same artifact.",
+          "faultClass": "literal-changed",
+          "file": "src/init/init.mjs",
+          "find": "    : ['${PREFIX}.testguard/evidence.json', '${PREFIX}.testguard/evidence-provisional.json'];",
+          "replace": "    : ['.testguard/evidence.json', '.testguard/evidence-provisional.json'];",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        }
+      ],
+      "tags": ["init", "audit"]
+    },
+    {
+      "id": "TG-BRIEF-LABELS-RUNNER-CACHES",
+      "statement": "The brief's install label names a package runner's cache (npx, pnpm dlx, bunx) as such, never as a local install, so a stale cached CLI is visible at session start. The npx cache sits under node_modules/ and was labelled 'local install'.",
+      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "severity": "low",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/brief.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The npx cache is no longer recognised and is labelled a local install again.",
+          "faultClass": "field-dropped",
+          "file": "src/brief/brief.mjs",
+          "find": "  [/[\\\\/]_npx[\\\\/]/, 'npx cache'],",
+          "replace": "",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        }
+      ],
+      "tags": ["init", "audit"]
     }
   ]
 }

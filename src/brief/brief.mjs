@@ -7,6 +7,24 @@ export const HEADING = '## TEST BLINDSPOT CONTEXT';
 export const MARKDOWN_MARKER = '<!-- testguard:brief -->';
 const ORDER = ['survived', 'nocover', 'unverifiable', 'fault-invalid', 'timeout', 'flaky-defender'];
 
+const RUNNER_CACHES = [
+  [/[\\/]_npx[\\/]/, 'npx cache'],
+  [/[\\/]pnpm[\\/]dlx[\\/]/, 'pnpm dlx cache'],
+  [/[\\/]bunx-[^\\/]*[\\/]/, 'bunx cache'],
+];
+/**
+ * Where the running CLI came from, for the brief's first line, so a stale
+ * binary is visible in the session-start context. A package runner's cache is
+ * checked first: it also sits under node_modules/, and calling it a local
+ * install hid exactly the stale copy the label exists to show — npx reuses
+ * whatever version it cached until that cache is cleared.
+ */
+export function installLabel(scriptPath) {
+  const path = scriptPath ?? '';
+  for (const [pattern, label] of RUNNER_CACHES) if (pattern.test(path)) return label;
+  return /[\\/]node_modules[\\/]/.test(path) ? 'local install' : 'global';
+}
+
 /** One line the agent can act on. Names the mechanism, never just the verdict. */
 export function hintFor(r) {
   const defenders = r.defenders.resolved.join(', ');

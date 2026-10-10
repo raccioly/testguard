@@ -4,10 +4,12 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, realpathSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { initProject, hookCommand } from '../src/init/init.mjs';
-import { USAGE } from '../src/cli.mjs';
+import { initProject, hookCommand, GITIGNORE_LINES, COMMITTED_OUTPUTS, CI_DOWNLOAD_DIR, InitUsageError } from '../src/init/init.mjs';
+import { USAGE, main } from '../src/cli.mjs';
+import { sweepPath, sweepEvidencePath } from '../src/commands/sweep.mjs';
+import { gatePath } from '../src/commands/gate.mjs';
 
 const gitInit = (dir) => { const g = (...a) => spawnSync('git', ['-c', 'user.email=i@example.invalid', '-c', 'user.name=i', ...a], { cwd: dir }); g('init', '-q'); };
 
@@ -342,4 +344,343 @@ describe('init', () => {
       expect(() => initProject({ projectDir: dir, ciEvidence: 'bitbucket' })).toThrow(/--ci-evidence must be github or gitlab/);
     });
   });
+});
+
+// ---------------------------------------------------------------------------
+// The .testguard/ directory: what init ignores is derived from what the code
+// writes, never from a second hand-kept list.
+// ---------------------------------------------------------------------------
+
+const SRC = fileURLToPath(new URL('../src', import.meta.url));
+const sourceFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+  e.isDirectory() ? (e.name === 'templates' ? [] : sourceFiles(join(dir, e.name))) : e.name.endsWith('.mjs') ? [join(dir, e.name)] : []);
+
+/**
+ * Every `.testguard/` path the code builds, read from the code itself: each
+ * `join(<dir>, '.testguard', <name>)` under src/ (the path helpers such as
+ * sweepPath() and the inline joins alike), plus the CI download directory.
+ * A join whose name is not a literal is reported, so a new artifact cannot
+ * slip past by being spelled differently.
+ */
+function writtenTestguardPaths() {
+  const paths = new Set([`${CI_DOWNLOAD_DIR}/evidence.json`]);
+  const unparsed = [];
+  for (const file of sourceFiles(SRC)) {
+    const text = readFileSync(file, 'utf8');
+    for (const m of text.matchAll(/join\(([^()]|\([^()]*\))*?'\.testguard'[^;\n]*/g)) {
+      const name = /join\([^,]+,\s*'\.testguard',\s*(?:'([^']+)'|`([^`]+)`)\s*\)/.exec(m[0]);
+      if (!name) { unparsed.push(`${file}: ${m[0].trim()}`); continue; }
+      paths.add(`.testguard/${(name[1] ?? name[2]).replace(/\$\{[^}]*\}/g, 'example')}`);
+    }
+  }
+  return { paths: [...paths].sort(), unparsed };
+}
+
+const checkIgnored = (root, rel) => spawnSync('git', ['-c', 'core.excludesFile=/dev/null', 'check-ignore', '-q', '--no-index', '--', rel], { cwd: root }).status === 0;
+
+describe('init ignores every regenerated .testguard/ output the code writes', () => {
+  const { paths, unparsed } = writtenTestguardPaths();
+
+  it('reads the written paths from the code, and every join it found is one it understood', () => {
+    expect(unparsed).toEqual([]);
+    // the scan is not vacuous: it sees the helpers it is meant to see
+    expect(paths).toContain(relative(tmpdir(), sweepPath(tmpdir())).split(sep).join('/'));
+    expect(paths).toContain(relative(tmpdir(), sweepEvidencePath(tmpdir())).split(sep).join('/'));
+    expect(paths).toContain(relative(tmpdir(), gatePath(tmpdir())).split(sep).join('/'));
+    expect(paths).toContain('.testguard/scaffold-example.json');
+  });
+
+  it('git ignores each one under the lines init writes, except the committed files', () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-every-output-')));
+    gitInit(dir);
+    initProject({ projectDir: dir });
+    const wrong = paths.filter((p) => checkIgnored(dir, p) === COMMITTED_OUTPUTS.includes(p));
+    expect(wrong, 'paths whose ignore state contradicts COMMITTED_OUTPUTS').toEqual([]);
+  });
+
+  it('the committed set is exactly the contract, the reserved status snapshot and the hand-run helper', () => {
+    // Widening this set is how an output would dodge the check above; it is a
+    // decision, so it is spelled out.
+    expect([...COMMITTED_OUTPUTS].sort()).toEqual(['.testguard/baseline.json', '.testguard/fetch-ci-evidence.sh', '.testguard/status.json']);
+  });
+
+  it('init\'s per-file lines and the `.testguard/*` form baseline advises agree on every path, status.json included', () => {
+    const perFile = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-form-a-')));
+    const star = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-form-b-')));
+    gitInit(perFile);
+    gitInit(star);
+    initProject({ projectDir: perFile });
+    writeFileSync(join(star, '.gitignore'), ['.testguard/*', ...COMMITTED_OUTPUTS.map((p) => `!${p}`)].join('\n') + '\n');
+    for (const p of [...paths, ...COMMITTED_OUTPUTS]) {
+      expect(checkIgnored(perFile, p), p).toBe(checkIgnored(star, p));
+    }
+  });
+
+  it('this repository\'s own .gitignore carries every line init writes', () => {
+    const own = readFileSync(new URL('../.gitignore', import.meta.url), 'utf8').split('\n').map((l) => l.trim());
+    expect(GITIGNORE_LINES.filter((l) => !own.includes(l))).toEqual([]);
+  });
+
+  it('re-running init on a project with an older block adds only the new lines, inside that block, once', () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-gi-upgrade-')));
+    const old = GITIGNORE_LINES.filter((l) => !/sweep/.test(l));
+    const before = `node_modules/\n# TestGuard: regenerated per run (baseline.json IS committed)\n${old.join('\n')}\n# mine\ndist/\n`;
+    writeFileSync(join(dir, '.gitignore'), before);
+    const r = initProject({ projectDir: dir });
+    const after = readFileSync(join(dir, '.gitignore'), 'utf8');
+    const lines = after.split('\n');
+    for (const l of GITIGNORE_LINES) expect(lines.filter((x) => x === l), l).toHaveLength(1);
+    expect(lines.filter((x) => x.startsWith('# TestGuard'))).toHaveLength(1); // no second header
+    // the new lines sit with the old block, not after the user's own lines
+    expect(lines.indexOf('.testguard/sweep.json')).toBeLessThan(lines.indexOf('# mine'));
+    expect(after.endsWith('# mine\ndist/\n')).toBe(true);
+    expect(r.done).toContain('.gitignore: 2 lines added');
+    expect(initProject({ projectDir: dir }).done).toEqual([]);
+    expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toBe(after);
+  });
+
+  it('adds nothing to a project that already uses the `.testguard/*` form', () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-gi-star-')));
+    const gi = ['node_modules/', '.testguard/*', ...COMMITTED_OUTPUTS.map((p) => `!${p}`)].join('\n') + '\n';
+    writeFileSync(join(dir, '.gitignore'), gi);
+    const r = initProject({ projectDir: dir });
+    expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toBe(gi);
+    expect(r.skipped.some((s) => /\.testguard\/\*/.test(s))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// init refuses before it writes: a refusal leaves the project as it was.
+// ---------------------------------------------------------------------------
+
+const listTree = (dir) => readdirSync(dir, { recursive: true }).map(String).filter((p) => !p.startsWith('.git' + sep) && p !== '.git').sort();
+const capture = () => { const lines = { out: [], err: [] }; return { lines, io: { out: (s) => lines.out.push(s), err: (s) => lines.err.push(s) } }; };
+
+describe('init validates everything before its first write', () => {
+  for (const bad of ['foo', 'GitHub', 'toString', '']) {
+    it(`--ci-evidence ${JSON.stringify(bad)} is a usage error (exit 3) and writes nothing`, async () => {
+      const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-usage-')));
+      gitInit(dir);
+      const { lines, io } = capture();
+      const code = await main(['init', dir, '--ci-evidence', bad], io);
+      expect(code).toBe(3);
+      const err = lines.err.join('\n');
+      expect(err).toMatch(/--ci-evidence must be github or gitlab/);
+      expect(err).toMatch(/testguard init --help/);
+      expect(err).not.toMatch(/bug in testguard|\n\s+at /);
+      expect(listTree(dir)).toEqual([]);
+    });
+  }
+
+  it('the library refuses an unknown platform before writing, too', () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-usage-lib-')));
+    expect(() => initProject({ projectDir: dir, ciEvidence: 'bitbucket' })).toThrow(InitUsageError);
+    expect(listTree(dir)).toEqual([]);
+  });
+
+  for (const [label, body, why] of [
+    ['unparseable', '{not json', /not valid JSON \(.+\)/],
+    ['an array', '[]', /must be a JSON object/],
+    ['null', 'null', /must be a JSON object/],
+    ['hooks that are not an object', '{"hooks": []}', /"hooks" must be an object/],
+    ['a SessionStart that is not an array', '{"hooks": {"SessionStart": {}}}', /"hooks\.SessionStart" must be an array/],
+  ]) {
+    it(`a settings.json that is ${label} is a precondition failure (exit 2) naming the file, and nothing is written`, async () => {
+      const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-badsettings-')));
+      gitInit(dir);
+      mkdirSync(join(dir, '.claude'));
+      const settingsPath = join(dir, '.claude', 'settings.json');
+      writeFileSync(settingsPath, body);
+      const before = listTree(dir);
+      const { lines, io } = capture();
+      const code = await main(['init', dir, '--ci-evidence', 'github'], io);
+      expect(code).toBe(2);
+      const err = lines.err.join('\n');
+      expect(err).toMatch(/^error: /);
+      expect(err).toContain(settingsPath);
+      expect(err).toMatch(why);
+      expect(err).not.toMatch(/bug in testguard|\n\s+at /);
+      expect(listTree(dir)).toEqual(before);           // no skill, no AGENTS.md, no .gitignore, no helper
+      expect(readFileSync(settingsPath, 'utf8')).toBe(body);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// One TestGuard hook per project, whatever hookCommand() looked like when the
+// earlier one was written.
+// ---------------------------------------------------------------------------
+
+describe('init replaces any earlier TestGuard hook in place', () => {
+  const sessionStart = (dir) => JSON.parse(readFileSync(join(dir, '.claude', 'settings.json'), 'utf8')).hooks.SessionStart;
+  const commands = (dir) => sessionStart(dir).flatMap((g) => g.hooks.map((h) => h.command));
+  const userHook = { matcher: 'startup', hooks: [{ type: 'command', command: 'echo hello' }] };
+
+  // Forms a TestGuard release has written, or plausibly will: a change to
+  // hookCommand() must never leave two briefs running at session start.
+  const ROOT_FORMS = [
+    'npx -y testguard-cli brief --text',
+    'npx --no-install testguard brief --text 2>/dev/null || true',
+    'node_modules/.bin/testguard brief --text 2>/dev/null || true',
+    // a hypothetical later form, anchored on the harness's project variable
+    '"$CLAUDE_PROJECT_DIR"/node_modules/.bin/testguard brief --text 2>/dev/null || testguard brief --text 2>/dev/null || true',
+  ];
+
+  for (const old of ROOT_FORMS) {
+    it(`root: ${old}`, () => {
+      const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-hook-root-')));
+      mkdirSync(join(dir, '.claude'));
+      writeFileSync(join(dir, '.claude', 'settings.json'), JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: 'command', command: old }] }, userHook] } }));
+      const r = initProject({ projectDir: dir });
+      expect(commands(dir)).toEqual([hookCommand('.'), 'echo hello']); // same position, user's hook untouched
+      expect(r.done.some((d) => /replaced/.test(d))).toBe(true);
+      const again = initProject({ projectDir: dir });
+      expect(again.done).toEqual([]);
+      expect(commands(dir)).toEqual([hookCommand('.'), 'echo hello']);
+    });
+  }
+
+  it('nested: only the project\'s own hook is replaced; other projects\' hooks and the user\'s stay; duplicates collapse', () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-hook-nested-')));
+    gitInit(root);
+    mkdirSync(join(root, 'backend'));
+    mkdirSync(join(root, '.claude'));
+    const oldBackend = 'backend/node_modules/.bin/testguard brief --text backend 2>/dev/null || node_modules/.bin/testguard brief --text backend 2>/dev/null || true';
+    const oldRoot = 'node_modules/.bin/testguard brief --text 2>/dev/null || true';
+    const frontend = hookCommand('frontend');
+    writeFileSync(join(root, '.claude', 'settings.json'), JSON.stringify({ hooks: { SessionStart: [
+      { hooks: [{ type: 'command', command: oldBackend }] },
+      { hooks: [{ type: 'command', command: frontend }] },
+      userHook,
+      { hooks: [{ type: 'command', command: oldRoot }] },
+      { hooks: [{ type: 'command', command: 'npx -y testguard-cli brief --text backend' }] }, // the duplicate the old code appended
+    ] } }));
+    initProject({ projectDir: join(root, 'backend') });
+    expect(commands(root)).toEqual([hookCommand('backend'), frontend, 'echo hello', oldRoot]);
+    expect(initProject({ projectDir: join(root, 'backend') }).done).toEqual([]);
+    // the root project's own hook is still its own to replace
+    initProject({ projectDir: root, here: true });
+    expect(commands(root)).toEqual([hookCommand('backend'), frontend, 'echo hello', hookCommand('.')]);
+  });
+
+  it('a TestGuard hook sharing a group with the user\'s hooks is replaced without touching them', () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-hook-group-')));
+    mkdirSync(join(dir, '.claude'));
+    writeFileSync(join(dir, '.claude', 'settings.json'), JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: 'command', command: 'echo a' }, { type: 'command', command: ROOT_FORMS[2], timeout: 30 }] }] } }));
+    initProject({ projectDir: dir });
+    expect(sessionStart(dir)).toEqual([{ hooks: [{ type: 'command', command: 'echo a' }, { type: 'command', command: hookCommand('.'), timeout: 30 }] }]);
+  });
+
+  it('a user hook that merely mentions testguard is not mistaken for ours', () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-init-hook-foreign-')));
+    mkdirSync(join(dir, '.claude'));
+    writeFileSync(join(dir, '.claude', 'settings.json'), JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: 'command', command: 'testguard status --json > /tmp/s.json' }] }] } }));
+    initProject({ projectDir: dir });
+    expect(commands(dir)).toEqual(['testguard status --json > /tmp/s.json', hookCommand('.')]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetch-ci-evidence.sh works for an ordinary project. No network: gh, glab
+// and testguard are stand-ins on PATH.
+// ---------------------------------------------------------------------------
+
+describe('the CI-evidence helper', () => {
+  const stub = (dir, name, body) => { mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, name), `#!/bin/sh\n${body}\n`, { mode: 0o755 }); };
+  // A gh/glab stand-in that "downloads" the named file into the --dir/--path it is given.
+  const ghWrites = (bin, file) => stub(bin, 'gh', `while [ $# -gt 0 ]; do [ "$1" = --dir ] && D=$2; shift; done; mkdir -p "$D/$(dirname ${file})" && echo '{}' > "$D/${file}"`);
+  const glabWrites = (bin, file) => stub(bin, 'glab', `while [ $# -gt 0 ]; do [ "$1" = --path ] && D=$2; shift; done; mkdir -p "$D/$(dirname ${file})" && echo '{}' > "$D/${file}"`);
+  const run = (helper, bin, cwd) => spawnSync('/bin/sh', [helper], { cwd, encoding: 'utf8', env: { ...process.env, PATH: `${bin}:/usr/bin:/bin` } });
+  const project = (platform) => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), `tg-helper-${platform}-`)));
+    gitInit(root);
+    mkdirSync(join(root, 'app'));
+    initProject({ projectDir: join(root, 'app'), ciEvidence: platform });
+    return { root, app: join(root, 'app'), helper: join(root, 'app', '.testguard', 'fetch-ci-evidence.sh'), bin: mkdtempSync(join(tmpdir(), 'tg-helper-bin-')) };
+  };
+
+  it('github: briefs from the evidence.json the action uploads, with the project\'s own install, from any cwd', () => {
+    const p = project('github');
+    ghWrites(p.bin, 'evidence.json');
+    stub(join(p.app, 'node_modules', '.bin'), 'testguard', 'echo "project $*"');
+    stub(join(p.root, 'node_modules', '.bin'), 'testguard', 'echo "root $*"');
+    stub(p.bin, 'testguard', 'echo "path $*"');
+    const r = run(p.helper, p.bin, p.root);
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('project brief . --text --evidence .testguard/ci/evidence.json');
+  });
+
+  it('github: still reads ci-self-evidence.json, and falls back to the repository root\'s install, then PATH', () => {
+    const p = project('github');
+    ghWrites(p.bin, 'ci-self-evidence.json');
+    stub(join(p.root, 'node_modules', '.bin'), 'testguard', 'echo "root $*"');
+    expect(run(p.helper, p.bin, p.app).stdout.trim()).toBe('root brief . --text --evidence .testguard/ci/ci-self-evidence.json');
+    const q = project('github');
+    ghWrites(q.bin, 'ci-self-evidence.json');
+    stub(q.bin, 'testguard', 'echo "path $*"');
+    expect(run(q.helper, q.bin, q.app).stdout.trim()).toBe('path brief . --text --evidence .testguard/ci/ci-self-evidence.json');
+  });
+
+  it('github: briefs from evidence-provisional.json when that is the file the action\'s run wrote', () => {
+    const p = project('github');
+    ghWrites(p.bin, 'evidence-provisional.json');
+    stub(join(p.app, 'node_modules', '.bin'), 'testguard', 'echo "project $*"');
+    expect(run(p.helper, p.bin, p.app).stdout.trim()).toBe('project brief . --text --evidence .testguard/ci/evidence-provisional.json');
+  });
+
+  it('gitlab: a project in a subdirectory briefs from <dir>/.testguard/evidence.json, where the template puts it', () => {
+    const p = project('gitlab'); // the project is root/app
+    glabWrites(p.bin, 'app/.testguard/evidence.json');
+    stub(join(p.app, 'node_modules', '.bin'), 'testguard', 'echo "project $*"');
+    const r = run(p.helper, p.bin, p.root);
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('project brief . --text --evidence .testguard/ci/app/.testguard/evidence.json');
+  });
+
+  it('gitlab: a project at the repository root briefs from .testguard/evidence.json', () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'tg-helper-gitlab-root-')));
+    gitInit(root);
+    initProject({ projectDir: root, ciEvidence: 'gitlab' });
+    const bin = mkdtempSync(join(tmpdir(), 'tg-helper-bin-'));
+    glabWrites(bin, '.testguard/evidence.json');
+    stub(join(root, 'node_modules', '.bin'), 'testguard', 'echo "project $*"');
+    expect(run(join(root, '.testguard', 'fetch-ci-evidence.sh'), bin, root).stdout.trim()).toBe('project brief . --text --evidence .testguard/ci/.testguard/evidence.json');
+  });
+
+  it('gitlab: never briefs a subdirectory project from another project\'s evidence in the same artifact', () => {
+    const p = project('gitlab'); // root/app, but the artifact holds only the root project's evidence
+    glabWrites(p.bin, '.testguard/evidence.json');
+    stub(join(p.app, 'node_modules', '.bin'), 'testguard', 'echo "project $*"');
+    const r = run(p.helper, p.bin, p.app);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe('');
+    expect(r.stderr).toMatch(/holds no evidence for this project .*app\/\.testguard\/evidence\.json/);
+  });
+
+  for (const platform of ['github', 'gitlab']) {
+    const tool = platform === 'github' ? 'gh' : 'glab';
+    it(`${platform}: exits 0 with a message when no CLI, no artifact, or no evidence file is found — never a stale file`, () => {
+      const p = project(platform);
+      // no testguard anywhere
+      stub(p.bin, tool, 'exit 0');
+      let r = run(p.helper, p.bin, p.app);
+      expect(r.status).toBe(0);
+      expect(r.stderr).toMatch(/no testguard CLI found/);
+      // the artifact is missing
+      stub(join(p.app, 'node_modules', '.bin'), 'testguard', 'echo "project $*"');
+      stub(p.bin, tool, 'exit 1');
+      r = run(p.helper, p.bin, p.app);
+      expect(r.status).toBe(0);
+      expect(r.stdout).toBe('');
+      expect(r.stderr).toMatch(/no .*artifact/);
+      // an evidence file left by an earlier download is not briefed from
+      mkdirSync(join(p.app, '.testguard', 'ci'), { recursive: true });
+      writeFileSync(join(p.app, '.testguard', 'ci', 'evidence.json'), '{}');
+      stub(p.bin, tool, 'exit 0'); // "downloads" an artifact with nothing we recognise
+      r = run(p.helper, p.bin, p.app);
+      expect(r.status).toBe(0);
+      expect(r.stdout).toBe('');
+      expect(r.stderr).toMatch(/holds no evidence/);
+    });
+  }
 });
