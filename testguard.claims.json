@@ -4224,8 +4224,8 @@
           "description": "An explicit --python is only a preference: resolution falls through to another interpreter, changing which dependencies the tests ran against.",
           "faultClass": "return-altered",
           "file": "src/probe/runners/python.mjs",
-          "find": "  if (explicit) return [{ path: explicit, source: 'project', explicit: true }];",
-          "replace": "  if (explicit) out.push({ path: explicit, source: 'project' });",
+          "find": "  if (explicit) return [{ ...explicit, explicit: true }];",
+          "replace": "  if (explicit) out.push({ ...explicit });",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -7746,6 +7746,399 @@
         }
       ],
       "tags": ["init", "audit"]
+    },
+    {
+      "id": "TG-ENV-LOAD-FAILURE-IS-NEVER-REUSED",
+      "statement": "A record whose defenders failed to load says something about the environment, not the code, so a later run always measures that fault again however unchanged its inputs are.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/attribution.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A broken --runner-cmd or a missing dependency becomes a permanent verdict: the load failure is reused after the environment is fixed.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/attribution.mjs",
+          "find": "  if (prior.detail?.reason === 'defenders-failed-to-load') return false;",
+          "replace": "  if (false) return false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RUNNER-CMD-BINDS-REUSE",
+      "statement": "A custom --runner-cmd is part of the test universe a verdict was measured against: changing the command re-measures every fault instead of reusing the old command's verdicts.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/native-universe-hash.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The custom-command universe hashes only the files, so a fixed command reuses the broken command's verdicts.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/universe.mjs",
+          "find": "  return sha256(JSON.stringify({ schemaVersion: 2, source: 'custom-command-static', command: commandTemplate, files }));",
+          "replace": "  return sha256(JSON.stringify({ schemaVersion: 2, source: 'custom-command-static', files }));",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The probe hashes an empty command into the universe, so any two commands look identical to reuse.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/probe.mjs",
+          "find": "      ? hashCustomCommandUniverse(allTests, commandTemplate)",
+          "replace": "      ? hashCustomCommandUniverse(allTests, [])",
+          "defendedBy": [
+            "test/probe-runner-identity.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RUNNER-IDENTITY-BINDS-REUSE",
+      "statement": "A verdict is reused only when the evidence records the same runner: the engine that ran, its version and where it was resolved from.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#resource-controls-and-measurement"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/worker-policy.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Reuse compares only the runner's name, so an upgraded runner or a global binary of the same name stands in for the measurement.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "  return recorded.name === current.name && recorded.version === current.version && recorded.source === current.source;",
+          "replace": "  return recorded.name === current.name;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The probe never asks whether the previous run used the same runner.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "      && sameRunner(previous.run, recordedRunner)",
+          "replace": "      && true",
+          "defendedBy": [
+            "test/probe-runner-identity.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RUNNER-SOURCE-IS-RECORDED",
+      "statement": "The evidence records where every resolved runner came from (project, path or builtin), not only the built-in Node runner.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/evidence.schema.json"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/worker-policy.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Only the builtin source is written, as after c74b6db: a PATH-resolved runner is indistinguishable from the project's own.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "  return { name, ...(version ? { version } : {}), ...(source ? { source } : {}) };",
+          "replace": "  return { name, ...(version ? { version } : {}), ...(source === 'builtin' ? { source } : {}) };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The probe drops the resolved source before recording the runner.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/probe.mjs",
+          "find": "    recordedRunner = runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), runnerSource);",
+          "replace": "    recordedRunner = runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), undefined);",
+          "defendedBy": [
+            "test/resource-timing.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-MALFORMED-RUNNER-CMD-IS-USAGE",
+      "statement": "A --runner-cmd without {files} or {out}, or with an unclosed quote, is a usage error (exit 3) naming the problem on probe, admit, sweep and replay, never a crash reported as a testguard bug.",
+      "source": {
+        "kind": "doc",
+        "ref": "docs/reference/languages-and-runners.md#custom-runners"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/runner-options.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The template error escapes as a RangeError, which the CLI reports as a bug with a stack trace.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/runner-options.mjs",
+          "find": "      return { error: error.message };",
+          "replace": "      throw error;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "probe ignores the validation result.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/probe.mjs",
+          "find": "  const runner = runnerOptions(values);\n  if (runner.error) {",
+          "replace": "  const runner = runnerOptions(values);\n  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "admit ignores the validation result.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/admit.mjs",
+          "find": "  const runner = runnerOptions(values);\n  if (runner.error) {",
+          "replace": "  const runner = runnerOptions(values);\n  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "sweep ignores the validation result.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/sweep.mjs",
+          "find": "  const runner = runnerOptions(values);\n  if (runner.error) {",
+          "replace": "  const runner = runnerOptions(values);\n  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "replay ignores the validation result.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/replay.mjs",
+          "find": "  const runner = runnerOptions(values);\n  if (runner.error) {",
+          "replace": "  const runner = runnerOptions(values);\n  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PYTHON-OPTION-MEANS-ONE-THING",
+      "statement": "--python and TESTGUARD_PYTHON read an interpreter the same way on every command that runs tests: a bare command name is looked up on PATH, anything with a path separator is a path.",
+      "source": {
+        "kind": "doc",
+        "ref": "docs/guides/python.md#which-interpreter"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/python-interpreter.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A bare name is resolved against the working directory, so --python python3 becomes <cwd>/python3.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/python.mjs",
+          "find": "  return bare ? { path: value, source: 'path' } : { path: resolve(value), source: 'project' };",
+          "replace": "  return { path: resolve(value), source: 'project' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "admit drops --python and tests against whatever interpreter discovery finds.",
+          "faultClass": "argument-swapped",
+          "file": "src/commands/admit.mjs",
+          "find": "    python: runner.python,",
+          "replace": "    python: undefined,",
+          "defendedBy": [
+            "test/python-option-commands.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "sweep drops --python.",
+          "faultClass": "argument-swapped",
+          "file": "src/commands/sweep.mjs",
+          "find": "      python: runner.python,",
+          "replace": "      python: undefined,",
+          "defendedBy": [
+            "test/python-option-commands.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "replay drops --python.",
+          "faultClass": "argument-swapped",
+          "file": "src/commands/replay.mjs",
+          "find": "    python: runner.python,",
+          "replace": "    python: undefined,",
+          "defendedBy": [
+            "test/python-option-commands.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "replay selects its runner without the interpreter it was given.",
+          "faultClass": "argument-swapped",
+          "file": "src/replay/replay.mjs",
+          "find": "        const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, python, name: runnerName, budgetMs: budgetFor(), budgetFor });",
+          "replace": "        const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, name: runnerName, budgetMs: budgetFor(), budgetFor });",
+          "defendedBy": [
+            "test/python-option-commands.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONTENTION-ADVICE-CHANGES-THE-RUN",
+      "statement": "The contention warning only advises something that would change the run: an already-serial run is told to wait, never to pass --serial again.",
+      "source": {
+        "kind": "doc",
+        "ref": "docs/guides/performance.md#keep-the-machine-responsive"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/contention.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every run is told to pass --serial, including the default run that already has it.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/contention.mjs",
+          "find": "  if (serial || workers <= 1) return",
+          "replace": "  if (false) return",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COST-DURATIONS-ARE-ROUNDED",
+      "statement": "Cost output prints measured durations rounded to whole milliseconds or tenths of a second, never raw floating-point noise.",
+      "source": {
+        "kind": "doc",
+        "ref": "docs/guides/performance.md#see-where-the-time-goes"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/cost.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Sub-second durations print unrounded, as in overhead 659.1493330000001ms.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/cost.mjs",
+          "find": ": `${whole}ms`;",
+          "replace": ": `${ms}ms`;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
     }
   ]
 }

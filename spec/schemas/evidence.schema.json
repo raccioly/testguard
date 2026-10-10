@@ -81,7 +81,7 @@
               "maxLength": 64
             },
             "source": {
-              "description": "`project`: the runner package resolved from the project. `path`: an executable on PATH ran instead. `builtin`: the explicitly selected node-test engine uses the Node executable running TestGuard; its version is required.",
+              "description": "Where the runner was resolved from; recorded for every resolved runner and absent only for a custom command. `project`: the runner package resolved from the project, the project's virtualenv, or an interpreter named by path. `path`: an executable found on PATH ran instead (including a bare command name given to --python). `builtin`: the explicitly selected node-test engine uses the Node executable running TestGuard; its version is required. Reuse requires the same name, version and source.",
               "enum": [
                 "project",
                 "path",
@@ -677,7 +677,7 @@
               }
             },
             "testUniverseHash": {
-              "description": "Canonical hash of the runner-native test universe and the configuration files that produced it. Optional for backward compatibility; current probes emit it, and evidence without it is never reusable against a configured discovery run.",
+              "description": "Canonical hash of the runner-native test universe and the configuration files that produced it; for a custom --runner-cmd, of the static file set and the parsed command argv. Optional for backward compatibility; current probes emit it, and evidence without it is never reusable against a configured discovery run.",
               "$ref": "urn:claimspec:v1:common#/$defs/sha256"
             },
             "discoveryHashes": {

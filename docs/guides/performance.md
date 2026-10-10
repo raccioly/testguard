@@ -157,8 +157,8 @@ shows a rewritten stage line at a terminal only.
 **Workers.** Built-in runners default to one worker in `probe`, `sweep`,
 `replay` and `admit`, which already means one test file at a time.
 `--workers 2` raises the ceiling for Vitest, Jest, Playwright and Node's test
-runner; `--serial` forces one whatever `--workers` says. Python is always
-serial. Faults run one after another, and so do the runner groups of a
+runner; `--serial` forces one whatever `--workers` says, so it only changes a
+run that also raised `--workers`. Python is always serial. Faults run one after another, and so do the runner groups of a
 mixed-runner defender set. [Languages and
 runners](../reference/languages-and-runners.md#runner-summary) shows the flag
 each runner receives.
@@ -168,7 +168,10 @@ running on the machine (Vitest, Jest, Playwright, Mocha, AVA, Karma, Cypress)
 other than its own. A contended machine turns a slow suite into a `TIMEOUT` or
 `FLAKY-DEFENDER` verdict about the load, not the claim, so the probe warns and
 records the detection in the evidence (`run.contention`). Wait for the other
-run to finish before trusting a timeout.
+run to finish before trusting a timeout. The warning's advice follows the run:
+a default run is already one file at a time, so it says to wait; a run that
+raised `--workers` is told to lower it or pass `--serial`; a `--runner-cmd` is
+told that its concurrency is the command's own.
 
 **Budgets.**
 
@@ -203,11 +206,18 @@ changed. All of these must match the evidence at the output path:
 - the requested and resolved defender sets and where they came from;
 - the test universe and the discovery inputs. For built-in runners this
   binds the runner, its version and the hashes of its config files,
-  `package.json`, workspace files, lockfiles and `tsconfig.json`;
+  `package.json`, workspace files, lockfiles and `tsconfig.json`. For a
+  `--runner-cmd` it binds the test files and the command itself (its parsed
+  words, hashed; reformatting whitespace is not a change);
+- the runner the evidence records (`run.runner`): the engine that ran, its
+  version, and where it was resolved from (`project`, `path`, `builtin`);
 - `--confirm` and the worker policy (`--workers`, `--serial`).
 
-A record produced by a probe error is never reused. Reused verdicts print
-`(reused)`. `--no-reuse` re-probes everything.
+A record produced by a probe error is never reused, and neither is one whose
+defenders failed to load (`defenders-failed-to-load`): that is a statement
+about the environment — a broken command, a missing dependency, a virtualenv
+without the test requirements — and fixing it changes none of the hashed
+inputs. Reused verdicts print `(reused)`. `--no-reuse` re-probes everything.
 
 Reuse reads the previous document at the path this run will write: a
 `--claim` run reuses `.testguard/evidence-partial.json`, a provisional run
@@ -215,9 +225,10 @@ Reuse reads the previous document at the path this run will write: a
 names. A cold run, a changed runner config or a changed worker policy probes
 from scratch even when your source has not changed.
 
-Two kinds of change reuse cannot see: the text of a `--runner-cmd`, and
-anything outside the hashed inputs, such as an environment variable or a
-service your tests read. Pass `--no-reuse` after either.
+One kind of change reuse cannot see: anything outside the hashed inputs that
+changes a verdict without breaking the load, such as an environment variable,
+a package upgraded inside the same virtualenv, or a service your tests read.
+Pass `--no-reuse` after one.
 
 In CI, restore the previous run's evidence from a cache and write to the same
 path, so only claims whose inputs changed are probed again. TestGuard's own CI

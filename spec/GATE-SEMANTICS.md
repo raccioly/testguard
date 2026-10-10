@@ -254,7 +254,12 @@ Rules that follow from the table:
    decided and leave a caller with an exit code this document does not define,
    which is strictly worse than one loud unverifiable claim. A `probe-error`
    record is never reused by a later run: it says something about the run, not
-   about the code. The one exception is a **precondition** failure — the
+   about the code. The same holds for a record whose reason is
+   `defenders-failed-to-load`: a broken `--runner-cmd`, a missing dependency or
+   an interpreter without the test requirements changes none of the hashed
+   inputs, so fixing the environment would otherwise leave the failure
+   reported as the current answer. Re-measuring it costs one baseline run per
+   defender set. The one exception is a **precondition** failure — the
    interpreter loading the source from outside the probed tree, a runner that
    does not resolve — which is a statement about every verdict in the run and
    still refuses it outright.
@@ -306,6 +311,11 @@ Rules that follow from the table:
    files; creating or editing any of them forces remeasurement. Evidence that
    predates this hash, or whose hash
    changed, is readable but never reusable for a current native discovery run.
+   A custom `--runner-cmd` has no native listing; its `testUniverseHash` binds
+   the static file set **and the parsed command argv**, so a changed command
+   is a changed universe and never reuses a verdict the old command measured.
+   Reformatting whitespace that parses to the same argv is not a change. Only
+   the hash is recorded, never the command text.
    When several configured runners list defenders, exact manifest membership
    assigns each file. An owned runner takes precedence over the project runner;
    competing owned runners or a declared defender absent from every manifest
@@ -946,6 +956,13 @@ worker ceiling and must be one for serial execution; custom commands omit it.
 Native evidence reuse requires the same recorded worker ceiling and serial policy.
 Older native evidence with no worker ceiling is remeasured; native and opaque
 custom-command policies are not interchangeable.
+Every reuse also requires the same recorded `run.runner`: name (the engine that
+ran, so pytest and unittest differ), version and `source`. `source` is recorded
+for every resolved runner — `project` (the project's package, its virtualenv,
+or an interpreter named by path), `path` (an executable found on PATH,
+including a bare command name given to `--python`) or `builtin` — and is absent
+only for a custom command, which resolves nothing. Evidence that recorded no
+runner, or a different one, is remeasured.
 `status.cost.measurements` copies these measurements when available. Historical
 `totalMs` and cost gates retain their existing record attribution, including
 reused durations and repeated shared baseline durations. Older evidence has no

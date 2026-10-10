@@ -84,18 +84,25 @@ nothing.
 `playwright` is stricter: it needs both a `playwright.config.{ts,mts,js,mjs,cjs}`
 in the project directory and `@playwright/test` resolvable from it.
 
-The evidence schema defines `runner.source` as `project`, `path` or `builtin`.
-In 0.18.3 the probe writes it only for `node-test`:
+The evidence records where every resolved runner came from in
+`runner.source`: `project` (the project's own package, its virtualenv, or an
+interpreter named by path), `path` (an executable found on PATH, including a
+bare command name given to `--python`) or `builtin` (`node-test`, the Node
+running TestGuard). A `--runner-cmd` resolves nothing and records no source.
 
 ```json
+"runner": { "name": "vitest", "version": "3.2.4", "source": "project" }
 "runner": { "name": "node-test", "version": "24.18.0", "source": "builtin" }
 ```
 
 A Python run records the engine that actually ran, never the adapter name:
 
 ```json
-"runner": { "name": "unittest", "version": "CPython 3.12.13" }
+"runner": { "name": "unittest", "version": "CPython 3.12.13", "source": "path" }
 ```
+
+The runner is part of what a verdict measured: a later probe reuses a verdict
+only when it records the same name, version and source.
 
 An unresolvable runner is a precondition failure (exit `2`), never a verdict
 about the tests.
@@ -206,8 +213,11 @@ fall back, because which engine ran changes what the evidence means.
 
 **Where it comes from.** The project's interpreter, resolved in this order:
 
-1. `--python <path>` or `TESTGUARD_PYTHON` — when either is set it is the only
-   candidate;
+1. `--python <interpreter>` or `TESTGUARD_PYTHON` — when either is set it is
+   the only candidate. Both read a value the same way: a bare name such as
+   `python3` is looked up on PATH, anything containing `/` is a path resolved
+   against the current directory. `probe`, `admit`, `sweep` and `replay` all
+   accept `--python`;
 2. the active virtualenv (`$VIRTUAL_ENV`);
 3. the project's `.venv`, `venv`, then `.env`;
 4. `python3`, then `python`, on PATH.
@@ -264,7 +274,9 @@ with the probed directory as its working directory — the scratch worktree,
 unless `--in-place`.
 
 A report without a `testResults` array makes the defenders unverifiable, and
-the load message says the command must emit the jest-compatible shape.
+the load message says the command must emit the jest-compatible shape. A
+template missing `{files}` or `{out}`, or with an unclosed quote, is a usage
+error: the command exits `3` with the reason before anything runs.
 
 ### What changes with a custom command
 
@@ -275,8 +287,12 @@ the load message says the command must emit the jest-compatible shape.
   not a native listing. `--require-origin` cannot certify against it.
 - **No worker flags.** `--workers` and `--serial` do not edit your command;
   put the runner's own parallelism flags in the template.
-- **Reuse does not see the template.** Changing only the `--runner-cmd` text
-  does not invalidate reused verdicts. Pass `--no-reuse` after you change it.
+- **The template is part of reuse.** The test universe's hash binds the
+  parsed command, so changing the `--runner-cmd` re-measures every fault;
+  reformatting whitespace that parses to the same words does not. The command
+  text itself is never written to the evidence, only the hash. A verdict whose
+  defenders failed to load is never reused at all, so fixing a broken command
+  is always measured again.
 
 ### Worked examples
 
