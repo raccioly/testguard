@@ -7455,6 +7455,162 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-JULES-MERGE-GATE-HOLDS-BY-DEFAULT",
+      "statement": "A green Jules pull request merges without a human only when every file is user documentation, a new test module, or the claims file gaining nothing but defenders for those new tests. An edited test, a removed or renamed file, a changed claim or fault, and anything else is held.",
+      "source": {
+        "kind": "spec",
+        "ref": "AGENTS.md#automated-agents-jules"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/jules-policy.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An edited existing test merges as if it were new.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/jules-policy.mjs",
+          "find": "    if (isNewTestPath(name) && f.status === 'added') { addedTests.push(name); substance++; continue; }",
+          "replace": "    if (isNewTestPath(name)) { addedTests.push(name); substance++; continue; }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A claims file that changes the contract is not compared.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/jules-policy.mjs",
+          "find": "    if (!claimsOnlyGainDefenders(claims.base, claims.head, addedTests)) {",
+          "replace": "    if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Any markdown file counts as user documentation, instruction files and the spec included.",
+          "faultClass": "return-altered",
+          "file": ".github/scripts/jules-policy.mjs",
+          "find": "  return f === 'README.md' || (f.startsWith('docs/') && f.endsWith('.md'));",
+          "replace": "  return f.endsWith('.md');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A defender that is not a test this PR adds is accepted.",
+          "faultClass": "return-altered",
+          "file": ".github/scripts/jules-policy.mjs",
+          "find": "  const grew = (b = [], h = []) => b.every((x, i) => h[i] === x) && h.slice(b.length).every((x) => added.has(x));",
+          "replace": "  const grew = (b = [], h = []) => b.every((x, i) => h[i] === x);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A removed file is treated like a modified one.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/jules-policy.mjs",
+          "find": "    if (f.previous_filename || !['added', 'modified'].includes(f.status)) return",
+          "replace": "    if (false) return",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-JULES-TRIAGE-BOUNDS-THE-QUEUE",
+      "statement": "A Jules pull request is closed when it is noise, the same work as an older open one (same routine target or same files), work declined within the last 60 days, or would make more than five wait for review; closures for a full queue never count as declined work.",
+      "source": {
+        "kind": "spec",
+        "ref": "AGENTS.md#automated-agents-jules"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/jules-policy.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The queue admits one more than its cap.",
+          "faultClass": "literal-changed",
+          "file": ".github/scripts/jules-policy.mjs",
+          "find": "  if (waiting >= QUEUE_CAP) return { action: 'close'",
+          "replace": "  if (waiting > QUEUE_CAP) return { action: 'close'",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Two PRs with the same files and different titles are not duplicates.",
+          "faultClass": "return-altered",
+          "file": ".github/scripts/jules-policy.mjs",
+          "find": "  return ka !== '' && ka === kb;",
+          "replace": "  return false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A PR closed for a full queue blocks its work as if declined.",
+          "faultClass": "statement-deleted",
+          "file": ".github/scripts/jules-policy.mjs",
+          "find": "    .filter((c) => !labelled(c, LABELS.queueFull))\n    .filter((c) => sameWork(c, pr))",
+          "replace": "    .filter((c) => sameWork(c, pr))",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The newer of two duplicates is kept and the older closed.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/jules-policy.mjs",
+          "find": "  const older = others.filter((o) => o.number < pr.number && sameWork(o, pr))",
+          "replace": "  const older = others.filter((o) => sameWork(o, pr))",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The weekly rotation ignores targets already open or declined.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/jules-policy.mjs",
+          "find": "    if (!taken.has(target)) return { go: true, target };",
+          "replace": "    return { go: true, target };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
     }
   ]
 }

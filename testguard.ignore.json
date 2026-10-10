@@ -165,6 +165,13 @@
       "by": "maintainer",
       "at": "2026-10-10T17:00:00Z",
       "expires": "2026-12-31T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": ".jules/preflight.mjs",
+      "reason": "Wiring for the Jules routines: it reads the public pull request list, the claims file and --help, then prints what the policy decided. Every decision (queue cap, decline window, weekly rotation, target lists) is a pure function in .github/scripts/jules-policy.mjs, claimed as TG-JULES-TRIAGE-BOUNDS-THE-QUEUE and TG-JULES-MERGE-GATE-HOLDS-BY-DEFAULT. Maintenance tooling; not shipped in the package.",
+      "by": "maintainer",
+      "at": "2026-10-10T18:00:00Z"
     }
   ]
 }

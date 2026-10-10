@@ -68,6 +68,31 @@ human. npm and PyPI publishing is OIDC-only; Homebrew uses a dedicated SSH
 deploy key scoped only to `raccioly/homebrew-tap`. There are no personal or
 registry tokens in this repo.
 
+## Automated agents (Jules)
+
+Google Jules runs scheduled routines here. Each routine is a file under
+`.jules/routines/`, and every routine follows `.jules/RULES.md`.
+
+- **Preflight first.** `node .jules/preflight.mjs <routine>` answers `GO`
+  with one target, or `STOP`. On STOP, open no pull request.
+- **No finding, no pull request.** That rules out status reports,
+  "already up to date" and count syncs.
+- **One pull request per target.** Its title starts
+  `[jules:<routine>] <target>`.
+  - A duplicate is closed on arrival, judged by that tag or by the changed
+    files, not by wording.
+  - A declined target is not re-proposed for 60 days.
+  - At most five wait for review at once.
+- **A red suite in your VM is your environment.** CI on `main` is green;
+  report it instead of "fixing" it.
+- **Merges with no human on green CI:** user docs, new test files, and those
+  tests appended to the `defendedBy` of existing claims. Everything else
+  waits for review.
+- **The authority** is `.github/scripts/jules-policy.mjs`, claimed as
+  `TG-JULES-MERGE-GATE-HOLDS-BY-DEFAULT` and
+  `TG-JULES-TRIAGE-BOUNDS-THE-QUEUE`. `.jules/README.md` is the maintainer's
+  setup guide.
+
 <!-- testguard:begin -->
 ## TestGuard
 
