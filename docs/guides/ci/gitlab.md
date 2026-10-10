@@ -138,8 +138,10 @@ npx testguard-cli init --ci-evidence gitlab   # writes .testguard/fetch-ci-evide
 The helper runs `glab ci artifact <branch> testguard:probe` into
 `.testguard/ci/` and then
 `testguard brief . --text --evidence .testguard/ci/.testguard/evidence.json`.
-It exits `0` with a message when `glab` is missing, when there is no artifact
-for the branch, or when `testguard` is not on `PATH`. The session-start hook
+It runs the same CLI the session-start hook would (the project's
+`node_modules/.bin/testguard`, then the repository root's, then `PATH`), and
+exits `0` with a message when `glab` is missing, when no TestGuard CLI is
+found, or when there is no artifact for the branch. The session-start hook
 never runs it; you do, when you want CI's view. How a foreign evidence file is
 read (its commit named, staleness still computed from the recorded hashes) is
 described in [GitHub Actions](github-actions.md#read-cis-evidence-locally).

@@ -159,15 +159,12 @@ jobs:
           command: probe
 
       # The fetch helper written by `init --ci-evidence github` downloads the
-      # artifact testguard-evidence-<branch> and reads ci-self-evidence.json.
-      - name: Name the evidence the way the fetch helper expects
-        if: always()
-        run: '[ -f .testguard/evidence.json ] && cp .testguard/evidence.json .testguard/ci-self-evidence.json || true'
+      # artifact testguard-evidence-<branch> and briefs from its evidence.json.
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: testguard-evidence-${{ github.ref_name }}
-          path: .testguard/ci-self-evidence.json
+          path: ${{ steps.testguard.outputs.evidence }}
           if-no-files-found: warn
 ```
 
@@ -258,8 +255,8 @@ says `unprobed` and the session-start brief is empty although the default
 branch has full evidence. Point either command at CI's document:
 
 ```bash
-testguard status . --evidence .testguard/ci/ci-self-evidence.json
-testguard brief . --text --evidence .testguard/ci/ci-self-evidence.json
+testguard status . --evidence .testguard/ci/evidence.json
+testguard brief . --text --evidence .testguard/ci/evidence.json
 ```
 
 A foreign document is not trusted blindly. `status` marks it
@@ -277,17 +274,21 @@ npx testguard-cli init --ci-evidence github   # writes .testguard/fetch-ci-evide
 ```
 
 The helper downloads the artifact `testguard-evidence-<branch>` with the `gh`
-CLI into `.testguard/ci/` (which `init` gitignores) and then runs
-`testguard brief . --text --evidence .testguard/ci/ci-self-evidence.json`.
-It pairs with the default-branch workflow above. Commit the helper; it is one
+CLI into a freshly emptied `.testguard/ci/` (which `init` gitignores) and then
+runs `brief . --text --evidence .testguard/ci/evidence.json`. It pairs with the
+default-branch workflow above, which uploads the action's `evidence` output; an
+artifact holding `ci-self-evidence.json`, the name an earlier version of this
+example used, is read too. Commit the helper; it is one
 of the `.testguard/` files that is not regenerated.
 
 - **It is an on-demand helper, not a hook.** The session-start hook never
   touches the network. You run the helper when you want CI's view.
-- It exits `0` with a message when `gh` is not installed, when no artifact
-  exists for the branch, or when `testguard` is not on `PATH`. With only a
-  devDependency install, run it as
-  `PATH="$PWD/node_modules/.bin:$PATH" .testguard/fetch-ci-evidence.sh`.
+- It runs the same CLI the session-start hook would: the project's
+  `node_modules/.bin/testguard`, then the repository root's, then a
+  `testguard` on `PATH`. A devDependency install needs nothing more.
+- It exits `0` with a message when `gh` is not installed, when no TestGuard CLI
+  is found, when no artifact exists for the branch, or when the artifact holds
+  no evidence file.
 - `init --force --ci-evidence github` replaces an existing helper.
 
 ## Next

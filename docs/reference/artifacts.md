@@ -28,12 +28,18 @@ history.
 .testguard/calibration.json
 .testguard/ci-self-evidence.json
 .testguard/ci/
+.testguard/sweep.json
+.testguard/sweep-evidence.json
 ```
 
+Re-running `init` after an upgrade adds only the lines a newer release
+introduced, directly after the ones already there, so the block never gains a
+second header. The list is checked against the code: a test derives every path
+a command writes under `.testguard/` and fails when one is missing here.
+
 `testguard baseline` prints whichever of those git does not yet ignore, and
-offers the form that needs no update when TestGuard adds an output. Prefer it:
-it also covers `sweep.json` and `sweep-evidence.json`, which the list above
-does not.
+offers the form that needs no update when TestGuard adds an output. Both forms
+ignore exactly the same files, and leave the same three trackable:
 
 ```gitignore
 .testguard/*
@@ -42,8 +48,9 @@ does not.
 !.testguard/fetch-ci-evidence.sh
 ```
 
-If `.gitignore` ignores `.testguard/` as a whole, `init` leaves it alone and
-warns that `baseline.json` should be committed.
+If `.gitignore` already uses the `.testguard/*` form, `init` adds nothing. If
+it ignores `.testguard/` as a whole, `init` leaves it alone and warns that
+`baseline.json` should be committed.
 
 ## Files under `.testguard/`
 
@@ -63,7 +70,7 @@ warns that `baseline.json` should be committed.
 | `fetch-ci-evidence.sh` | `init --ci-evidence github\|gitlab` | shell script | **commit** |
 | `ci/` | `fetch-ci-evidence.sh` (download directory) | n/a | ignore |
 | `ci-self-evidence.json` | your CI, by convention (see below) | [`evidence`](../../spec/schemas/evidence.schema.json) | ignore |
-| `status.json` | no command writes it | [`status`](../../spec/schemas/status.schema.json) | commit, if you keep one |
+| `status.json` | no command writes it | [`status`](../../spec/schemas/status.schema.json) | not ignored by either form; commit it if you keep one |
 
 Every path above is the default; the commands that write a document take
 `--out <path>` to put it elsewhere.
@@ -131,30 +138,38 @@ recomputes every number. `replay --out` moves both into the same directory.
 
 ### fetch-ci-evidence.sh
 
-An on-demand helper written by `init --ci-evidence`. It downloads CI's
-evidence for a branch (default `main`, or the first argument) into
-`.testguard/ci/` and runs `testguard brief . --text --evidence <file>` on it.
-It exits `0` with a message when the platform CLI, `testguard` or the artifact
-is missing. It is not a hook: the session-start hook never touches the
-network.
+An on-demand helper written by `init --ci-evidence`. It runs from the project
+it was written into, whatever directory you call it from, empties
+`.testguard/ci/`, downloads CI's evidence for a branch (default `main`, or the
+first argument) into it, and runs `brief . --text --evidence <file>` on the
+first of `evidence.json`, `ci-self-evidence.json` or `.testguard/evidence.json`
+it finds there. It uses the same CLI the session-start hook would:
+`./node_modules/.bin/testguard`, then the repository root's
+`node_modules/.bin/testguard`, then a `testguard` on `PATH`; never a package
+runner. It exits `0` with a message when the platform CLI, a TestGuard CLI,
+the artifact or an evidence file in it is missing. It is not a hook: the
+session-start hook never touches the network.
 
 | Variant | Needs | Downloads | Briefs from |
 |---|---|---|---|
-| `github` | `gh` | the artifact named `testguard-evidence-<branch>` | `.testguard/ci/ci-self-evidence.json` |
+| `github` | `gh` | the artifact named `testguard-evidence-<branch>` | `.testguard/ci/evidence.json` (or `ci-self-evidence.json`) |
 | `gitlab` | `glab` | the artifacts of the `testguard:probe` job | `.testguard/ci/.testguard/evidence.json` |
 
 The `gitlab` variant matches the artifacts of the
-[GitLab CI template](../guides/ci/gitlab.md). The `github` variant expects your
-workflow to upload an artifact with that name containing a file named
-`ci-self-evidence.json`; the TestGuard GitHub Action does not upload one for
-you. See [GitHub Actions](../guides/ci/github-actions.md).
+[GitLab CI template](../guides/ci/gitlab.md). The `github` variant matches the
+default-branch workflow in [GitHub Actions](../guides/ci/github-actions.md),
+which uploads the action's `evidence` output under that name; the action does
+not upload an artifact by itself.
 
 ### status.json
 
-A name reserved for a snapshot of the status document. `baseline` lists it
-among the committed files in its `.gitignore` advice, but no command writes
-it. If you want one, write it
-yourself with `npx testguard-cli status --json > .testguard/status.json`.
+A name reserved for a snapshot of the status document. No command writes it,
+and no ignore form TestGuard suggests ignores it: `init`'s per-file lines never
+name it, and the `.testguard/*` form `baseline` advises negates it. If you want
+a snapshot under review, write it yourself with
+`npx testguard-cli status --json > .testguard/status.json` and commit it; it
+describes the moment you wrote it, so refresh it in the same commit as the
+change it describes.
 
 ### Files written outside `.testguard/`
 
