@@ -18,6 +18,17 @@ export function hashNativeTestUniverse(manifests) {
   return sha256(JSON.stringify(bound));
 }
 
+/**
+ * A custom `--runner-cmd` has no native listing, so its universe is the static
+ * file set — and the command itself. The files alone cannot tell a broken
+ * command from the fixed one, and a verdict measured by one is not an answer
+ * from the other. The parsed argv is hashed, so reformatting whitespace is not
+ * a change and the command text never appears in the evidence.
+ */
+export function hashCustomCommandUniverse(files, commandTemplate) {
+  return sha256(JSON.stringify({ schemaVersion: 2, source: 'custom-command-static', command: commandTemplate, files }));
+}
+
 /** Shared owning-adapter collection; check failures retain existing probe semantics. */
 export async function collectOwnedManifests(runner, primaryManifest, { projectDir, sourceDir, python, budgetMs, budgetFor, assertOpen = () => {} }) {
   const owned = OWNED_RUNNERS.filter((r) => r !== runner
