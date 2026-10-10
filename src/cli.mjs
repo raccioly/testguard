@@ -76,8 +76,8 @@ probe
                        Resolved against your working tree, never the scratch worktree.
   --workers <n>        maximum built-in runner workers (default: 1); Python remains serial
   --serial             one worker, even when --workers is higher (vitest --no-file-parallelism, jest --runInBand,
-                       playwright --workers=1; pytest never loads xdist either way). Use it when another test runner
-                       is already running — probe warns and records the contention either way
+                       playwright --workers=1; pytest never loads xdist either way). The default --workers 1 is already
+                       serial, so it only changes a run that raised --workers; probe warns and records contention either way
   --in-place           mutate the working tree instead of a scratch worktree
   --no-escalate        do not re-run survivors against the whole suite
   --no-reuse           re-probe claims whose inputs have not changed

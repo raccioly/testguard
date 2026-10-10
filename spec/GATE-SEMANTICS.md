@@ -862,7 +862,8 @@ It requires a complete current-project run with confirm >= 3 and refuses
 before loading or writing. No policy is inferred when the option is absent.
 After measurement, the command reloads current claims and collects the current
 native runner universe under the same command budget, then binds targets,
-resolved defenders and current discovery dependencies. Missing bindings or
+resolved defenders, current discovery dependencies and the recorded runner
+identities (name, version and source). Missing bindings or
 discovery failure yields unavailable; custom/static runner universes cannot
 certify this boundary. Expired command budgets still write no partial result.
 This is point-in-time admission, not an atomic filesystem snapshot. Stored

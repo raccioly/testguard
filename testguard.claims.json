@@ -8139,6 +8139,25 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-POLICY-FRESHNESS-BINDS-RUNNER-SOURCE",
+      "statement": "Origin-policy freshness refuses evidence recorded by a runner from a different source (project, PATH, builtin) even when its name and version match.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-declared-origin-policy-result-contract" },
+      "severity": "medium",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/policy-freshness.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Runner source is no longer compared; a global binary of the same version vouches for the project's.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/policy-freshness.mjs",
+          "find": "      && (recorded?.source ?? null) === (current?.source ?? null);",
+          "replace": "      && true;",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        }
+      ]
     }
   ]
 }

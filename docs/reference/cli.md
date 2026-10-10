@@ -225,7 +225,7 @@ confirmed, complete run may feed a baseline.
 
 | `--runner` | What runs |
 |---|---|
-| `auto` | The first of `vitest`, `jest`, `python` that resolves. A defender under Playwright's `testDir` always runs under `playwright`, and a `.py` defender always under `python`, whatever the project runner. |
+| `auto` | The first of `vitest`, `jest`, `python` that resolves and discovers at least one test file. A defender under Playwright's `testDir` always runs under `playwright`, and a `.py` defender always under `python`, whatever the project runner. |
 | `vitest` | Vitest, resolved from the project's own package first. |
 | `jest` | Jest, resolved the same way. |
 | `playwright` | Playwright Test. |

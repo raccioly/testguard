@@ -52,7 +52,8 @@ export async function readNativeTestUniverse(options) {
   options.assertOpen?.();
   if (selected.error) throw new DiscoveryError(selected.error);
   const collection = await collectOwnedManifests(selected.runner, selected.manifest, options);
-  const primaryRunner = { name: selected.engine ?? selected.runner.name, version: selected.version };
-  const runners = [primaryRunner, ...[...collection.ownedChecked].filter(([, check]) => check.ok).map(([runner, check]) => ({ name: check.engine ?? runner.name, version: check.version }))];
+  const identity = (name, version, source) => ({ name, version, ...(source ? { source } : {}) });
+  const primaryRunner = identity(selected.engine ?? selected.runner.name, selected.version, selected.source);
+  const runners = [primaryRunner, ...[...collection.ownedChecked].filter(([, check]) => check.ok).map(([runner, check]) => identity(check.engine ?? runner.name, check.version, check.source))];
   return { ...collection, primary: selected.runner, primaryRunner, runners, testUniverseHash: hashNativeTestUniverse(collection.manifests) };
 }
