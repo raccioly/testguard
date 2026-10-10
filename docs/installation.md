@@ -198,7 +198,7 @@ What can reach the network is the channel around it, and only these:
 | npm / npx | installing the package, or `npx` running a package the project does not have |
 | The pip wrapper | when no local `node_modules/testguard-cli` exists: `npx -y testguard-cli@latest` |
 | Homebrew | `brew install` / `brew upgrade` |
-| The GitHub Action and the GitLab template | every job runs `npx -y testguard-cli@<version>`; the GitLab template also runs `npm ci` |
+| The GitHub Action and the GitLab template | every job runs `npx -y testguard-cli@<version>`; the GitLab template also installs the project's npm dependencies when `dir` has a `package.json` |
 | The GitLab template, with `post_note: true` | posts the markdown brief to the merge request through the GitLab API |
 | `.testguard/fetch-ci-evidence.sh` (from `init --ci-evidence`) | when you run it: `gh` or `glab` downloads CI's artifact |
 | The MCP config printed by `init --mcp` | `npx -y testguard-cli mcp`, which fetches only when the package is not installed |
