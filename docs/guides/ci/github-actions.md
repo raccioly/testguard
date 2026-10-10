@@ -29,7 +29,7 @@ dependencies; your workflow does both before it.
 | `strict` | `false` | `gate` | `true` fails a change whose files were all excluded (non-source, or never-claimed patterns) instead of passing with a note. |
 | `version` | the CLI release published with this action tag | all | The `testguard-cli` version to run. Leave it alone unless you deliberately run a different CLI from the same action. |
 | `node-version` | `22` | all | Node.js version set up by the action (20 or later). It replaces any Node your job set up earlier, for this step and the ones after it. |
-| `runner` | `auto` | `probe` | `vitest`, `jest`, `playwright`, `python`, `pytest`, `unittest` or `auto`. Any value other than `auto` is passed as `--runner`, so `node-test` works too. `python` picks pytest when the interpreter can import it and stdlib `unittest` otherwise; `pytest` and `unittest` pin that choice and fail rather than fall back. |
+| `runner` | `auto` | `probe` | `vitest`, `jest`, `playwright`, `python`, `pytest`, `unittest`, `node-test` or `auto`. Any value other than `auto` is passed as `--runner`. `python` picks pytest when the interpreter can import it and stdlib `unittest` otherwise; `pytest` and `unittest` pin that choice and fail rather than fall back. |
 | `python` | `''` | `probe` | Python interpreter for `.py` defenders. Empty means `$VIRTUAL_ENV`, then the project's `.venv`/`venv`, then `python3` on `PATH`. |
 
 Inputs that do not apply to the chosen command are ignored. For a flag the
@@ -43,12 +43,20 @@ and so on), run the CLI directly in a `run:` step after `npm ci`; see the
 
 | Output | Value |
 |---|---|
-| `evidence` | Absolute path of `.testguard/evidence.json` in the working directory. |
+| `evidence` | Absolute path of the evidence file this run wrote, in the working directory; empty when it wrote none. |
 
-The output is set whatever the command, and always names `evidence.json`.
-Only a complete, confirmed `probe` writes that file: a provisional run
-(`confirm` below 3) writes `evidence-provisional.json`, and `gate`, `claims`
-and `brief` write no evidence.
+The output names the file the run actually wrote: `.testguard/evidence.json`
+for a complete, confirmed `probe`, and `.testguard/evidence-provisional.json`
+for a provisional one (`confirm` below 3). It is empty for `gate`, `claims`,
+`baseline` and `brief`, which write no evidence, for an `allow-empty` probe
+that verified nothing, and for a probe that stopped before writing (a usage
+error, a missing claims file). The step compares the evidence files before and
+after the run, so an `evidence.json` restored from a cache that the run did not
+rewrite is not reported. The output is set even when the step fails, so an
+`if: always()` step after it can read it.
+
+Inputs reach the step's script as environment variables, not as text spliced
+into it, so a value containing quotes or `$(…)` is passed to the CLI as data.
 
 ## Exit codes
 
@@ -180,11 +188,12 @@ Reuse is not a guarantee of a cheap run: a cold cache, changed discovery or
 configuration, or a different `confirm` or worker policy re-probes in full.
 See [performance](../performance.md) for what a probe costs.
 
-If you do not use the fetch helper, upload the action's output directly:
+If you do not use the fetch helper, upload the action's output directly.
+Guard on it being non-empty: `upload-artifact` rejects an empty `path`.
 
 ```yaml
       - uses: actions/upload-artifact@v7
-        if: always()
+        if: always() && steps.testguard.outputs.evidence != ''
         with:
           name: testguard-evidence
           path: ${{ steps.testguard.outputs.evidence }}
