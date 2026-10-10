@@ -7413,6 +7413,48 @@
           ]
         }
       ]
+    },
+    {
+      "id": "TG-FIXTURE-GIT-IGNORES-AMBIENT-CONFIG",
+      "statement": "Every git command a test makes to build a fixture carries options that neutralise the machine's global git config: hooks do not run and commits are not signed, so the suite's result does not depend on where it runs.",
+      "source": {
+        "kind": "spec",
+        "ref": "CHANGELOG [Unreleased]"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fixture-git.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Fixture commits run the global hooks.",
+          "faultClass": "field-dropped",
+          "file": "test/helpers/git.mjs",
+          "find": "  '-c', `core.hooksPath=${devNull}`,\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Fixture commits obey global mandatory signing.",
+          "faultClass": "field-dropped",
+          "file": "test/helpers/git.mjs",
+          "find": "  '-c', 'commit.gpgsign=false',\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
     }
   ]
 }
