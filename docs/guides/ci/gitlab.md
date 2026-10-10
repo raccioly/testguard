@@ -138,6 +138,9 @@ npx testguard-cli init --ci-evidence gitlab   # writes .testguard/fetch-ci-evide
 The helper runs `glab ci artifact <branch> testguard:probe` into
 `.testguard/ci/` and then
 `testguard brief . --text --evidence .testguard/ci/.testguard/evidence.json`.
+For a project in a subdirectory the artifact keeps the project's path, and the
+helper reads `.testguard/ci/<dir>/.testguard/evidence.json`, never another
+project's evidence from the same artifact.
 It runs the same CLI the session-start hook would (the project's
 `node_modules/.bin/testguard`, then the repository root's, then `PATH`), and
 exits `0` with a message when `glab` is missing, when no TestGuard CLI is

@@ -159,17 +159,20 @@ jobs:
           command: probe
 
       # The fetch helper written by `init --ci-evidence github` downloads the
-      # artifact testguard-evidence-<branch> and briefs from its evidence.json.
+      # artifact testguard-evidence-<branch> and briefs from the evidence file
+      # in it (evidence.json, or evidence-provisional.json below confirm 3).
       - uses: actions/upload-artifact@v7
-        if: always()
+        if: always() && steps.testguard.outputs.evidence != ''
         with:
           name: testguard-evidence-${{ github.ref_name }}
           path: ${{ steps.testguard.outputs.evidence }}
           if-no-files-found: warn
 ```
 
-`if: always()` matters: a probe that finds a survivor fails the step, and that
-is exactly the evidence you want to keep. Upload the branch-named artifact on
+`always()` matters: a probe that finds a survivor fails the step, and that
+is exactly the evidence you want to keep. The `evidence` output is empty when
+the run wrote no evidence, so the condition skips the upload instead of
+failing it. Upload the branch-named artifact on
 `push` only. On a pull request `github.ref_name` is `<number>/merge`, and an
 artifact name cannot contain `/`.
 
@@ -181,7 +184,7 @@ If you do not use the fetch helper, upload the action's output directly:
 
 ```yaml
       - uses: actions/upload-artifact@v7
-        if: always()
+        if: always() && steps.testguard.outputs.evidence != ''
         with:
           name: testguard-evidence
           path: ${{ steps.testguard.outputs.evidence }}
@@ -276,9 +279,10 @@ npx testguard-cli init --ci-evidence github   # writes .testguard/fetch-ci-evide
 The helper downloads the artifact `testguard-evidence-<branch>` with the `gh`
 CLI into a freshly emptied `.testguard/ci/` (which `init` gitignores) and then
 runs `brief . --text --evidence .testguard/ci/evidence.json`. It pairs with the
-default-branch workflow above, which uploads the action's `evidence` output; an
-artifact holding `ci-self-evidence.json`, the name an earlier version of this
-example used, is read too. Commit the helper; it is one
+default-branch workflow above, which uploads the file the action's `evidence`
+output names; `evidence-provisional.json` (a run below `confirm: 3`, briefed
+as provisional) and `ci-self-evidence.json` (the name an earlier version of
+this example used) are read too. Commit the helper; it is one
 of the `.testguard/` files that is not regenerated.
 
 - **It is an on-demand helper, not a hook.** The session-start hook never

@@ -141,9 +141,8 @@ recomputes every number. `replay --out` moves both into the same directory.
 An on-demand helper written by `init --ci-evidence`. It runs from the project
 it was written into, whatever directory you call it from, empties
 `.testguard/ci/`, downloads CI's evidence for a branch (default `main`, or the
-first argument) into it, and runs `brief . --text --evidence <file>` on the
-first of `evidence.json`, `ci-self-evidence.json` or `.testguard/evidence.json`
-it finds there. It uses the same CLI the session-start hook would:
+first argument) into it, and runs `brief . --text --evidence <file>` on this
+project's evidence file in it (see the table). It uses the same CLI the session-start hook would:
 `./node_modules/.bin/testguard`, then the repository root's
 `node_modules/.bin/testguard`, then a `testguard` on `PATH`; never a package
 runner. It exits `0` with a message when the platform CLI, a TestGuard CLI,
@@ -152,14 +151,15 @@ session-start hook never touches the network.
 
 | Variant | Needs | Downloads | Briefs from |
 |---|---|---|---|
-| `github` | `gh` | the artifact named `testguard-evidence-<branch>` | `.testguard/ci/evidence.json` (or `ci-self-evidence.json`) |
-| `gitlab` | `glab` | the artifacts of the `testguard:probe` job | `.testguard/ci/.testguard/evidence.json` |
+| `github` | `gh` | the artifact named `testguard-evidence-<branch>` | `.testguard/ci/evidence.json`, else `evidence-provisional.json`, else `ci-self-evidence.json` |
+| `gitlab` | `glab` | the artifacts of the `testguard:probe` job | `.testguard/ci/<dir>/.testguard/evidence.json` (`<dir>/` is empty for a project at the repository root), else `evidence-provisional.json` beside it |
 
 The `gitlab` variant matches the artifacts of the
 [GitLab CI template](../guides/ci/gitlab.md). The `github` variant matches the
 default-branch workflow in [GitHub Actions](../guides/ci/github-actions.md),
-which uploads the action's `evidence` output under that name; the action does
-not upload an artifact by itself.
+which uploads the file the action's `evidence` output names under that name;
+the action does not upload an artifact by itself. A subdirectory project's
+GitLab helper never reads another project's evidence from the same artifact.
 
 ### status.json
 
