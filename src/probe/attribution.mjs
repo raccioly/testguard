@@ -131,6 +131,11 @@ export function isReusable(prior, current) {
   // A record that exists because the probe threw is a statement about the run,
   // not about the code. Reusing it would make one disturbed run permanent.
   if (prior.detail?.reason === 'probe-error') return false;
+  // Defenders that never loaded say something about the environment — a
+  // broken --runner-cmd, a missing dependency, an interpreter without the test
+  // requirements — and none of that is hashed below. Fixing it changes no
+  // input, so the failure would keep being reported as the current answer.
+  if (prior.detail?.reason === 'defenders-failed-to-load') return false;
   const origin = prior.defenders.selectionSource ?? (prior.defenders.requested.length ? 'claim' : 'discovery');
   if (current.selectionSource && origin !== current.selectionSource) return false;
   const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);

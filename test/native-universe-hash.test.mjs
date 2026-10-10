@@ -23,3 +23,16 @@ it('binds every owning runner and refuses missing, duplicate or edited manifests
   const renamed = entry('vitest'); renamed[0].name = 'jest';
   expect(() => hashNativeTestUniverse([renamed])).toThrow(/inconsistent/);
 });
+
+it('binds a custom command universe to the command as well as the files', async () => {
+  const { hashCustomCommandUniverse } = await import('../src/probe/universe.mjs');
+  const { parseCommandTemplate } = await import('../src/probe/runners/shared.mjs');
+  const files = ['test/a.test.mjs'];
+  const fixed = hashCustomCommandUniverse(files, parseCommandTemplate('node runner.cjs {files} {out}'));
+  // A broken command fixed in place is a different measurement: the files did not change, the command did.
+  expect(fixed).not.toBe(hashCustomCommandUniverse(files, parseCommandTemplate('node runnr.cjs {files} {out}')));
+  expect(fixed).not.toBe(hashCustomCommandUniverse(['test/a.test.mjs', 'test/b.test.mjs'], parseCommandTemplate('node runner.cjs {files} {out}')));
+  // Whitespace that parses to the same argv is the same command.
+  expect(fixed).toBe(hashCustomCommandUniverse(files, parseCommandTemplate('node   runner.cjs {files}  {out}')));
+  expect(fixed).toMatch(/^[0-9a-f]{64}$/);
+});

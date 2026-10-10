@@ -36,7 +36,11 @@ export function originPolicyInputsFresh({ projectDir, claims, evidence, universe
     if (methodOf(evidence.run) !== 'fault-injection' || evidence.run.provisional || evidence.run.confirmRuns < 3) return false;
     const testUniverseHash = hashNativeTestUniverse(universe.manifests);
     if (universe.testUniverseHash !== testUniverseHash) return false;
-    const matchesRunner = (recorded, current) => recorded?.name === current?.name && recorded?.version === current?.version;
+    // Where the runner came from is part of its identity: a global vitest of
+    // the same version is a different binary from the project's, the same
+    // rule verdict reuse applies (sameRunner in probe.mjs).
+    const matchesRunner = (recorded, current) => recorded?.name === current?.name && recorded?.version === current?.version
+      && (recorded?.source ?? null) === (current?.source ?? null);
     if (!universe.primaryRunner || !matchesRunner(evidence.run.runner, universe.primaryRunner)) return false;
     if ((evidence.run.runners ?? []).some((recorded) => !universe.runners?.some((current) => matchesRunner(recorded, current)))) return false;
     const allTests = Object.freeze([...new Set([...universe.manifests.values()].flatMap((m) => m.files))].sort());

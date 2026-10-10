@@ -21,7 +21,7 @@ import { hashFile, sha256 } from '../util/hash.mjs';
 import { fingerprint } from '../../spec/lib/fingerprint.mjs';
 import { recordedOriginSummary } from '../../spec/lib/origins.mjs';
 import { persistenceSignalsFor } from '../supply/persistence.mjs';
-import { collectOwnedManifests, hashNativeTestUniverse } from './universe.mjs';
+import { collectOwnedManifests, hashNativeTestUniverse, hashCustomCommandUniverse } from './universe.mjs';
 
 
 /** Is `child` the same file as `root`, or under it? Both must already be real paths. */
@@ -60,6 +60,27 @@ export function selectClaims(claims, only) {
 export function sameWorkerPolicy(previousRun, { workers = 1, serial = workers === 1, runnerCommand } = {}) {
   if (runnerCommand) return previousRun?.workers === undefined && !previousRun?.serial;
   return previousRun?.workers === (serial ? 1 : workers) && Boolean(previousRun?.serial) === serial;
+}
+
+/**
+ * What the evidence says ran: the engine's name, the version it reported, and
+ * where it was resolved from (`project`, `path`, `builtin`). A custom command
+ * resolves nothing, so it claims no source.
+ */
+export function runnerRecord(name, version, source) {
+  return { name, ...(version ? { version } : {}), ...(source ? { source } : {}) };
+}
+
+/**
+ * Reuse cannot stand in for a measurement by a different runner. pytest and
+ * unittest are one adapter and two engines; a global vitest of the same
+ * version is a different binary from the project's. Evidence that recorded no
+ * runner cannot vouch for this one.
+ */
+export function sameRunner(previousRun, current) {
+  const recorded = previousRun?.runner;
+  if (!recorded) return false;
+  return recorded.name === current.name && recorded.version === current.version && recorded.source === current.source;
 }
 
 /**
@@ -205,13 +226,14 @@ export async function probe({
   // Contention: name it before the first run, and record it, so a later
   // reader of a TIMEOUT or FLAKY-DEFENDER knows the machine was loaded.
   const contention = detectContention();
-  if (contention.detected) onWarn(contentionWarning(contention));
+  if (contention.detected) onWarn(contentionWarning(contention, { serial, workers, custom: Boolean(runnerCommand) }));
 
   const iso = mode === 'worktree' ? createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules }) : inPlace({ repoRoot: root, projectDir });
   const isoReal = realpathSync(iso.projectDir);
   const records = [];
   let runnerVersion;
   let runnerSource;
+  let recordedRunner;
   let primaryManifest;
   let runner = RUNNERS[runnerName === 'auto' ? 'vitest' : runnerName];
   // A runner with more than one engine (Python: pytest or unittest) is recorded
@@ -236,7 +258,8 @@ export async function probe({
       primaryManifest = sel.manifest;
       if (sel.engine) engines.set(sel.runner, sel.engine);
     }
-    runnersUsed.set(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name));
+    recordedRunner = runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), runnerSource);
+    runnersUsed.set(recordedRunner.name, recordedRunner.version);
     // Files an owning runner (Playwright) claims run under it, whatever the
     // project runner is; it must resolve before the first such defender runs.
     const owned = OWNED_RUNNERS.filter((r) => r !== runner
@@ -283,7 +306,7 @@ export async function probe({
       ? [...new Set([...runner.tests(iso.projectDir).filter((t) => !owned.some((r) => r.owns(iso.projectDir, t))), ...owned.flatMap((r) => r.tests(iso.projectDir))])]
       : [...ownerByFile.keys()]).sort());
     const testUniverseHash = commandTemplate
-      ? sha256(JSON.stringify({ schemaVersion: 1, source: 'custom-command-static', files: allTests }))
+      ? hashCustomCommandUniverse(allTests, commandTemplate)
       : hashNativeTestUniverse(manifests);
     const baselineCache = new Map();
     const discoveryHashCache = new Map();
@@ -295,6 +318,7 @@ export async function probe({
     const fatalEditFor = (file) => runnerFor(iso.projectDir, file, runner).fatalEdit?.();
     const prior = previous && previous.run.confirmRuns === confirmRuns
       && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand })
+      && sameRunner(previous.run, recordedRunner)
       ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
       : new Map();
     const partitionConfigured = (files) => {
@@ -403,7 +427,9 @@ export async function probe({
       startedAt,
       finishedAt: new Date().toISOString(),
       repo: { head, dirty, ...(snapshot ? { snapshot } : {}), ...(ignoredDirty.length ? { ignoredDirty } : {}) },
-      runner: { name: labelOf(runner), ...((runnerVersion ?? readRunnerVersion(projectDir, runner.name)) ? { version: runnerVersion ?? readRunnerVersion(projectDir, runner.name) } : {}), ...(runnerSource === 'builtin' ? { source: runnerSource } : {}) },
+      // Where the runner came from is part of what was measured: recorded for
+      // every resolved runner, as the schema documents, not only the builtin.
+      runner: recordedRunner,
       ...(runnersUsed.size > 1 ? { runners: [...runnersUsed].map(([n, v]) => ({ name: n, ...(v ? { version: v } : {}) })) } : {}),
       confirmRuns,
       measurements,

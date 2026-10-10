@@ -45,6 +45,26 @@ the field. Point your editor at the schema so it flags these as you type:
 { "$schema": "./node_modules/testguard-cli/spec/schemas/claims.schema.json" }
 ```
 
+### `ignore document … does not conform to the spec` or `concerns document … does not conform to the spec`
+
+The same check, for `testguard.ignore.json` or `testguard.concerns.json`; the
+command exits `2` and the lines after the message name the field. Two common
+causes in an ignore file:
+
+- `/entries/N/kind: must be equal to one of the allowed values: path, claim, fault`.
+  A `fingerprint` entry was accepted by earlier schemas but never read, so it
+  suppressed nothing. Remove it; to accept a known finding, freeze it with
+  `testguard baseline`.
+- `a fault entry names one fault exactly, as <claimId>/<faultId>` (or the
+  `claim` equivalent). `claim` and `fault` patterns are matched exactly; a glob
+  or a bare claim ID in a `fault` entry would excuse nothing, or too much.
+
+`cannot read concerns document …` (or `ignore document`) means the file is not
+valid JSON; the message ends with the parser's error.
+
+See [the ignore file](reference/configuration.md#ignore-file) and
+[the concerns file](reference/configuration.md#concerns-file).
+
 ### `--claim: unknown claim id …`
 
 The ID is not in the claims file being read. Check the spelling and, in a

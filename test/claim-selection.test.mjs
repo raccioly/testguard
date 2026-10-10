@@ -50,7 +50,8 @@ describe('claim option semantics', () => {
       expect(help).toContain(`testguard ${command}`);
       expect(help).toContain(option);
       expect(help).toContain('Example:');
-      if (command !== 'probe') expect(help).not.toContain('--node-modules');
+      // replay, sweep and admit accept --node-modules too, so the probe-only leak check uses a probe-only flag.
+      if (command !== 'probe') expect(help).not.toContain('--allow-empty');
       if (command !== 'replay') expect(help).not.toContain('--since <range>');
     }
     const global = capture();

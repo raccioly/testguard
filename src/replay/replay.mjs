@@ -90,6 +90,7 @@ export async function replay({
   runnerCommand,
   runnerName = 'auto',
   nodeModules,
+  python,
   scratchBase,
   limit,
   toolVersion = '0.0.0',
@@ -123,7 +124,7 @@ export async function replay({
       let universe;
       if (!commandTemplate) {
         const budgetFor = () => commandBudget?.runBudget(budgetMs) ?? budgetMs;
-        const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, name: runnerName, budgetMs: budgetFor(), budgetFor });
+        const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, python, name: runnerName, budgetMs: budgetFor(), budgetFor });
         commandBudget?.assertOpen();
         if (sel.error) throw new PreconditionError(`test runner is not resolvable in the scratch worktree (${sel.error}). Pass --node-modules <path>.`);
         runnerUsed = sel.runner;
@@ -135,7 +136,7 @@ export async function replay({
         const primaryIsPython = ['python', 'pytest', 'unittest'].includes(runnerUsed.name);
         const owned = OWNED_RUNNERS.filter((candidate) => candidate !== runnerUsed && !(candidate.name === 'python' && primaryIsPython));
         for (const candidate of owned) {
-          const check = await candidate.check({ projectDir: iso.projectDir, sourceDir: projectDir, budgetMs: budgetFor(), budgetFor });
+          const check = await candidate.check({ projectDir: iso.projectDir, sourceDir: projectDir, python, budgetMs: budgetFor(), budgetFor });
           commandBudget?.assertOpen();
           if (!check.ok) continue;
           try {
@@ -146,7 +147,7 @@ export async function replay({
         }
         universe = buildReplayRunnerUniverse(runnerUsed, manifests);
       }
-      const record = await replayOne({ fix, iso, root, projectDir, confirmRuns, budgetMs, commandBudget, workers, serial, commandTemplate, runner: runnerUsed, universe, onStage, index: i + 1, total: selected.length });
+      const record = await replayOne({ fix, iso, root, projectDir, python, confirmRuns, budgetMs, commandBudget, workers, serial, commandTemplate, runner: runnerUsed, universe, onStage, index: i + 1, total: selected.length });
       records.push(record);
       onProgress(record);
     } finally {
@@ -213,7 +214,7 @@ export function partitionReplayDefenders(files, primary, universe) {
   return groups;
 }
 
-async function replayOne({ fix, iso, root, projectDir, confirmRuns, budgetMs, commandBudget, workers, serial, commandTemplate, runner, universe, onStage, index, total }) {
+async function replayOne({ fix, iso, root, projectDir, python, confirmRuns, budgetMs, commandBudget, workers, serial, commandTemplate, runner, universe, onStage, index, total }) {
   // git reports paths from the REPOSITORY root; the runner and every file
   // operation here work inside the scratch worktree, relative to the PROJECT
   // directory. Map once, and refuse anything that would land outside the
@@ -329,12 +330,12 @@ async function replayOne({ fix, iso, root, projectDir, confirmRuns, budgetMs, co
       // A custom command is one explicit execution boundary. Preserve that
       // contract exactly; TestGuard cannot infer several native engines from
       // an opaque user command.
-      res = await runner.run({ projectDir: iso.projectDir, sourceDir: projectDir, files: related, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, commandTemplate, workers, serial });
+      res = await runner.run({ projectDir: iso.projectDir, sourceDir: projectDir, python, files: related, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, commandTemplate, workers, serial });
     } else {
       const parts = [];
       for (const [configuredRunner, files] of partitionReplayDefenders(related, runner, universe)) {
         commandBudget?.assertOpen();
-        parts.push(await configuredRunner.run({ projectDir: iso.projectDir, sourceDir: projectDir, files, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, workers, serial }));
+        parts.push(await configuredRunner.run({ projectDir: iso.projectDir, sourceDir: projectDir, python, files, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, workers, serial }));
         commandBudget?.assertOpen();
       }
       res = mergeRuns(parts);

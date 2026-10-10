@@ -1,6 +1,5 @@
 import { resolve } from 'node:path';
 import { loadConcerns, renderConcerns } from '../supply/concerns.mjs';
-import { validate } from '../../spec/lib/validate.mjs';
 
 /**
  * `testguard concerns [dir]`: the one-sentence scopes a sweep can be aimed by.
@@ -13,16 +12,9 @@ import { validate } from '../../spec/lib/validate.mjs';
  */
 export async function concernsCommand({ projectDir, values, version }, io) {
   const path = values.concerns ? resolve(values.concerns) : undefined;
+  // A file that does not parse or does not conform throws a SpecDocError
+  // naming it, which the CLI reports as exit 2: wrong with the FILE.
   const loaded = loadConcerns(projectDir, { path });
-
-  if (loaded.source) {
-    const result = validate('concerns', { schemaVersion: 1, concerns: loaded.raw });
-    if (!result.ok) {
-      io.err(`${loaded.source} does not conform to the spec:`);
-      for (const e of result.errors) io.err(`  ${e.path}: ${e.message}`);
-      return 2;
-    }
-  }
   if (values.json) {
     io.out(JSON.stringify({ schemaVersion: 1, tool: { name: 'testguard', version }, source: loaded.source, shadowed: loaded.shadowed, concerns: loaded.concerns }, null, 2));
   } else {

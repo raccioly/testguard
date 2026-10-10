@@ -29,7 +29,7 @@ function fixture(discovered = false) {
   const claim = { ...record.claim, faults: [fault], ...(discovered ? {} : { defendedBy: ['test/value.test.mjs'] }) };
   const files = ['test/negative.test.mjs', 'test/value.test.mjs'];
   const manifests = new Map([[{ name: 'vitest' }, createDiscoveryManifest({ runner: 'vitest', version: '5.0.1', files })]]);
-  const primaryRunner = { name: 'vitest', version: '5.0.1' };
+  const primaryRunner = { name: 'vitest', version: '5.0.1', source: example.run.runner.source };
   const universe = { manifests, primaryRunner, runners: [primaryRunner], testUniverseHash: hashNativeTestUniverse(manifests) };
   const discovery = discovered ? discoverDefendersDetailed(projectDir, fault.file, Object.freeze(files)) : null;
   const resolved = discovered ? discovery.canDetect : claim.defendedBy;
@@ -108,5 +108,7 @@ it('refuses changed or missing runner identities including an owning engine', ()
     (x) => { x.universe.primaryRunner.name = 'jest'; },
     (x) => { x.universe.primaryRunner.version = '6.0'; },
     (x) => { x.evidence.run.runners = [{ name: 'pytest', version: '8.0' }]; },
+    (x) => { x.universe.primaryRunner.source = 'path'; },
+    (x) => { x.evidence.run.runner.source = 'project'; x.universe.primaryRunner.source = 'path'; },
   ]) { const input = fixture(); change(input); expect(originPolicyInputsFresh(input)).toBe(false); }
 });

@@ -18,6 +18,17 @@ export function hashNativeTestUniverse(manifests) {
   return sha256(JSON.stringify(bound));
 }
 
+/**
+ * A custom `--runner-cmd` has no native listing, so its universe is the static
+ * file set — and the command itself. The files alone cannot tell a broken
+ * command from the fixed one, and a verdict measured by one is not an answer
+ * from the other. The parsed argv is hashed, so reformatting whitespace is not
+ * a change and the command text never appears in the evidence.
+ */
+export function hashCustomCommandUniverse(files, commandTemplate) {
+  return sha256(JSON.stringify({ schemaVersion: 2, source: 'custom-command-static', command: commandTemplate, files }));
+}
+
 /** Shared owning-adapter collection; check failures retain existing probe semantics. */
 export async function collectOwnedManifests(runner, primaryManifest, { projectDir, sourceDir, python, budgetMs, budgetFor, assertOpen = () => {} }) {
   const owned = OWNED_RUNNERS.filter((r) => r !== runner
@@ -41,7 +52,8 @@ export async function readNativeTestUniverse(options) {
   options.assertOpen?.();
   if (selected.error) throw new DiscoveryError(selected.error);
   const collection = await collectOwnedManifests(selected.runner, selected.manifest, options);
-  const primaryRunner = { name: selected.engine ?? selected.runner.name, version: selected.version };
-  const runners = [primaryRunner, ...[...collection.ownedChecked].filter(([, check]) => check.ok).map(([runner, check]) => ({ name: check.engine ?? runner.name, version: check.version }))];
+  const identity = (name, version, source) => ({ name, version, ...(source ? { source } : {}) });
+  const primaryRunner = identity(selected.engine ?? selected.runner.name, selected.version, selected.source);
+  const runners = [primaryRunner, ...[...collection.ownedChecked].filter(([, check]) => check.ok).map(([runner, check]) => identity(check.engine ?? runner.name, check.version, check.source))];
   return { ...collection, primary: selected.runner, primaryRunner, runners, testUniverseHash: hashNativeTestUniverse(collection.manifests) };
 }

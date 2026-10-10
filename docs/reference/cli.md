@@ -114,12 +114,15 @@ it never reaches the network.
 |---|---|---|
 | `--here` | off | Keep the agent layer in `[dir]` instead of the git root, for a subdirectory that is its own agent root. |
 | `--force` | off | Replace an existing skill file (and an existing `.testguard/fetch-ci-evidence.sh`). It does not refresh an `AGENTS.md` section that already lists the project. |
-| `--ci-evidence github\|gitlab` | none | Also write `.testguard/fetch-ci-evidence.sh`, an on-demand helper that downloads CI's evidence artifact and briefs from it. See [artifacts](artifacts.md#fetch-ci-evidencesh). Any other value fails with exit `2` after the agent layer has already been written. |
+| `--ci-evidence github\|gitlab` | none | Also write `.testguard/fetch-ci-evidence.sh`, an on-demand helper that downloads CI's evidence artifact and briefs from it. See [artifacts](artifacts.md#fetch-ci-evidencesh). Any other value is a usage error (exit `3`) and nothing is written. |
 | `--mcp` | off | Print the MCP server configuration for Claude Code, Cursor and Codex. Printed, never written. See [MCP](mcp.md#register-the-server). |
 | `--json` | off | Print `{done, skipped, warnings, agentRoot, dir, mcpConfig?}`. |
 
 **Exit:** `0`; `1` when a file it wrote is ignored by git (it is reported, not
-offered for commit); `2` when `.claude/settings.json` is not valid JSON.
+offered for commit); `2` when `.claude/settings.json` is not valid JSON or not
+an object init can add a hook to (the message names the file); `3` for a bad
+option. On `2` or `3` nothing is written: every check runs before the first
+write.
 
 **`--json` schema:** none published.
 
@@ -195,9 +198,9 @@ spec before it is written.
 | `--runner <name>` | `auto` | Test runner. See the table below. |
 | `--runner-cmd "<cmd>"` | none | A custom runner command; must contain `{files}` and `{out}`, e.g. `"pnpm vitest run {files} --reporter=json --outputFile={out}"`. |
 | `--node-modules <dir>` | `TESTGUARD_NODE_MODULES` | `node_modules` to link into the scratch worktree when it cannot see yours. |
-| `--python <path>` | `TESTGUARD_PYTHON`, then `$VIRTUAL_ENV`, then `.venv`, `venv`, `.env` in the project, then `python3`, `python` on `PATH` | Interpreter for `.py` defenders, resolved against your working tree. |
+| `--python <path>` | `TESTGUARD_PYTHON`, then `$VIRTUAL_ENV`, then `.venv`, `venv`, `.env` in the project, then `python3`, `python` on `PATH` | Interpreter for `.py` defenders, resolved against your working tree. A bare name is looked up on `PATH`. An explicit interpreter is the only one tried: it is never replaced by another. |
 | `--workers <n>` | `1` | Maximum built-in runner workers. Python stays serial. |
-| `--serial` | off | One test file at a time (vitest `--no-file-parallelism`, jest `--runInBand`, playwright `--workers=1`, pytest `-p no:xdist`). |
+| `--serial` | off | One worker, even when `--workers` is higher (vitest `--no-file-parallelism`, jest `--runInBand`, playwright `--workers=1`). With the default `--workers 1` it changes nothing. pytest always runs with `-p no:xdist`, with or without it. |
 | `--no-escalate` | off | Do not re-run survivors against the whole suite. Escalation runs the whole suite up to N times per survivor. |
 | `--no-reuse` | off | Re-probe claims whose recorded inputs have not changed. |
 | `--allow-empty` | off | Adoption only: a valid claims file with zero claims exits `0` instead of `2`, writes no evidence, and says verification was skipped. Has no effect with `--claim`. |
@@ -222,7 +225,7 @@ confirmed, complete run may feed a baseline.
 
 | `--runner` | What runs |
 |---|---|
-| `auto` | The first of `vitest`, `jest`, `python` that resolves. A defender under Playwright's `testDir` always runs under `playwright`, and a `.py` defender always under `python`, whatever the project runner. |
+| `auto` | The first of `vitest`, `jest`, `python` that resolves and discovers at least one test file. A defender under Playwright's `testDir` always runs under `playwright`, and a `.py` defender always under `python`, whatever the project runner. |
 | `vitest` | Vitest, resolved from the project's own package first. |
 | `jest` | Jest, resolved the same way. |
 | `playwright` | Playwright Test. |
@@ -271,9 +274,9 @@ ignore. Commit the baseline it writes.
 without `--allow-provisional`, or `--restamp` cannot apply (no baseline yet,
 evidence from a dirty tree or snapshot, or different fingerprints).
 
-**`--json` schema:** the status document from
-[`status.schema.json`](../../spec/schemas/status.schema.json) plus a
-`baseline` key; the baseline file conforms to
+**`--json` schema:** [`status.schema.json`](../../spec/schemas/status.schema.json),
+with `baseline` = `{path, frozen}` or `{path, restamped}`; the document is
+validated before it is printed. The baseline file conforms to
 [`baseline.schema.json`](../../spec/schemas/baseline.schema.json).
 
 ## brief
@@ -285,8 +288,8 @@ npx testguard-cli brief [dir] [--text | --markdown] [--max <n>] [--evidence <pat
 Turns evidence plus baseline into a ranked, capped `## TEST BLINDSPOT CONTEXT`
 block, with the next action and unclaimed changed files first. Without
 `--text` or `--markdown` it also writes `.testguard/brief.json`. The first line
-says which install answered (`local install` or `global`), so a stale one is
-visible.
+says which install answered (`local install`, `npx cache`, `pnpm dlx cache`,
+`bunx cache` or `global`), so a stale one is visible.
 
 | Flag | Default | Meaning |
 |---|---|---|
@@ -325,7 +328,7 @@ entry excuses nothing. It always writes `.testguard/gate.json`.
 | `--exclude <glob>` | none | More files that never carry claims. Repeatable. |
 | `--explain` | off | Print the default exclusions and exit `0`. |
 | `--strict` | off | A non-empty change that evaluates nothing is a failure, not a note. |
-| `--ignore <path>` | `<dir>/testguard.ignore.json` | Ignore file. |
+| `--ignore <path>` | `<dir>/testguard.ignore.json` | Ignore file. Only its `path` entries apply here; see [the ignore file](configuration.md#ignore-file). |
 | `--claims <path>` | `<dir>/testguard.claims.json` | Claims file. |
 | `--out <path>` | `<dir>/.testguard/gate.json` | Gate document. |
 | `--quiet` | off | Omit the `gate: <path>` line and the "comparing against" note. |
@@ -350,7 +353,8 @@ delegated, not counted as coverage here (see the
 
 **Exit:** `0` every changed source file is claimed or excused; `1` an
 unclaimed file, or `--strict` with nothing evaluated; `2` cannot evaluate (the
-reference does not resolve, invalid claims); `3` no reference could be found.
+reference does not resolve, an invalid claims or ignore file); `3` no reference
+could be found.
 
 **`--json` schema:** [`gate.schema.json`](../../spec/schemas/gate.schema.json).
 
@@ -415,8 +419,9 @@ repository, and reports what a green suite did not notice. It never writes
 | `--budget <ms>` | `120000` | Wall clock per runner invocation. |
 | `--command-budget <ms>` | none | Cooperative deadline for the whole sweep; expiry exits `2` and writes nothing. |
 | `--workers <n>` | `1` | Maximum built-in runner workers. |
-| `--serial` | off | One test file at a time. |
+| `--serial` | off | One worker, even when `--workers` is higher. |
 | `--runner`, `--runner-cmd`, `--node-modules` | as for [probe](#probe) | Runner selection. |
+| `--python <path>` | as for [probe](#probe) | Interpreter for `.py` defenders (or `TESTGUARD_PYTHON`). |
 | `--claims <path>`, `--ignore <path>` | project defaults | Files used to decide which changed files are unclaimed. |
 | `--max <n>` | `20` | Findings printed in the text report. |
 | `--out <path>` | `<dir>/.testguard/sweep.json` | Sweep document. |
@@ -425,8 +430,9 @@ repository, and reports what a green suite did not notice. It never writes
 
 **Exit:** `0` nothing survived; `1` a fault survived or a swept file has no
 test that imports it (`survived` or `nocover`; see
-[sweep exit semantics](verdicts.md#sweep)); `2` cannot evaluate; `3` no
-reference, `--cap` not a positive integer, or an unknown `--concern`.
+[sweep exit semantics](verdicts.md#sweep)); `2` cannot evaluate, including a
+concerns file that is not valid JSON or does not conform; `3` no reference,
+`--cap` not a positive integer, or an unknown `--concern`.
 
 **`--json` schema:** [`sweep.schema.json`](../../spec/schemas/sweep.schema.json).
 
@@ -447,8 +453,9 @@ format is in [configuration](configuration.md#concerns-file).
 | `--concerns <path>` | `<dir>/testguard.concerns.json` | Read this concerns file instead. |
 | `--json` | off | Print `{schemaVersion, tool, source, shadowed, concerns}`. |
 
-**Exit:** `0`; `2` when the file does not conform to the schema. It has no
-exit code that means something is wrong with the project.
+**Exit:** `0`; `2` when the file is not valid JSON or does not conform to the
+schema (the message names the file and the error). It has no exit code that
+means something is wrong with the project.
 
 **`--json` schema:** none published for the listing; the file itself conforms
 to [`concerns.schema.json`](../../spec/schemas/concerns.schema.json).
@@ -489,15 +496,19 @@ never gates. See the [replay guide](../guides/replay.md).
 | `--budget <ms>` | `120000` | Wall clock per run. |
 | `--command-budget <ms>` | none | Cooperative deadline; expiry writes neither the replay nor the calibration. |
 | `--workers <n>` | `1` | Maximum built-in runner workers. |
-| `--serial` | off | One test file at a time. |
+| `--serial` | off | One worker, even when `--workers` is higher. |
 | `--runner`, `--runner-cmd`, `--node-modules` | as for [probe](#probe) | Runner selection. |
+| `--python <path>` | as for [probe](#probe) | Interpreter for `.py` defenders (or `TESTGUARD_PYTHON`). |
 | `--out <path>` | `<dir>/.testguard/replay.json` | Replay document. The calibration is written as `calibration.json` in the same directory. |
-| `--baseline <path>` | beside the replay document | Write the calibration document to this path instead. |
+| `--calibration-out <path>` | beside the replay document | Write the calibration document to this path instead. |
 | `--json` | off | Print `{replay, calibration, paths}`. |
 
+`replay` has no `--baseline`: a baseline gates probe findings, and replay
+never gates. Passing it exits `3` and names `--calibration-out`.
+
 **Exit:** `0` whatever the verdicts; `2` when the range holds no fix commits
-or another precondition fails; `3` when `--since` is missing or a number is
-malformed.
+or another precondition fails; `3` when `--since` is missing, a number is
+malformed, or `--baseline` is given.
 
 **`--json` schema:** the two documents conform to
 [`replay.schema.json`](../../spec/schemas/replay.schema.json) and
@@ -524,10 +535,11 @@ directory of `--claims`).
 | `--budget <ms>` | `120000` | Wall clock per runner invocation. |
 | `--command-budget <ms>` | none | Cooperative deadline for the whole admission. |
 | `--workers <n>` | `1` | Maximum built-in runner workers. |
-| `--serial` | off | One test file at a time. |
+| `--serial` | off | One worker, even when `--workers` is higher. |
 | `--claims <path>` | found from the test file | Claims file; its directory is the project. |
 | `--out <path>` | `<project>/.testguard/evidence-partial.json` | Evidence file. Never the canonical one. |
 | `--runner`, `--runner-cmd`, `--node-modules` | as for [probe](#probe) | Runner selection. |
+| `--python <path>` | as for [probe](#probe) | Interpreter for `.py` defenders (or `TESTGUARD_PYTHON`). |
 | `--quiet` | off | Suppress progress and the provisional warning. |
 | `--json` | off | Print `{admitted, provisional, claim, test, faults, evidence, command}`. |
 

@@ -56,7 +56,7 @@ inputs:
     required: false
     default: '22'
   runner:
-    description: 'probe only: vitest | jest | playwright | python | pytest | unittest | auto. `python` picks pytest when the interpreter can import it and stdlib unittest otherwise; `pytest`/`unittest` pin that choice and fail rather than fall back.'
+    description: 'probe only: vitest | jest | playwright | python | pytest | unittest | node-test | auto. `python` picks pytest when the interpreter can import it and stdlib unittest otherwise; `pytest`/`unittest` pin that choice and fail rather than fall back.'
     required: false
     default: 'auto'
   python:
@@ -66,7 +66,7 @@ inputs:
 
 outputs:
   evidence:
-    description: 'Path to the evidence file written by probe'
+    description: 'Absolute path of the evidence file this run wrote: .testguard/evidence.json, or .testguard/evidence-provisional.json when confirm < 3. Empty when the command wrote none (gate, claims, baseline, brief, an allow-empty probe, or a probe that stopped before writing).'
     value: ${{ steps.run.outputs.evidence }}
 
 runs:
@@ -79,26 +79,59 @@ runs:
     - id: run
       shell: bash
       working-directory: ${{ inputs.working-directory }}
+      # Inputs reach the script as environment variables, never spliced into
+      # its text: a `${{ }}` expression inside `run:` is pasted in before bash
+      # parses it, so an input carrying `"` or `$(...)` would run as shell.
+      env:
+        TG_COMMAND: ${{ inputs.command }}
+        TG_CLAIMS: ${{ inputs.claims }}
+        TG_SEVERITY: ${{ inputs.severity }}
+        TG_CONFIRM: ${{ inputs.confirm }}
+        TG_BUDGET: ${{ inputs.budget }}
+        TG_NO_ESCALATE: ${{ inputs.no-escalate }}
+        TG_ALLOW_EMPTY: ${{ inputs.allow-empty }}
+        TG_CHANGED_REF: ${{ inputs.changed-ref }}
+        TG_STRICT: ${{ inputs.strict }}
+        TG_VERSION: ${{ inputs.version }}
+        TG_RUNNER: ${{ inputs.runner }}
+        TG_PYTHON: ${{ inputs.python }}
       run: |
         set -o pipefail
         ARGS=()
-        [ -n "${{ inputs.claims }}" ] && ARGS+=(--claims "${{ inputs.claims }}")
-        if [ "${{ inputs.command }}" = "probe" ]; then
-          ARGS+=(--severity "${{ inputs.severity }}" --confirm "${{ inputs.confirm }}" --budget "${{ inputs.budget }}")
-          [ "${{ inputs.no-escalate }}" = "true" ] && ARGS+=(--no-escalate)
-          [ "${{ inputs.allow-empty }}" = "true" ] && ARGS+=(--allow-empty)
-          [ "${{ inputs.runner }}" != "auto" ] && ARGS+=(--runner "${{ inputs.runner }}")
-          [ -n "${{ inputs.python }}" ] && ARGS+=(--python "${{ inputs.python }}")
+        [ -n "$TG_CLAIMS" ] && ARGS+=(--claims "$TG_CLAIMS")
+        if [ "$TG_COMMAND" = "probe" ]; then
+          ARGS+=(--severity "$TG_SEVERITY" --confirm "$TG_CONFIRM" --budget "$TG_BUDGET")
+          [ "$TG_NO_ESCALATE" = "true" ] && ARGS+=(--no-escalate)
+          [ "$TG_ALLOW_EMPTY" = "true" ] && ARGS+=(--allow-empty)
+          [ "$TG_RUNNER" != "auto" ] && ARGS+=(--runner "$TG_RUNNER")
+          [ -n "$TG_PYTHON" ] && ARGS+=(--python "$TG_PYTHON")
         fi
-        [ "${{ inputs.command }}" = "brief" ] && ARGS+=(--text)
-        if [ "${{ inputs.command }}" = "gate" ]; then
-          REF="${{ inputs.changed-ref }}"
+        [ "$TG_COMMAND" = "brief" ] && ARGS+=(--text)
+        if [ "$TG_COMMAND" = "gate" ]; then
+          REF="$TG_CHANGED_REF"
           if [ -z "$REF" ] && [ -n "${GITHUB_BASE_REF:-}" ]; then
             git fetch --no-tags --quiet origin "$GITHUB_BASE_REF" || true
             REF="origin/${GITHUB_BASE_REF}"
           fi
           [ -n "$REF" ] && ARGS+=(--changed "$REF")
-          [ "${{ inputs.strict }}" = "true" ] && ARGS+=(--strict)
+          [ "$TG_STRICT" = "true" ] && ARGS+=(--strict)
         fi
-        echo "evidence=$(pwd)/.testguard/evidence.json" >> "$GITHUB_OUTPUT"
-        npx -y "testguard-cli@${{ inputs.version }}" "${{ inputs.command }}" . "${ARGS[@]}"
+        # `evidence` names the file THIS run wrote: evidence.json for a
+        # confirmed probe, evidence-provisional.json when confirm < 3, and
+        # nothing for a command that writes no evidence or a probe that stopped
+        # before writing. A file already there (a restored cache) is compared
+        # by inode, size and timestamps before and after, so a stale copy is
+        # never reported as this run's result.
+        fingerprint() {
+          node -e 'const fs = require("node:fs"); for (const f of [".testguard/evidence.json", ".testguard/evidence-provisional.json"]) { let s; try { s = fs.statSync(f, { bigint: true }); } catch { continue; } console.log([f, s.ino, s.size, s.mtimeNs, s.ctimeNs].join(" ")); }'
+        }
+        BEFORE="$(fingerprint)"
+        status=0
+        npx -y "testguard-cli@${TG_VERSION}" "$TG_COMMAND" . "${ARGS[@]}" || status=$?
+        EVIDENCE=""
+        while IFS= read -r line; do
+          [ -n "$line" ] || continue
+          if ! grep -qxF -- "$line" <<<"$BEFORE"; then EVIDENCE="$(pwd)/${line%% *}"; break; fi
+        done <<<"$(fingerprint)"
+        echo "evidence=${EVIDENCE}" >> "$GITHUB_OUTPUT"
+        exit "$status"

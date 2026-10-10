@@ -31,7 +31,7 @@ npx testguard-cli init          # agent layer at the git root, project layer her
 + .claude/skills/testguard/SKILL.md
 + .claude/settings.json: SessionStart hook → brief --text (local install first, then a testguard on PATH, never a fetch)
 + AGENTS.md created with the TestGuard section
-+ .gitignore: 10 lines added
++ .gitignore: 12 lines added
 
 Agents now start with the blind-spot brief and can run `testguard status --json` to learn what to do next. The hook prefers a local install and never fetches from the network.
 Commit these files.
@@ -95,10 +95,12 @@ Why it is shaped this way:
 - It never reaches the network.
   There is no package-runner fallback in it in any form: one that declines to
   install still resolves the package from the registry first.
-  An older hook that used one is replaced when you run `init` again.
+  Any earlier TestGuard hook, whichever release wrote it, is replaced in
+  place when you run `init` again, so a session never briefs twice.
 - `brief --text` prints only, and exits `0` silently when there is no evidence
-  yet. The brief names the install that answered (`local install` or
-  `global`), so a stale global binary is visible.
+  yet. The brief names the install that answered (`local install`,
+  `npx cache`, `pnpm dlx cache`, `bunx cache` or `global`), so a stale
+  binary, global or cached, is visible.
 
 For other harnesses with a session-start mechanism, the same command works
 unchanged.
@@ -238,8 +240,8 @@ brief is empty and `status` says `unprobed` even when CI has full evidence.
 Point either command at CI's document:
 
 ```bash
-testguard status . --evidence .testguard/ci/ci-self-evidence.json
-testguard brief . --text --evidence .testguard/ci/ci-self-evidence.json
+testguard status . --evidence .testguard/ci/evidence.json
+testguard brief . --text --evidence .testguard/ci/evidence.json
 ```
 
 A provided document is marked `evidenceSource: provided`, both commits are

@@ -26,7 +26,7 @@ and 9.
 
 TestGuard tries these in order and takes the first that answers:
 
-1. `--python <path>` or `TESTGUARD_PYTHON`. When either is set it is the
+1. `--python <interpreter>` or `TESTGUARD_PYTHON`. When either is set it is the
    **only** candidate: an interpreter you named and TestGuard quietly replaced
    would change which dependencies the tests ran against without changing
    anything the evidence says.
@@ -39,10 +39,16 @@ worktree the probe runs in. A virtualenv is gitignored, so the worktree does
 not contain one; it is referenced by absolute path, the way virtualenvs are
 meant to be used.
 
-`--python` is a path and is resolved against the current directory, so pass
-`.venv/bin/python` rather than a bare command name. `TESTGUARD_PYTHON` is used
-exactly as given. Only `probe` accepts `--python`; for `admit`, `sweep` and
-`replay`, set `TESTGUARD_PYTHON`.
+`--python` and `TESTGUARD_PYTHON` take the same values and mean the same
+thing, the way a shell reads a command: a bare name such as `python3` or
+`python3.12` is looked up on PATH, and anything containing a `/` (for example
+`.venv/bin/python`) is a path, resolved against the current directory.
+`probe`, `admit`, `sweep` and `replay` all accept `--python`.
+
+The evidence records where the interpreter came from in `run.runner.source`:
+`project` for a virtualenv, the project's own environment or an interpreter
+named by path, and `path` for one found on PATH (including a bare name given to
+`--python`).
 
 When nothing answers, the probe stops with exit `2`:
 

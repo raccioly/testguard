@@ -3,6 +3,7 @@ import { sweep, renderSweep, ConcernError } from '../sweep/sweep.mjs';
 import { resolveChangedRef } from '../gate/changed.mjs';
 import { writeSpecDoc } from '../evidence/writer.mjs';
 import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
+import { runnerOptions } from './runner-options.mjs';
 
 export const sweepPath = (projectDir) => join(projectDir, '.testguard', 'sweep.json');
 /**
@@ -46,6 +47,11 @@ export async function sweepCommand({ projectDir, values, version }, io) {
     io.err('--command-budget must be at least 1000 milliseconds');
     return 3;
   }
+  const runner = runnerOptions(values);
+  if (runner.error) {
+    io.err(runner.error);
+    return 3;
+  }
   const commandBudget = createCommandBudget(commandBudgetMs);
   // A concern that aims at the write surface or at a glob needs no diff, the
   // same as --save-paths. Only a concern that defers to the gate does.
@@ -85,9 +91,10 @@ export async function sweepCommand({ projectDir, values, version }, io) {
       workers,
       serial: values.serial || workers === 1,
       commandBudget,
-      runnerCommand: values['runner-cmd'],
+      runnerCommand: runner.runnerCommand,
       runnerName: values.runner,
       nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
+      python: runner.python,
       toolVersion: version,
       claimsPath: values.claims ? resolve(values.claims) : undefined,
       ignorePath: values.ignore ? resolve(values.ignore) : undefined,
