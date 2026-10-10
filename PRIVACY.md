@@ -8,7 +8,8 @@ TestGuard collects nothing and sends nothing.
   activity in the project is `npm install` fetching development dependencies
   and, if you use `npx`, npm fetching the package itself. The `pip` wrapper
   runs a project-local install when there is one and otherwise asks `npx` for
-  the latest release, which is that same fetch.
+  the npm release matching the pip package's own version, which is that same
+  fetch.
 - **CI jobs you configure.** The GitLab template posts the brief as a
   merge-request note only when you set `post_note: true` and supply a token.
   The GitHub Action uploads nothing; publishing its evidence is a step you add.

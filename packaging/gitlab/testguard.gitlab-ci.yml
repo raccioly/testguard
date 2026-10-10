@@ -12,7 +12,7 @@
 # with the same inputs; a compliance framework can then require it on every
 # project in a group.
 #
-# Three jobs. `testguard:gate` runs on every merge request pipeline and fails
+# Two jobs. `testguard:gate` runs on every merge request pipeline and fails
 # when a changed source file carries no claim (and no excusing ignore entry).
 # `testguard:probe` runs the faults against the tests, gated by the committed
 # baseline, and always writes the brief — as JSON, and as markdown for humans.
@@ -24,6 +24,10 @@
 # The gate measures the change against CI_MERGE_REQUEST_DIFF_BASE_SHA, which
 # GitLab provides on merge request pipelines and which needs no extra fetch.
 # On other pipelines set TESTGUARD_CHANGED_REF (and fetch that ref).
+#
+# The template sets no top-level `variables:` (an included file's top-level
+# variables reach every job of the pipeline). GIT_DEPTH, TESTGUARD_VERSION and
+# TESTGUARD_DIR are set on its own jobs only.
 
 spec:
   inputs:
@@ -38,43 +42,59 @@ spec:
       default: "node:22"
     severity:
       description: "probe: gate only at or above this severity (critical, high, medium, low)"
+      options: [critical, high, medium, low]
       default: "low"
     confirm:
       description: "probe: runs per verdict (N); below 3 is provisional"
-      default: "3"
+      type: number
+      default: 3
     budget:
       description: "probe: wall-clock budget per test run, ms"
-      default: "120000"
+      type: number
+      default: 120000
     no_escalate:
       description: "probe: skip re-running survivors against the whole suite"
-      default: "false"
+      type: boolean
+      default: false
     runner:
-      description: "probe: vitest | jest | playwright | python | pytest | unittest | auto. `python` picks pytest when the interpreter can import it and stdlib unittest otherwise; `pytest`/`unittest` pin that choice and fail rather than fall back. The default Node image has no Python — set `image` to one that does before probing a Python project."
+      description: "probe: vitest | jest | playwright | python | pytest | unittest | node-test | auto. `python` picks pytest when the interpreter can import it and stdlib unittest otherwise; `pytest`/`unittest` pin that choice and fail rather than fall back. The default Node image has no Python — set `image` to one that does before probing a Python project."
+      options: [vitest, jest, playwright, python, pytest, unittest, node-test, auto]
       default: "auto"
     python:
       description: "probe: Python interpreter for .py defenders (default: $VIRTUAL_ENV, then the project .venv/venv, then python3 on PATH)"
       default: ""
     strict:
       description: "gate: fail a change whose files were all excluded instead of passing with a note"
-      default: "false"
+      type: boolean
+      default: false
     post_note:
       description: post the markdown brief as a merge-request note (requires TESTGUARD_GITLAB_TOKEN with api scope)
-      default: "false"
+      type: boolean
+      default: false
     stage:
       description: pipeline stage for both jobs
       default: "test"
 ---
-variables:
-  TESTGUARD_VERSION: "$[[ inputs.version ]]"
-  TESTGUARD_DIR: "$[[ inputs.dir ]]"
-  GIT_DEPTH: "0" # the probe builds a scratch worktree from HEAD; full history is the safe default
-
 .testguard:
   image: $[[ inputs.image ]]
   stage: $[[ inputs.stage ]]
+  variables:
+    TESTGUARD_VERSION: "$[[ inputs.version ]]"
+    TESTGUARD_DIR: "$[[ inputs.dir ]]"
+    GIT_DEPTH: "0" # the probe builds a scratch worktree from HEAD; full history is the safe default
   before_script:
     - cd "$TESTGUARD_DIR"
-    - npm ci --ignore-scripts
+    # The project's own dependencies (its test runner). The CLI runs through
+    # npx and is never added to package.json.
+    - |
+      if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+        npm ci --ignore-scripts
+      elif [ -f package.json ]; then
+        echo "TestGuard: no package-lock.json in $TESTGUARD_DIR; installing package.json's dependencies without writing a lockfile"
+        npm install --ignore-scripts --no-save --no-package-lock --no-audit --no-fund
+      else
+        echo "TestGuard: no package.json in $TESTGUARD_DIR; skipping the npm install (the CLI runs through npx)"
+      fi
 
 testguard:gate:
   extends: .testguard
@@ -85,7 +105,9 @@ testguard:gate:
     - npx -y "testguard-cli@${TESTGUARD_VERSION}" gate . $ARGS
   artifacts:
     when: always
-    paths: [".testguard/gate.json"]
+    # Artifact paths are resolved from the repository root, not from the
+    # directory the script changed into.
+    paths: ["$[[ inputs.dir ]]/.testguard/gate.json"]
 
 testguard:probe:
   extends: .testguard
@@ -124,4 +146,8 @@ testguard:probe:
     - exit $status
   artifacts:
     when: always
-    paths: [".testguard/evidence.json", ".testguard/brief.json", ".testguard/brief.md"]
+    paths:
+      - "$[[ inputs.dir ]]/.testguard/evidence.json"
+      - "$[[ inputs.dir ]]/.testguard/evidence-provisional.json" # confirm < 3
+      - "$[[ inputs.dir ]]/.testguard/brief.json"
+      - "$[[ inputs.dir ]]/.testguard/brief.md"
