@@ -7393,6 +7393,81 @@
           "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
         }
       ]
+    },
+    {
+      "id": "TG-CONFIG-FILES-FAIL-LOUDLY",
+      "statement": "A concerns or ignore file that does not parse, does not conform, or declares an entry that would do nothing fails the command that reads it (exit 2, naming the file); it is never read as \"nothing declared\", so a sweep cannot aim at nothing and pass, and an ignore entry cannot look approved while excusing nothing.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "severity": "high",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/cli-surface.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The concerns file is never read: an empty document stands in for it, so a malformed or schema-invalid file silently becomes the built-ins only.",
+          "faultClass": "argument-swapped",
+          "file": "src/supply/concerns.mjs",
+          "find": "    const doc = readSpecDoc('concerns', p);",
+          "replace": "    const doc = readSpecDoc('concerns', p, { source: '{\"schemaVersion\":1,\"concerns\":[]}' });",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F2",
+          "description": "The ignore schema accepts the inert fingerprint kind again: an entry a reviewer approved as a suppression is read by nothing.",
+          "faultClass": "literal-changed",
+          "file": "spec/schemas/ignore.schema.json",
+          "find": "\"enum\": [\"path\", \"claim\", \"fault\"]",
+          "replace": "\"enum\": [\"path\", \"claim\", \"fault\", \"fingerprint\"]",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F3",
+          "description": "A fault entry is no longer required to name <claimId>/<faultId>, so a bare claim id in a fault entry excuses the whole claim's removal.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/validate.mjs",
+          "find": "        if (parts.length !== 2 || !parts.every((p) => IDENTIFIER.test(p))) errors.push(",
+          "replace": "        if (false) errors.push(",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["spec/conformance/schemas.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-CLI-SAYS-WHAT-IT-DOES",
+      "statement": "What the CLI prints about itself matches what it does: baseline --json prints a status document its own schema accepts, gate --explain names exactly the extensions the gate treats as source, and replay refuses --baseline rather than writing the calibration somewhere the caller did not ask.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "severity": "medium",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/cli-surface.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "baseline --json emits a key the status schema forbids, which is the document every integration parses.",
+          "faultClass": "field-dropped",
+          "file": "src/commands/baseline.mjs",
+          "find": "  const doc = { ...computeStatus({ projectDir, toolVersion: version }), baseline };",
+          "replace": "  const doc = { ...computeStatus({ projectDir, toolVersion: version }), result: baseline };",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F2",
+          "description": "gate --explain prints a hand-written extension list without .py, while the gate treats .py as source.",
+          "faultClass": "literal-changed",
+          "file": "src/gate/changed.mjs",
+          "find": "  `Non-source files (anything but ${[...SOURCE_EXT].join(' ')}) are excluded before these patterns apply.`,",
+          "replace": "  'Non-source files (anything but .js .mjs .cjs .ts .mts .cts .jsx .tsx) are excluded before these patterns apply.',",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F3",
+          "description": "replay accepts --baseline again and silently ignores it, so the calibration lands somewhere the caller did not ask.",
+          "faultClass": "guard-removed",
+          "file": "src/cli.mjs",
+          "find": "  if (command === 'replay' && values.baseline !== undefined) {",
+          "replace": "  if (false) {",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+        }
+      ]
     }
   ]
 }
