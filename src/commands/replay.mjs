@@ -55,7 +55,7 @@ export async function replayCommand({ projectDir, values, version }, io) {
   // Beside the replay document, whatever --out says: the two are one result,
   // and splitting them across directories loses the pairing — and leaves a
   // file behind in a repository the run is only meant to read.
-  const calPath = values.baseline ? resolve(values.baseline) : values.out ? join(dirname(outPath), 'calibration.json') : calibrationPath(projectDir);
+  const calPath = values['calibration-out'] ? resolve(values['calibration-out']) : values.out ? join(dirname(outPath), 'calibration.json') : calibrationPath(projectDir);
   // Replay and calibration are one result. Cross the deadline boundary only
   // after both complete documents exist in memory; serialization is then the
   // documented non-interruptible final step, so expiry can never leave half

@@ -45,6 +45,17 @@ export const DEFAULT_EXCLUDES = Object.freeze([
 ]);
 const DEFAULT_EXCLUDE_RES = DEFAULT_EXCLUDES.map(globToRegExp);
 
+/**
+ * What `gate --explain` prints, built from the two lists the gate itself
+ * applies. A hand-written copy of the extension list omitted `.py` for as long
+ * as the gate had treated Python as source.
+ */
+export const explainExclusions = () => [
+  'Files that are source by extension but never carry claims (excluded by default; add more with --exclude <glob>):',
+  ...DEFAULT_EXCLUDES.map((g) => `  ${g}`),
+  `Non-source files (anything but ${[...SOURCE_EXT].join(' ')}) are excluded before these patterns apply.`,
+];
+
 /** Whether a source-shaped path is outside TestGuard's claimable module surface. */
 export const isDefaultExcluded = (file) => DEFAULT_EXCLUDE_RES.some((re) => re.test(file));
 
