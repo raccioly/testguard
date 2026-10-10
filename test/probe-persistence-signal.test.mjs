@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { probe } from '../src/probe/probe.mjs';
 import { validate } from '../spec/lib/validate.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -16,7 +17,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // this project's node_modules linked in, probed in place.
 function repo() {
   const dir = mkdtempSync(join(tmpdir(), 'tg-persist-signal-'));
-  const g = (...a) => spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8' });
+  const g = (...a) => spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8' });
   g('init', '-q');
   mkdirSync(join(dir, 'src'));
   mkdirSync(join(dir, 'test'));

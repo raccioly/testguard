@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { TOOLS } from '../src/mcp/tools.mjs';
 import { writeSpecDoc } from '../src/evidence/writer.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 it('hands back the unprobed status action without executing the proposed probe', () => {
   const dir = mkdtempSync(join(tmpdir(), 'tg-mcp-next-'));
@@ -22,7 +23,7 @@ it('hands back the unprobed status action without executing the proposed probe',
       }],
     }] });
     for (const args of [['init', '-q'], ['add', '-A'], ['-c', 'user.email=fixture@example.invalid', '-c', 'user.name=fixture', 'commit', '-qm', 'fixture']]) {
-      execFileSync('git', args, { cwd: dir, timeout: 5000 });
+      execFileSync('git', [...FIXTURE_GIT, ...args], { cwd: dir, timeout: 5000 });
     }
     const next = TOOLS.find((tool) => tool.name === 'testguard_next_command').handler({ dir });
     expect(next).toMatchObject({ state: 'unprobed', action: 'probe', command: 'testguard probe' });

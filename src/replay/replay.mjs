@@ -2,7 +2,7 @@ import { resetInterpreterCache } from '../probe/runners/python.mjs';
 import { existsSync, rmSync, realpathSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { git, GitError, repoRoot, headSha } from '../git.mjs';
+import { git, GitError, NO_HOOKS, repoRoot, headSha } from '../git.mjs';
 import { createScratch, PreconditionError } from '../probe/worktree.mjs';
 import { selectRunner, discoverRunnerManifest, RUNNERS, OWNED_RUNNERS, mergeRuns } from '../probe/runners/index.mjs';
 import { parseCommandTemplate } from '../probe/runners/shared.mjs';
@@ -263,7 +263,7 @@ async function replayOne({ fix, iso, root, projectDir, python, confirmRuns, budg
     return { ...base, faultClass, verdict: 'unverifiable', reason: 'no-prior-version', runs: [{ outcome: 'error', durationMs: 0 }] };
   }
   try {
-    if (existedBefore.length) git(['checkout', `${fix.commit}^`, '--', ...existedBefore.map(rel)], iso.projectDir);
+    if (existedBefore.length) git([...NO_HOOKS, 'checkout', `${fix.commit}^`, '--', ...existedBefore.map(rel)], iso.projectDir);
     for (const f of addedByTheFix) {
       const abs = join(iso.projectDir, rel(f));
       if (existsSync(abs)) rmSync(inside(abs), { force: true });

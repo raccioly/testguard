@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { probe } from '../src/probe/probe.mjs';
 import { PreconditionError } from '../src/probe/worktree.mjs';
 import { validate } from '../spec/lib/validate.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 
 
@@ -41,7 +42,7 @@ const FAULT = { id: 'F1', description: 'd', faultClass: 'other', file: 'src/a.mj
 /** A repo with two claims over two source files, each with its own defender. */
 function repo() {
   const dir = mkdtempSync(join(tmpdir(), 'tg-probe-error-'));
-  const g = (...a) => spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8', timeout: 5000 });
+  const g = (...a) => spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8', timeout: 5000 });
   g('init', '-q');
   mkdirSync(join(dir, 'src'));
   mkdirSync(join(dir, 'test'));

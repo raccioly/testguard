@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 // A broken --runner-cmd makes every defender fail to load. Fixing the command
 // in place changes nothing the record's inputs hash — target, defenders and
@@ -32,7 +33,7 @@ beforeAll(() => {
   writeFileSync(join(dir, 'testguard.claims.json'), JSON.stringify(CLAIMS, null, 2));
   writeFileSync(join(dir, '.gitignore'), '.testguard/\n');
   for (const args of [['init', '-q'], ['add', '.'], ['-c', 'user.email=fixture@example.invalid', '-c', 'user.name=fixture', 'commit', '-qm', 'fixture']]) {
-    execFileSync('git', args, { cwd: dir, timeout: 5000 });
+    execFileSync('git', [...FIXTURE_GIT, ...args], { cwd: dir, timeout: 5000 });
   }
 });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));

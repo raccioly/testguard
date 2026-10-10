@@ -85,6 +85,93 @@
       "reason": "Replaced by TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS, which states the opposite of one half of it. The old statement said nocover \"carries no information about detection\" and its one fault (every verdict enters the denominator) was killed — but the claim it defended was wrong: nocover is a successful measurement with the worst result, and excluding it scored a project with no tests for a subsystem better than one with weak tests, because its worst outcomes left the denominator before the ratio was taken. The other half (flaky and unverifiable are failed measurements and enter neither side) is carried into the new claim's statement and test. Not a rename, because the statement had to change; not a silent removal, because this entry says why.",
       "by": "maintainer",
       "at": "2026-09-18T15:35:15Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/admit.test.mjs",
+      "reason": "Changed only to pin the fixture git options (FIXTURE_GIT from test/helpers/git.mjs) so the suite no longer depends on the machine's global git config; no assertion changed. It defended no claim before this change and defends none now. The excuse expires so the next real edit to this file states the claim it defends instead of riding on this one.",
+      "by": "maintainer",
+      "at": "2026-10-10T17:00:00Z",
+      "expires": "2026-12-31T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/fault-defenders.test.mjs",
+      "reason": "Changed only to pin the fixture git options (FIXTURE_GIT from test/helpers/git.mjs) so the suite no longer depends on the machine's global git config; no assertion changed. It defended no claim before this change and defends none now. The excuse expires so the next real edit to this file states the claim it defends instead of riding on this one.",
+      "by": "maintainer",
+      "at": "2026-10-10T17:00:00Z",
+      "expires": "2026-12-31T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/mcp.test.mjs",
+      "reason": "Changed only to pin the fixture git options (FIXTURE_GIT from test/helpers/git.mjs) so the suite no longer depends on the machine's global git config; no assertion changed. It defended no claim before this change and defends none now. The excuse expires so the next real edit to this file states the claim it defends instead of riding on this one.",
+      "by": "maintainer",
+      "at": "2026-10-10T17:00:00Z",
+      "expires": "2026-12-31T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/negative-control.test.mjs",
+      "reason": "Changed only to pin the fixture git options (FIXTURE_GIT from test/helpers/git.mjs) so the suite no longer depends on the machine's global git config; no assertion changed. It defended no claim before this change and defends none now. The excuse expires so the next real edit to this file states the claim it defends instead of riding on this one.",
+      "by": "maintainer",
+      "at": "2026-10-10T17:00:00Z",
+      "expires": "2026-12-31T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/origin-policy-cli.test.mjs",
+      "reason": "Changed only to pin the fixture git options (FIXTURE_GIT from test/helpers/git.mjs) so the suite no longer depends on the machine's global git config; no assertion changed. It defended no claim before this change and defends none now. The excuse expires so the next real edit to this file states the claim it defends instead of riding on this one.",
+      "by": "maintainer",
+      "at": "2026-10-10T17:00:00Z",
+      "expires": "2026-12-31T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/probe-error.test.mjs",
+      "reason": "Changed only to pin the fixture git options (FIXTURE_GIT from test/helpers/git.mjs) so the suite no longer depends on the machine's global git config; no assertion changed. It defended no claim before this change and defends none now. The excuse expires so the next real edit to this file states the claim it defends instead of riding on this one.",
+      "by": "maintainer",
+      "at": "2026-10-10T17:00:00Z",
+      "expires": "2026-12-31T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/probe-preconditions.test.mjs",
+      "reason": "Changed only to pin the fixture git options (FIXTURE_GIT from test/helpers/git.mjs) so the suite no longer depends on the machine's global git config; no assertion changed. It defended no claim before this change and defends none now. The excuse expires so the next real edit to this file states the claim it defends instead of riding on this one.",
+      "by": "maintainer",
+      "at": "2026-10-10T17:00:00Z",
+      "expires": "2026-12-31T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/probe.jest.test.mjs",
+      "reason": "Changed only to pin the fixture git options (FIXTURE_GIT from test/helpers/git.mjs) so the suite no longer depends on the machine's global git config; no assertion changed. It defended no claim before this change and defends none now. The excuse expires so the next real edit to this file states the claim it defends instead of riding on this one.",
+      "by": "maintainer",
+      "at": "2026-10-10T17:00:00Z",
+      "expires": "2026-12-31T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/probe.python.test.mjs",
+      "reason": "Changed only to pin the fixture git options (FIXTURE_GIT from test/helpers/git.mjs) so the suite no longer depends on the machine's global git config; no assertion changed. It defended no claim before this change and defends none now. The excuse expires so the next real edit to this file states the claim it defends instead of riding on this one.",
+      "by": "maintainer",
+      "at": "2026-10-10T17:00:00Z",
+      "expires": "2026-12-31T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/snapshot.test.mjs",
+      "reason": "Changed only to pin the fixture git options (FIXTURE_GIT from test/helpers/git.mjs) so the suite no longer depends on the machine's global git config; no assertion changed. It defended no claim before this change and defends none now. The excuse expires so the next real edit to this file states the claim it defends instead of riding on this one.",
+      "by": "maintainer",
+      "at": "2026-10-10T17:00:00Z",
+      "expires": "2026-12-31T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": ".jules/preflight.mjs",
+      "reason": "Wiring for the Jules routines: it reads the public pull request list, the claims file and --help, then prints what the policy decided. Every decision (queue cap, decline window, weekly rotation, target lists) is a pure function in .github/scripts/jules-policy.mjs, claimed as TG-JULES-TRIAGE-BOUNDS-THE-QUEUE and TG-JULES-MERGE-GATE-HOLDS-BY-DEFAULT. Maintenance tooling; not shipped in the package.",
+      "by": "maintainer",
+      "at": "2026-10-10T18:00:00Z"
     }
   ]
 }
