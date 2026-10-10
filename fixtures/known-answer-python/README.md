@@ -34,7 +34,7 @@ spots comes from running against a real codebase with real history.
 | FLAKY-001 | (defender is flaky) | F1 anything | flaky-defender |
 | DISCOVER-001 | Every match is replaced (no `defendedBy`) | F1 loop body removed | killed — defenders **discovered** by Python module name |
 | PATCHED-001 | `mask()` replaces with equal-length asterisks (defender patches one attribute) | F1 one asterisk per match | killed — with `target-attribute-patched` |
-| UNREACHED-001 | Only an administrator is allowed | F1 always allows | **survived**, `targetNotImported` |
+| UNREACHED-001 | Only an administrator is allowed | F1 always allows | unverifiable (subject-not-executed): negative control `not-reached`, `targetNotImported` |
 
 ## The exhibit — REDACT-001/F1
 
@@ -64,9 +64,15 @@ it and raises `target-attribute-patched`, naming the attributes.
 
 **A fault that never runs is not a survivor.** `UNREACHED-001`'s declared
 defender never imports `demo/orphan.py`. The fault is applied, the suite is
-green, and nothing about the tests' assertions has been learned. The record
-carries `detail.targetNotImported` so that `survived` cannot be read as
-"the tests are blind here" when the truth is "the tests were never there".
+green, and nothing about the tests' assertions has been learned. The would-be
+survivor is charged the negative control: with `demo/orphan.py` replaced by
+something that cannot compile, the defender still passes, so the verdict is
+`unverifiable` with reason `subject-not-executed` and
+`detail.negativeControl: "not-reached"` — never `survived`, which would read
+as "the tests are blind here" when the truth is "the tests were never there".
+The record also carries `detail.targetNotImported`: Python can name the file
+the interpreter loaded, which is the same finding reported more precisely,
+and the two may never disagree.
 
 ## Timeouts cost wall-clock
 

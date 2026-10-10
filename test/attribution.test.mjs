@@ -251,6 +251,15 @@ describe('reuse — a prior verdict may only stand for the fault that produced i
     expect(isReusable(prior({ verdict: 'unverifiable', detail: { baselineRuns: [], probeRuns: [], reason: 'anchor-missing' } }), current())).toBe(true);
   });
 
+  it('never reuses a record whose defenders failed to load — that is the environment, not the code', () => {
+    // A broken --runner-cmd, a missing node_modules or a virtualenv without the
+    // test dependencies all leave the target and defenders byte-identical. The
+    // inputs match, the environment is fixed, and reusing the record would keep
+    // presenting a failure nobody can see any more as the current answer.
+    const unloaded = prior({ verdict: 'unverifiable', detail: { baselineRuns: [{ outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs: 5 }], probeRuns: [], reason: 'defenders-failed-to-load' } });
+    expect(isReusable(unloaded, current())).toBe(false);
+  });
+
   it('has nothing to reuse without a prior', () => {
     expect(isReusable(undefined, current())).toBe(false);
   });

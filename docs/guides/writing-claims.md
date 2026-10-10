@@ -665,6 +665,11 @@ of the mechanism. Add `expires` where you can: an expired entry excuses nothing
 and is reported as `EXPIRED`. `gate` prints every entry it relied on. The full
 format is in [configuration](../reference/configuration.md).
 
+An ignore entry excuses a file from the change gate; it does not take
+anything out of a probe. `probe` never reads the ignore file, so a claim you
+wrote is always probed and no entry can hide a survivor. To accept a finding
+you know about, freeze it with `testguard baseline`.
+
 ## Removing or renaming a claim
 
 Claims can be wrong, superseded or split, so removal is allowed. It is never

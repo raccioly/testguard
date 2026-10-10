@@ -2235,10 +2235,10 @@
       "faults": [
         {
           "id": "F1",
-          "description": "The already-installed check is defeated; every init appends another hook.",
+          "description": "The already-installed check is defeated; every init rewrites the hook and reports a change that is not one.",
           "faultClass": "literal-changed",
           "file": "src/init/init.mjs",
-          "find": "  const hasCmd = settings.hooks.SessionStart.some((e) => JSON.stringify(e).includes(cmd));",
+          "find": "  const hasCmd = ours.length === 1 && ours[0].command === cmd;",
           "replace": "  const hasCmd = false;",
           "producedBy": {
             "producer": "human",
@@ -4224,8 +4224,8 @@
           "description": "An explicit --python is only a preference: resolution falls through to another interpreter, changing which dependencies the tests ran against.",
           "faultClass": "return-altered",
           "file": "src/probe/runners/python.mjs",
-          "find": "  if (explicit) return [{ path: explicit, source: 'project', explicit: true }];",
-          "replace": "  if (explicit) out.push({ path: explicit, source: 'project' });",
+          "find": "  if (explicit) return [{ ...explicit, explicit: true }];",
+          "replace": "  if (explicit) out.push({ ...explicit });",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -5373,7 +5373,7 @@
           "description": "The outputs that shipped after the advice was written fall off the list again, so a project is told to ignore a set that no longer matches what the tool writes.",
           "faultClass": "field-dropped",
           "file": "src/init/init.mjs",
-          "find": "export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json', '.testguard/replay.json', '.testguard/calibration.json', '.testguard/ci-self-evidence.json', '.testguard/ci/'];",
+          "find": "export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json', '.testguard/replay.json', '.testguard/calibration.json', '.testguard/ci-self-evidence.json', '.testguard/ci/', '.testguard/sweep.json', '.testguard/sweep-evidence.json'];",
           "replace": "export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json'];",
           "producedBy": {
             "producer": "human",
@@ -7390,6 +7390,775 @@
           "file": "src/cli.mjs",
           "find": "  --runner <name>      vitest | jest | playwright | python | pytest | unittest | node-test | auto",
           "replace": "  --runner <name>      vitest | jest | playwright | python | pytest | unittest | node-test | deno | auto",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONFIG-FILES-FAIL-LOUDLY",
+      "statement": "A concerns or ignore file that does not parse, does not conform, or declares an entry that would do nothing fails the command that reads it (exit 2, naming the file); it is never read as \"nothing declared\", so a sweep cannot aim at nothing and pass, and an ignore entry cannot look approved while excusing nothing.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "severity": "high",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/cli-surface.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The concerns file is never read: an empty document stands in for it, so a malformed or schema-invalid file silently becomes the built-ins only.",
+          "faultClass": "argument-swapped",
+          "file": "src/supply/concerns.mjs",
+          "find": "    const doc = readSpecDoc('concerns', p);",
+          "replace": "    const doc = readSpecDoc('concerns', p, { source: '{\"schemaVersion\":1,\"concerns\":[]}' });",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F2",
+          "description": "The ignore schema accepts the inert fingerprint kind again: an entry a reviewer approved as a suppression is read by nothing.",
+          "faultClass": "literal-changed",
+          "file": "spec/schemas/ignore.schema.json",
+          "find": "\"enum\": [\"path\", \"claim\", \"fault\"]",
+          "replace": "\"enum\": [\"path\", \"claim\", \"fault\", \"fingerprint\"]",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F3",
+          "description": "A fault entry is no longer required to name <claimId>/<faultId>, so a bare claim id in a fault entry excuses the whole claim's removal.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/validate.mjs",
+          "find": "        if (parts.length !== 2 || !parts.every((p) => IDENTIFIER.test(p))) errors.push(",
+          "replace": "        if (false) errors.push(",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["spec/conformance/schemas.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-CLI-SAYS-WHAT-IT-DOES",
+      "statement": "What the CLI prints about itself matches what it does: baseline --json prints a status document its own schema accepts, gate --explain names exactly the extensions the gate treats as source, and replay refuses --baseline rather than writing the calibration somewhere the caller did not ask.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "severity": "medium",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/cli-surface.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "baseline --json emits a key the status schema forbids, which is the document every integration parses.",
+          "faultClass": "field-dropped",
+          "file": "src/commands/baseline.mjs",
+          "find": "  const doc = { ...computeStatus({ projectDir, toolVersion: version }), baseline };",
+          "replace": "  const doc = { ...computeStatus({ projectDir, toolVersion: version }), result: baseline };",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F2",
+          "description": "gate --explain prints a hand-written extension list without .py, while the gate treats .py as source.",
+          "faultClass": "literal-changed",
+          "file": "src/gate/changed.mjs",
+          "find": "  `Non-source files (anything but ${[...SOURCE_EXT].join(' ')}) are excluded before these patterns apply.`,",
+          "replace": "  'Non-source files (anything but .js .mjs .cjs .ts .mts .cts .jsx .tsx) are excluded before these patterns apply.',",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F3",
+          "description": "replay accepts --baseline again and silently ignores it, so the calibration lands somewhere the caller did not ask.",
+          "faultClass": "guard-removed",
+          "file": "src/cli.mjs",
+          "find": "  if (command === 'replay' && values.baseline !== undefined) {",
+          "replace": "  if (false) {",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+        }
+      ]
+    },
+    {
+      "id": "TG-GITLAB-ARTIFACTS-UNDER-DIR",
+      "statement": "The GitLab template's artifact paths carry the dir input, so the files a job writes under a subdirectory project are kept; GitLab resolves artifact paths from the repository root, not from the directory the script changed into.",
+      "source": { "kind": "spec", "ref": "docs/guides/ci/gitlab.md" },
+      "severity": "high",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/gitlab-template.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "The gate artifact path drops the dir prefix; with dir set to a subdirectory GitLab keeps no gate.json.",
+          "faultClass": "literal-changed", "file": "packaging/gitlab/testguard.gitlab-ci.yml",
+          "find": "    paths: [\"$[[ inputs.dir ]]/.testguard/gate.json\"]",
+          "replace": "    paths: [\".testguard/gate.json\"]",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/gitlab-template.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-GITLAB-INSTALL-WITHOUT-LOCKFILE",
+      "statement": "The GitLab template runs npm ci only when dir has an npm lockfile; a project without one, or a Python-only project without a package.json, is not failed by the install step, and the CLI is never added to package.json.",
+      "source": { "kind": "spec", "ref": "docs/guides/ci/gitlab.md" },
+      "severity": "high",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/gitlab-template.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "The install step runs npm ci whatever the project has, which fails every job of a Python-only project before TestGuard runs.",
+          "faultClass": "condition-forced", "file": "packaging/gitlab/testguard.gitlab-ci.yml",
+          "find": "      if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then",
+          "replace": "      if true; then",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/gitlab-template.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-ACTION-EVIDENCE-OUTPUT-IS-WRITTEN-FILE",
+      "statement": "The GitHub Action's evidence output names the evidence file the run actually wrote (evidence.json, or evidence-provisional.json when confirm < 3) and is empty when the run wrote none; a pre-existing file the run did not rewrite is never named.",
+      "source": { "kind": "spec", "ref": "docs/guides/ci/github-actions.md#output" },
+      "severity": "medium",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/action.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "The output names .testguard/evidence.json whatever the command wrote, so a provisional run or a gate points a later upload step at a file that is absent or stale.",
+          "faultClass": "literal-changed", "file": "action.yml",
+          "find": "        echo \"evidence=${EVIDENCE}\" >> \"$GITHUB_OUTPUT\"",
+          "replace": "        echo \"evidence=$(pwd)/.testguard/evidence.json\" >> \"$GITHUB_OUTPUT\"",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/action.test.mjs"]
+        },
+        {
+          "id": "F2", "description": "Every evidence file present after the run is reported, so a cache-restored evidence.json from an earlier commit is named as this run's result.",
+          "faultClass": "condition-forced", "file": "action.yml",
+          "find": "          if ! grep -qxF -- \"$line\" <<<\"$BEFORE\"; then",
+          "replace": "          if true; then",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/action.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-ACTION-INPUTS-ARE-DATA",
+      "statement": "The GitHub Action passes its inputs to the run script as environment variables, so an input value containing quotes or command substitution reaches the CLI verbatim and is never executed as shell.",
+      "source": { "kind": "spec", "ref": "docs/guides/ci/github-actions.md#output" },
+      "severity": "high",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/action.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "The claims input is spliced into the script text again, so a value carrying a quote or $(...) runs as shell inside the workflow.",
+          "faultClass": "other", "file": "action.yml",
+          "find": "        [ -n \"$TG_CLAIMS\" ] && ARGS+=(--claims \"$TG_CLAIMS\")",
+          "replace": "        [ -n \"${{ inputs.claims }}\" ] && ARGS+=(--claims \"${{ inputs.claims }}\")",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/action.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-PIP-WRAPPER-PINS-OWN-VERSION",
+      "statement": "With no project-local install, the pip wrapper runs the npm CLI pinned to the wheel's own version, and refuses rather than run an unpinned CLI when it cannot read that version.",
+      "source": { "kind": "spec", "ref": "docs/installation.md#pip" },
+      "severity": "high",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/python-wrapper.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "The npx fallback asks for @latest, so the CLI that runs is whatever npm published last, not the installed release.",
+          "faultClass": "literal-changed", "file": "testguard_cli/wrapper.py",
+          "find": "        return f\"{PACKAGE}@{version(PACKAGE)}\"",
+          "replace": "        return f\"{PACKAGE}@latest\"",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/python-wrapper.test.mjs"]
+        },
+        {
+          "id": "F2", "description": "Missing package metadata falls back to @latest instead of refusing.",
+          "faultClass": "literal-changed", "file": "testguard_cli/wrapper.py",
+          "find": "    except PackageNotFoundError:\n        return None",
+          "replace": "    except PackageNotFoundError:\n        return f\"{PACKAGE}@latest\"",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/python-wrapper.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-YAML-TEST-HELPER-READS-EVERY-DOCUMENT",
+      "statement": "The tests' YAML helper returns every document in a file, so the GitLab template's job document is parsed and checked, not only its spec header.",
+      "source": { "kind": "manual", "ref": "test/helpers/yaml.mjs" },
+      "severity": "medium",
+      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/gitlab-template.test.mjs"],
+      "faults": [
+        {
+          "id": "F1", "description": "The helper returns only the first YAML document, so the template's jobs are never parsed.",
+          "faultClass": "other", "file": "test/helpers/yaml.mjs",
+          "find": "export function parseYaml(path) {",
+          "replace": "export function parseYaml(path) { return parseAll(path).slice(0, 1); }\nfunction parseAll(path) {",
+          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
+          "defendedBy": ["test/gitlab-template.test.mjs"]
+        }
+      ]
+    },
+    {
+      "id": "TG-INIT-REFUSES-BEFORE-WRITING",
+      "statement": "init checks every option and every file it must merge into before its first write. A bad --ci-evidence value is a usage error (exit 3) and an unmergeable .claude/settings.json is a precondition failure (exit 2) naming the file and the JSON error; either way the project is left exactly as it was. It used to print 'this is a bug in testguard' with a stack trace after it had already written the skill, the hook and the AGENTS.md section.",
+      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "severity": "medium",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/init-preflight.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The --ci-evidence value is no longer checked before the writes, so an unknown platform installs the whole agent layer and a helper for the wrong platform.",
+          "faultClass": "guard-removed",
+          "file": "src/init/init.mjs",
+          "find": "  if (ciEvidence !== undefined && !CI_PLATFORMS.includes(ciEvidence)) throw new InitUsageError(`--ci-evidence must be github or gitlab, not ${JSON.stringify(ciEvidence)}`);",
+          "replace": "",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F2",
+          "description": "An unparseable settings.json throws a plain Error again, which the CLI reports as a defect in testguard with a stack trace instead of a precondition naming the file.",
+          "faultClass": "other",
+          "file": "src/init/init.mjs",
+          "find": "    throw new PreconditionError(`${settingsPath} is not valid JSON (${e.message}); fix it before init can add the hook. Nothing was written.`);",
+          "replace": "    throw new Error(`${settingsPath} is not valid JSON (${e.message}); fix it before init can add the hook. Nothing was written.`);",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        }
+      ],
+      "tags": ["init", "audit"]
+    },
+    {
+      "id": "TG-INIT-REPLACES-ANY-TESTGUARD-HOOK",
+      "statement": "Re-running init leaves exactly one TestGuard session-start hook per project, in the position the earlier one had, whatever form an earlier release wrote it in; hooks for other projects and the user's own hooks are untouched. Matching only the current text and two npx forms meant any change to hookCommand() made the next init append a second hook, so every session briefed twice.",
+      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "severity": "low",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/init-hook-replace.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Only the old npx forms are recognised as TestGuard hooks, so a later change to hookCommand() appends a second hook beside the first.",
+          "faultClass": "literal-changed",
+          "file": "src/init/init.mjs",
+          "find": "  const m = /(?:^|[\\s/])testguard(?:-cli)?(?:@[^\\s\"|;&]+)?\\s+brief\\s+--text\\b(?:\\s+([^\\s\"|;&]+))?/.exec(command);",
+          "replace": "  const m = /npx\\s+(?:-y|--no-install)\\s+testguard(?:-cli)?(?:@[^\\s\"|;&]+)?\\s+brief\\s+--text\\b(?:\\s+([^\\s\"|;&]+))?/.exec(command);",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F2",
+          "description": "Duplicate TestGuard hooks an older init left for the same project are kept, so the session still briefs twice after the upgrade.",
+          "faultClass": "statement-deleted",
+          "file": "src/init/init.mjs",
+          "find": "      for (const { gi, hi } of extra.reverse()) groups[gi].hooks.splice(hi, 1);",
+          "replace": "",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        }
+      ],
+      "tags": ["init", "audit"]
+    },
+    {
+      "id": "TG-INIT-IGNORES-EVERY-WRITTEN-OUTPUT",
+      "statement": "Every regenerated file a command writes under .testguard/ is in the .gitignore block init writes, checked against the paths the code itself builds rather than a second list; re-running init after an upgrade adds only the new lines, inside the existing block, once. sweep.json and sweep-evidence.json shipped without their lines and were offered for commit.",
+      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "severity": "low",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/init-ignores.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The sweep outputs fall off init's list, so a project that sweeps sees sweep.json and sweep-evidence.json as files to commit.",
+          "faultClass": "field-dropped",
+          "file": "src/init/init.mjs",
+          "find": "export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json', '.testguard/replay.json', '.testguard/calibration.json', '.testguard/ci-self-evidence.json', '.testguard/ci/', '.testguard/sweep.json', '.testguard/sweep-evidence.json'];",
+          "replace": "export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json', '.testguard/replay.json', '.testguard/calibration.json', '.testguard/ci-self-evidence.json', '.testguard/ci/'];",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F2",
+          "description": "Re-running init after an upgrade appends a second TestGuard header and block instead of extending the first.",
+          "faultClass": "return-altered",
+          "file": "src/init/init.mjs",
+          "find": "  return [...lines.slice(0, last + 1), ...missing, ...lines.slice(last + 1)].join('\\n');",
+          "replace": "  return gi.replace(/\\s*$/, '\\n') + GITIGNORE_HEADER + '\\n' + missing.join('\\n') + '\\n';",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        }
+      ],
+      "tags": ["init", "audit"]
+    },
+    {
+      "id": "TG-CI-HELPER-RUNS-THE-HOOKS-CLI",
+      "statement": "fetch-ci-evidence.sh briefs with the same CLI the session-start hook runs (the project's node_modules/.bin, then the repository root's, then PATH), from the evidence file the GitHub Action or the GitLab template actually uploads (for GitLab, under the project's own path from the repository root, never another project's), and never from a file an earlier download left behind.",
+      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "severity": "low",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/ci-evidence-helper.github.test.mjs", "test/ci-evidence-helper.gitlab.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "defendedBy": ["test/ci-evidence-helper.github.test.mjs"],
+          "description": "The project's own install is skipped, so a devDependency install is not found and the helper says no CLI exists or runs a different one.",
+          "faultClass": "field-dropped",
+          "file": "src/init/init.mjs",
+          "find": "for c in ./node_modules/.bin/testguard \"\\${ROOT:+$ROOT/node_modules/.bin/testguard}\"; do",
+          "replace": "for c in \"\\${ROOT:+$ROOT/node_modules/.bin/testguard}\"; do",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F2",
+          "defendedBy": ["test/ci-evidence-helper.github.test.mjs"],
+          "description": "evidence.json, the file the action's evidence output names after a confirmed run, is not looked for, so the documented workflow's artifact briefs nothing.",
+          "faultClass": "field-dropped",
+          "file": "src/init/init.mjs",
+          "find": "    ? ['evidence.json', 'evidence-provisional.json', 'ci-self-evidence.json']",
+          "replace": "    ? ['evidence-provisional.json', 'ci-self-evidence.json']",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F3",
+          "defendedBy": ["test/ci-evidence-helper.gitlab.test.mjs"],
+          "description": "The download directory is not emptied first, so a failed or empty download briefs from the evidence an earlier run left there as if it were current.",
+          "faultClass": "statement-deleted",
+          "file": "src/init/init.mjs",
+          "find": "rm -rf \"$OUT\" && mkdir -p \"$OUT\" || exit 0",
+          "replace": "mkdir -p \"$OUT\" || exit 0",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F4",
+          "defendedBy": ["test/ci-evidence-helper.gitlab.test.mjs"],
+          "description": "The GitLab helper ignores the project's path from the repository root, so a project in a subdirectory finds nothing, or briefs from the root project's evidence in the same artifact.",
+          "faultClass": "literal-changed",
+          "file": "src/init/init.mjs",
+          "find": "    : ['${PREFIX}.testguard/evidence.json', '${PREFIX}.testguard/evidence-provisional.json'];",
+          "replace": "    : ['.testguard/evidence.json', '.testguard/evidence-provisional.json'];",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        }
+      ],
+      "tags": ["init", "audit"]
+    },
+    {
+      "id": "TG-BRIEF-LABELS-RUNNER-CACHES",
+      "statement": "The brief's install label names a package runner's cache (npx, pnpm dlx, bunx) as such, never as a local install, so a stale cached CLI is visible at session start. The npx cache sits under node_modules/ and was labelled 'local install'.",
+      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "severity": "low",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/brief.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The npx cache is no longer recognised and is labelled a local install again.",
+          "faultClass": "field-dropped",
+          "file": "src/brief/brief.mjs",
+          "find": "  [/[\\\\/]_npx[\\\\/]/, 'npx cache'],",
+          "replace": "",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        }
+      ],
+      "tags": ["init", "audit"]
+    },
+    {
+      "id": "TG-ENV-LOAD-FAILURE-IS-NEVER-REUSED",
+      "statement": "A record whose defenders failed to load says something about the environment, not the code, so a later run always measures that fault again however unchanged its inputs are.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/attribution.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A broken --runner-cmd or a missing dependency becomes a permanent verdict: the load failure is reused after the environment is fixed.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/attribution.mjs",
+          "find": "  if (prior.detail?.reason === 'defenders-failed-to-load') return false;",
+          "replace": "  if (false) return false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RUNNER-CMD-BINDS-REUSE",
+      "statement": "A custom --runner-cmd is part of the test universe a verdict was measured against: changing the command re-measures every fault instead of reusing the old command's verdicts.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/native-universe-hash.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The custom-command universe hashes only the files, so a fixed command reuses the broken command's verdicts.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/universe.mjs",
+          "find": "  return sha256(JSON.stringify({ schemaVersion: 2, source: 'custom-command-static', command: commandTemplate, files }));",
+          "replace": "  return sha256(JSON.stringify({ schemaVersion: 2, source: 'custom-command-static', files }));",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The probe hashes an empty command into the universe, so any two commands look identical to reuse.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/probe.mjs",
+          "find": "      ? hashCustomCommandUniverse(allTests, commandTemplate)",
+          "replace": "      ? hashCustomCommandUniverse(allTests, [])",
+          "defendedBy": [
+            "test/probe-runner-identity.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RUNNER-IDENTITY-BINDS-REUSE",
+      "statement": "A verdict is reused only when the evidence records the same runner: the engine that ran, its version and where it was resolved from.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#resource-controls-and-measurement"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/worker-policy.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Reuse compares only the runner's name, so an upgraded runner or a global binary of the same name stands in for the measurement.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "  return recorded.name === current.name && recorded.version === current.version && recorded.source === current.source;",
+          "replace": "  return recorded.name === current.name;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The probe never asks whether the previous run used the same runner.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "      && sameRunner(previous.run, recordedRunner)",
+          "replace": "      && true",
+          "defendedBy": [
+            "test/probe-runner-identity.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RUNNER-SOURCE-IS-RECORDED",
+      "statement": "The evidence records where every resolved runner came from (project, path or builtin), not only the built-in Node runner.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/schemas/evidence.schema.json"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/worker-policy.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Only the builtin source is written, as after c74b6db: a PATH-resolved runner is indistinguishable from the project's own.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "  return { name, ...(version ? { version } : {}), ...(source ? { source } : {}) };",
+          "replace": "  return { name, ...(version ? { version } : {}), ...(source === 'builtin' ? { source } : {}) };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The probe drops the resolved source before recording the runner.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/probe.mjs",
+          "find": "    recordedRunner = runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), runnerSource);",
+          "replace": "    recordedRunner = runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), undefined);",
+          "defendedBy": [
+            "test/resource-timing.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-MALFORMED-RUNNER-CMD-IS-USAGE",
+      "statement": "A --runner-cmd without {files} or {out}, or with an unclosed quote, is a usage error (exit 3) naming the problem on probe, admit, sweep and replay, never a crash reported as a testguard bug.",
+      "source": {
+        "kind": "doc",
+        "ref": "docs/reference/languages-and-runners.md#custom-runners"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/runner-options.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The template error escapes as a RangeError, which the CLI reports as a bug with a stack trace.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/runner-options.mjs",
+          "find": "      return { error: error.message };",
+          "replace": "      throw error;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "probe ignores the validation result.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/probe.mjs",
+          "find": "  const runner = runnerOptions(values);\n  if (runner.error) {",
+          "replace": "  const runner = runnerOptions(values);\n  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "admit ignores the validation result.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/admit.mjs",
+          "find": "  const runner = runnerOptions(values);\n  if (runner.error) {",
+          "replace": "  const runner = runnerOptions(values);\n  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "sweep ignores the validation result.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/sweep.mjs",
+          "find": "  const runner = runnerOptions(values);\n  if (runner.error) {",
+          "replace": "  const runner = runnerOptions(values);\n  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "replay ignores the validation result.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/replay.mjs",
+          "find": "  const runner = runnerOptions(values);\n  if (runner.error) {",
+          "replace": "  const runner = runnerOptions(values);\n  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PYTHON-OPTION-MEANS-ONE-THING",
+      "statement": "--python and TESTGUARD_PYTHON read an interpreter the same way on every command that runs tests: a bare command name is looked up on PATH, anything with a path separator is a path.",
+      "source": {
+        "kind": "doc",
+        "ref": "docs/guides/python.md#which-interpreter"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/python-interpreter.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A bare name is resolved against the working directory, so --python python3 becomes <cwd>/python3.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/python.mjs",
+          "find": "  return bare ? { path: value, source: 'path' } : { path: resolve(value), source: 'project' };",
+          "replace": "  return { path: resolve(value), source: 'project' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "admit drops --python and tests against whatever interpreter discovery finds.",
+          "faultClass": "argument-swapped",
+          "file": "src/commands/admit.mjs",
+          "find": "    python: runner.python,",
+          "replace": "    python: undefined,",
+          "defendedBy": [
+            "test/python-option-commands.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "sweep drops --python.",
+          "faultClass": "argument-swapped",
+          "file": "src/commands/sweep.mjs",
+          "find": "      python: runner.python,",
+          "replace": "      python: undefined,",
+          "defendedBy": [
+            "test/python-option-commands.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "replay drops --python.",
+          "faultClass": "argument-swapped",
+          "file": "src/commands/replay.mjs",
+          "find": "    python: runner.python,",
+          "replace": "    python: undefined,",
+          "defendedBy": [
+            "test/python-option-commands.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "replay selects its runner without the interpreter it was given.",
+          "faultClass": "argument-swapped",
+          "file": "src/replay/replay.mjs",
+          "find": "        const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, python, name: runnerName, budgetMs: budgetFor(), budgetFor });",
+          "replace": "        const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, name: runnerName, budgetMs: budgetFor(), budgetFor });",
+          "defendedBy": [
+            "test/python-option-commands.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONTENTION-ADVICE-CHANGES-THE-RUN",
+      "statement": "The contention warning only advises something that would change the run: an already-serial run is told to wait, never to pass --serial again.",
+      "source": {
+        "kind": "doc",
+        "ref": "docs/guides/performance.md#keep-the-machine-responsive"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/contention.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every run is told to pass --serial, including the default run that already has it.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/contention.mjs",
+          "find": "  if (serial || workers <= 1) return",
+          "replace": "  if (false) return",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COST-DURATIONS-ARE-ROUNDED",
+      "statement": "Cost output prints measured durations rounded to whole milliseconds or tenths of a second, never raw floating-point noise.",
+      "source": {
+        "kind": "doc",
+        "ref": "docs/guides/performance.md#see-where-the-time-goes"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/cost.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Sub-second durations print unrounded, as in overhead 659.1493330000001ms.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/cost.mjs",
+          "find": ": `${whole}ms`;",
+          "replace": ": `${ms}ms`;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-POLICY-FRESHNESS-BINDS-RUNNER-SOURCE",
+      "statement": "Origin-policy freshness refuses evidence recorded by a runner from a different source (project, PATH, builtin) even when its name and version match.",
+      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-declared-origin-policy-result-contract" },
+      "severity": "medium",
+      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
+      "defendedBy": ["test/policy-freshness.test.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Runner source is no longer compared; a global binary of the same version vouches for the project's.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/policy-freshness.mjs",
+          "find": "      && (recorded?.source ?? null) === (current?.source ?? null);",
+          "replace": "      && true;",
           "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
         }
       ]

@@ -189,6 +189,29 @@
       },
       "additionalProperties": false
     },
+    "baseline": {
+      "description": "Present on baseline --json: the validated status document plus what this invocation wrote. `frozen` when a baseline was frozen (the number of unproven findings it holds), `restamped` when an existing baseline's head was moved (the commit it now names). A status document carries at most one invocation result, so it never has both `baseline` and `run`.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["path", "frozen"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+            "frozen": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["path", "restamped"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+            "restamped": { "$ref": "urn:claimspec:v1:common#/$defs/gitSha" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
     "cost": {
       "description": "Present when probe --json --cost is requested; derived only from the runs in the emitted evidence.",
       "type": "object",

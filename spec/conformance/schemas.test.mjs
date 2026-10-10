@@ -28,6 +28,20 @@ describe('claimspec v1 — conformance', () => {
       expect(validate('evidence', evidence).ok).toBe(false);
     }
   });
+  it('records where every resolved runner came from: project, path or builtin; a custom command claims none', () => {
+    const evidence = load('examples', 'evidence.json');
+    for (const runner of [
+      { name: 'vitest', version: '5.0.1', source: 'project' },
+      { name: 'unittest', version: 'CPython 3.12.0', source: 'path' },
+      { name: 'vitest' },
+    ]) {
+      evidence.run.runner = runner;
+      if (evidence.run.runners) evidence.run.runners[0] = { name: runner.name, ...(runner.version ? { version: runner.version } : {}) };
+      expect(validate('evidence', evidence).errors).toEqual([]);
+    }
+    evidence.run.runner = { name: 'vitest', version: '5.0.1', source: 'global' };
+    expect(validate('evidence', evidence).ok).toBe(false);
+  });
   it('admits per-fault cost output in status and rejects invalid selection origins', () => {
     const status = load('examples', 'status.json');
     const evidence = load('examples', 'evidence.json');

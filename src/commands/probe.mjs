@@ -14,6 +14,7 @@ import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
 import { originPolicyRequest, evaluateOriginPolicy } from '../probe/origin-policy.mjs';
 import { readNativeTestUniverse } from '../probe/universe.mjs';
 import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
+import { runnerOptions } from './runner-options.mjs';
 export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
@@ -55,6 +56,11 @@ export async function probeCommand({ projectDir, values, version }, io) {
   }
   if (commandBudgetMs === null) {
     io.err('--command-budget must be at least 1000 milliseconds');
+    return 3;
+  }
+  const runner = runnerOptions(values);
+  if (runner.error) {
+    io.err(runner.error);
     return 3;
   }
   const commandBudget = createCommandBudget(commandBudgetMs);
@@ -113,10 +119,10 @@ export async function probeCommand({ projectDir, values, version }, io) {
     refExplicit: values.ref !== undefined,
     ignoreDirty: values['ignore-dirty'],
     onWarn: (m) => io.err(`warning: ${m}`),
-    runnerCommand: values['runner-cmd'],
+    runnerCommand: runner.runnerCommand,
     runnerName: values.runner,
     nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
-    python: values.python ? resolve(values.python) : undefined,
+    python: runner.python,
     only,
     escalate: !values['no-escalate'],
     toolVersion: version,
@@ -139,11 +145,11 @@ export async function probeCommand({ projectDir, values, version }, io) {
     let universe;
     // Custom commands carry a static universe, which cannot establish this
     // native policy boundary. Discovery failures are unavailability, not kills.
-    if (!values['runner-cmd']) {
+    if (!runner.runnerCommand) {
       try {
         universe = await readNativeTestUniverse({
           projectDir, sourceDir: projectDir, runnerName: values.runner,
-          python: values.python ? resolve(values.python) : undefined,
+          python: runner.python,
           budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs,
           budgetFor: () => commandBudget?.runBudget(budgetMs) ?? budgetMs,
           assertOpen: () => commandBudget?.assertOpen(),
@@ -187,7 +193,9 @@ export async function probeCommand({ projectDir, values, version }, io) {
     const killed = evidence.records.filter((r) => r.verdict === 'killed').length;
     if (killed) io.out(`  ${killed} killed (not listed; --verbose to see them)`);
   }
-  io.out(renderSummary(evidence.records, evidence.run) + (baseline ? ` ${g.new.length} new since baseline, ${g.baselined.length} baselined.` : ' No baseline.'));
+  io.out(renderSummary(evidence.records, evidence.run));
+  // Its own line: the summary ends with the origins line, which is not a sentence to append to.
+  io.out(baseline ? `${g.new.length} new since baseline, ${g.baselined.length} baselined.` : 'No baseline.');
   if (policy) io.out(renderOriginPolicy(policy, { basis: 'current' }));
   if (values.cost) {
     io.out('');

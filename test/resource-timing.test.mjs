@@ -60,6 +60,8 @@ it('remeasures native evidence when the worker ceiling changes', async () => {
     const first = await probe(opts);
     expect(first.records[0].verdict).toBe('killed');
     expect(first.run.measurements.runnerInvocations).toBe(2);
+    // Where the runner was resolved from is recorded for every runner, not only the builtin one.
+    expect(first.run.runner).toMatchObject({ name: 'vitest', source: 'project' });
     const changed = await probe({ ...opts, previous: first, workers: 2 });
     expect(changed.records[0].verdict).toBe('killed');
     expect(changed.records[0]).not.toHaveProperty('reusedFrom');

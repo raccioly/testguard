@@ -1,7 +1,17 @@
-import { initProject } from '../init/init.mjs';
+import { initProject, InitUsageError } from '../init/init.mjs';
 
 export async function initCommand({ projectDir, values }, io) {
-  const r = initProject({ projectDir, force: values.force, here: values.here, ciEvidence: values['ci-evidence'], mcp: values.mcp });
+  let r;
+  try {
+    r = initProject({ projectDir, force: values.force, here: values.here, ciEvidence: values['ci-evidence'], mcp: values.mcp });
+  } catch (e) {
+    // A bad option is the caller's to fix, and init has written nothing yet:
+    // every option is checked before the first write.
+    if (!(e instanceof InitUsageError)) throw e;
+    io.err(e.message);
+    io.err("Run 'testguard init --help' for its options. Nothing was written.");
+    return 3;
+  }
   const { done, skipped, warnings, agentRoot, dir, mcpConfig } = r;
   if (values.json) {
     io.out(JSON.stringify({ done, skipped, warnings, agentRoot, dir, ...(mcpConfig ? { mcpConfig } : {}) }, null, 2));

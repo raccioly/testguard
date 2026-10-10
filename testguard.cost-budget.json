@@ -1,6 +1,6 @@
 {
   "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine.",
-  "seconds": 2250,
+  "seconds": 2700,
   "measured": {
     "seconds": 816,
     "at": "2026-09-18",
@@ -10,7 +10,7 @@
     "how": "probe . --include-dirty --budget 180000 --cost, from scratch, idle developer machine, after the shared-defender cut",
     "note": "LOCAL. Not comparable with measuredInCI and not what this budget is set from. The previous local from-scratch figure (1168 s, 129 faults) was taken on a contended machine, so 1168 -> 816 overstates the cut."
   },
-  "headroom": "PR #174 run 36604096944 measured 1974 s on the Node 22 leg at 220/220 killed faults after the command-write and dirty-preflight defender cuts reduced the prior 2205 s run by 231 s. The remaining growth is deliberate coverage: 34 more faults than the 1457 s PR leg that set the prior ceiling, including native discovery/configuration closure, mixed-runner replay, process-tree cleanup, whole-command deadlines, and generated CommonJS fail-closed behavior. 2250 is 14.0% above the measured leg, preserving the established CI-variance rule without waiving the unchanged 100 s per-claim ceiling. The new worst claim is 100 s and no claim exceeded that independent ceiling. The next from-scratch release evidence must be recorded and used to tighten this again if the PR cache made 1974 s an overestimate.",
+  "headroom": "PR #210 run 38087039461 measured 2438 s on the Node 22 leg with every fault killed, before the init/helper defender split that removes an estimated 60-70 s. The growth is 22 claims and 43 faults guarding the docs-audit fixes (security, verdict reuse, init preflight). 2700 keeps the established ~14% CI-variance headroom over the expected post-split leg; the 100 s per-claim ceiling is unchanged. Tighten again from the next measured leg or from-scratch release evidence.",
   "history": [
     {
       "seconds": 950,
@@ -46,6 +46,11 @@
       "seconds": 2250,
       "at": "2026-09-29",
       "why": "PR #174 run 36604096944 produced complete evidence with 220/220 faults killed and measured 1974 s against 1650. This is the post-optimization figure: the immediately preceding run cost 2205 s, and precise write-boundary defenders plus fault-specific dirty-preflight files removed 231 s before any ceiling change. Relative to the 1457 s / 186-fault PR leg that set 1650, the release candidate adds 34 faults and several intentionally integration-defended process/discovery contracts. The most expensive claims were 100, 82, 64, 61, and 52 s; none breached the separate 100 s per-claim gate. 2250 restores 14.0% headroom over the measured CI leg while keeping per-claim pressure intact."
+    },
+    {
+      "seconds": 2700,
+      "at": "2026-10-10",
+      "why": "PR #210 (the docs-audit fixes) adds 22 claims and 43 faults guarding a GitHub Action shell injection, verdict reuse surviving a changed --runner-cmd or a different runner, defender load failures never being reused, the pip wrapper's pinned fallback, init's all-or-nothing preflight, and runner-source binding. Run 38087039461 (ci.yml test (22)) measured 2438 s against 2250 with every fault killed; the new claims cost 365 s of it. Before raising anything the four init/helper claims were moved off test/init.test.mjs (43 tests, about 1.8 s a run) onto four single-purpose files and per-fault GitHub/GitLab helper files, re-probed 17/17 killed, which cuts an estimated 60-70 s. The rest is the deliberate coverage. 2700 is 10.7% above the pre-cut 2438 s leg and about 14% above the expected post-cut figure, the same CI-variance rule as 2250; the 100 s per-claim ceiling is unchanged and no new claim is near it (worst 43 s before the cut). Record the next leg's measured figure here and tighten if the cut landed bigger."
     }
   ],
   "measuredInCI": {
@@ -57,15 +62,15 @@
     "runs": 1080,
     "how": "release.yml test: probe . --budget 180000 --cost, from scratch on the v0.13.0 release commit. No verdict reuse, which is what this budget is defined against.",
     "prLeg": {
-      "seconds": 1974,
-      "run": "36604096944",
-      "faults": 220,
-      "note": "ci.yml test (22) on PR #174 after the targeted defender-cost cuts; complete evidence was 220/220 killed. The run may include restored evidence costs, but this is the leg the ceiling gates and the separate 100 s per-claim ceiling remains unchanged.",
+      "seconds": 2438,
+      "run": "38087039461",
+      "faults": 395,
+      "note": "ci.yml test (22) on PR #210 before the init/helper defender split; every fault killed. New claims cost 365 s of it.",
       "before": {
-        "seconds": 1457,
-        "run": "35745787566",
-        "faults": 186,
-        "note": "PR #164 leg that set the previous 1650 s ceiling."
+        "seconds": 1974,
+        "run": "36604096944",
+        "faults": 220,
+        "note": "ci.yml test (22) on PR #174 after the targeted defender-cost cuts; complete evidence was 220/220 killed. The run may include restored evidence costs, but this is the leg the ceiling gates and the separate 100 s per-claim ceiling remains unchanged."
       }
     },
     "before": {

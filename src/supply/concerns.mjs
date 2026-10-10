@@ -27,9 +27,10 @@
  * look; the probe says what it found; a human states the sentence worth
  * defending. Nothing here is written to `testguard.claims.json`.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { saveSurface } from './savepath.mjs';
+import { readSpecDoc } from '../evidence/writer.mjs';
 import { globToRegExp, walk } from '../util/glob.mjs';
 
 export const defaultConcernsPath = (projectDir) => join(projectDir, 'testguard.concerns.json');
@@ -80,8 +81,13 @@ export function loadConcerns(projectDir, { path } = {}) {
   let project = [];
   let source = null;
   if (existsSync(p)) {
-    const doc = JSON.parse(readFileSync(p, 'utf8'));
-    project = doc.concerns ?? [];
+    // Through the spec reader, for every caller: a file that does not parse or
+    // does not conform is a SpecDocError naming the file (exit 2), never a
+    // crash reported as a bug in this tool — and never a concern sweep quietly
+    // aims at nothing. A glob concern with no globs matches no file, and a
+    // sweep over no file reports clean.
+    const doc = readSpecDoc('concerns', p);
+    project = doc.concerns;
     source = p;
   }
   const overridden = new Set(project.map((c) => c.id));
@@ -91,11 +97,11 @@ export function loadConcerns(projectDir, { path } = {}) {
   ];
   return {
     concerns,
-    // The project's own entries, exactly as written. Validation runs against
-    // these: the enriched objects above carry a `builtin` marker this tool
-    // added, and a schema that refuses unknown properties is right to reject
-    // them. Validating what we constructed instead of what the user wrote
-    // would report OUR bug as THEIR malformed file.
+    // The project's own entries, exactly as written — and as validated above,
+    // before enrichment: the objects in `concerns` carry a `builtin` marker
+    // this tool added, and a schema that refuses unknown properties is right to
+    // reject them. Validating what we constructed instead of what the user
+    // wrote would report OUR bug as THEIR malformed file.
     raw: project.map(({ builtin, ...c }) => c),
     source,
     shadowed: BUILTIN_CONCERNS.filter((c) => overridden.has(c.id)).map((c) => c.id),

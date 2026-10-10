@@ -2,7 +2,7 @@
 // Requirements live in docs-canonical/REQUIREMENTS.md; the matrix there must agree with these.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { renderBriefMarkdown, renderUnclaimedMarkdown, MARKDOWN_MARKER, buildBrief, buildUnclaimedBrief, HEADING, hintFor } from '../src/brief/brief.mjs';
+import { renderBriefMarkdown, renderUnclaimedMarkdown, MARKDOWN_MARKER, buildBrief, buildUnclaimedBrief, HEADING, hintFor, installLabel } from '../src/brief/brief.mjs';
 import { buildBaseline } from '../src/baseline/baseline.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { renderSummary, renderRecord } from '../src/render.mjs';
@@ -147,5 +147,30 @@ describe('provisional rendering', () => {
       expect(text).toContain('### Unclaimed changes since `HEAD`');
       expect(text).toContain('- `a.ts` (source) → `s`');
     });
+  });
+});
+
+describe('installLabel names where the running CLI came from', () => {
+  // The label exists so a stale binary is visible in the session-start brief.
+  // npx's cache sits under node_modules too, and was labelled "local install":
+  // exactly the stale copy (a version npx cached weeks ago) the label is for.
+  it.each([
+    ['/Users/dev/.npm/_npx/0123abcd/node_modules/.bin/testguard', 'npx cache'],
+    ['/home/dev/.npm/_npx/0123abcd/node_modules/testguard-cli/cli/testguard.mjs', 'npx cache'],
+    ['C:\\Users\\dev\\AppData\\Local\\npm-cache\\_npx\\0123abcd\\node_modules\\testguard-cli\\cli\\testguard.mjs', 'npx cache'],
+    ['/Users/dev/Library/Caches/pnpm/dlx/abc/def/node_modules/.bin/testguard', 'pnpm dlx cache'],
+    ['/private/tmp/bunx-501-testguard-cli@latest/node_modules/.bin/testguard', 'bunx cache'],
+    ['/work/app/node_modules/.bin/testguard', 'local install'],
+    ['/work/app/node_modules/testguard-cli/cli/testguard.mjs', 'local install'],
+    ['/usr/local/bin/testguard', 'global'],
+    ['/opt/homebrew/bin/testguard', 'global'],
+    ['', 'global'],
+    [undefined, 'global'],
+  ])('%s → %s', (path, label) => {
+    expect(installLabel(path)).toBe(label);
+  });
+
+  it('is what the brief text shows', () => {
+    expect(buildBrief(evidence, undefined, { install: installLabel('/Users/dev/.npm/_npx/0123abcd/node_modules/.bin/testguard') }).text).toMatch(/^testguard \S+ \(npx cache\)/m);
   });
 });

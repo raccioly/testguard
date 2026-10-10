@@ -2,6 +2,7 @@ import { dirname, join, resolve } from 'node:path';
 import { replay, calibrationFrom, renderReplay } from '../replay/replay.mjs';
 import { writeSpecDoc } from '../evidence/writer.mjs';
 import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
+import { runnerOptions } from './runner-options.mjs';
 
 export const replayPath = (projectDir) => join(projectDir, '.testguard', 'replay.json');
 export const calibrationPath = (projectDir) => join(projectDir, '.testguard', 'calibration.json');
@@ -29,6 +30,11 @@ export async function replayCommand({ projectDir, values, version }, io) {
     io.err('--command-budget must be at least 1000 milliseconds');
     return 3;
   }
+  const runner = runnerOptions(values);
+  if (runner.error) {
+    io.err(runner.error);
+    return 3;
+  }
   const commandBudget = createCommandBudget(commandBudgetMs);
 
   const doc = await replay({
@@ -39,9 +45,10 @@ export async function replayCommand({ projectDir, values, version }, io) {
     workers,
     serial: values.serial || workers === 1,
     commandBudget,
-    runnerCommand: values['runner-cmd'],
+    runnerCommand: runner.runnerCommand,
     runnerName: values.runner,
     nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
+    python: runner.python,
     limit,
     toolVersion: version,
     onStage: !values.quiet && !values.json && process.stderr.isTTY ? ({ commit, i, n, stage }) => process.stderr.write(`\r\x1b[K  … ${commit.slice(0, 9)} (${i}/${n}) ${stage}`) : undefined,
@@ -55,7 +62,7 @@ export async function replayCommand({ projectDir, values, version }, io) {
   // Beside the replay document, whatever --out says: the two are one result,
   // and splitting them across directories loses the pairing — and leaves a
   // file behind in a repository the run is only meant to read.
-  const calPath = values.baseline ? resolve(values.baseline) : values.out ? join(dirname(outPath), 'calibration.json') : calibrationPath(projectDir);
+  const calPath = values['calibration-out'] ? resolve(values['calibration-out']) : values.out ? join(dirname(outPath), 'calibration.json') : calibrationPath(projectDir);
   // Replay and calibration are one result. Cross the deadline boundary only
   // after both complete documents exist in memory; serialization is then the
   // documented non-interruptible final step, so expiry can never leave half

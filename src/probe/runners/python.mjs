@@ -2,7 +2,7 @@ import { performance } from 'node:perf_hooks';
 import { existsSync, readFileSync } from 'node:fs';
 import { registerChild } from './lifecycle.mjs';
 import { spawn } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runProcess, listTestFiles, firstInformativeLine, terminateProcessTree } from './shared.mjs';
 
@@ -70,6 +70,20 @@ const PY_FILE = /\.py$/;
 const TIMEOUT = /\bTimeout >|\btimed out\b|\bTimeoutError\b/i;
 
 /**
+ * The interpreter the operator named, with `--python` or `TESTGUARD_PYTHON` —
+ * both the same way, as a shell would. A bare command name (`python3`, no path
+ * separator) is looked up on PATH: resolving it against the working directory
+ * produced `<cwd>/python3`, which is never an interpreter. Anything with a
+ * separator is a path, resolved once against the working directory. An empty
+ * value names nothing.
+ */
+export function explicitInterpreter(value) {
+  if (typeof value !== 'string' || value === '') return undefined;
+  const bare = !value.includes('/') && !(process.platform === 'win32' && value.includes('\\'));
+  return bare ? { path: value, source: 'path' } : { path: resolve(value), source: 'project' };
+}
+
+/**
  * Interpreters to try, best first: the active virtualenv, the project's own,
  * then PATH.
  *
@@ -82,8 +96,8 @@ function candidates(projectDir, python) {
   const out = [];
   const win = process.platform === 'win32';
   const binOf = (root) => (win ? join(root, 'Scripts', 'python.exe') : join(root, 'bin', 'python'));
-  const explicit = python ?? process.env.TESTGUARD_PYTHON;
-  if (explicit) return [{ path: explicit, source: 'project', explicit: true }];
+  const explicit = explicitInterpreter(python ?? process.env.TESTGUARD_PYTHON);
+  if (explicit) return [{ ...explicit, explicit: true }];
   if (process.env.VIRTUAL_ENV) out.push({ path: binOf(process.env.VIRTUAL_ENV), source: 'project' });
   for (const dir of ['.venv', 'venv', '.env']) out.push({ path: binOf(join(projectDir, dir)), source: 'project' });
   out.push({ path: win ? 'python.exe' : 'python3', source: 'path' });
@@ -159,9 +173,9 @@ export function resolveInterpreter({ projectDir, python, budgetMs = 30_000, budg
       if (answer) return { ...candidate, ...answer };
       tried.push(candidate.path);
     }
-    const explicit = python ?? process.env.TESTGUARD_PYTHON;
+    const explicit = explicitInterpreter(python ?? process.env.TESTGUARD_PYTHON);
     return { error: explicit
-      ? `${explicit} is not a usable Python interpreter`
+      ? `${explicit.path} is not a usable Python interpreter${explicit.source === 'path' ? ' (looked up on PATH)' : ''}`
       : `no usable Python interpreter (tried ${tried.join(', ') || 'nothing'}); install Python 3.8+, or point --python / TESTGUARD_PYTHON at one` };
   })();
   interpreters.set(key, task);

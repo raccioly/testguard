@@ -109,7 +109,13 @@ export function costReport(records, { run } = {}) {
   };
 }
 
-const secs = (ms) => (ms >= 10_000 ? `${Math.round(ms / 1000)}s` : ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
+// Measured durations are performance.now() differences, so they are fractional:
+// round before choosing the unit, or 659.1493330000001ms prints verbatim and
+// 999.6 prints as "1000ms".
+const secs = (ms) => {
+  const whole = Math.round(ms);
+  return whole >= 10_000 ? `${Math.round(ms / 1000)}s` : whole >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${whole}ms`;
+};
 /** Exported so a caller can format a duration the same way the report does. */
 export const formatMs = secs;
 

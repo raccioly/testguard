@@ -1,5 +1,5 @@
 import { join, resolve } from 'node:path';
-import { computeChangedGate, resolveChangedRef, renderGate, DEFAULT_EXCLUDES } from '../gate/changed.mjs';
+import { computeChangedGate, resolveChangedRef, renderGate, explainExclusions } from '../gate/changed.mjs';
 import { writeSpecDoc } from '../evidence/writer.mjs';
 
 export const gatePath = (projectDir) => join(projectDir, '.testguard', 'gate.json');
@@ -11,9 +11,7 @@ export const gatePath = (projectDir) => join(projectDir, '.testguard', 'gate.jso
  */
 export async function gateCommand({ projectDir, values, version }, io) {
   if (values.explain) {
-    io.out('Files that are source by extension but never carry claims (excluded by default; add more with --exclude <glob>):');
-    for (const g of DEFAULT_EXCLUDES) io.out(`  ${g}`);
-    io.out('Non-source files (anything but .js .mjs .cjs .ts .mts .cts .jsx .tsx) are excluded before these patterns apply.');
+    for (const line of explainExclusions()) io.out(line);
     return 0;
   }
   const resolved = resolveChangedRef({ explicit: values.changed, projectDir });
