@@ -20,6 +20,7 @@ const PINS = [
   /raccioly\/testguard@v(\d+\.\d+\.\d+)/g,       // GitHub Action reference
   /testguard\/v(\d+\.\d+\.\d+)\/packaging/g,     // raw.githubusercontent template URL
   /testguard-cli-(\d+\.\d+\.\d+)\.tgz/g,          // npm tarball (homebrew)
+  /raccioly\/testguard\n#?\s*rev: v(\d+\.\d+\.\d+)/g, // pre-commit `rev:` under this repo
 ];
 
 /**
@@ -86,6 +87,19 @@ describe('sync-release-version: package.json is the single source of truth for t
       .split('\n').filter(Boolean).filter((f) => !HISTORICAL.has(f));
     const stale = pinsIn(ROOT, tracked).filter(([, v]) => v !== version);
     expect(stale).toEqual([]);
+  });
+
+  // The two tests above find a forgotten pin only after a release has moved
+  // past it. This one finds it the day it is written: a page that pins a
+  // version and is not a surface will go stale on the next release, silently.
+  it('every tracked file that pins a release is a surface the sync rewrites', () => {
+    const listed = spawnSync('node', [join(ROOT, '.github', 'scripts', 'sync-release-version.mjs'), '--list-surfaces'], { encoding: 'utf8' });
+    expect(listed.status, listed.stderr).toBe(0);
+    const surfaces = new Set(listed.stdout.split('\n').filter(Boolean));
+    const tracked = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: ROOT, encoding: 'utf8' }).stdout
+      .split('\n').filter(Boolean).filter((f) => !HISTORICAL.has(f));
+    const unlisted = [...new Set(pinsIn(ROOT, tracked).map(([rel]) => rel))].filter((rel) => !surfaces.has(rel));
+    expect(unlisted, `pins a release but is not in sync-release-version.mjs: ${unlisted.join(', ')}`).toEqual([]);
   });
 
   it('refuses a non-stable version, so a pre-release never reaches the surfaces', () => {

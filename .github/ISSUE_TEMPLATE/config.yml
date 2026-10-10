@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Documentation
+    url: https://github.com/raccioly/testguard/blob/main/docs/README.md
+    about: Quickstart, adoption guides, the CLI reference and troubleshooting.
+  - name: 💬 Questions and adoption help
+    url: https://github.com/raccioly/testguard/discussions
+    about: How to state a claim, read a verdict or fit TestGuard to your stack.
+  - name: 🔒 Security vulnerability
+    url: https://github.com/raccioly/testguard/security/advisories/new
+    about: Report privately. Do not open a public issue; see SECURITY.md.

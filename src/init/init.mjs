@@ -101,7 +101,7 @@ const CI_EVIDENCE_HELPERS = {
 # exits 0 with a message whenever anything is missing.
 BRANCH="\${1:-main}"
 OUT=.testguard/ci
-command -v gh >/dev/null 2>&1 || { echo "gh is not installed; see README > Read CI's evidence locally" >&2; exit 0; }
+command -v gh >/dev/null 2>&1 || { echo "gh is not installed; see https://github.com/raccioly/testguard/blob/main/docs/guides/ci/github-actions.md#read-cis-evidence-locally" >&2; exit 0; }
 command -v testguard >/dev/null 2>&1 || { echo "testguard is not on PATH; install it or run npx testguard-cli brief --evidence <file>" >&2; exit 0; }
 mkdir -p "$OUT" || exit 0
 gh run download --name "testguard-evidence-$BRANCH" --dir "$OUT" >/dev/null 2>&1 || { echo "no testguard-evidence-$BRANCH artifact to download" >&2; exit 0; }
@@ -113,7 +113,7 @@ exec testguard brief . --text --evidence "$OUT/ci-self-evidence.json"
 # exits 0 with a message whenever anything is missing.
 BRANCH="\${1:-main}"
 OUT=.testguard/ci
-command -v glab >/dev/null 2>&1 || { echo "glab is not installed; see README > Read CI's evidence locally" >&2; exit 0; }
+command -v glab >/dev/null 2>&1 || { echo "glab is not installed; see https://github.com/raccioly/testguard/blob/main/docs/guides/ci/gitlab.md#read-cis-evidence-locally" >&2; exit 0; }
 command -v testguard >/dev/null 2>&1 || { echo "testguard is not on PATH; install it or run npx testguard-cli brief --evidence <file>" >&2; exit 0; }
 mkdir -p "$OUT" || exit 0
 glab ci artifact "$BRANCH" testguard:probe --path "$OUT/" >/dev/null 2>&1 || { echo "no testguard:probe artifact to download for $BRANCH" >&2; exit 0; }

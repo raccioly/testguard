@@ -1,7 +1,8 @@
 // @req NFR-01
 // Requirements live in docs-canonical/REQUIREMENTS.md; the matrix there must agree with these.
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, realpathSync, statSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, realpathSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -80,6 +81,23 @@ describe('no surface describes a hook mechanism the code does not use', () => {
 
   it('the README does not', () => {
     expect(offenders(readFileSync(new URL('../README.md', import.meta.url), 'utf8'))).toEqual([]);
+  });
+
+  // docs/ is where the hook is now explained at length, for every harness —
+  // the same sentence in more places, so the same property in more places.
+  const docsPages = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? docsPages(join(dir, e.name)) : e.name.endsWith('.md') ? [join(dir, e.name)] : []);
+
+  it('no page under docs/ does, and every hook command a page shows is one the code emits', () => {
+    const valid = new Set([hookCommand('.'), hookCommand('backend')]);
+    for (const page of docsPages(fileURLToPath(new URL('../docs', import.meta.url)))) {
+      const text = readFileSync(page, 'utf8');
+      expect(offenders(text), page).toEqual([]);
+      for (const m of text.matchAll(/"((?:[^"\\\n]|\\.)*brief --text(?:[^"\\\n]|\\.)*\|\|(?:[^"\\\n]|\\.)*)"/g)) {
+        const c = JSON.parse(`"${m[1]}"`);
+        expect(valid.has(c), `${page} shows a hook command the code does not emit:\n  ${c}`).toBe(true);
+      }
+    }
   });
 
   it('the canonical security document does not', () => {

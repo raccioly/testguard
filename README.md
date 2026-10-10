@@ -7,8 +7,10 @@
 [![npm](https://img.shields.io/npm/v/testguard-cli.svg)](https://www.npmjs.com/package/testguard-cli)
 [![PyPI](https://img.shields.io/pypi/v/testguard-cli.svg)](https://pypi.org/project/testguard-cli/)
 [![node](https://img.shields.io/node/v/testguard-cli.svg)](https://nodejs.org)
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![deps](https://img.shields.io/badge/runtime%20deps-1%20pinned-brightgreen.svg)](./package.json)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/raccioly/testguard/blob/main/LICENSE)
+[![deps](https://img.shields.io/badge/runtime%20deps-1%20pinned-brightgreen.svg)](https://github.com/raccioly/testguard/blob/main/package.json)
+
+**English** · [Português (Brasil)](https://github.com/raccioly/testguard/blob/main/docs/i18n/pt-BR/README.md) · [Español](https://github.com/raccioly/testguard/blob/main/docs/i18n/es/README.md) · [简体中文](https://github.com/raccioly/testguard/blob/main/docs/i18n/zh-CN/README.md)
 
 > Breaks your code on purpose and reports every promise your tests did not
 > notice breaking.
@@ -80,7 +82,7 @@ risk. TestGuard binds every fault to a **stated claim**, so the output is not
 a score but a finding: *"Your project says a missing scope fails closed.
 Nothing checks that."* That is the difference between a metric and an audit.
 
-📄 **[Read the six-page technical brief (PDF)](docs/testguard-explained.pdf)**
+📄 **[Read the six-page technical brief (PDF)](https://github.com/raccioly/testguard/blob/main/docs/testguard-explained.pdf)**
 — the idea on page one, then the field evidence, the anatomy of a run, the
 verdicts, the loop and its calibration, and the prior art.
 
@@ -127,1153 +129,138 @@ raises coverage. TestGuard admits it because it fails when the claim is false.
 | npm | `npm i -D testguard-cli` then `npx testguard probe` |
 | pip | `pip install testguard-cli` then `testguard probe` (needs Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.18.3` — see [`action.yml`](./action.yml) |
-| pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-probe` |
-| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.18.3/packaging/gitlab/testguard.gitlab-ci.yml` with `inputs:` — see [`packaging/gitlab/`](./packaging/gitlab/testguard.gitlab-ci.yml) |
+| GitHub Action | `uses: raccioly/testguard@v0.18.3` |
+| pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-gate`, `testguard-probe` |
+| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.18.3/packaging/gitlab/testguard.gitlab-ci.yml` |
 
-Projects that set `min-release-age` in `.npmrc` cannot see a version published
-less than that many days ago (`ENOVERSIONS`); install that one with
-`npm i -D testguard-cli --min-release-age=0`.
+Requirements, offline installs, `ENOVERSIONS` and every CI option are in the
+[installation guide](https://github.com/raccioly/testguard/blob/main/docs/installation.md).
 
-## Usage
+## Quickstart
 
 ```bash
 npx testguard-cli init                      # install the agent layer at the git root
 npx testguard-cli status --json             # where the project is, and the ONE next action
-npx testguard-cli claims                    # what does this project claim, and is each claim probeable?
-npx testguard-cli claims --check-anchors    # fail fast if an exact anchor moved or a replacement no longer parses
-npx testguard-cli claims --annotate --claim AUTH-ADMIN --json # read-only file-header placement preview
 npx testguard-cli scaffold src/auth.ts      # propose faults for a file, as a draft to keep or drop
+npx testguard-cli claims --check-anchors    # every claim is probeable before anything runs
 npx testguard-cli probe                     # try to falsify each claim; report what the tests missed
-npx testguard-cli admit test/auth.test.ts --claim AUTH-ADMIN   # does this test satisfy the two-gate rule?
+npx testguard-cli admit test/auth.test.ts --claim AUTH-ADMIN   # does this test fail when the claim is false?
 npx testguard-cli baseline                  # freeze today's unproven findings; only new ones gate
 npx testguard-cli gate --changed origin/main # fail when a changed source file carries no claim
-npx testguard-cli sweep --changed origin/main # no claims yet? propose faults for the changed files and report what nothing noticed
+npx testguard-cli sweep --changed origin/main # no claims yet? report what nothing noticed in the changed files
 npx testguard-cli brief --text              # tell the agent where the suite is blind, before it writes
-npx testguard-cli replay --since v1.0..HEAD # would this suite have caught the bugs that escaped?
-npx testguard-cli mcp                       # serve the read-only loop over MCP, on stdio
+npx testguard-cli replay --since HEAD~50..HEAD # would this suite have caught the bugs that escaped?
 ```
 
 Exit codes are the contract: `0` nothing new to prove, `1` unproven claims,
 unclaimed changes or invalid fault anchors, `2` a precondition failed and
-nothing was probed, `3` usage.
-Every command accepts `--json`.
+nothing was probed, `3` usage. Every command except `mcp` accepts `--json`.
 
-### Intent-first drafts
+The [quickstart](https://github.com/raccioly/testguard/blob/main/docs/quickstart.md)
+walks through a first claim end to end. Adding TestGuard to a codebase that
+already has a large suite has its own guide:
+[adopting TestGuard in an existing project](https://github.com/raccioly/testguard/blob/main/docs/guides/existing-projects.md).
 
-Scaffold drafts propose mechanical faults, not intended behavior. New claims
-declare `inferred` origin even with an annotation. Supply the intended observable
-behavior from a requirement, ADR, bug or incident independently of the code:
-inputs, expected outcome and forbidden outcome. Record the supplied source
-kind/ref; when unavailable keep inferred. References are not authenticated or
-fetched, and passing tests do not establish independent intent. Review proposals
-against the supplied intent before adopting and probing; existing `--claim`
-metadata is preserved.
+## Languages and test runners
 
-### Optional annotation placement
+| Language | Runners | Faults proposed by `scaffold` |
+|---|---|---|
+| JavaScript | vitest, jest, Playwright, Node's built-in test runner | seven shapes: forced guards, deleted statements, altered returns, weakened literals, removed calls, dropped payload fields, swapped arguments |
+| TypeScript | vitest, jest, Playwright (through the project's own transform) | the same seven |
+| JSX, TSX (UI) | vitest, jest, Playwright | the seven, plus removed elements and dropped event handlers |
+| Python ≥ 3.8 | pytest, or stdlib `unittest` when pytest is absent | the same seven, in Python syntax |
+| Anything else | `--runner-cmd` with a jest-compatible JSON report | hand-written faults |
 
-Ordinary `claims` output and status notes identify missing scanned source links
-as advisories. Counts are distinct claim IDs, not faults. They do not change
-verification state, its next action or exit codes; annotation-sourced missing
-IDs still produce the existing claims drift error. Scanned text is a lexical
-link, not authenticated intent or source ownership.
-Status advice uses a bounded scan (10,000 entries, 1,000 files, 64 directory
-levels, 256 KiB per file, 2 MiB total); incomplete scans report unavailable
-advice without concluding an ID is absent. Keep the original `--claims`
-argument for preview when inspecting a custom claims selection.
+One claim can be defended by a vitest test and a pytest test at once. Runner
+resolution, discovery, mocks and limits are in the
+[languages and runners reference](https://github.com/raccioly/testguard/blob/main/docs/reference/languages-and-runners.md).
 
-`testguard claims --annotate` previews JavaScript/TypeScript or Python
-file-header links for declared claims; repeat `--claim` or use comma-separated
-IDs to select claims. Add `--apply` only after reviewing the selection to
-explicitly write annotations. Each invocation recomputes its plan: an earlier
-preview is not a saved approval token. No `--out` or unrelated inspection
-switches are accepted with authoring. JSON conforms to the `annotations`
-authoring schema; it contains no source/proposed contents or probe verdicts.
+## Use it with your AI agent
 
-This is file-level placement, not symbol ownership or proof of correctness.
-Missing annotations do not disable exact fault-anchor validation, and placement
-does not change claim origins, evidence or baselines. Unsupported, ambiguous or
-unsafe targets block the complete selection. Original/proposed files are capped
-at 2 MiB and the aggregate at 16 MiB. Preserve BOM, shebang, Python encoding
-cookie, newline style and permissions. A preview exits 0 when applicable, 2 when
-refused; apply exits 0 only after verified completion, 2 for refusal/partial
-failure; malformed options exit 3.
+TestGuard is meant to be driven by an agent. `testguard init` installs a skill
+that teaches the operating loop, an `AGENTS.md` section, and a session-start
+hook that briefs every session with the ranked blind spots before it writes
+code. For Claude Code, the hook in `.claude/settings.json` is:
 
-Apply uses an exclusive owned lock and retains fsynced originals in an owner-only
-recovery directory outside the checkout (the result reports its location).
-External claims files can be previewed but cannot authorize writes. It never
-reclaims an existing lock or automatically rolls back over editor changes.
-This is recoverable, not a cross-file atomic transaction: interruption or
-arbitrary concurrent edits can leave partial content. Compare retained originals
-manually before recovery; inspect ownership before removing a leftover lock.
-
-## How it works
-
-```bash
-npx testguard-cli init        # install the agent layer: skill, session-start hook, AGENTS.md section
-npx testguard-cli status --json   # where the project is and the ONE next action — the machine entry point
-npx testguard-cli claims      # what does this project claim, and is every claim probeable?
-npx testguard-cli probe       # try to falsify each claim; report what the tests missed
-npx testguard-cli baseline    # freeze today's unproven findings; from now on only new ones gate
-npx testguard-cli brief       # tell the agent where the suite is blind, before it writes
-npx testguard-cli gate --changed origin/main   # fail when a changed source file carries no claim at all
-npx testguard-cli scaffold src/x.ts   # propose faults for a file, as a draft to keep or drop
-npx testguard-cli admit test/x.test.ts --claim X   # is this test green on HEAD and does it fail on every fault of X? ADMITTED or NOT ADMITTED
+```json
+{ "hooks": { "SessionStart": [ { "hooks": [
+  { "type": "command", "command": "node_modules/.bin/testguard brief --text 2>/dev/null || { command -v testguard >/dev/null 2>&1 && testguard brief --text 2>/dev/null; } || true" }
+] } ] } }
 ```
 
-1. **Claims** live in `testguard.claims.json` (editors validate it against
-   `"$schema": "./node_modules/testguard-cli/spec/schemas/claims.schema.json"`):
-   a statement, where it comes from, which tests supposedly defend it, and
-   one or more *faults* — each a deterministic source change that would make
-   the statement false. Every
-   claim and every fault records who produced it. `testguard claims`
-   validates the file and reports drift against `@claim <ID>` annotations in
-   source. Test files are deliberately not scanned — a claim asserted by a test is the authorship trap the tool exists for — and annotation ids must contain a hyphen so prose is never mistaken for one.
-   `claims --check-anchors` additionally locates every exact anchor and parses
-   each in-memory JavaScript or Python replacement. It runs no tests, creates
-   no worktree and changes no file, so a moved anchor is reported before an
-   expensive probe. It reports and stops; it never guesses a new anchor.
-2. **Probe** confirms the defenders are green N times unmodified, applies
-   each fault in a scratch git worktree (your tree is never touched), runs
-   the defenders N times, re-runs survivors against the whole suite with
-   N-run attribution (up to N: it stops as soon as no test has failed in
-   every run, because from there none can be named a killer), restores, and
-   classifies. It warns when another test runner is already running — a
-   contended machine turns a slow suite into a `TIMEOUT` verdict about the
-   load, not the claim — records that on the evidence, and offers `--serial`
-   to run one test file at a time. Verdicts are a closed set:
+It resolves the project's own install, then a `testguard` on `PATH`, and ends
+in `true`, so it can never break a session or reach the network. Any other
+harness can use `testguard mcp` (five read-only tools over stdio) or
+`testguard status --json`. Setup for Claude Code, Codex, Cursor and others is
+in the [AI agents guide](https://github.com/raccioly/testguard/blob/main/docs/guides/ai-agents.md).
 
-   | Verdict | Meaning |
-   |---|---|
-   | `killed` | a test body rejected the behaviour, N/N — the only pass |
-   | `SURVIVED` | the defenders stayed green while the claim was false |
-   | `NOCOVER` | no test file defends the claim at all |
-   | `UNVERIFIABLE` | the fault's anchor is missing or ambiguous — loud, never a skip |
-   | `TIMEOUT` | the defenders hung; a hang is not a detection |
-   | `FAULT-INVALID` | the replacement does not load — a bad fault, not a finding |
-   | `FLAKY-DEFENDER` | the defenders are not reliably green, or disagreed across runs — `detail.flakeRate` says how often (`failures` of `runs` on unmodified source) |
+## Documentation
 
-   Never a single score. Findings are ranked by severity, claim provenance
-   and blast radius (relative imports, `tsconfig` path aliases and
-   `package.json#imports` are resolved; bare package names are not), and
-   written to `.testguard/evidence.json` — validated against the spec before
-   it is written.
-
-   Worktree mode probes a **commit**. If a defender or target file has
-   uncommitted changes and you asked for the implicit HEAD, `probe` refuses
-   and says so — otherwise your new tests would be silently absent and the
-   same survivors would come back with no hint why. `--include-dirty`
-   snapshots the working tree (tracked edits and new files) into a throwaway
-   commit and probes that; your tree, HEAD and index are never touched. An
-   **explicit `--ref`** (a pre-fix commit in a post-mortem, say) is honoured
-   over a dirty tree, as is `--ignore-dirty`: a warning names the files and
-   the evidence records them as `repo.ignoredDirty`, so the run says what it
-   did not look at. Every summary names the commit probed.
-
-   A fault may declare its own `defendedBy` to override the claim's set.
-   Omit the fault field to inherit; set it to `[]` to request discovery rather
-   than inheritance. Evidence names the selection origin and selected files.
-   Changing either invalidates reuse and makes status stale. A narrowed fault
-   set after a prior kill is warned about by `claims`; re-probe before trusting
-   it. For example, a unit-level fault can select `["test/unit.test.mjs"]`
-   while an integration fault inherits the claim's broader set.
-
-   A claim with no `defendedBy` has its defenders **discovered**: the test
-   files that import the fault's target, by relative path or resolved alias
-   (tsconfig `paths`, through `extends` and `references`, vite/vitest
-   `resolve.alias`, package.json `imports`) — **minus the files that mock
-   it**. A test that `vi.mock`s / `jest.mock`s the target cannot detect any
-   fault in it; counting it would make `NOCOVER` under-report and waste runs.
-   `NOCOVER` therefore means exactly "no test file imports this source
-   without mocking it". `claims` prints the split (`18 import · 16 mock · 2
-   can detect`), the evidence lists the mocking files, and a mocking file
-   that never `expect(...)`s anything imported from the target carries the
-   static signal `mocked-never-asserted` — the cheapest blind-spot signal
-   there is, and the exact signature of one escaped bug in the field
-   reports. Silence it, visibly, with `// unasserted: <why>` above the mock.
-   Its sibling `persistence-payload-unasserted` is attached to a **survivor
-   on a write path** whose defender mocks the database: the test can prove
-   the call shape and never that the row landed, and the signal names the
-   mocked layer and the file's assertion mix (exact, partial, argument-free).
-
-   Runners: **vitest**, **jest**, **Playwright** and **Python** (`--runner
-   auto` picks the first of vitest, jest, python that resolves). A JavaScript
-   runner is resolved from the **project's own package** first — its pinned
-   version, its own bin script — and only then from an executable on PATH,
-   which the evidence records as `runner.source: "path"`; `npx` is never
-   asked, because its cache answers for packages a project does not have.
-   **Node's built-in framework** uses explicit `--runner node-test` with plain
-   JavaScript test files and default Node collection. It uses the Node executable
-   running TestGuard, records `runner.source: "builtin"` and its actual version,
-   and installs nothing. Discovery loads test modules with test bodies filtered
-   out, so top-level code can run. Custom loaders, `NODE_OPTIONS`, `NODE_PATH`
-   and module-mocking configurations are outside this initial adapter's scope.
-   `auto` keeps its existing runner order. Each confirmation uses fresh isolated
-   processes and the same worker, timeout and confirmation rules.
-
-   To reproduce the narrow native-runner comparison, run
-   `node .github/scripts/benchmark-node-runner.mjs --out /absolute/receipt-dir`
-   from this repository after installing its pinned development dependencies.
-   It compares 17 identical classifier inputs and four existing faults through
-   complete probes, with three confirmations, fresh worker receipts and
-   reversed execution order. Results describe that workload and runtime only.
-
-   Other frameworks go through `--runner-cmd`. Each runner is proven against
-   its own copy of the known-answer fixture.
-
-   **Python** runs under `pytest` when the project's interpreter can import
-   it and stdlib `unittest` when it cannot, and the evidence records the
-   engine that actually ran — `--runner pytest` or `--runner unittest` pins
-   the choice and fails rather than falling back. Nothing is installed into
-   the project: the reporters ship inside TestGuard and reach the interpreter
-   through `PYTHONPATH`, so a codebase whose test dependencies are the
-   standard library stays that way. The interpreter is the project's
-   `.venv`/`venv`, the active `VIRTUAL_ENV`, or `--python <path>`. A `.py`
-   defender runs under Python whatever the project runner is, so one claim
-   can be defended by a vitest test and a pytest test at once.
-
-   Two things Python forces that JavaScript does not. **`patch("pkg.mod.fn")`
-   is not `vi.mock`**: it replaces one attribute, so the file is still a
-   defender of every other fault in that module — it keeps its place and
-   carries a `target-attribute-patched` signal naming the attributes. And
-   **the fault must be the code that ran**: a strict editable install puts an
-   import hook ahead of `sys.path`, so Python can load the original file while
-   TestGuard faults the copy — a green baseline, every claim `SURVIVED`, and a
-   report that reads as a devastating finding while being entirely false. With
-   the fault applied, TestGuard asks which file was actually imported and
-   refuses the run when it is outside the tree being probed. When no defender
-   imported the subject at all, the run continues and the record says so
-   (`detail.targetNotImported`), because that is a fact about the defenders'
-   reach and not about their assertions.
-
-   The two-gate rule, as one verb: `testguard admit <test-file> --claim <ID>`
-   runs the claim's faults against your uncommitted test and answers
-   `ADMITTED` (exit 0: the test is green on unmodified HEAD and fails on
-   every fault, N/N) or `NOT ADMITTED` (exit 1: the first blocking fault and
-   what to do about it). The test must be a declared or discovered defender
-   of the claim. It is sugar over `probe --claim <ID> --include-dirty`, so
-   it can never disagree with the gate. Every generator on the market admits
-   a test because it compiles, passes and raises coverage; `admit` admits it
-   because it fails when the claim is false.
-
-   Practical loop: first pass `--no-escalate` (escalation re-runs the whole
-   suite N times per survivor); iterate on one claim with `--claim <ID>`, or
-   select a batch with commas or repeated flags (`--claim A,B --claim C`).
-   Every occurrence is retained in first-seen order, duplicates are collapsed,
-   and partial human/JSON output names both the requested and probed counts, so
-   a green subset cannot masquerade as the selection the operator asked for.
-   Use either `--include-dirty` or `--in-place` (only fault target files must be
-   clean there; test files may be dirty), optionally `--confirm 1` for a fast
-   **provisional** signal — verdicts print with a `?`, evidence goes to
-   `evidence-provisional.json`, and `baseline` refuses it; final pass with
-   defaults. By default
-   the stream shows only unproven faults plus a killed count — `--verbose`
-   shows every fault. A custom
-   runner (`pnpm --filter`, a specific config) goes in
-   `--runner-cmd "<cmd> {files} … {out}"`; if the scratch worktree cannot
-   see your `node_modules`, pass `--node-modules <dir>`.
-3. **Baseline** freezes every non-passing fingerprint. Later probes suppress
-   what was already known and exit non-zero only on what is new. Prior verdicts
-   can be reused when their recorded inputs and runner policy still match.
-   Cold runs, changed discovery/configuration or `--no-reuse` can require a
-   full probe; unchanged target and defender files alone do not guarantee reuse.
-   A baseline frozen from `--include-dirty`
-   evidence records the snapshot and points at the *parent* of the commit
-   that will carry your tests; after you commit, a clean `probe` plus
-   `baseline --restamp` moves it to that commit — only when the fingerprints
-   are identical, never otherwise. `status` notes a baseline that predates
-   HEAD without making it a state.
-4. **Brief** turns evidence plus baseline into a ranked, capped
-   `## TEST BLINDSPOT CONTEXT` block, printed and also written to
-   `.testguard/brief.json` (`--text` prints only; `--markdown` prints the same brief as a
-   merge-request note for the human reviewer, unclaimed changes first). Wire it into an agent's session start
-   — for Claude Code, in `.claude/settings.json`:
-
-   ```json
-   { "hooks": { "SessionStart": [ { "hooks": [
-     { "type": "command", "command": "node_modules/.bin/testguard brief --text 2>/dev/null || { command -v testguard >/dev/null 2>&1 && testguard brief --text 2>/dev/null; } || true" }
-   ] } ] } }
-   ```
-
-   `--text` prints only, and exits 0 silently when there is no evidence yet;
-   the command resolves the project's own install, then a `testguard` on
-   `PATH`, and ends in `true` — so the hook can never break a session. There
-   is no `npx` in it, in any form: `--no-install` resolves the package from
-   the registry before declining to install it, so it is quiet rather than
-   offline. The brief's first line says which install answered
-   (`local install` or `global`), so a stale one is visible.
-
-### Advisory updates for AI sessions
-
-New integrations created by `testguard init` tell the AI to identify the actual
-CLI (project-local before global) and, once per session when network policy
-permits, read the registry's stable version:
-
-```bash
-npm view testguard-cli dist-tags.latest --json --fetch-retries=0 --fetch-timeout=5000
-```
-
-This is an optional check performed by the AI, not by TestGuard's CLI or hook.
-A newer stable version produces a suggestion and a request for approval, never
-an automatic install. Project pins and the original package manager still
-apply; prereleases and development checkouts are not replaced. Offline or
-failed checks do not change verdicts, evidence or exit codes, and do not prove
-that an installation is current. AI instructions are guidance, not a guarantee
-that every harness performs the check.
-
-Upgrading the package does **not** refresh an existing copied skill or an
-existing managed section already listing the project. Compare the upgraded
-package's `src/init/templates/SKILL.md` with
-`.claude/skills/testguard/SKILL.md` and merge approved changes, preserving local
-customizations. For an existing `AGENTS.md` section, add the same advisory
-policy after reviewing it. `testguard init --force` replaces the whole skill
-but does not refresh an already-listed managed section; use it only with
-explicit overwrite approval and review the diff. No new automatic refresh
-mechanism is introduced.
-
-### Would this suite have caught the bugs that already escaped?
-
-An injected fault is a fault somebody thought of. A bug that actually shipped
-is ground truth: a human already confirmed it was a defect, and there is no
-equivalent-mutant argument to have about it.
-
-```bash
-npx testguard-cli replay --since HEAD~50..HEAD --max 10
-```
-
-For each fix commit in the range — one that changes source **and** a test
-together — `replay` checks it out in a scratch worktree, reverts only its
-source files to the parent, **deletes the test the fix shipped** (that test
-proves nothing about what the suite knew before it existed), and runs the
-tests that import the reverted code:
-
-| Verdict | Meaning |
+| | |
 |---|---|
-| `caught` | a remaining test failed by assertion, every run. The suite knew. |
-| `blind` | the suite stayed green on known-broken code. |
-| `nocover` | no test imports the reverted files — worse than blind. |
-| `flaky` | the runs disagreed, so nothing can be concluded. A flaky failure reads as detection, which biases this metric *optimistically*; mixed runs are never `caught`. |
-| `unverifiable` | the revert did not apply, or the suite could not load. |
-
-One patch counts once (`git patch-id`), because a dual-branch topology
-carries the same fix under two or three shas. **`replay` reports and never
-gates**: a bug that escaped is history, not a regression in this change.
-
-Each replayed bug is also labelled with the injected-fault class its diff
-most resembles, which is the join key that turns an uninterpretable mutation
-score into a statement with a sample size:
-
-```
-  guard-removed          missed  7/9    p=0.78  ci [0.45, 0.94]
-  field-dropped          missed  4/4    p=1.00  ci [0.51, 1.00]
-```
-
-Read as *"when a real bug of this class escapes, how often does the suite
-miss it"* — a miss rate, so a high `p` is bad. It is written as a
-`calibration` document beside the replay one. `caught`, `blind` and
-`nocover` are measurements and enter the ratio, `nocover` as a miss: leaving
-it out would score a project with no tests at all for a subsystem *better*
-than one with weak tests. `flaky` and `unverifiable` are failed measurements
-and enter neither side. Every `p` and `ci` is recomputable from `n` and the
-miss count, and the validator recomputes them.
-
-**The open question this exists to answer.** Does a calibration learned on a
-repository *with* history transfer to a greenfield one that has none? AI
-authored code has no history, so replay cannot help it directly and
-calibration is the only bridge. That transfer is unproven, it is the core
-product bet, and this is the instrument for testing it — not the answer.
-
-### Read CI's evidence locally
-
-Verdict reuse makes a probe cheap, but the evidence lives where `probe` ran
-and is gitignored. On a fresh clone, or on a laptop where CI does the
-probing, the session-start brief is empty and `status` says `unprobed` while
-the default branch has full evidence. Point either command at CI's document:
-
-```bash
-testguard status . --evidence .testguard/ci/ci-self-evidence.json
-testguard brief . --text --evidence .testguard/ci/ci-self-evidence.json
-```
-
-A foreign document is not trusted blindly. `status` marks it
-`evidenceSource: provided`, prints the commit it describes next to the
-commit in your tree, and still computes staleness from the recorded input
-hashes — so a file you have edited since CI probed it goes `evidence-stale`
-for exactly those claims.
-
-`testguard init --ci-evidence github` (or `gitlab`) writes
-`.testguard/fetch-ci-evidence.sh`, which downloads the branch-named artifact
-with the platform CLI you already have and then briefs from it. **It is an
-on-demand helper, not a hook**: the session-start hook never touches the
-network, and the helper exits 0 with a message when the CLI or the artifact
-is missing. TestGuard itself still makes no network calls.
-
-### Starting from zero claims
-
-During gradual adoption, use `testguard probe --allow-empty` to skip a valid
-empty claims file without blocking a push. It explicitly reports that no
-verification was performed and writes no evidence; `--json` retains the
-`no-claims` state. Missing or invalid claims files still fail. Run `gate`
-separately to enforce changed-file coverage. For the pre-commit probe hook,
-set `args: [--allow-empty]`; for the GitHub Action, set `allow-empty: 'true'`.
-The default probe still exits 2 when no claims exist.
-
-In a monorepo, a valid nested `testguard.claims.json` marks a separate project.
-The parent gate reports its changed files as delegated and does not count them
-as parent coverage. Run `gate` in each child project as well; a passing parent
-gate does not establish that child coverage passed. Invalid child claims fail
-evaluation instead of hiding files.
-
-`gate` names the changed files that carry no claim, and stops there —
-correctly, because stating a claim is a human act. But a project adopting this
-tool reads that list, has nothing to compare it against, and closes the tab.
-The bottleneck was never verification; it is **oracle supply**.
-
-`sweep` is the lowest rung of that supply. No claim, no concern, nothing
-written by anybody:
-
-```bash
-npx testguard-cli sweep --changed origin/main          # propose, probe a bounded selection, report
-npx testguard-cli sweep --changed HEAD --include-dirty --cap 20
-```
-
-It takes the files `gate` just called uncovered, proposes faults with the same
-mechanical producers `scaffold` uses, probes a bounded selection, and reports
-what a green suite did not notice. A fault that survives needs no claim to be
-alarming: something was deliberately broken and not one test failed.
-
-```
-swept 13 of 14 unclaimed changed files against origin/main.
-proposed 510 faults, probed 10 (cap 10), deferred 350.
-  The 350 deferred are not a verdict: raise --cap, or sweep a smaller change.
-  150 presentational elements (icons, static wrappers) set aside: nobody writes a test for those, and a survivor there would teach the ordering the wrong lesson.
-
-9 findings — a deliberate break that no test noticed:
-
-  SURVIVED      src/app/actions/register.ts:118  [write path]
-    [line 118] Field dropped: `password_hash` is no longer written.
-    src/tests/actions/register.test.ts mocks @/lib/prisma; 1 exact, 8 partial,
-    31 argument-free call assertions in the file. A field dropped from the write
-    payload fails only against an assertion that names that field exactly.
-    Assert the whole object written by the call this fault changes, including
-    `password_hash` — or read the record back and assert on what was stored.
-```
-
-Three rules make it safe to run on a repository that has never seen this tool:
-
-Pooled draft IDs are unique even when source files share basenames/functions or
-annotation IDs. Sweep reserves original IDs and suffixes collisions before
-selection, keeping every fault, its metadata and defenders attached to its own
-draft. These are proposal identities, not authenticated claims.
-
-- **It never writes `testguard.claims.json`**, and never will. A claim is a
-  sentence someone is willing to stand behind; a sentence nobody wrote is not
-  one. Its drafts land beside the evidence to keep or drop.
-- **Its evidence never replaces `.testguard/evidence.json`.** A sweep probes
-  faults nobody stated, under TODO statements; folding that into the document
-  `status` and `baseline` read would corrupt the record of what the project
-  actually claims.
-- **It does not fail on its own bad guess.** Only `survived` and `nocover`
-  exit 1. A proposal that would not compile, or an anchor that did not locate,
-  is reported and never gates — a tool that fails because its own guess was bad
-  is a tool people switch off.
-
-The ordering **learns from your own runs**. Every evidence record already
-carries a fault class and a verdict, so "how often does a fault of this class
-survive here" is a tally, not a new thing to collect — a sweep persists its
-evidence and the next one reads it. A project with no evidence falls back to
-the shipped prior and says so; one with its own records overrides it in
-proportion to how many it has. The report names which, because an ordering
-nobody can trace is a number nobody should trust.
-
-The cap and the ordering are Google's: their mutation service surfaces at most
-7 × |files| mutants per change and orders candidates on the measured
-productivity of their operator in similar context, which took their productive
-rate from 15% to 89%
-([Petrović et al., *Practical Mutation Testing at Scale*, 2021](https://arxiv.org/abs/2102.11378)).
-TestGuard's ordering prior is measured the same way — from probed faults on a
-real AI-authored codebase — and shrunk toward a neutral value, so one
-observation of a class surviving never dominates a sweep. The cap is spread
-across files: a single file with many candidates cannot make the others look
-clean.
-
-A sweep is weaker evidence than a probe, and says so. Nobody stated that the
-behaviour mattered. It is stronger than nothing, which is what a repository
-with no claims has — and the survivors worth defending become the first claims.
-
-#### Concerns: one sentence, two hundred screens
-
-A claim names one promise precisely, which is why a repository with two hundred
-screens never finishes writing them. A **concern** names a *kind* of promise and
-says where to look for it:
-
-```bash
-npx testguard-cli concerns                      # what this project can be swept by
-npx testguard-cli sweep --concern ADMIN-GUARDS  # aim a sweep at one
-```
-
-```json
-{
-  "schemaVersion": 1,
-  "concerns": [
-    {
-      "id": "ADMIN-GUARDS",
-      "statement": "Every admin route refuses a caller without the admin role.",
-      "severity": "critical",
-      "targets": { "kind": "glob", "globs": ["src/app/api/admin/**"] },
-      "faultClasses": ["guard-removed", "condition-forced", "return-altered"]
-    }
-  ]
-}
-```
-
-Five lines, and the sweep reports:
-
-```
-concern ADMIN-GUARDS matches 24 files. Swept 23.
-  158 further proposals were outside this concern's fault classes.
-
-SURVIVED   src/app/api/admin/claims/[id]/route.ts
-  [line 41] Guard never triggers: `if (!membership || (membership.role !== 'owner'
-  && membership.role !== 'manager'))` becomes `if (false)`.
-```
-
-The idea is Meta's: ACH has an engineer describe an area of concern in plain
-text and gates every generated step by execution. What is taken here is the
-**unit** — the concern as the thing a human writes — not their generator, and
-**no model is required**. A concern's useful core is a named scope plus a
-producer selection, which the mechanical producers already satisfy, so every
-verifying command stays offline.
-
-Two concerns ship built in, and only two. An authorization concern would need a
-heuristic for *"which files check permissions"*, and a guess there is exactly
-the noise that gets a check switched off — so `SAVE-PERSISTS` and
-`CHANGED-CODE` are the defaults, and a project that knows its own auth layer
-says so in three lines. Declaring a concern with a built-in's id replaces it,
-and the replacement is reported rather than silent.
-
-A concern is **not** a claim and never becomes one by itself. It says where to
-look; the probe says what it found; a human states the sentence worth defending.
-
-#### Sweeping the save surface instead of the diff
-
-A diff cannot answer *"when the user clicks save, does it actually save?"* — it
-only knows what changed today. `--save-paths` points the same sweep at every
-file that writes to storage:
-
-```bash
-npx testguard-cli sweep --save-paths --cap 20
-```
-
-```
-119 writes to storage across 37 files, carrying 226 payload fields. Swept 36.
-proposed 762 faults, probed 20 (cap 20), deferred 742.
-
-SURVIVED   src/app/actions/register.ts  [write path]
-  [line 59] Field dropped: `password_hash` is no longer written.
-  src/tests/actions/register.test.ts mocks @/lib/prisma; 1 exact, 8 partial,
-  31 argument-free call assertions in the file. A field dropped from the write
-  payload fails only against an assertion that names that field exactly.
-```
-
-The first line is the point. A report that lists findings without saying how
-much surface it looked at invites you to assume the rest is fine, so the
-denominator comes first and the document carries `writeSites` and
-`payloadFields` whether or not anything survived. Measured on a real
-AI-authored application: **12 of 26 probed persistence faults survived a fully
-green suite, and all 12 were a dropped payload field.**
-
-It also states, before any verdict, **what the defenders could prove at all**:
-
-```
-of those 37 files: 32 defended only by tests that mock the persistence layer,
-1 with an unmocked defender, 4 with no defender at all.
-```
-
-That line is the read-back answer. A test that replaced the database can prove
-the *call shape* and nothing beyond it — a `where` that matches no rows, a
-rolled-back transaction and a rejected constraint all pass against a mock that
-recorded the arguments and returned a plausible object. So rather than pretend
-to measure persistence, TestGuard states the limit, the same way `nocover` says
-"no test imports this" instead of guessing.
-
-When every defender mocks the layer, the report says so outright: *nothing in
-this suite can prove a write reached storage*. A clean probe there is not
-evidence of persistence — it is evidence that nothing could have measured it.
-
-`unmocked` is deliberately weaker than "proves persistence": a test that does
-not replace the database may simply never reach it. Possible is the honest word.
-
-### Every change needs a claim
-
-`probe` can only verify claims that exist. Every escaped defect in the field
-reports so far was a **claim gap**: the feature shipped green with zero
-claims, and a verifier with no claim about a feature is silent about it by
-construction. `gate` closes that hole on the delta:
-
-```bash
-npx testguard-cli gate --changed origin/main            # in a PR: the files changed since the base branch
-npx testguard-cli gate --changed HEAD --include-dirty   # before a commit: the working tree, staged or not
-```
-
-Every changed source file must carry a fault, resolve as a defender of a
-claim (test files), or be excused by an unexpired `path` entry in
-`testguard.ignore.json` — with a reason a reviewer will accept. One
-unclaimed file exits `1`; there is no percentage. Every reliance on an ignore
-entry is printed, so a reviewer sees *why* the gate passed; an expired entry
-excuses nothing. Non-source files and documented never-claimed patterns
-(`*.d.ts`, `*.config.*`, fixtures, mocks; `--explain` lists them) are
-excluded and said so; `--strict` fails a change that evaluated nothing.
-
-An ignore file is a list of `entries`. The field is `pattern`, and `reason` is
-not optional — it is the whole point of the mechanism:
-
-```json
-{
-  "$schema": "./node_modules/testguard-cli/spec/schemas/ignore.schema.json",
-  "schemaVersion": 1,
-  "entries": [
-    {
-      "kind": "path",
-      "pattern": "src/commands/**",
-      "reason": "Thin wrappers: read flags, call the module, print. The logic is claimed in the modules they call.",
-      "by": "maintainer",
-      "at": "2026-09-17T00:00:00Z"
-    },
-    {
-      "kind": "path",
-      "pattern": "src/legacy/billing.ts",
-      "reason": "Scheduled for deletion in Q4; claims would outlive the file.",
-      "by": "maintainer",
-      "at": "2026-09-17T00:00:00Z",
-      "expires": "2026-12-31T00:00:00Z"
-    }
-  ]
-}
-```
-
-`kind: "claim"` entries take the same shape and excuse a *removed claim*
-instead of an unclaimed file. An entry past its `expires` excuses nothing and
-is reported as `EXPIRED`.
-
-With a reference known, `status --changed <ref>` reports `unclaimed-changes`
-**before** any evidence state and makes the claim the next action; the brief
-lists the unclaimed files first. The claim is written before more code.
-After claim coverage, `status` reports `invalid-anchors` before any evidence
-state when an exact fault anchor is missing or ambiguous, and points at the
-fault definition to repair. Repair preserves the fault's meaning and requires
-a re-probe; there is deliberately no `--fix`.
-
-**The base is detected when Git records it.** An explicit `--changed` wins,
-then `TESTGUARD_CHANGED_REF`, GitHub Actions (`GITHUB_BASE_REF`) and GitLab
-merge request pipelines (`CI_MERGE_REQUEST_DIFF_BASE_SHA`, then
-`CI_MERGE_REQUEST_TARGET_BRANCH_NAME`). In an ordinary clone on a feature
-branch, bare `testguard gate` uses the configured remote's symbolic default
-branch (normally `origin/main`) and says how it chose it. If that symbolic ref
-is absent, a configured upstream is used only when its branch name differs
-from the current branch. A feature branch's same-name tracking ref and the
-default branch itself are never selected: either could produce a misleading
-empty diff. In those ambiguous cases, pass `--changed` explicitly.
-
-The base must exist locally: GitHub — `actions/checkout` with `fetch-depth: 0`;
-GitLab — the diff base sha needs nothing extra on a merge request pipeline,
-the branch name needs `GIT_DEPTH: 0` or a `git fetch origin <target>`. A
-detected base that does not resolve is a warning for `status` and `brief`
-(they keep working) and an error for `gate` (its whole job is the measurement).
-
-```yaml
-# GitHub Actions
-- uses: actions/checkout@v4
-  with: { fetch-depth: 0 }
-- uses: raccioly/testguard@v0.18.3
-  with: { command: gate }
-
-# GitLab CI — the component-shaped template: gate + probe, brief as an artifact and, opted in, as a merge-request note
-include:
-  - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.18.3/packaging/gitlab/testguard.gitlab-ci.yml'
-    inputs: { dir: backend, post_note: true }   # post_note needs TESTGUARD_GITLAB_TOKEN (api scope); one note, updated in place
-```
-
-The template carries `spec: inputs:` (`version`, `dir`, `image`, `severity`,
-`confirm`, `budget`, `no_escalate`, `strict`, `post_note`, `stage`), so
-mirrored into a GitLab project it is a catalog component that a compliance
-framework can require on every project in a group. The CLI itself never
-talks to the network; only the job posts, and only when told to.
-
-### Properties
-
-- **Deterministic measurement.** No model decides a verdict. Faults are
-  string substitutions from a reviewed file; verdicts come from the test
-  runner's structured report, confirmed N times. The same inputs give the
-  same evidence, which is what makes it replayable for an auditor.
-- **No network, no telemetry.** The CLI never opens a socket. The
-  session-start hook resolves an installed binary and never fetches one.
-  Nothing leaves the machine unless a CI job you configured posts it.
-- **Artifacts are data in the repository.** Claims, evidence, baseline and
-  brief are JSON validated against a published schema before they are
-  written. Nothing is healed, regenerated or re-targeted at run time; a
-  claims file is code, and is reviewed like code.
-- **Never optimistic.** A timeout, a load failure, a mixed N-run result, a
-  flaky defender or a missing anchor is reported as unproven, never rounded
-  toward green. The one pass is `killed`; everything else gates.
-- **Per-run and whole-command time are separate.** `--budget` limits each
-  runner invocation. `--command-budget` is a cooperative deadline for the
-  complete `probe`, `sweep`, or `replay` measurement: asynchronous children
-  receive only the remaining time, and stage/write boundaries re-check it.
-  Synchronous setup may overrun the nominal deadline, but once expiry is
-  observed TestGuard exits `2` and writes no new result document; a completed
-  prefix is not presented as though the unattempted suffix were clean.
-- **Configured discovery is evidence.** Vitest, Jest, and Playwright enumerate
-  their own configured files; TestGuard validates and hashes that immutable
-  universe instead of guessing with filename globs. Automatic JavaScript and
-  TypeScript discovery follows the imported symbol through barrels. Ambiguous
-  or unbounded resolution is `unverifiable`, never a flattering `nocover`.
-- **One exact-pinned runtime dependency** (`ajv`), Node ≥ 20, MIT.
-
-### Prior art, and what was taken from where
-
-Breaking code to test the tests is mutation testing, and it dates to the 1970s.
-Two industrial programmes solved the parts that make it usable, and this tool
-takes from both.
-
-**Google** made it affordable: mutate only *changed* lines, cap what is
-surfaced at seven per file, and order candidates by the measured productivity
-of the operator in similar context — developer feedback took their productive
-rate from 15% to 89%
-([Petrović et al., 2021](https://arxiv.org/abs/2102.11378)). `sweep`'s diff
-scope, its cap and its ordering are theirs; the productivity prior here is
-measured on real probed faults rather than assumed.
-
-**Meta** made it specific: an engineer writes a *concern* in plain text, a
-model drafts faults for it, and every step is gated by execution before a
-human ever sees it — 73% of the resulting tests were accepted
-([Foster et al., FSE 2025](https://arxiv.org/abs/2501.12862)). The rule that
-nothing a model proposes reaches the claims file without passing `probe` and a
-human keep is theirs.
-
-What neither does is bind a fault to a **stated promise**, which is what this
-tool is for. The full record — including what was deliberately *not* taken, the
-measured reason no model decides a verdict, and the gaps in what we borrowed —
-is in [`docs-canonical/PRIOR-ART.md`](docs-canonical/PRIOR-ART.md).
-
-### What TestGuard is not
+| **Get started** | [Quickstart](https://github.com/raccioly/testguard/blob/main/docs/quickstart.md) · [Installation](https://github.com/raccioly/testguard/blob/main/docs/installation.md) · [Upgrading](https://github.com/raccioly/testguard/blob/main/docs/upgrade.md) |
+| **Guides** | [Existing projects](https://github.com/raccioly/testguard/blob/main/docs/guides/existing-projects.md) · [New projects](https://github.com/raccioly/testguard/blob/main/docs/guides/new-projects.md) · [Writing claims](https://github.com/raccioly/testguard/blob/main/docs/guides/writing-claims.md) · [AI agents](https://github.com/raccioly/testguard/blob/main/docs/guides/ai-agents.md) · [Python](https://github.com/raccioly/testguard/blob/main/docs/guides/python.md) · [Monorepos](https://github.com/raccioly/testguard/blob/main/docs/guides/monorepo.md) · [Performance](https://github.com/raccioly/testguard/blob/main/docs/guides/performance.md) · [Replaying escaped bugs](https://github.com/raccioly/testguard/blob/main/docs/guides/replay.md) |
+| **CI** | [GitHub Actions](https://github.com/raccioly/testguard/blob/main/docs/guides/ci/github-actions.md) · [GitLab CI](https://github.com/raccioly/testguard/blob/main/docs/guides/ci/gitlab.md) · [pre-commit](https://github.com/raccioly/testguard/blob/main/docs/guides/ci/pre-commit.md) |
+| **Reference** | [CLI](https://github.com/raccioly/testguard/blob/main/docs/reference/cli.md) · [Languages and runners](https://github.com/raccioly/testguard/blob/main/docs/reference/languages-and-runners.md) · [Configuration](https://github.com/raccioly/testguard/blob/main/docs/reference/configuration.md) · [Verdicts](https://github.com/raccioly/testguard/blob/main/docs/reference/verdicts.md) · [Artifacts](https://github.com/raccioly/testguard/blob/main/docs/reference/artifacts.md) · [MCP](https://github.com/raccioly/testguard/blob/main/docs/reference/mcp.md) · [Gate semantics](https://github.com/raccioly/testguard/blob/main/spec/GATE-SEMANTICS.md) |
+| **Understand** | [How it works](https://github.com/raccioly/testguard/blob/main/docs/concepts/how-it-works.md) · [Glossary](https://github.com/raccioly/testguard/blob/main/docs/glossary.md) · [FAQ](https://github.com/raccioly/testguard/blob/main/docs/faq.md) · [Troubleshooting](https://github.com/raccioly/testguard/blob/main/docs/troubleshooting.md) · [Prior art](https://github.com/raccioly/testguard/blob/main/docs-canonical/PRIOR-ART.md) |
+| **Translations** | [Português (Brasil)](https://github.com/raccioly/testguard/blob/main/docs/i18n/pt-BR/README.md) · [Español](https://github.com/raccioly/testguard/blob/main/docs/i18n/es/README.md) · [简体中文](https://github.com/raccioly/testguard/blob/main/docs/i18n/zh-CN/README.md) |
+
+## What TestGuard is not
 
 - **Not a test generator.** It judges a test the agent wrote (`admit`); the
-  generating half stays with the agent, where the market is putting it.
+  generating half stays with the agent.
 - **Not a mutation-score dashboard.** No blanket mutants, no single score, no
   threshold. Faults are few and bound to stated claims; findings are ranked,
   never summed.
-- **Not a self-healing runner.** A defender that adapts itself to a change is
-  a defender that did not observe it; TestGuard reports that, it does not do
-  it.
 - **Not a coverage tool.** A line executed says nothing about whether an
-  assertion would notice. `NOCOVER` here means no test even imports the
-  file; everything above that is measured by injecting the fault.
-
-A claim that **disappeared** is invisible to all of the above: `probe`
-verifies the claims that exist, `gate` sees the source file covered by some
-other claim, and `status` says clean. Deleting a claim is therefore cheaper
-than weakening its fault — and `changedFaults` exists precisely because
-weakening was the cheap escape. So:
-
-```bash
-npx testguard-cli claims --since origin/main    # what existed there and does not now
-```
-
-`removed-claim` and `removed-fault` gate; a rename that keeps the statement
-verbatim is reported as `renamed-claim` and does not. Where evidence is
-present, the line names the verdict the claim last had, because *"it was
-SURVIVED when it was removed"* is the sentence that matters. The escape hatch
-is the same one as everywhere else: a `claim` entry in
-`testguard.ignore.json` with a reason, expiring if you give it an `expires`.
-Removal is allowed — claims can be wrong, superseded or split — and it is
-never silent.
-
-### Probing a Python project
-
-Nothing is installed into your project. TestGuard carries its own reporters and
-puts them on the interpreter's `PYTHONPATH`, so a codebase whose test
-dependencies are the standard library keeps none.
-
-```bash
-npx testguard-cli probe .                        # auto: pytest if importable, else stdlib unittest
-npx testguard-cli probe . --runner unittest      # pin the stdlib engine
-npx testguard-cli probe . --python .venv/bin/python
-```
-
-The evidence records the engine that actually ran, and `--runner pytest` fails
-rather than quietly using `unittest` — which engine ran changes what the
-evidence means.
-
-Three things behave differently from JavaScript, and each one is a place a
-naive port would have produced a confident wrong answer:
-
-- **Defenders are matched by module name**, the way Python itself matches, so
-  a test that reaches your package through `sys.path`, a `conftest.py` or an
-  installed distribution is found either way.
-- **`patch("pkg.mod.fn")` is not `vi.mock`.** It replaces one attribute, so the
-  file still detects a fault anywhere else in that module: it stays a defender
-  and carries a `target-attribute-patched` signal naming the attributes. Only a
-  patch of the module *itself* removes a defender.
-- **The fault has to be the code that ran.** A strict editable install puts an
-  import hook ahead of `sys.path`, so Python can load your original file while
-  TestGuard faults its copy — green baseline, every claim `SURVIVED`, and a
-  report that reads as a catastrophe while being entirely false. With the fault
-  applied TestGuard asks which file was really imported and **refuses the run**
-  if it came from outside the tree being probed. If no defender imported the
-  subject at all, the run continues and the record says so
-  (`detail.targetNotImported`): that is a fact about the tests' reach, not
-  about their assertions, and the two must not read alike.
-
-`testguard scaffold path/to/module.py` proposes Python faults the same way it
-does for JavaScript.
-
-### Run it from any harness
-
-The operating loop above lives in a Claude Code skill and a session-start
-hook. Both vanish the moment the harness is Cursor, Codex, Devin or whatever
-comes next — and the harness is exactly the layer most likely to change. So
-the same documents are also served over the Model Context Protocol:
-
-```bash
-npx testguard-cli mcp            # JSON-RPC 2.0 on stdio
-npx testguard-cli init --mcp     # prints the config for Claude Code, Cursor and Codex
-```
-
-Five tools, all **read-only**: `testguard_status`, `testguard_brief`,
-`testguard_claims`, `testguard_evidence`, `testguard_next_command`.
-
-**No tool runs a probe.** A probe is long-running, budgeted, and the person
-should see it happen, so `next_command` hands back the exact shell line for
-the agent to run in its own terminal. Nothing here writes a file either —
-editing a claims file through a connector would defeat the point of recording
-every fault edit. The server declares only a `tools` capability: no prompts,
-no resources, no sampling.
-
-It is hand-written against a pinned protocol version rather than built on the
-official SDK, because this tool has one exact-pinned runtime dependency and
-keeps it that way. The surface is three methods and five tools and will not
-grow; tests speak the wire format to a real child process and check each
-tool against the CLI's own `--json` output, so the two cannot drift.
-
-### Built for agents to run
-
-TestGuard is meant to be driven by an AI agent, not typed by a person. Three
-things make that safe:
-
-- **One source of truth.** `testguard status --json` computes `state` and the
-  one `next` action from the claims file, the evidence, the baseline and the
-  working tree. Every human rendering — the CLI text, the session-start
-  brief, the skill — derives from it, so they cannot disagree. Every command
-  accepts `--json`.
-- **An installable operating loop.** `testguard init [dir]` writes the
-  **agent layer at the git root**, where agent sessions run —
-  `.claude/skills/testguard/SKILL.md` (state → action, verdict → the only
-  acceptable fix, the two-gate rule for any test the agent writes), the
-  `brief --text` session-start hook, an `AGENTS.md` section — and the
-  **project layer** (`.gitignore` lines) beside the claims file. A second
-  project in the same repository adds a hook line and an `AGENTS.md`
-  bullet; `--here` keeps everything in the subdirectory. The hook
-  resolves the project's `node_modules/.bin/testguard`, then the git root's,
-  then a `testguard` on `PATH` via `command -v`, then does nothing — **no
-  `npx` in any form, so no path to the network**; a pre-0.6 `npx -y` or
-  `npx --no-install` hook is replaced. A written file that
-  `.gitignore` swallows is reported, not offered for commit. Idempotent.
-- **Independence is recorded (L3).** `probe` measures *power* — would this
-  test notice if the code were wrong. It also records, on every kill, whether
-  the killing test was last touched by the same change (or the same author) as
-  the code it guards: `detail.independence` is `co-authored`,
-  `separate-change` or `unknown`. A co-authored kill is legitimate — a fix
-  *should* ship with its regression test — but a repository where every kill
-  is co-authored has no independent verification, whatever its claim
-  verification rate says. It is a **signal**: ranking reads it, verdicts never
-  do, and `probe`, `status` and the brief all say it in one line. Nothing else in this category
-  measures it, and agents saturate the tests they can see
-  ([SpecBench](https://arxiv.org/abs/2605.21384)).
-- **Claimed surface is visible.** A clean probe is only about claims that
-  exist. `status` therefore reports claimed source modules over the current
-  module denominator, how many of the 20 highest-churn modules are claimed,
-  and the concrete unclaimed modules worth examining next over a bounded
-  200-commit window. Churn and path-risk signals stay separate; there is no
-  synthetic health score. When most modules remain unclaimed and the existing
-  evidence is clean, the next action expands the denominator instead of
-  congratulating the same small set of claims again.
-- **Gaming is visible.** The cheapest way to make a survivor disappear is to
-  weaken its fault, not to write a test. Evidence records every fault's
-  content hash; `status` lists any fault edited after it survived, with its
-  previous verdict, and makes reviewing that edit the next action. Editing a
-  claim is allowed — claims can be wrong — but it is never invisible.
-
-### Watching a probe that is still running
-
-A probe runs the defenders N times clean and N times per fault, which takes
-minutes. It used to print its stage line only when `stderr` was a terminal —
-so CI, a redirected log and an agent harness saw **nothing at all** for the
-whole run, which is indistinguishable from a hang. A gate you cannot tell
-from a hang is a gate people start killing.
-
-The rewriting is a rendering choice, not a reason to withhold the
-information:
-
-| `--progress` | What you get |
-|---|---|
-| `auto` (default) | `tty` at a terminal, `plain` everywhere else |
-| `tty` | one line, rewritten in place — for a human watching |
-| `plain` | one append-only line per stage — a log file, CI, an agent |
-| `ndjson` | one JSON object per line, stages **and** verdicts as they land |
-| `none` | silence |
-
-```bash
-npx testguard-cli probe . > probe.log 2>&1          # now reports; used to be silent
-npx testguard-cli probe . --progress ndjson 2>events.ndjson
-```
-
-```
-{"event":"stage","claim":"TG-COST-NAMES-SHARED-DEFENDERS","fault":"F1","stage":"baseline","run":1,"of":3,"at":"…"}
-{"event":"verdict","claim":"TG-COST-NAMES-SHARED-DEFENDERS","fault":"F1","verdict":"killed","severity":"medium","file":"src/probe/cost.mjs","at":"…"}
-```
-
-**Progress always goes to stderr**, so `--json` leaves stdout as one document
-and nothing else. `--quiet` and `--json` imply `none`, and an explicit
-`--progress` overrides both: an operator who asks for a stream of events has
-said what they want.
-
-### What the probe costs, and why a gate gets slow
-
-A fresh probe grows with the selected faults, confirmation count and the cost
-of their defenders. Shared baselines and valid verdict reuse avoid some repeated
-work. Roughly, the fresh work is
-
-```
-fresh baseline runs × defender-set cost
-+ Σ (fault confirmations × that fault's defender-set cost)
-+ survivor diagnostics and setup/discovery work
-```
-
-One slow acceptance test selected by several faults can therefore be executed
-many times. The symptom can be a gate that takes twenty minutes; the selected
-defender sets determine how much each fault costs. Historical attributed totals
-are reported separately from measured fresh elapsed time and runner invocations.
-
-```bash
-npx testguard-cli claims . --cost     # read back from the last probe's evidence
-npx testguard-cli probe . --cost      # what the run you just made spent
-```
-
-```
-63 fault records cost 24m across 378 defender runs.
-
-most expensive claims
-    4m 58s  TG-FAULT-EDIT-VISIBLE              1 fault  · 6 runs
-
-defender files, by the time of the runs that included them
-  (a fault runs its selected defender set at once, so these overlap and do not sum to the total)
-    24m 3s  test/probe.fixture.test.mjs                  5 claims
-
-shared defenders — each fault selects the file; durations include recorded baseline sharing
-    24m 3s  test/probe.fixture.test.mjs
-            named by TG-ESCALATION-N-RUNS/F1, TG-FAULT-EDIT-VISIBLE/F1, …
-```
-
-Every number is read back out of the `durationMs` the probe already records.
-`--cost` re-measures nothing, spawns nothing, and costs the price of reading
-one JSON file.
-
-Cost output also lists individual faults, their selected defenders and selection
-origin. Sharing is counted across distinct fault identities, including siblings
-within one claim; repeated confirmation runs alone are not sharing.
-
-**The per-file figures overlap.** A run executes a fault's whole defender set
-at once, so the runner never says how much of it belonged to which file. A
-file's `ms` is the time of every run that *included* it: an upper bound on
-what removing it could save, which is the decision you are making. Only
-`totalMs` is additive.
-
-**What to do about a shared defender.** Extract the decision it proves into a
-pure function, unit-test that, and point the claim at the unit test. This is
-not a testing trick — it is the same reason `classify()` in this codebase is
-pure. A rule you can state in three lines should not need a fifty-second
-acceptance test to falsify it. When the extraction is right the claim still
-fails on the fault; when it is wrong the claim SURVIVES, and the probe tells
-you so before you have shipped a weaker gate. Do not narrow `defendedBy` and
-assume — re-probe the claim and read the verdict.
-
-### Authoring faults mechanically
-
-Writing faults by hand means reading the code to find exact anchors. Two
-field reports found that ~80% of hand-written faults are one of nine shapes,
-so `scaffold` proposes them for you:
-
-```bash
-npx testguard-cli scaffold src/auth.ts          # → .testguard/scaffold-auth.json (a draft, never your claims file)
-npx testguard-cli scaffold src/auth.ts --claim AUTH-ADMIN   # every proposal under one claim; copies it if it exists
-npx testguard-cli scaffold src/auth.ts src/session.ts --into draft.json --claim AUTH-ADMIN --json  # read-only merged preview
-npx testguard-cli scaffold src/auth.ts src/session.ts --into draft.json --claim AUTH-ADMIN         # explicit recoverable draft update
-npx testguard-cli scaffold --from-document requirements.md --json  # read-only input metadata, no document text
-npx testguard-cli scaffold --from-fix <full-commit-ID> --json        # read-only fixed historical inventory
-```
-
-Input inspection uses exactly one `--from-document` or `--from-fix`, with no
-positional sources or other options except JSON/help/version. Fix IDs must be
-full lowercase SHA-1/SHA-256 commit IDs with exactly one parent. Plain-text
-documents are bounded to 2 MiB; local Git inspection is offline and bounded.
-Both output modes are stdout-only and say verification was not performed.
-Metadata retains historical exclusions, not private/delegated filenames.
-Input text and commit subjects are untrusted data, not instructions or an
-authenticated claim. Supply independent intended behavior, review faults and
-probe afterward; inspection does not create claims or prove coverage.
-
-Without a supplied ID or annotation, generated groups use unfinished
-`TODO-CLAIM-N` placeholders rather than module/function names. Replace them with
-intent-shaped identities when authoring; mechanical grouping does not establish
-an invariant boundary. Existing claims/evidence are never automatically renamed.
-
-`--into` requires an existing disposable draft and exactly one existing claim
-ID. It preserves supplied intent, metadata and prior faults; multiple source
-paths append in deterministic order. `--json` is a read-only preview. Without
-it, the tool keeps private recovery outside the checkout and reports updated
-or unchanged **unproven** draft status. Review and probe are still required.
-Canonical claims/evidence/baseline paths, unsafe aliases and conflicting options
-are refused; partial writes never become success or trigger automatic rollback.
-Limits: 32 sources, 2 MiB per input/output draft or source, 16 MiB source total,
-4096 generated proposals. These limits are not a performance guarantee.
-
-| Shape | What it proposes |
-|---|---|
-| `condition-forced` | `if (<guard>) {` → `if (false) {` — a guard is a `!…` condition or one whose body returns, throws or 4xx-es |
-| `statement-deleted` | a single-line guard (`if (…) return …;`) or a state change (`x = …;`) removed |
-| `return-altered` | `return <check>;` (`===`, `.includes(`, `&&`, …) → `return true;` |
-| `literal-changed` | `httpOnly`/`secure` flipped, `sameSite` → `none`, a cost/rounds → `1`, a ttl/tolerance/window/limit ×1000 |
-| `call-removed` | a bare `verify…()` / `validate…()` / `check…()` / `authorize…()` call removed |
-| `field-dropped` | a field removed from an object that is returned, built by an arrow, assigned to a payload-ish name, passed to a `save`/`update`/`send`/`write`/… call, or is a `z.object({…})`-style schema; a string entry removed from an allow-list array; a `...base,` line or inline `{ ...base, … }` merge dropped. Only a line that can go on its own (balanced, comma-terminated or followed by the closer); never inside tests, fixtures or migrations |
-| `argument-swapped` | a call kept, its first argument swapped for `undefined` (and `{}` when the argument is itself a call) — only when that argument is derived from a parameter of the enclosing function or a request-like value (`req`, `ctx`, `event`, …). The seam fault: `decide(deriveFrom(input), now)` → `decide(undefined, now)` |
-| `element-removed` | a one-line JSX element — self-closing (`<Toggle … />`) or paired (`<button …>Save</button>`) — removed; the UI shape behind "the toggle is invisible", killable by a browser-layer defender |
-| `handler-dropped` | an `on<Event>={…}` prop removed, whether it is its own line or inline in the tag; the control renders and does nothing |
-
-The table above is JavaScript. `scaffold` reads Python too, and proposes the
-same fault classes in Python syntax: `if <guard>:` → `if False:`,
-`return <check>` → `return True`, `verify=True` → `verify=False`, a
-parameter-derived argument swapped for `None`, a key dropped from a payload
-`dict` or an allow-list. Three differences are deliberate. A statement is
-removed by replacing it with `pass`, never by deleting the line, because a
-block whose only statement is gone is an `IndentationError`; and a line that
-leaves a bracket open (`COLOURS = {`), or sits inside one opened on an earlier
-line (`help="…"` in an `add_argument(`), is never removed at all. Both exist
-because a fault that cannot compile is a `fault-invalid` verdict — a probe run
-spent saying nothing about the tests. Third, a **module-level dunder
-assignment** (`__version__`, `__all__`, `__author__`) is not proposed. Deleting
-one does change behaviour, so it is not an equivalent mutant; it is something
-nobody writes a test for, which is the disqualification an icon already gets on
-the JSX side — a survivor there teaches the survival-learned ordering to prefer
-a barren class. The rule is narrow on purpose: a module-level *constant*
-(`DEFAULT_MAX_SIZE = 100`) is still proposed, because removing a real default
-changes a real default. The two JSX shapes (`element-removed`,
-`handler-dropped`) have no Python meaning and are absent rather than faked.
-
-Every proposal's `find` is the exact line with `expectHits`/`occurrence`
-computed from the file, so it is verifiable by construction; provenance is
-`producer: derived`; `defendedBy` is prefilled from the tests that import
-the module; proposals are grouped under a preceding `@claim <ID>` annotation
-or by enclosing function. Statements are `TODO:` placeholders — a proposal
-becomes a claim only when a human states what it defends. Deterministic
-heuristics, no AST, no LLM; a proposal the tool cannot anchor is never
-emitted.
-
-**Commit `.testguard/baseline.json`; ignore `evidence.json` and `brief.json`.**
-The baseline is the frozen contract; the other two are regenerated per run.
-
-The fault model is the auditable artifact. You never reach 100% of
-correctness; you reach **100% of stated claims verified**, and the statement
-of claims is what an assessor reads. A claims file is code — its `replace`
-strings run under your test runner — so review it like code.
+  assertion would notice. `NOCOVER` here means no test even imports the file.
+- **Not a network client.** The CLI never opens a socket and collects no
+  telemetry. One exact-pinned runtime dependency (`ajv`), Node ≥ 20, MIT.
 
 ## Try it
 
 The repository ships a known-answer fixture with a real blind spot:
 
 ```bash
-git clone <this repo> && cd testguard && npm install
+git clone https://github.com/raccioly/testguard && cd testguard && npm install
 npm test                                  # includes probing the fixture end to end
 ```
 
 `fixtures/known-answer/` is a tiny project whose audit-row test asserts with
 `expect.objectContaining({...})` and omits the `content` key. Swap the
 redacted text for the raw input and the test stays green. `probe` reports it
-as `SURVIVED`; the fixture's [README](fixtures/known-answer/README.md) walks
-through every verdict.
-
-The same blind spot, in Python, is
-[`fixtures/known-answer-python/`](fixtures/known-answer-python/README.md) —
-run under **both** stdlib `unittest` and `pytest`, which have different report
-shapes and different notions of failure and must still agree on all sixteen
-verdicts.
+as `SURVIVED`; the fixture's [README](https://github.com/raccioly/testguard/blob/main/fixtures/known-answer/README.md)
+walks through every verdict. The same blind spot in Python is
+[`fixtures/known-answer-python/`](https://github.com/raccioly/testguard/blob/main/fixtures/known-answer-python/README.md),
+run under both stdlib `unittest` and `pytest`, which must agree on every
+verdict.
 
 ## Status
 
-Origin summaries are informational: status counts current declared claim
-origins even when evidence is stale; probe evidence and briefs count recorded
-origins across all records before filtering or truncation. Distinct claims and
-records have separate totals; conflicting recorded kinds or references count
-as mixed claims. Labels such as `spec`, `bug` or `incident` do not authenticate
-independence and never waive a failed measurement or change default gates.
-References remain opaque and are not echoed in these summaries. Older strict
-readers reject these additive fields; use the matching candidate reader for
-unreleased formats. The candidate `probe --require-origin spec,adr,bug,incident`
-option selects declared kinds for a complete confirmed current-project probe.
-Repeat the option or use comma-separated kinds; partial, provisional, explicit
-historical and ignore-dirty combinations are refused. Failed policy exits 1
-even when baseline debt or a severity floor hides ordinary findings; unavailable
-current bindings exit 2. The command rechecks native runner/configuration
-membership, current claims, targets, defenders and discovery dependencies before
-publishing. Custom/static runner universes cannot certify this boundary. This is
-a declaration check, not authenticated independence or an atomic disk snapshot.
-Offline status recomputes a current-declaration audit using the recorded eligible
-selection, always marking native freshness unavailable without launching a
-runner. It does not implicitly activate a new gate or replace status's next
-action. Briefs preserve the recorded-run policy before caps and baseline
-filtering, explicitly not current freshness. A zero-item cap never turns
-survivors into an all-defended message.
+Thirteen commands (`status`, `init`, `claims`, `probe`, `admit`, `baseline`,
+`brief`, `gate`, `scaffold`, `sweep`, `concerns`, `replay`, `mcp`). Runners
+for vitest, jest, Playwright, Node's built-in test runner, pytest and stdlib
+`unittest`, plus `--runner-cmd` for anything that writes a jest-compatible
+report. Hand-authored faults and a mechanical scaffold for JavaScript,
+TypeScript and Python. The contract is fourteen JSON Schemas under
+[`spec/`](https://github.com/raccioly/testguard/blob/main/spec/README.md),
+shared with the other Guard tools. Every release is in the
+[changelog](https://github.com/raccioly/testguard/blob/main/CHANGELOG.md).
 
-**v0.5.** Eleven commands (`status`, `init`, `claims`, `probe`, `admit`,
-`replay`, `baseline`, `brief`, `gate`, `scaffold`, `sweep`, `mcp`), vitest, jest,
-Playwright and Python (pytest / stdlib unittest) runners, hand-authored faults
-plus a mechanical scaffold for JavaScript and Python, an agent operating layer
-(`status`, `init`) and a change gate (`gate`). The contract spine — eight JSON
-Schemas shared with the other Guard tools — is under [`spec/`](spec/). One
-exact-pinned runtime dependency (`ajv`, for schema validation); Node ≥ 20, and
-Python ≥ 3.8 only when probing Python.
-
-Not yet: test generation (the acceptance half, `admit`, exists; the generating
-half stays the agent's), runners beyond those four, AST-aware producers, and
-the transfer of a calibration between repositories — `replay` measures it now;
+Not yet: test generation (the acceptance half, `admit`, exists; the
+generating half stays the agent's), AST-aware producers, and the transfer of
+a calibration between repositories. `replay` measures that transfer now;
 whether it carries to a repository with no history is unproven. Each is
 designed for; none is claimed.
 
-### Keeping developer machines responsive
+## Contributing
 
-Built-in probe, sweep, replay and admission runners default to one worker. Use
-`--workers 2` for a larger Vitest/Jest/Playwright worker ceiling; `--serial` always
-uses one. Python remains serial. Faults and mixed-runner groups run sequentially.
-Custom `--runner-cmd` commands, browser subprocesses, native library threads and
-test-created processes are not an OS resource sandbox. The regression suite also
-caps outer workers at two, or one when fewer than three CPUs are available
-in an interactive run; dedicated CI uses at most two because its acceptance tests start nested runners.
-
-`--budget` bounds each runner invocation; `--command-budget` bounds a complete
-command cooperatively and refuses partial result publication. Cancellation kills
-owned runners before restoring mutations and removing scratch worktrees. Already
-reparented daemons remain outside the portable cleanup guarantee. No runner output
-limit can count as an assertion failure or detection.
-
-New probe evidence includes actual elapsed time, unique fresh runner time and
-setup/discovery/other overhead. `probe --cost` and `claims --cost` display this
-separately from historical attributed record costs. Existing cost ceilings are
-unchanged; old evidence does not supply a measured breakdown.
-
-Playwright confirmations run the same project-resolved CLI used for discovery,
-avoiding an npm subprocess per run. Python projects whose configuration requires
-pytest-xdist must support serial execution; an incompatible configuration remains
-unproven rather than bypassing the worker policy.
+Bug reports, field reports and documentation fixes are welcome. Read
+[CONTRIBUTING.md](https://github.com/raccioly/testguard/blob/main/CONTRIBUTING.md)
+and [AGENTS.md](https://github.com/raccioly/testguard/blob/main/AGENTS.md)
+first; for help, see [SUPPORT.md](https://github.com/raccioly/testguard/blob/main/SUPPORT.md),
+and report vulnerabilities privately per
+[SECURITY.md](https://github.com/raccioly/testguard/blob/main/SECURITY.md).
 
 ## Licence
 

@@ -9,7 +9,65 @@ TestGuard injects the faults a project's claims forbid and reports every one
 the tests fail to detect. It is a **claim verifier**, not a test generator.
 You operate it through one loop and one source of truth.
 
+## Update advice (once per session, never an automatic install)
+
+Before the operating loop, identify the CLI you will actually run: prefer the
+project's installed `node_modules/.bin/testguard`, then the repository-root
+install for a nested project, then `testguard` on PATH. Run that exact CLI with
+`--version`, and use the same executable for verification. Do not use `npx` to
+discover a version: it can fetch or install a different tool. When developing
+TestGuard itself, use `node cli/testguard.mjs`; do not replace a source checkout
+with a published version to make validation pass.
+
+If the user's network policy permits registry access, make one bounded,
+read-only check per session (not per command or project):
+
+```bash
+npm view testguard-cli dist-tags.latest --json --fetch-retries=0 --fetch-timeout=5000
+```
+
+Compare valid stable versions by numeric SemVer major, minor, then patch, not
+lexicographically and not merely for inequality. Do not recommend a downgrade
+or replacing a prerelease/development checkout. If the registry result is
+missing, malformed, unavailable, or network access is prohibited, continue the
+operating loop without claiming the installation is up to date. No retries or
+repeated prompts after the user declines within this session.
+
+For a newer stable version, say: "Using TestGuard X from <resolved executable>;
+Y is available. Would you like to update?" Respect project pins, compatibility,
+company policy and the original package manager; a registry's `latest` tag is
+not proof that an upgrade is safe. Never install automatically, modify a
+lockfile or CI pin, or switch between local and global installs without approval.
+After an approved update, verify the same executable's version again.
+
+Keep this advice in the AI conversation, separate from CLI JSON, evidence,
+verdicts and exit codes. The CLI and session-start hook remain offline; the AI
+performs this optional check, not TestGuard. Instructions cannot guarantee that
+every AI checks for updates.
+
+Package upgrades do not refresh an existing copied skill. Preserve customized
+instructions: compare this file with the upgraded package's
+`src/init/templates/SKILL.md` and merge approved changes. Use `testguard init
+--force` only with explicit permission to replace the whole skill; review the
+diff afterward. An ordinary `init` preserves existing skills and managed
+sections already listing this project.
+
 ## The one source of truth
+
+Missing source-link advisories in claims/status never replace `next`, change
+verdicts or prove intent. Exact anchors remain checked without annotations.
+Origin summaries are likewise informational: status counts current declared
+claims; evidence/briefs count recorded declarations and records, including
+mixed sources. Source kinds are not authenticated independence. Never use an
+origin label to waive a survivor.
+Optional source links: `testguard claims --annotate --claim <ID>` is a read-only
+file-header preview. Only with explicit permission to edit source, rerun with
+`--apply`; each invocation recomputes its plan. Review refusals and partial
+failures, and retain the reported private recovery originals. Never automatically
+remove an existing lock or roll back over user edits. Placement is file-level,
+not symbol ownership, verified behavior or authenticated intent. Missing links
+do not disable exact fault-anchor checks. Authoring never replaces the status
+operating loop or writes canonical claims/evidence/baselines.
 
 ```bash
 testguard status --json
@@ -20,7 +78,8 @@ which files exist. `state` is one of:
 
 | state | meaning | you do |
 |---|---|---|
-| `no-claims` | no `testguard.claims.json` | `testguard scaffold <file>` for a file with guards; replace every `TODO:` statement with what the code guarantees; keep or drop each proposal; move the claims into `testguard.claims.json` |
+| `no-claims` | missing or empty `testguard.claims.json` | `testguard scaffold <file>` for a file with guards; replace every `TODO:` statement with the intended guarantee from a spec, ticket, or past bug; keep or drop each proposal; move the claims into `testguard.claims.json` |
+| `unclaimed-changes` | files you changed carry no claim (when a reference is explicit, supplied by CI, or safely inferred from local Git's remote default/upstream metadata) | `next.file` names the first; `testguard scaffold <file>` and state the claim, or add a `testguard.ignore.json` path entry with a reason a reviewer will accept. **Before** writing more code. |
 | `invalid-anchors` | an exact fault anchor moved or became ambiguous | run `testguard claims --check-anchors`; repair `next.target` in the claims file without changing what the fault means, then re-probe. Never guess or auto-fix an anchor. |
 | `unprobed` | claims never probed | `testguard probe` |
 | `evidence-stale` | code, tests or claims changed since the evidence | `testguard probe --include-dirty` (or `--claim <ID>` for one) |
@@ -28,7 +87,39 @@ which files exist. `state` is one of:
 | `unproven` | a finding is not covered by the baseline | `next.target` names it; see the verdict table |
 | `clean` | everything killed or baselined | `testguard baseline` if `next` says so; otherwise nothing |
 
-Exit codes: `0` clean · `1` unproven claims (or drift) · `2` precondition failed / nothing to do yet · `3` usage.
+Exit codes: `0` clean · `1` unproven claims (or drift, or unclaimed changes) · `2` precondition failed / nothing to do yet · `3` usage.
+
+## Every change needs a claim
+
+Scaffold proposes mechanical faults, not intended behavior. New drafts declare
+`source.kind: inferred` even when grouped by an annotation. Before adopting a
+draft, ask for the intended observable behavior from a requirement, ADR, bug or
+incident independently of the implementation: inputs, expected outcome and
+forbidden outcome. Record the supplied source kind/ref; when unavailable, keep
+inferred and say the intent remains unestablished. Do not promote origin because
+an annotation exists or tests pass. References are opaque, not authenticated;
+verification commands never fetch them. Preserve existing supplied metadata.
+Review each proposal against that intent, then probe. Do not paraphrase the code
+and call that independent intent, or automatically move drafts into canonical
+claims.
+
+`probe` verifies only the claims that exist; it is silent about unclaimed
+code by construction. So, for every source file you create or change:
+
+1. `testguard gate --changed HEAD --include-dirty` (the pre-commit shape; in a
+   PR, `--changed origin/<base>`). One unclaimed file exits `1`.
+2. For each `UNCLAIMED` file: `testguard scaffold <file>` proposes faults;
+   state what the code guarantees; add the claim, its faults and its
+   `defendedBy` to `testguard.claims.json`. A new test file must be named in
+   some claim's `defendedBy`, or it is unclaimed too.
+3. Only when a file genuinely carries nothing to claim (generated code, a
+   thin wrapper whose logic is claimed elsewhere): a `path` entry in
+   `testguard.ignore.json` with a reason and, where possible, an `expires`.
+   The gate prints every entry it relied on; a reviewer reads them.
+4. After editing guarded code, run `testguard claims --check-anchors`. Repair
+   any named fault definition without weakening its meaning; the check never
+   relocates an anchor for you.
+5. Then `testguard admit <test-file> --claim <ID>` for the new claim's test (or `testguard probe --claim <ID> --include-dirty` for the full report).
 
 ## Verdict → action
 
@@ -44,12 +135,18 @@ Exit codes: `0` clean · `1` unproven claims (or drift) · `2` precondition fail
 
 ## The fix loop
 
+For independently supplied intent in an existing disposable draft, use
+`testguard scaffold <source...> --into <draft.json> --claim <existing-ID> --json`
+to preview appended faults without writes. Omit `--json` only when explicitly
+authorized to update that draft; private recovery is retained. Never use a
+canonical claims/evidence/baseline path. Preserve intended behavior and declared
+origin; generated faults are not independent intent or verification. Review the
+faults and probe the selected draft before promoting it to canonical claims.
+
 1. `testguard status --json` → take `next.target`.
-   After editing guarded code, run `testguard claims --check-anchors` before
-   any probe; repair a named fault definition without weakening its meaning.
 2. Write the test. It must **fail when the fault is applied and pass on HEAD**. To check the first half by hand: apply `find` → `replace` in the target file, run the defender, restore.
-3. `testguard probe --claim <ID> --include-dirty` — probes your uncommitted test without touching the tree. `--confirm 1` gives a fast **provisional** signal; a `?` on a verdict means unconfirmed.
-4. When it is `killed` at `--confirm 3`, commit the test.
+3. `testguard admit <test-file> --claim <ID>` — the two gates as one verb, on your uncommitted test, without touching the tree: `ADMITTED` (exit 0) means the test is green on HEAD and fails on every fault of the claim, 3/3; `NOT ADMITTED` (exit 1) names the first blocking fault and what to do. `--fault <FID>` judges one fault; `--confirm 1` gives a fast **provisional** `ADMITTED?` that must be confirmed at 3 before you commit. (`testguard probe --claim <ID> --include-dirty` is the same run with the full report.)
+4. When it is `ADMITTED` at `--confirm 3`, commit the test.
 5. When everything is killed or baselined, `testguard baseline` if `next` says so, and commit `.testguard/baseline.json`.
 
 ## Rules that are not yours to bend

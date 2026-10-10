@@ -20,7 +20,7 @@ Node ≥ 20. Python ≥ 3.8 only if you touch `testguard_cli/`.
 
 | Path | What lives there |
 |---|---|
-| `spec/schemas/` | the six shared formats (JSON Schema 2020-12). **The contract.** |
+| `spec/schemas/` | the fourteen shared formats (JSON Schema 2020-12). **The contract.** |
 | `spec/lib/` | the validator and the one fingerprint implementation |
 | `spec/conformance/` | one valid example per kind; must-reject documents named for their defect |
 | `src/probe/` | worktree isolation, injector, runner adapter, classifier, ranker, orchestrator |
@@ -28,6 +28,8 @@ Node ≥ 20. Python ≥ 3.8 only if you touch `testguard_cli/`.
 | `src/commands/`, `src/cli.mjs`, `cli/` | argument parsing and dispatch |
 | `fixtures/known-answer/` | the oracle: a project with a known verdict for every value in the verdict set |
 | `testguard.claims.json` | TestGuard's claims about itself, probed in CI |
+| `docs/` | user documentation; `test/docs.test.mjs` checks it against the code |
+| `docs-canonical/` | design intent (architecture, requirements, security), validated by DocGuard |
 
 ## Rules that are not negotiable
 
@@ -64,6 +66,39 @@ edited to match the tool's output proves nothing.
 `npm run self:probe`. If it survives, **write the test first** — that is the
 two-gate rule applied to ourselves: the new test must pass on HEAD and fail
 on the fault.
+
+## Changing documentation
+
+User documentation lives in [`docs/`](docs/README.md). The README is the
+front page, and every fact has one home page; other pages link to it rather
+than repeat it.
+
+- **A user-visible change updates its reference page in the same PR.** A new
+  command needs a `## <command>` section in `docs/reference/cli.md`, a new
+  runner needs a row in `docs/reference/languages-and-runners.md`, and a new
+  verdict, status state, schema, Action input or GitLab input needs its own
+  page entry. `test/docs.test.mjs` derives each of those sets from the code
+  and fails when a page is missing a member. It also fails on a broken
+  relative link or heading anchor.
+- **Version pins** (`raccioly/testguard@vX.Y.Z`, the GitLab include URL, a
+  pre-commit `rev:`) belong only in the pages listed as `DOC_SURFACES` in
+  `.github/scripts/sync-release-version.mjs`, which rewrites them on every
+  release. A pin anywhere else fails `test/release-version.test.mjs`. A new
+  pinned page also needs adding to `RELEASE_SURFACES` in
+  `.github/workflows/auto-merge.yml`.
+- **README links into `docs/` are absolute** (`https://github.com/raccioly/testguard/blob/main/docs/…`).
+  npm and PyPI render the README without the `docs/` directory.
+- **Show real output.** Run the command against a fixture and paste what it
+  printed, shortened with `…` if needed. Never write output by hand.
+- **Translations** live in `docs/i18n/<lang>/` and cover the README and the
+  quickstart. They open with a banner naming the English page and the release
+  they were translated from, keep the English heading structure, and copy
+  every fenced code block byte for byte — `test/docs.test.mjs` checks all
+  three. When you change a code block in the README or quickstart, change the
+  translations' copy of it in the same PR; prose may lag, commands may not.
+- **No session-start hook example may contain `npx`**; copy what
+  `hookCommand()` emits. `test/init.test.mjs` checks the README and the
+  canonical security document for this.
 
 ## Pull requests
 
