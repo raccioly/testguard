@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- GitHub Action: inputs reach the run step as environment variables instead of being pasted into the script, so a value containing quotes or `$(…)` is no longer executed as shell.
+- The `pip` wrapper's `npx` fallback runs the CLI version matching the installed wheel instead of `@latest`, and refuses rather than run an unpinned CLI when it cannot read its own version.
+
+### Fixed
+
+- **Verdict reuse:**
+  - A changed `--runner-cmd` invalidates reuse: the custom-command test universe hash binds the parsed command (only the hash is recorded, never the command).
+  - Reuse requires the same recorded runner (name, version, source).
+  - A record whose defenders failed to load is never reused, so fixing a broken environment always re-measures.
+- `run.runner.source` is recorded for every resolved runner (`project`, `path`, `builtin`), not only for `node-test`. Origin-policy freshness compares it too.
+- **Input errors no longer crash.** Each of these used to print "this is a bug in testguard" with a stack trace; now:
+  - A malformed `--runner-cmd` is a usage error (exit 3) on `probe`, `admit`, `sweep` and `replay`.
+  - `init --ci-evidence <anything but github|gitlab>` is a usage error (exit 3). It is checked before anything is written; it used to fail after installing the agent layer.
+  - An unparseable or wrongly shaped `.claude/settings.json` makes `init` exit 2, naming the file and the JSON error, with nothing written.
+  - A `testguard.concerns.json` that is not valid JSON or does not conform makes `concerns` and `sweep` exit 2, naming the file and the error. `sweep` used to aim at nothing and pass.
+- **`--python`:**
+  - A bare name such as `python3` is looked up on `PATH` instead of being resolved to `<cwd>/python3`. The same applies to `TESTGUARD_PYTHON` and `claims --check-anchors`.
+  - `admit`, `sweep` and `replay` now honour `--python`.
+- `baseline --json` prints a status document that validates. The `baseline` result is part of `status.schema.json` and is checked before printing.
+- **`init`:**
+  - It ignores `.testguard/sweep.json` and `.testguard/sweep-evidence.json`.
+  - Re-running it adds only missing lines inside the existing block, and nothing to a `.gitignore` that uses `.testguard/*`.
+  - Re-running it replaces any earlier TestGuard session-start hook in place, for the root and for subdirectory projects, and removes duplicates. A changed hook command no longer adds a second hook.
+- **`fetch-ci-evidence.sh`:**
+  - It finds the CLI the way the hook does (project, repo root, `PATH`) and works from any directory.
+  - It reads the evidence the Action and the GitLab template actually upload, including `<dir>/.testguard/evidence.json` for subdirectory projects.
+  - It never reads a leftover download.
+- The brief labels a CLI run from the npx, pnpm dlx or bunx cache as such, not as "local install".
+- **GitLab template:**
+  - Artifact paths include the `dir` input, so a project in a subdirectory keeps its gate, evidence and brief artifacts. The provisional evidence file is kept too.
+  - The install step no longer fails a project without an npm lockfile or a `package.json`.
+  - `GIT_DEPTH` and the template's variables are scoped to its own jobs instead of the whole pipeline.
+  - The header comment counts its jobs correctly.
+- GitHub Action: the `evidence` output names the file the run actually wrote (`evidence.json` or `evidence-provisional.json`), or is empty when nothing was written.
+- `gate --explain` lists `.py` among source extensions; the text is built from the gate's own list.
+- `probe --cost` rounds sub-second durations. The probe summary prints the baseline sentence on its own line.
+- **Contention warning:** it no longer tells an already-serial run to pass `--serial`. It advises waiting, lowering `--workers`, or the command's own concurrency, as fits the run.
+- **Help text:**
+  - `--json` is no longer promised to `mcp`.
+  - `replay` no longer shows sweep's shape lines, and shows the `--max` default and the `--changed` alias.
+  - `admit`, `sweep` and `replay` list `--runner`, `--runner-cmd`, `--node-modules` and `--python`.
+  - `--python` and `--serial` describe what they actually do.
+- `fixtures/known-answer-python/README.md` shows UNREACHED-001 as unverifiable (subject-not-executed), matching `expected.json`.
+
+### Changed
+
+- `replay --calibration-out <path>` chooses where the calibration is written. The undocumented `replay --baseline` now exits 3 and names the new flag.
+- **`testguard.ignore.json`:**
+  - It no longer accepts `kind: "fingerprint"`, which nothing ever read; use a baseline.
+  - `claim` and `fault` patterns must be exact identities (`<claimId>`, `<claimId>/<faultId>`); a bare claim ID used to excuse a whole removed claim through a `fault` entry.
+  - `GATE-SEMANTICS.md` states that no ignore entry removes anything from a probe.
+- Schema errors on a closed list name the allowed values.
+- **GitLab template inputs are typed:**
+  - `no_escalate`, `strict` and `post_note` are `boolean`; `confirm` and `budget` are `number`.
+  - `severity` and `runner` declare their allowed values.
+  - Write switches unquoted (`post_note: true`).
+- The `runner` input descriptions in `action.yml` and the GitLab template list `node-test`.
+
 ### Documentation
 
 - A `docs/` tree replaces the README-as-manual. It has a quickstart, installation for every channel, and an upgrade guide. Guides cover adopting TestGuard in an existing project, new projects, writing claims, AI agents, Python, monorepos, performance, replay, GitHub Actions, GitLab CI and pre-commit. Reference pages cover the CLI, languages and runners, configuration, verdicts, artifacts and MCP. There are also concepts, troubleshooting, FAQ and glossary pages. The README is now the front page and links into it with absolute URLs, so the links also work on npm and PyPI.

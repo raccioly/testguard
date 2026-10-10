@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "kind": "fingerprint",
+      "pattern": "01876384493be6809da455cb1a1c4bc92e7564e9898506d790b9589200502163",
+      "reason": "A known survivor accepted for now; this would suppress a finding outside the baseline."
+    }
+  ]
+}

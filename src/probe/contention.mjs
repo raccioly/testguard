@@ -90,8 +90,19 @@ export function detectContention({ self = process.pid, alive = defaultAlive, ...
   return { detected: runners.length > 0, runners };
 }
 
-/** One line for the operator: what is running, and what it costs. */
-export const contentionWarning = (c) =>
+/**
+ * What would actually change this run. `--serial` is the same as `--workers 1`,
+ * which is the default, so advising it to a run that is already serial offers
+ * a flag that changes nothing; a custom command's concurrency is its own.
+ */
+function contentionAdvice({ serial = true, workers = 1, custom = false }) {
+  if (custom) return 'Wait for it to finish; a --runner-cmd manages its own concurrency, so make that command run one test file at a time if it does not already.';
+  if (serial || workers <= 1) return 'Wait for it to finish: this probe already runs one test file at a time (--workers 1), so --serial would change nothing.';
+  return `Wait for it to finish, or lower --workers ${workers} (or pass --serial) to run one test file at a time.`;
+}
+
+/** One line for the operator: what is running, what it costs, and what would help. */
+export const contentionWarning = (c, policy = {}) =>
   `${c.runners.length} test runner${c.runners.length === 1 ? ' is' : 's are'} already running (${c.runners.map((r) => `pid ${r.pid}`).join(', ')}); ` +
   'defenders run N times each here, and a suite that times out under parallel load yields TIMEOUT or FLAKY-DEFENDER — verdicts about the load, not the claim. ' +
-  'Wait for it to finish, or pass --serial to run one test file at a time.';
+  contentionAdvice(policy);

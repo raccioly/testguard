@@ -4,6 +4,7 @@ import { readSpecDoc, writeSpecDoc } from '../evidence/writer.mjs';
 import { buildBaseline, restampBaseline } from '../baseline/baseline.mjs';
 import { evidencePath, baselinePath } from './probe.mjs';
 import { computeStatus } from '../status/status.mjs';
+import { validate } from '../../spec/lib/validate.mjs';
 import { isGitIgnored, GITIGNORE_LINES, COMMITTED_OUTPUTS } from '../init/init.mjs';
 
 /**
@@ -18,6 +19,19 @@ import { isGitIgnored, GITIGNORE_LINES, COMMITTED_OUTPUTS } from '../init/init.m
  */
 function unignoredOutputs(projectDir) {
   return GITIGNORE_LINES.filter((l) => !isGitIgnored(projectDir, l.replace('*', 'x')));
+}
+
+/**
+ * The status document plus what this invocation wrote, validated before it is
+ * printed — the same contract `probe --json` keeps for its `run`. A JSON mode
+ * whose output its own schema refuses is a parser failure handed to every
+ * integration that trusted the exit code.
+ */
+function statusWith(projectDir, version, baseline) {
+  const doc = { ...computeStatus({ projectDir, toolVersion: version }), baseline };
+  const result = validate('status', doc);
+  if (!result.ok) throw new Error(`baseline JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
+  return JSON.stringify(doc, null, 2);
 }
 
 export async function baselineCommand({ projectDir, values, version }, io) {
@@ -43,14 +57,14 @@ export async function baselineCommand({ projectDir, values, version }, io) {
       return 2;
     }
     writeSpecDoc('baseline', outPath, r.baseline);
-    io.out(values.json ? JSON.stringify({ ...computeStatus({ projectDir, toolVersion: version }), baseline: { path: outPath, restamped: r.baseline.head } }, null, 2) : `baseline: re-stamped to ${r.baseline.head.slice(0, 12)} (same fingerprints, clean tree) → ${outPath}`);
+    io.out(values.json ? statusWith(projectDir, version, { path: outPath, restamped: r.baseline.head }) : `baseline: re-stamped to ${r.baseline.head.slice(0, 12)} (same fingerprints, clean tree) → ${outPath}`);
     return 0;
   }
   const baseline = buildBaseline(evidence);
   writeSpecDoc('baseline', outPath, baseline);
   const n = Object.values(baseline.fingerprints).reduce((a, b) => a + b, 0);
   if (values.json) {
-    io.out(JSON.stringify({ ...computeStatus({ projectDir, toolVersion: version }), baseline: { path: outPath, frozen: n } }, null, 2));
+    io.out(statusWith(projectDir, version, { path: outPath, frozen: n }));
     return 0;
   }
   io.out(`baseline: ${n} unproven finding${n === 1 ? '' : 's'} frozen at ${baseline.head.slice(0, 12)}${baseline.snapshot ? ` (working-tree snapshot ${baseline.snapshot.slice(0, 7)}; after you commit, a clean probe + \`baseline --restamp\` moves head to that commit)` : baseline.dirty ? ' (working tree was dirty)' : ''}${evidence.run.provisional ? ' — FROM PROVISIONAL EVIDENCE (--allow-provisional)' : ''} → ${outPath}`);

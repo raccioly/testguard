@@ -39,7 +39,7 @@ npx testguard init            # writes the agent layer at the git root
 + .claude/skills/testguard/SKILL.md
 + .claude/settings.json: SessionStart hook → brief --text (local install first, then a testguard on PATH, never a fetch)
 + AGENTS.md created with the TestGuard section
-+ .gitignore: 10 lines added
++ .gitignore: 12 lines added
 ```
 
 It does not create a claims file, change your tests or touch source code. If

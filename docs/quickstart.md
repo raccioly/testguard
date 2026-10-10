@@ -100,7 +100,7 @@ npx testguard-cli init          # the agent layer and the .gitignore lines
 + .claude/skills/testguard/SKILL.md
 + .claude/settings.json: SessionStart hook → brief --text (local install first, then a testguard on PATH, never a fetch)
 + AGENTS.md created with the TestGuard section
-+ .gitignore: 10 lines added
++ .gitignore: 12 lines added
 
 Agents now start with the blind-spot brief and can run `testguard status --json` to learn what to do next. The hook prefers a local install and never fetches from the network.
 Commit these files.

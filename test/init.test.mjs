@@ -4,10 +4,12 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, realpathSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { initProject, hookCommand } from '../src/init/init.mjs';
-import { USAGE } from '../src/cli.mjs';
+import { initProject, hookCommand, GITIGNORE_LINES, COMMITTED_OUTPUTS, CI_DOWNLOAD_DIR, InitUsageError } from '../src/init/init.mjs';
+import { USAGE, main } from '../src/cli.mjs';
+import { sweepPath, sweepEvidencePath } from '../src/commands/sweep.mjs';
+import { gatePath } from '../src/commands/gate.mjs';
 
 const gitInit = (dir) => { const g = (...a) => spawnSync('git', ['-c', 'user.email=i@example.invalid', '-c', 'user.name=i', ...a], { cwd: dir }); g('init', '-q'); };
 

@@ -49,7 +49,7 @@ try {
   const emptyStatus = JSON.parse(run(bin, ['probe', emptyProject, '--allow-empty', '--json'], consumer));
   if (emptyStatus.state !== 'no-claims' || emptyStatus.run || existsSync(join(emptyProject, '.testguard', 'evidence.json'))) throw new Error('installed empty-adoption probe invented verification evidence');
   const replayHelp = run(bin, ['replay', '--help'], consumer);
-  if (!replayHelp.includes('--since') || replayHelp.includes('--node-modules')) throw new Error('installed command help is not command-specific');
+  if (!replayHelp.includes('--since') || replayHelp.includes('--allow-empty')) throw new Error('installed command help is not command-specific');
   writeFileSync(join(emptyProject, 'vite.config.mjs'), "export default { base: '/', plugins: [{ configureServer(s) { s.middlewares.use('/__rooms', () => {}); const parts = '/__room'.split('/'); } }] };\n");
   const installedDiscovery = join(consumer, 'node_modules', 'testguard-cli', 'src', 'probe', 'runners', 'discovery.mjs');
   run(process.execPath, ['--input-type=module', '-e',

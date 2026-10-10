@@ -268,3 +268,22 @@ describe('the per-claim ceiling — what the total absorbs silently', () => {
     expect(budget.seconds).toBeGreaterThan(budget.measuredInCI.seconds);
   });
 });
+
+describe('durations print the way a person reads them', () => {
+  it('rounds sub-second measurements to whole milliseconds', async () => {
+    const { formatMs } = await import('../src/probe/cost.mjs');
+    // performance.now() differences are fractional: 659.1493330000001ms was printed verbatim.
+    expect(formatMs(659.1493330000001)).toBe('659ms');
+    expect(formatMs(0.4)).toBe('0ms');
+    expect(formatMs(12)).toBe('12ms');
+    // A value that rounds up to a second is printed as one, never as "1000ms".
+    expect(formatMs(999.6)).toBe('1.0s');
+    expect(formatMs(1234.5)).toBe('1.2s');
+    expect(formatMs(9999.6)).toBe('10s');
+  });
+
+  it('the measured overhead line carries no float noise', () => {
+    const text = renderCost(costReport([rec('C', 'F', ['a.test.mjs'], { probe: [run(10)] })], { run: { measurements: { elapsedMs: 234.62341700000002, runnerMs: 113.644541, overheadMs: 120.97887600000001, runnerInvocations: 6 } } }));
+    expect(text.split('\n')[0]).toBe('actual elapsed 235ms; fresh runners 114ms across 6 invocations; setup/discovery/other overhead 121ms');
+  });
+});

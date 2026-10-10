@@ -97,3 +97,23 @@ describe('a runner that has already exited is not contention', () => {
     expect(result.runners.map((row) => row.pid)).toEqual([40]);
   });
 });
+
+describe('the contention advice is something that would change the run', () => {
+  const c = { detected: true, runners: [{ pid: 501, command: 'vitest' }] };
+  it('a serial run (the default, --workers 1) is told to wait, not to pass a flag it already has', () => {
+    const w = contentionWarning(c, { serial: true, workers: 1 });
+    expect(w).toMatch(/Wait for it to finish/);
+    expect(w).not.toMatch(/pass --serial/);
+    expect(w).toMatch(/already runs one test file at a time/);
+  });
+  it('a run that raised --workers is told how to lower it', () => {
+    const w = contentionWarning(c, { serial: false, workers: 4 });
+    expect(w).toMatch(/--workers 4/);
+    expect(w).toMatch(/--serial/);
+  });
+  it('a custom command manages its own concurrency, so no TestGuard flag is offered as the fix', () => {
+    const w = contentionWarning(c, { custom: true });
+    expect(w).toMatch(/--runner-cmd/);
+    expect(w).not.toMatch(/pass --serial/);
+  });
+});

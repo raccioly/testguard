@@ -41,7 +41,7 @@ export async function claimsCommand({ projectDir, values, suppliedOptions, versi
   const drift = reconcile(claims, annotations);
   const advisory = annotationAdvisory(claims, annotations, { customClaims: Boolean(values.claims) });
   const anchorChecks = values['check-anchors']
-    ? await checkAnchors(projectDir, claims, { python: values.python ? resolve(values.python) : undefined })
+    ? await checkAnchors(projectDir, claims, { python: values.python || undefined }) // a bare name is a PATH lookup; see explicitInterpreter
     : undefined;
 
   // A claim that disappeared is invisible to every other command; compare

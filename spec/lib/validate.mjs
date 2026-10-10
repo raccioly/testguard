@@ -112,8 +112,23 @@ function originErrors(kind, doc) {
 }
 
 // Rules JSON Schema cannot express. Each returns an array of {path, message}.
+const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const semantic = {
   'authoring-input': authoringInputErrors,
+  // A claim or fault entry is matched exactly against an identity, so a
+  // pattern that is not one excuses nothing — or, for a `fault` entry without
+  // its `/<faultId>`, excuses the whole claim. Neither is what a reviewer read.
+  ignore(doc) {
+    const errors = [];
+    doc.entries.forEach((e, i) => {
+      if (e.kind === 'claim' && !IDENTIFIER.test(e.pattern)) errors.push({ path: `/entries/${i}/pattern`, message: 'a claim entry names one claim id exactly; globs and paths are not matched' });
+      if (e.kind === 'fault') {
+        const parts = e.pattern.split('/');
+        if (parts.length !== 2 || !parts.every((p) => IDENTIFIER.test(p))) errors.push({ path: `/entries/${i}/pattern`, message: 'a fault entry names one fault exactly, as <claimId>/<faultId>' });
+      }
+    });
+    return errors;
+  },
   annotations(doc) {
     const errors = [];
     const fail = (path, message) => errors.push({ path, message });
@@ -419,6 +434,10 @@ const semantic = {
       const requested = new Set(scope.requestedClaims);
       if (scope.probedClaims.some((id) => !requested.has(id))) errors.push({ path: '/run/scope/probedClaims', message: 'every probed claim must have been requested' });
     }
+    // One invocation result per document: `run` is what a probe measured,
+    // `baseline` is what a baseline command wrote. A document carrying both
+    // would attribute one command's result to the other.
+    if (doc.run && doc.baseline) errors.push({ path: '/baseline', message: 'a status document carries at most one invocation result: run (probe) or baseline (baseline), never both' });
     return errors;
   },
 
@@ -588,7 +607,9 @@ export function validate(kind, doc) {
   if (!check(doc)) {
     return {
       ok: false,
-      errors: check.errors.map((e) => ({ path: e.instancePath || '/', message: e.message ?? 'invalid' })),
+      // A closed set names its members: "must be equal to one of the allowed
+      // values" alone sends the reader to the schema to find out what they are.
+      errors: check.errors.map((e) => ({ path: e.instancePath || '/', message: `${e.message ?? 'invalid'}${e.keyword === 'enum' ? `: ${e.params.allowedValues.join(', ')}` : ''}` })),
     };
   }
   const errors = semantic[kind] ? semantic[kind](doc) : [];

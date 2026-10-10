@@ -193,11 +193,11 @@ testing it — not the answer.
 | `--runner <name>` | `auto` | the project runner, as for `probe` |
 | `--runner-cmd "<cmd>"` | none | a custom runner command; see [Languages and runners](../reference/languages-and-runners.md#custom-runners) |
 | `--node-modules <dir>` | auto-linked | the `node_modules` to link into each scratch worktree (or `TESTGUARD_NODE_MODULES`) |
+| `--python <interpreter>` | discovered | the interpreter for Python defenders (or `TESTGUARD_PYTHON`), as for `probe`; see [Python](python.md#which-interpreter) |
 | `--out <path>` | `.testguard/replay.json` | the replay document; the calibration is written beside it |
 | `--json` | off | print `{ replay, calibration, paths }` instead of the summary |
 
-`replay` has no `--python`; set `TESTGUARD_PYTHON` to choose the interpreter
-for Python defenders. Replay is slow — one worktree and N runs per fix — so
+Replay is slow — one worktree and N runs per fix — so
 start with a small `--max`, and see [Performance](performance.md) for
 budgets.
 

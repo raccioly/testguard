@@ -254,7 +254,12 @@ Rules that follow from the table:
    decided and leave a caller with an exit code this document does not define,
    which is strictly worse than one loud unverifiable claim. A `probe-error`
    record is never reused by a later run: it says something about the run, not
-   about the code. The one exception is a **precondition** failure — the
+   about the code. The same holds for a record whose reason is
+   `defenders-failed-to-load`: a broken `--runner-cmd`, a missing dependency or
+   an interpreter without the test requirements changes none of the hashed
+   inputs, so fixing the environment would otherwise leave the failure
+   reported as the current answer. Re-measuring it costs one baseline run per
+   defender set. The one exception is a **precondition** failure — the
    interpreter loading the source from outside the probed tree, a runner that
    does not resolve — which is a statement about every verdict in the run and
    still refuses it outright.
@@ -306,6 +311,11 @@ Rules that follow from the table:
    files; creating or editing any of them forces remeasurement. Evidence that
    predates this hash, or whose hash
    changed, is readable but never reusable for a current native discovery run.
+   A custom `--runner-cmd` has no native listing; its `testUniverseHash` binds
+   the static file set **and the parsed command argv**, so a changed command
+   is a changed universe and never reuses a verdict the old command measured.
+   Reformatting whitespace that parses to the same argv is not a change. Only
+   the hash is recorded, never the command text.
    When several configured runners list defenders, exact manifest membership
    assigns each file. An owned runner takes precedence over the project runner;
    competing owned runners or a declared defender absent from every manifest
@@ -578,12 +588,42 @@ Adopting tools may reconcile an existing baseline format (for example a
 `{version, fingerprints:{hash:count}}` file) by mapping it onto this shape;
 the suppress-up-to-count semantics are identical.
 
+A baseline command's machine output is the status document plus an optional
+`baseline` result, exactly as a probe's is the status document plus `run`:
+`{path, frozen}` when it froze one (`frozen` counts the unproven findings it
+holds), `{path, restamped}` when it moved an existing baseline's head (the
+commit it now names). The document is validated before it is printed. One
+document carries at most one invocation result, never both `run` and
+`baseline`.
+
 ## Ignore and annotations
 
-- An ignore entry removes a subject from *scope* before probing. Every entry
+- An ignore entry excuses a *coverage* or *removal* finding; it never
+  removes anything from a probe and never touches a verdict. A probe reads no
+  ignore file: a claim that is in the claims file is probed, so an excuse can
+  never hide a survivor. A known finding is accepted in a baseline (above),
+  which is fingerprinted, counted and reported as baselined. Every entry
   carries a `reason` of at least eight characters; the structured form is what
-  an auditor reads. A plain gitignore-syntax file may be accepted as shorthand
-  for reasonless `path` entries.
+  an auditor reads. An entry past its `expires` excuses nothing and is
+  reported as expired. The kinds, and the only thing each does:
+  - `path` — a glob over project paths. Excuses a changed source file from
+    the change gate (below); every reliance is reported.
+  - `claim` — exactly one claim id. Excuses the removal of that claim, and of
+    any of its faults, when claims are compared against an earlier reference.
+  - `fault` — exactly `<claimId>/<faultId>`. Excuses the removal of that one
+    fault in the same comparison.
+
+  There is no fingerprint kind: suppressing a finding by fingerprint is what a
+  baseline does, and a second, uncounted channel for it would let debt be
+  accepted where no baseline report shows it. A `claim` or `fault` pattern
+  that is not an exact identity is invalid, because it would excuse nothing —
+  or, for a `fault` entry without its fault id, the whole claim. A plain
+  gitignore-syntax file may be accepted as shorthand for reasonless `path`
+  entries.
+- A concerns file is read like every other spec document: one that does not
+  parse or does not conform fails the command that reads it (exit `2`). It
+  never degrades to a concern that matches nothing — a sweep aimed at nothing
+  reports clean.
 - An annotation is **strictly additive**. It never changes, suppresses, or
   drops a finding. Ranking may read annotations; verdicts never do.
 - A **signal** is a static, annotation-grade fact about a defender, recorded
@@ -822,7 +862,8 @@ It requires a complete current-project run with confirm >= 3 and refuses
 before loading or writing. No policy is inferred when the option is absent.
 After measurement, the command reloads current claims and collects the current
 native runner universe under the same command budget, then binds targets,
-resolved defenders and current discovery dependencies. Missing bindings or
+resolved defenders, current discovery dependencies and the recorded runner
+identities (name, version and source). Missing bindings or
 discovery failure yields unavailable; custom/static runner universes cannot
 certify this boundary. Expired command budgets still write no partial result.
 This is point-in-time admission, not an atomic filesystem snapshot. Stored
@@ -916,6 +957,13 @@ worker ceiling and must be one for serial execution; custom commands omit it.
 Native evidence reuse requires the same recorded worker ceiling and serial policy.
 Older native evidence with no worker ceiling is remeasured; native and opaque
 custom-command policies are not interchangeable.
+Every reuse also requires the same recorded `run.runner`: name (the engine that
+ran, so pytest and unittest differ), version and `source`. `source` is recorded
+for every resolved runner — `project` (the project's package, its virtualenv,
+or an interpreter named by path), `path` (an executable found on PATH,
+including a bare command name given to `--python`) or `builtin` — and is absent
+only for a custom command, which resolves nothing. Evidence that recorded no
+runner, or a different one, is remeasured.
 `status.cost.measurements` copies these measurements when available. Historical
 `totalMs` and cost gates retain their existing record attribution, including
 reused durations and repeated shared baseline durations. Older evidence has no

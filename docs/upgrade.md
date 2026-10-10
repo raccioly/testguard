@@ -26,7 +26,7 @@ guide for that release.
 |---|---|---|
 | npm devDependency | `npm i -D testguard-cli@latest`, or `@<version>` | Commit the lockfile. This is the copy the session-start hook runs. |
 | npx | `npx testguard-cli@<version> <command>` | Name the version to be sure which one npx runs. |
-| pip | `pip install -U testguard-cli` | This upgrades the wrapper only. The CLI it runs is the project's `node_modules/testguard-cli` when there is one, otherwise `npx -y testguard-cli@latest`; see [installation](installation.md#pip). |
+| pip | `pip install -U testguard-cli` | This upgrades the wrapper only. The CLI it runs is the project's `node_modules/testguard-cli` when there is one, otherwise `npx -y testguard-cli@<version>` at the wrapper's own version, so upgrading the wrapper upgrades that CLI too; see [installation](installation.md#pip). |
 | Homebrew | `brew upgrade testguard` | |
 | GitHub Action | change the tag in `uses: raccioly/testguard@…` | The `version` input defaults to the CLI released with that tag. If you set `version` yourself, change it too. |
 | GitLab CI | change the tag in the `include: remote:` URL | Same rule for the template's `version` input. |
@@ -59,8 +59,11 @@ Re-running `testguard init` after an upgrade is safe and does a little:
 - It leaves an existing skill, and a section that already lists the project,
   untouched. Its output says so with `=` lines.
 - If the new version's hook command differs from the one you have, `init`
-  adds the new entry beside the old one. Look at `.claude/settings.json`
-  afterwards and delete the old entry.
+  replaces your TestGuard hook in place (for each project, the root and every
+  subdirectory alike), keeping its position and any other keys on it, and
+  removes duplicates an older `init` left. Other hooks are not touched.
+- It adds the `.gitignore` lines a newer release introduced, directly after
+  the TestGuard lines already there, and nothing else.
 
 ### Merging the skill by hand
 
@@ -79,9 +82,10 @@ current wording, then carry the changes you want into your section by hand.
 `testguard init --force` overwrites `.claude/skills/testguard/SKILL.md` with
 the new template, losing any local edits, and with `--ci-evidence` it also
 replaces `.testguard/fetch-ci-evidence.sh`. It does **not** refresh an
-`AGENTS.md` section that already lists the project, and it does not rewrite a
-hook that is already present. Use it only when replacing the whole skill is
-what you want, and review the diff before you commit.
+`AGENTS.md` section that already lists the project. The hook needs no
+`--force`: a plain `init` already replaces an earlier one. Use it only when
+replacing the whole skill is what you want, and review the diff before you
+commit.
 
 ## Advisory updates for AI sessions
 

@@ -11,6 +11,11 @@ coverage/
 .testguard/gate.json
 .testguard/ci-self-evidence.json
 .testguard/scaffold-*.json
+.testguard/replay.json
+.testguard/calibration.json
+.testguard/ci/
+.testguard/sweep.json
+.testguard/sweep-evidence.json
 # Local agent tooling — not part of the public project
 .wolf/
 .claude/
