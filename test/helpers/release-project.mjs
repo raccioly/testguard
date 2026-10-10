@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..','..');
-const SURFACES = ['package.json', 'pyproject.toml', 'action.yml', 'README.md', 'packaging/homebrew/testguard.rb', 'packaging/gitlab/testguard.gitlab-ci.yml', 'docs/testguard-explained.html'];
+const SURFACES = ['package.json', 'pyproject.toml', 'action.yml', 'README.md', 'packaging/homebrew/testguard.rb', 'packaging/gitlab/testguard.gitlab-ci.yml', 'docs/testguard-explained.html', '.pre-commit-hooks.yaml', 'docs/installation.md', 'docs/guides/ci/github-actions.md', 'docs/guides/ci/gitlab.md', 'docs/guides/ci/pre-commit.md', 'docs/guides/monorepo.md', 'docs/i18n/pt-BR/README.md', 'docs/i18n/es/README.md', 'docs/i18n/zh-CN/README.md'];
 
 /** A copy of every version surface plus the script, so the real repository is never rewritten. */
 function sandbox() {
