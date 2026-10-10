@@ -176,6 +176,15 @@ const CI_EVIDENCE_HELPER = (platform) => {
     ? 'gh run download --name "testguard-evidence-$BRANCH" --dir "$OUT"'
     : 'glab ci artifact "$BRANCH" testguard:probe --path "$OUT/"';
   const missing = github ? 'no testguard-evidence-$BRANCH artifact to download' : 'no testguard:probe artifact to download for $BRANCH';
+  // Where the evidence sits in the downloaded artifact. The action's
+  // `evidence` output names the one file its run wrote, uploaded at the
+  // artifact's root; ci-self-evidence.json is what an earlier workflow example
+  // uploaded. The GitLab template keeps the project's path from the repository
+  // root, so a project in a subdirectory finds its own evidence under that
+  // prefix — and never another project's from the same artifact.
+  const candidates = github
+    ? ['evidence.json', 'evidence-provisional.json', 'ci-self-evidence.json']
+    : ['${PREFIX}.testguard/evidence.json', '${PREFIX}.testguard/evidence-provisional.json'];
   return `#!/bin/sh
 # Fetch the evidence CI wrote on a branch, then brief from it. Run it when you
 # want it: the session-start hook never touches the network, and this script
@@ -189,7 +198,7 @@ command -v ${tool} >/dev/null 2>&1 || { echo "${tool} is not installed; see http
 # repository root's, then a testguard on PATH. Never a package-runner fetch.
 TG=
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
-for c in ./node_modules/.bin/testguard "\${ROOT:+$ROOT/node_modules/.bin/testguard}"; do
+${github ? '' : '# This project\'s path from the repository root, with a trailing slash; empty at the root.\nPREFIX=$(git rev-parse --show-prefix 2>/dev/null)\n'}for c in ./node_modules/.bin/testguard "\${ROOT:+$ROOT/node_modules/.bin/testguard}"; do
   if [ -n "$c" ] && [ -x "$c" ]; then TG=$c; break; fi
 done
 [ -n "$TG" ] || TG=$(command -v testguard 2>/dev/null)
@@ -197,12 +206,10 @@ done
 # A fresh download directory, so an earlier download is never briefed as this one.
 rm -rf "$OUT" && mkdir -p "$OUT" || exit 0
 ${download} >/dev/null 2>&1 || { echo "${missing}" >&2; exit 0; }
-# evidence.json is what the GitHub Action and the GitLab template write;
-# ci-self-evidence.json is the name an earlier workflow example uploaded.
-for f in "$OUT/evidence.json" "$OUT/ci-self-evidence.json" "$OUT/.testguard/evidence.json"; do
+for f in ${candidates.map((c) => `"$OUT/${c}"`).join(' ')}; do
   [ -f "$f" ] && exec "$TG" brief . --text --evidence "$f"
 done
-echo "the downloaded artifact holds no evidence.json, ci-self-evidence.json or .testguard/evidence.json" >&2
+echo "the downloaded artifact holds no evidence for this project (looked for ${candidates.join(', ')})" >&2
 exit 0
 `;
 };

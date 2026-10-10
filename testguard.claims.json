@@ -7483,7 +7483,7 @@
     },
     {
       "id": "TG-CI-HELPER-RUNS-THE-HOOKS-CLI",
-      "statement": "fetch-ci-evidence.sh briefs with the same CLI the session-start hook runs (the project's node_modules/.bin, then the repository root's, then PATH), from the evidence file the GitHub Action or the GitLab template actually uploads, and never from a file an earlier download left behind.",
+      "statement": "fetch-ci-evidence.sh briefs with the same CLI the session-start hook runs (the project's node_modules/.bin, then the repository root's, then PATH), from the evidence file the GitHub Action or the GitLab template actually uploads (for GitLab, under the project's own path from the repository root, never another project's), and never from a file an earlier download left behind.",
       "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
       "severity": "low",
       "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
@@ -7500,11 +7500,11 @@
         },
         {
           "id": "F2",
-          "description": "evidence.json, the file the action's evidence output names, is not looked for, so the documented workflow's artifact briefs nothing.",
+          "description": "evidence.json, the file the action's evidence output names after a confirmed run, is not looked for, so the documented workflow's artifact briefs nothing.",
           "faultClass": "field-dropped",
           "file": "src/init/init.mjs",
-          "find": "for f in \"$OUT/evidence.json\" \"$OUT/ci-self-evidence.json\" \"$OUT/.testguard/evidence.json\"; do",
-          "replace": "for f in \"$OUT/ci-self-evidence.json\" \"$OUT/.testguard/evidence.json\"; do",
+          "find": "    ? ['evidence.json', 'evidence-provisional.json', 'ci-self-evidence.json']",
+          "replace": "    ? ['evidence-provisional.json', 'ci-self-evidence.json']",
           "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
         },
         {
@@ -7514,6 +7514,15 @@
           "file": "src/init/init.mjs",
           "find": "rm -rf \"$OUT\" && mkdir -p \"$OUT\" || exit 0",
           "replace": "mkdir -p \"$OUT\" || exit 0",
+          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+        },
+        {
+          "id": "F4",
+          "description": "The GitLab helper ignores the project's path from the repository root, so a project in a subdirectory finds nothing, or briefs from the root project's evidence in the same artifact.",
+          "faultClass": "literal-changed",
+          "file": "src/init/init.mjs",
+          "find": "    : ['${PREFIX}.testguard/evidence.json', '${PREFIX}.testguard/evidence-provisional.json'];",
+          "replace": "    : ['.testguard/evidence.json', '.testguard/evidence-provisional.json'];",
           "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
         }
       ],

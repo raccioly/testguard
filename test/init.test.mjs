@@ -621,13 +621,40 @@ describe('the CI-evidence helper', () => {
     expect(run(q.helper, q.bin, q.app).stdout.trim()).toBe('path brief . --text --evidence .testguard/ci/ci-self-evidence.json');
   });
 
-  it('gitlab: briefs from the template\'s .testguard/evidence.json', () => {
-    const p = project('gitlab');
+  it('github: briefs from evidence-provisional.json when that is the file the action\'s run wrote', () => {
+    const p = project('github');
+    ghWrites(p.bin, 'evidence-provisional.json');
+    stub(join(p.app, 'node_modules', '.bin'), 'testguard', 'echo "project $*"');
+    expect(run(p.helper, p.bin, p.app).stdout.trim()).toBe('project brief . --text --evidence .testguard/ci/evidence-provisional.json');
+  });
+
+  it('gitlab: a project in a subdirectory briefs from <dir>/.testguard/evidence.json, where the template puts it', () => {
+    const p = project('gitlab'); // the project is root/app
+    glabWrites(p.bin, 'app/.testguard/evidence.json');
+    stub(join(p.app, 'node_modules', '.bin'), 'testguard', 'echo "project $*"');
+    const r = run(p.helper, p.bin, p.root);
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('project brief . --text --evidence .testguard/ci/app/.testguard/evidence.json');
+  });
+
+  it('gitlab: a project at the repository root briefs from .testguard/evidence.json', () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'tg-helper-gitlab-root-')));
+    gitInit(root);
+    initProject({ projectDir: root, ciEvidence: 'gitlab' });
+    const bin = mkdtempSync(join(tmpdir(), 'tg-helper-bin-'));
+    glabWrites(bin, '.testguard/evidence.json');
+    stub(join(root, 'node_modules', '.bin'), 'testguard', 'echo "project $*"');
+    expect(run(join(root, '.testguard', 'fetch-ci-evidence.sh'), bin, root).stdout.trim()).toBe('project brief . --text --evidence .testguard/ci/.testguard/evidence.json');
+  });
+
+  it('gitlab: never briefs a subdirectory project from another project\'s evidence in the same artifact', () => {
+    const p = project('gitlab'); // root/app, but the artifact holds only the root project's evidence
     glabWrites(p.bin, '.testguard/evidence.json');
     stub(join(p.app, 'node_modules', '.bin'), 'testguard', 'echo "project $*"');
     const r = run(p.helper, p.bin, p.app);
     expect(r.status).toBe(0);
-    expect(r.stdout.trim()).toBe('project brief . --text --evidence .testguard/ci/.testguard/evidence.json');
+    expect(r.stdout).toBe('');
+    expect(r.stderr).toMatch(/holds no evidence for this project .*app\/\.testguard\/evidence\.json/);
   });
 
   for (const platform of ['github', 'gitlab']) {
