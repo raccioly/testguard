@@ -792,6 +792,25 @@ evidence; they simply do not turn CI red.
 
 ## Exit codes
 
+| Code | Meaning |
+|---|---|
+| `0` | No new gating findings at or above the severity floor. |
+| `1` | At least one new gating finding. |
+| `2` | Precondition failed: test runner not resolvable (e.g. no `node_modules` linked into the scratch worktree), working tree dirty for a fault target file, claims file invalid, no commits. Nothing was probed. |
+| `3` | Usage or configuration error. |
+
+A tool must never exit `0` because it had nothing to check. If the claims
+file is empty or every claim is out of scope, that is reported explicitly and
+the exit code is `2`.
+
+`probe --allow-empty` is an explicit adoption exception for a valid claims
+file containing zero claims, with no `--claim` selection. It exits `0`, says
+that verification was skipped, and writes no evidence or baseline. Its JSON
+output is the existing `no-claims` status document, without run metadata;
+it never reports a clean measurement. Missing or invalid claims still fail,
+and selected claims cannot be silently skipped. Run `gate` separately to
+enforce coverage of changed files during adoption. Integrations must opt in.
+
 ### Explicit declared-origin policy result contract
 
 Optional `originPolicy` on evidence, status and brief (and status's probe `run`)
@@ -833,25 +852,6 @@ hidden source declarations. Brief policy describes its recorded run only.
 Completed probe JSON with unavailable policy exits 2; failed policy or ordinary
 new findings exits 1; passed policy without ordinary findings exits 0.
 Partial/provisional invocations cannot carry an origin policy.
-
-| Code | Meaning |
-|---|---|
-| `0` | No new gating findings at or above the severity floor. |
-| `1` | At least one new gating finding. |
-| `2` | Precondition failed: test runner not resolvable (e.g. no `node_modules` linked into the scratch worktree), working tree dirty for a fault target file, claims file invalid, no commits. Nothing was probed. |
-| `3` | Usage or configuration error. |
-
-A tool must never exit `0` because it had nothing to check. If the claims
-file is empty or every claim is out of scope, that is reported explicitly and
-the exit code is `2`.
-
-`probe --allow-empty` is an explicit adoption exception for a valid claims
-file containing zero claims, with no `--claim` selection. It exits `0`, says
-that verification was skipped, and writes no evidence or baseline. Its JSON
-output is the existing `no-claims` status document, without run metadata;
-it never reports a clean measurement. Missing or invalid claims still fail,
-and selected claims cannot be silently skipped. Run `gate` separately to
-enforce coverage of changed files during adoption. Integrations must opt in.
 
 ## Read-only authoring input (candidate)
 

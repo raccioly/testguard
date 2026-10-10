@@ -2,7 +2,9 @@
 
 ## Documentation
 
-- [README](./README.md) — what it is, the four commands, verdicts, the hook
+- [docs/](./docs/README.md) — the documentation hub: quickstart, installation,
+  [adopting TestGuard in an existing project](./docs/guides/existing-projects.md),
+  the [CLI reference](./docs/reference/cli.md) and [troubleshooting](./docs/troubleshooting.md)
 - [spec/](./spec/) — the shared formats, and [GATE-SEMANTICS.md](./spec/GATE-SEMANTICS.md) for exactly when CI goes red
 - [fixtures/known-answer/](./fixtures/known-answer/) — a worked example of every verdict
 - [bench/](./bench/) — running against a real codebase
@@ -20,6 +22,9 @@
 
 ## Reading a verdict you did not expect
 
+The full list, with the one acceptable fix for each, is in
+[docs/reference/verdicts.md](./docs/reference/verdicts.md); the common ones:
+
 | You got | It usually means |
 |---|---|
 | `UNVERIFIABLE` | the fault's `find` string no longer matches the source (or matches more than `expectHits` times). Re-author the fault; the claim is undefended until you do. |
@@ -30,4 +35,6 @@
 
 ## Questions
 
-Search [existing issues](https://github.com/raccioly/testguard/issues) first; then open one with the `question` label.
+Search [existing issues](https://github.com/raccioly/testguard/issues) and the [FAQ](./docs/faq.md) first; then ask in [Discussions](https://github.com/raccioly/testguard/discussions).
+
+A page that is wrong or missing is a bug too: [open a documentation issue](https://github.com/raccioly/testguard/issues/new?template=documentation.md).

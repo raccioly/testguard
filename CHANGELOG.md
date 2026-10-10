@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `probe` and `replay` no longer run the project's git hooks on their scratch tree. `git worktree add` and replay's revert of a fixed file both trigger `post-checkout`, so a failing hook (Git LFS's whenever `git-lfs` is not on PATH, a husky or lefthook script) failed a probe that would otherwise have succeeded, and a slow one slowed every run. Hooks are disabled for those two commands only; filters, LFS smudge included, still apply. Claimed as `TG-SCRATCH-NEVER-RUNS-PROJECT-HOOKS`.
 - The test suite no longer depends on the machine's global git config. Fixtures committed through it, so a global `core.hooksPath` or `commit.gpgsign=true` turned 142 tests red while CI stayed green. Fixtures now pin their own git options (`test/helpers/git.mjs`), and a new CI `hermeticity` job runs the suite under a deliberately hostile config. That job is what found the hook bug above.
 
+### Documentation
+
+- A `docs/` tree replaces the README-as-manual. It has a quickstart, installation for every channel, and an upgrade guide. Guides cover adopting TestGuard in an existing project, new projects, writing claims, AI agents, Python, monorepos, performance, replay, GitHub Actions, GitLab CI and pre-commit. Reference pages cover the CLI, languages and runners, configuration, verdicts, artifacts and MCP. There are also concepts, troubleshooting, FAQ and glossary pages. The README is now the front page and links into it with absolute URLs, so the links also work on npm and PyPI.
+- `test/docs.test.mjs` derives facts from the code and fails when a page is missing one: a CLI command, a `--runner` value, an Action or GitLab input, a verdict, a status state or a schema. It also fails on a broken relative link or heading anchor.
+- Release-sync now rewrites the version pins in the docs pages that show a pinned install, and in the `.pre-commit-hooks.yaml` consumer example (it read `v0.1.0`). A new test fails when any tracked file pins a release without being a sync surface.
+- Fixed stale facts: the README status section (v0.5, "eleven commands" without `concerns`) and the schema counts in the README and CONTRIBUTING (there are fourteen). PRIVACY now names the `pip` wrapper's `npx` fallback and the opt-in GitLab note.
+- Issue templates: a documentation template, and contact links to the docs, Discussions and private security advisories.
+- Translations of the README and quickstart into Português (Brasil), Español and 简体中文 under `docs/i18n/`. English is authoritative; each translation names the release it came from and copies every code block byte for byte, and tests check both. The translated READMEs are release-sync surfaces.
+- `spec/README.md` lists the `concerns` and `sweep` formats and no longer calls `authoring-input` CLI exposure pending. The exit-code table in `GATE-SEMANTICS.md` now sits under its own heading instead of under the origin-policy subsection.
+- The `init --ci-evidence` helper's "not installed" messages point at the CI guides instead of a README section that no longer exists. `.agents/skills/testguard/SKILL.md` matches the shipped template again, and a test keeps it that way.
+- Self-claim `TG-DOCS-COVER-THE-CLI`: a command or runner added without documentation is a fault `test/docs.test.mjs` kills.
+
 ## [0.18.3] - 2026-10-05
 
 Automated weekly release — everything merged since `v0.18.2`.
