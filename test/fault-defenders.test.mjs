@@ -9,6 +9,7 @@ import { validate } from '../spec/lib/validate.mjs';
 import { claimsCommand, defenderNarrowing } from '../src/commands/claims.mjs';
 import { main } from '../src/cli.mjs';
 import { writeSpecDoc } from '../src/evidence/writer.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 function project() {
   const dir = mkdtempSync(join(tmpdir(), 'tg-fault-defenders-'));
@@ -22,7 +23,7 @@ function project() {
   const claims = { schemaVersion: 1, claims: [{ id: 'C-1', statement: 'Both functions return one.', severity: 'high', source: { kind: 'manual' }, producedBy: { producer: 'human' }, defendedBy: ['test/a.test.mjs', 'test/b.test.mjs'], faults: [fault('INHERIT', 'a'), fault('OVERRIDE', 'a', { defendedBy: ['test/a.test.mjs'] }), fault('DISCOVER', 'b', { defendedBy: [] })] }] };
   writeFileSync(join(dir, 'testguard.claims.json'), JSON.stringify(claims));
   for (const args of [['init', '-q'], ['add', '-A'], ['commit', '-qm', 'fixture']]) {
-    const r = spawnSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@example.invalid', ...args], { cwd: dir, encoding: 'utf8' });
+    const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.name=test', '-c', 'user.email=test@example.invalid', ...args], { cwd: dir, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(r.stderr);
   }
   symlinkSync(join(process.cwd(), 'node_modules'), join(dir, 'node_modules'), 'dir');

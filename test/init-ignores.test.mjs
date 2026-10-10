@@ -10,8 +10,9 @@ import { initProject, hookCommand, GITIGNORE_LINES, COMMITTED_OUTPUTS, CI_DOWNLO
 import { USAGE, main } from '../src/cli.mjs';
 import { sweepPath, sweepEvidencePath } from '../src/commands/sweep.mjs';
 import { gatePath } from '../src/commands/gate.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
-const gitInit = (dir) => { const g = (...a) => spawnSync('git', ['-c', 'user.email=i@example.invalid', '-c', 'user.name=i', ...a], { cwd: dir }); g('init', '-q'); };
+const gitInit = (dir) => { const g = (...a) => spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=i@example.invalid', '-c', 'user.name=i', ...a], { cwd: dir }); g('init', '-q'); };
 
 // ---------------------------------------------------------------------------
 // The .testguard/ directory: what init ignores is derived from what the code
@@ -43,7 +44,7 @@ function writtenTestguardPaths() {
   return { paths: [...paths].sort(), unparsed };
 }
 
-const checkIgnored = (root, rel) => spawnSync('git', ['-c', 'core.excludesFile=/dev/null', 'check-ignore', '-q', '--no-index', '--', rel], { cwd: root }).status === 0;
+const checkIgnored = (root, rel) => spawnSync('git', [...FIXTURE_GIT, '-c', 'core.excludesFile=/dev/null', 'check-ignore', '-q', '--no-index', '--', rel], { cwd: root }).status === 0;
 
 describe('init ignores every regenerated .testguard/ output the code writes', () => {
   const { paths, unparsed } = writtenTestguardPaths();

@@ -4,6 +4,7 @@ import { tmpdir, devNull } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseFixChangedPaths } from '../src/scaffold/fix-paths.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const before = 'a'.repeat(40), after = 'b'.repeat(40), zero = '0'.repeat(40);
 const row = (file, status = 'M', oldMode = '100644', newMode = '100644', oldId = before, newId = after) => `:${oldMode} ${newMode} ${oldId} ${newId} ${status}\0${file}\0`;
@@ -15,7 +16,7 @@ describe('bounded raw fix path decoder', () => {
   it('decodes actual no-renames full-ID NUL raw diff output', () => {
     const root = mkdtempSync(join(tmpdir(), 'testguard-fix-paths-')); roots.push(root);
     const git = (...args) => {
-      const result = spawnSync('git', ['-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', '-c', `core.hooksPath=${devNull}`, ...args], { cwd: root });
+      const result = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', '-c', `core.hooksPath=${devNull}`, ...args], { cwd: root });
       expect(result.status).toBe(0); return result.stdout;
     };
     git('init', '-q'); writeFileSync(join(root, 'guard.mjs'), 'export const x = 1;'); writeFileSync(join(root, 'old.py'), 'x = 1');

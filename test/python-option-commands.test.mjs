@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 // `--python` used to reach `probe` only: admit, sweep and replay parsed it and
 // dropped it, silently testing against whatever interpreter discovery found.
@@ -10,7 +11,7 @@ import { tmpdir } from 'node:os';
 // honoured, it is a precondition failure naming it; ignored, the command runs.
 const MISSING = '/nonexistent/testguard-python-option';
 const by = { producer: 'human', by: 'fixture' };
-const git = (dir, ...args) => execFileSync('git', ['-c', 'user.email=fixture@example.invalid', '-c', 'user.name=fixture', ...args], { cwd: dir, timeout: 5000 });
+const git = (dir, ...args) => execFileSync('git', [...FIXTURE_GIT, '-c', 'user.email=fixture@example.invalid', '-c', 'user.name=fixture', ...args], { cwd: dir, timeout: 5000 });
 const capture = () => { const lines = { out: [], err: [] }; return { lines, io: { out: (s) => lines.out.push(s), err: (s) => lines.err.push(s) } }; };
 
 let dir;

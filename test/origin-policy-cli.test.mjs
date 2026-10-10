@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { main } from '../src/cli.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { writeSpecDoc } from '../src/evidence/writer.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 async function invoke(args) {
   const out = [], err = [];
@@ -39,7 +40,7 @@ it('actual native probe reports eligible/ineligible declarations and never basel
     const claims = { schemaVersion: 1, claims: [{ id: 'C-1', statement: 'Value is one.', severity: 'low', source: { kind: 'bug', ref: 'opaque-private-reference' }, producedBy: { producer: 'agent' }, defendedBy: ['checks/value.case.mjs'], faults: [{ id: 'F1', description: 'Change value.', file: 'src/value.mjs', faultClass: 'other', find: 'value = 1', replace: 'value = 2', producedBy: { producer: 'agent' } }] }] };
     writeSpecDoc('claims', join(dir, 'testguard.claims.json'), claims);
     for (const args of [['init', '-q'], ['add', '-A'], ['commit', '-qm', 'fixture']]) {
-      const r = spawnSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@example.invalid', ...args], { cwd: dir, encoding: 'utf8' });
+      const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.name=test', '-c', 'user.email=test@example.invalid', ...args], { cwd: dir, encoding: 'utf8' });
       if (r.status !== 0) throw Error(r.stderr);
     }
     symlinkSync(join(process.cwd(), 'node_modules'), join(dir, 'node_modules'), 'dir');

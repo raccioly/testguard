@@ -12,6 +12,7 @@ import { validate } from '../spec/lib/validate.mjs';
 import { fingerprint } from '../spec/lib/fingerprint.mjs';
 import { hashFile } from '../src/util/hash.mjs';
 import { main } from '../src/cli.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const example = JSON.parse(readFileSync(new URL('../spec/conformance/examples/evidence.json', import.meta.url), 'utf8'));
 const caveat = 'declared origins, not authenticated independence';
@@ -67,7 +68,7 @@ it('actual probe writes a recorded summary for its full selected record universe
     mkdirSync(join(dir, 'test'));
     writeFileSync(join(dir, 'test/unrelated.test.mjs'), "import { it, expect } from 'vitest'; it('unrelated', () => expect(1).toBe(1));\n");
     for (const args of [['init', '-q'], ['add', '-A'], ['commit', '-qm', 'fixture']]) {
-      const r = spawnSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@example.invalid', ...args], { cwd: dir, encoding: 'utf8' });
+      const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.name=test', '-c', 'user.email=test@example.invalid', ...args], { cwd: dir, encoding: 'utf8' });
       if (r.status !== 0) throw Error(r.stderr);
     }
     symlinkSync(join(process.cwd(), 'node_modules'), join(dir, 'node_modules'), 'dir');

@@ -8,13 +8,14 @@ import { spawnSync } from 'node:child_process';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createScratch, findNodeModules, PreconditionError } from '../src/probe/worktree.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function repo() {
   const dir = mkdtempSync(join(tmpdir(), 'tg-wt-'));
   const g = (...a) => {
-    const r = spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8' });
+    const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(r.stderr);
     return r.stdout.trim();
   };
@@ -39,6 +40,21 @@ describe('createScratch', () => {
     expect(existsSync(s.root)).toBe(false);
   });
 
+  it("never runs the project's post-checkout hook on the scratch tree, though a plain checkout would", () => {
+    const { dir } = repo();
+    const hooks = mkdtempSync(join(tmpdir(), 'tg-hooks-'));
+    const fired = join(hooks, 'fired');
+    writeFileSync(join(hooks, 'post-checkout'), `#!/bin/sh\necho "$@" >> '${fired}'\nexit 1\n`, { mode: 0o755 });
+    // Repo-local, so it outranks any global hooksPath the machine carries.
+    spawnSync('git', ['config', 'core.hooksPath', hooks], { cwd: dir });
+    const s = createScratch({ repoRoot: dir, projectDir: dir });
+    expect(readFileSync(join(s.projectDir, 'a.txt'), 'utf8')).toBe('second\n');
+    expect(existsSync(fired)).toBe(false);
+    s.cleanup();
+    spawnSync('git', ['checkout', '-q', 'HEAD', '--', 'a.txt'], { cwd: dir });
+    expect(existsSync(fired)).toBe(true);
+  });
+
   it('checks out a pinned ref and reports its sha', () => {
     const { dir, first } = repo();
     const s = createScratch({ repoRoot: dir, projectDir: dir, ref: first.slice(0, 8) });
@@ -53,10 +69,10 @@ describe('createScratch', () => {
     mkdirSync(join(real, 'dep'));
     writeFileSync(join(real, 'dep', 'marker'), 'x');
     const linked = mkdtempSync(join(tmpdir(), 'tg-linked-'));
-    spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', 'init', '-q'], { cwd: linked });
+    spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', 'init', '-q'], { cwd: linked });
     writeFileSync(join(linked, 'a.txt'), 'a\n');
-    spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', 'add', 'a.txt'], { cwd: linked });
-    spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', 'commit', '-qm', 'one'], { cwd: linked });
+    spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', 'add', 'a.txt'], { cwd: linked });
+    spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', 'commit', '-qm', 'one'], { cwd: linked });
     symlinkSync(real, join(linked, 'node_modules'), 'dir');
     expect(findNodeModules(linked).map((n) => n.rel)).toEqual(['node_modules']);
     const s = createScratch({ repoRoot: linked, projectDir: linked });
@@ -96,7 +112,7 @@ describe('probe chooses its isolation, and says which one it used', () => {
   it('worktree mode probes a scratch copy and leaves the project tree untouched', async () => {
     const { probe } = await import('../src/probe/probe.mjs');
     const dir = mkdtempSync(join(tmpdir(), 'tg-iso-'));
-    const g = (...a) => spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8' });
+    const g = (...a) => spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8' });
     g('init', '-q');
     mkdirSync(join(dir, 'src'));
     mkdirSync(join(dir, 'test'));
