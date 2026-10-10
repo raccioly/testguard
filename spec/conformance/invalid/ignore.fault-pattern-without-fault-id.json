@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "kind": "fault",
+      "pattern": "REDACT-002",
+      "reason": "Meant one fault; as a bare claim id it would excuse the whole claim's removal."
+    }
+  ]
+}
