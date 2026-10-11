@@ -1373,6 +1373,72 @@
       ]
     },
     {
+      "id": "TG-STRUCTURED-REQUIREMENT-REF-VALIDATED",
+      "statement": "A source.ref that starts with req: is valid only as req:<spec-id>#<requirement-id> under kind spec; the schema and requirementRef() admit exactly the same references, and every other ref stays opaque.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "spec/conformance/origins.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Treat every ref as opaque, so a malformed req: reference validates.",
+          "faultClass": "condition-forced",
+          "file": "spec/schemas/common.schema.json",
+          "find": "\"pattern\": \"^(?!req:)[\\\\s\\\\S]*$|^req:",
+          "replace": "\"pattern\": \"^[\\\\s\\\\S]*$|^req:",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Drop the kind conditional, so a req: reference validates under any kind.",
+          "faultClass": "condition-forced",
+          "file": "spec/schemas/common.schema.json",
+          "find": "\"then\": { \"properties\": { \"kind\": { \"const\": \"spec\" } } }",
+          "replace": "\"then\": { \"properties\": { \"kind\": { \"$ref\": \"#/$defs/claimSourceKind\" } } }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Parse a req: reference whatever its kind.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/origins.mjs",
+          "find": "typeof source !== 'object' || source.kind !== 'spec' || typeof",
+          "replace": "typeof source !== 'object' || typeof",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Parse any req:<a>#<b> without the grammar, so whitespace, slashes and colons pass.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/origins.mjs",
+          "find": "if (!REQUIREMENT_REF_PATTERN.test(source.ref)) return null;",
+          "replace": "if (!/^req:[^#]+#[^#]+$/u.test(source.ref)) return null;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-ORIGIN-SUMMARY-NEVER-PROMOTES-DECLARATIONS",
       "statement": "Origin summaries count distinct claim identities separately from actual records, refuse duplicate current declarations and retain conflicting recorded declarations as mixed rather than selecting an apparently consistent source.",
       "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },

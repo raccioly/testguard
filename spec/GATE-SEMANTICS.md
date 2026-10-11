@@ -16,6 +16,24 @@ These are declarations, not authentication of independence, chronology,
 production occurrence or correctness. The optional reference remains opaque
 metadata (at most 512 characters); verification does not fetch it. Producer
 provenance and measured test independence are separate signals.
+
+One prefix is reserved. A `ref` that starts with `req:` is a structured
+requirement reference, `req:<spec-id>#<requirement-id>`, with `<spec-id>`
+matching `[A-Za-z0-9][A-Za-z0-9._-]{0,127}` and `<requirement-id>` matching
+`[A-Za-z][A-Za-z0-9._-]{0,63}`. It must be declared with kind `spec`.
+Validation rejects a malformed one at `/source/ref` and one under another kind
+at `/source/kind`; it is never degraded to opaque, because a typo would
+otherwise read as "no evidence for this requirement". Every other `ref` stays
+opaque. A structured reference is still a declaration. TestGuard does not
+resolve it, fetch the spec or check that the requirement exists. A consumer
+that keeps a requirement index, such as DocGuard, compares
+`<spec-id>#<requirement-id>` exactly against its own keys. `requirementRef()`
+in `spec/lib/origins.mjs` parses the same pattern the shared
+`$defs/claimSource` declares. Older readers accept the form as an opaque string,
+so adopting it needs no upgrade; only readers with this rule catch a malformed
+one. The reference is claim metadata: editing it makes saved evidence for that
+claim stale, as any source edit does. Fingerprints, verdicts and gates do not
+change.
 Adding kinds does not change verdicts, baseline/fingerprint identity or default
 gates. Existing ranking weights stay unchanged; new kinds use the existing 0.9
 fallback, not an invented strength hierarchy. Existing documents remain valid

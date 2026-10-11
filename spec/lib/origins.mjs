@@ -5,6 +5,25 @@ import { isDeepStrictEqual } from 'node:util';
 const common = JSON.parse(readFileSync(new URL('../schemas/common.schema.json', import.meta.url), 'utf8'));
 export const CLAIM_SOURCE_KINDS = Object.freeze([...common.$defs.claimSourceKind.enum]);
 const kindSet = new Set(CLAIM_SOURCE_KINDS);
+
+/**
+ * A structured requirement reference, `req:<spec-id>#<requirement-id>`, read
+ * from the one pattern the shared schema declares (`$defs/claimSource`). It is
+ * a declaration: nothing here resolves the spec or checks the requirement
+ * exists. Consumers compare `specId#requirementId` exactly.
+ */
+const sourceRef = common.$defs.claimSource.properties.ref.pattern;
+// The schema's second alternative is the structured form; the first keeps every other ref opaque.
+export const REQUIREMENT_REF_PATTERN = new RegExp(`^${sourceRef.slice(sourceRef.indexOf('|^') + 2)}`, 'u');
+const REQUIREMENT_REF_PARTS = /^req:([^#]+)#(.+)$/u;
+
+/** `{ specId, requirementId }` for a valid structured `spec` reference; `null` for anything else. */
+export function requirementRef(source) {
+  if (!source || typeof source !== 'object' || source.kind !== 'spec' || typeof source.ref !== 'string') return null;
+  if (!REQUIREMENT_REF_PATTERN.test(source.ref)) return null;
+  const [, specId, requirementId] = REQUIREMENT_REF_PARTS.exec(source.ref);
+  return { specId, requirementId };
+}
 const counts = () => Object.fromEntries(CLAIM_SOURCE_KINDS.map((kind) => [kind, 0]));
 
 // Consumers validate their full document first. These narrow guards prevent

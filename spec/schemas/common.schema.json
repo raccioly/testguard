@@ -77,6 +77,22 @@
       "description": "Declared origin of claim intent, not authenticated independence or an evidence-strength order. References remain opaque; producer provenance and measured test independence are separate.",
       "enum": ["spec", "adr", "annotation", "comment", "manual", "doc", "bug", "incident", "review", "inferred"]
     },
+    "claimSource": {
+      "description": "Declared origin of claim intent. A source label or reference does not authenticate independence, chronology or correctness. Producer provenance and measured test independence are separate. `ref` is opaque, except that the `req:` prefix is reserved for a structured requirement reference, `req:<spec-id>#<requirement-id>`, which must be declared with kind `spec`. Neither form is ever resolved or fetched.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/claimSourceKind" },
+        "ref": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^(?!req:)[\\s\\S]*$|^req:[A-Za-z0-9][A-Za-z0-9._-]{0,127}#[A-Za-z][A-Za-z0-9._-]{0,63}$"
+        }
+      },
+      "additionalProperties": false,
+      "if": { "type": "object", "required": ["ref"], "properties": { "ref": { "type": "string", "pattern": "^req:" } } },
+      "then": { "properties": { "kind": { "const": "spec" } } }
+    },
     "nestedProject": {
       "description": "Changed files delegated to a separately validated descendant TestGuard project. This is not coverage or evidence; run that project's gate separately.",
       "type": "object",

@@ -96,6 +96,23 @@ lowest, but a label never waives a finding. `producedBy.producer` is separate:
 it records who *wrote the entry*, while `source` records where the *intent*
 came from.
 
+### Naming the requirement a claim defends
+
+`source.ref` is free text, except that the `req:` prefix is reserved for a
+structured requirement reference:
+
+```json
+"source": { "kind": "spec", "ref": "req:acme.billing#FR-003" }
+```
+
+The part before `#` is the spec ID and the part after it is the requirement
+ID. A requirement-tracing tool can then tell which evidence speaks for which
+requirement without guessing from a file path; DocGuard uses it to report the
+tests that cite a changed requirement as re-verified. The form must be
+declared with `kind: "spec"`. A malformed `req:` reference, or one under
+another kind, fails validation. TestGuard never resolves it, so a spec ID that
+does not exist is still valid here; the consumer checks it.
+
 ## Faults
 
 A fault is one concrete way the claim could be false, written as an exact
