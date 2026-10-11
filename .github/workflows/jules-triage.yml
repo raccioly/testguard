@@ -1,0 +1,41 @@
+name: Jules PR triage
+
+# Closes Google Jules PRs that are noise, duplicates, previously declined
+# work, or over the review queue cap; labels the rest. Policy:
+# .github/scripts/jules-policy.mjs (pure, unit-tested in
+# test/jules-policy.test.mjs, claimed in testguard.claims.json).
+#
+# SECURITY: pull_request_target carries write scope, so nothing here checks
+# out or runs PR code. The checkout is the default branch, credentials are not
+# persisted, and the PR is read through the API only.
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: jules-triage
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    if: github.event.pull_request.user.login == 'google-labs-jules[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the policy from the default branch (never the PR head)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Triage
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { run } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/jules-triage.mjs`);
+            await run({ github, context, core });
