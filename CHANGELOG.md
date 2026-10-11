@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-11
+
+Automated weekly release — everything merged since `v0.19.0`.
+
+### Changed
+
+- feat(spec): structured requirement references in source.ref (#214)
+- docs(jules): note the Inactive-schedule quirk and the shallow VM clone (#213)
+- chore(homebrew): sha256 for v0.19.0 (#212)
+
+
 ### Added
 
 - Structured requirement references: a claim's `source.ref` may name the requirement it defends as `req:<spec-id>#<requirement-id>` (kind `spec`). A malformed `req:` reference, or one under another kind, now fails validation; every other reference stays opaque. The claim source is now defined once in `common.schema.json` (`$defs/claimSource`), and `requirementRef()` in `spec/lib/origins.mjs` parses the same pattern. Older readers accept the form as an opaque string. This is the format DocGuard's requirement anchors read to report the tests that cite a changed requirement as re-verified.
