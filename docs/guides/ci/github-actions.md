@@ -100,7 +100,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0               # the base branch must exist locally
-      - uses: raccioly/testguard@v0.18.3
+      - uses: raccioly/testguard@v0.19.0
         with:
           command: gate                # every changed source file needs a claim
 
@@ -114,7 +114,7 @@ jobs:
         with:
           node-version: 22
       - run: npm ci                    # the probe runs the project's own test runner
-      - uses: raccioly/testguard@v0.18.3
+      - uses: raccioly/testguard@v0.19.0
         with:
           command: probe
           severity: high               # fail only on new high or critical findings
@@ -162,7 +162,7 @@ jobs:
             testguard-evidence-
 
       - id: testguard
-        uses: raccioly/testguard@v0.18.3
+        uses: raccioly/testguard@v0.19.0
         with:
           command: probe
 
@@ -211,7 +211,7 @@ the probe at the interpreter if it is not one TestGuard finds on its own
         with:
           python-version: '3.12'
       - run: python -m venv .venv && .venv/bin/pip install -r requirements.txt
-      - uses: raccioly/testguard@v0.18.3
+      - uses: raccioly/testguard@v0.19.0
         with:
           command: probe
           runner: python             # pytest if .venv can import it, else unittest
@@ -227,7 +227,7 @@ Each project in a monorepo gets its own step, because a passing parent gate
 says nothing about a child project's coverage:
 
 ```yaml
-      - uses: raccioly/testguard@v0.18.3
+      - uses: raccioly/testguard@v0.19.0
         with:
           command: gate
           working-directory: services/billing
@@ -245,7 +245,7 @@ run that verified nothing must not look like a pass. During adoption set
 `allow-empty`:
 
 ```yaml
-      - uses: raccioly/testguard@v0.18.3
+      - uses: raccioly/testguard@v0.19.0
         with:
           command: probe
           allow-empty: 'true'

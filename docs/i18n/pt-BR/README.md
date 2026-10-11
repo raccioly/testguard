@@ -145,9 +145,9 @@ a cobertura. O TestGuard o admite porque ele falha quando a alegação é falsa.
 | npm | `npm i -D testguard-cli` e depois `npx testguard probe` |
 | pip | `pip install testguard-cli` e depois `testguard probe` (requer Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.18.3` |
+| GitHub Action | `uses: raccioly/testguard@v0.19.0` |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-gate`, `testguard-probe` |
-| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.18.3/packaging/gitlab/testguard.gitlab-ci.yml` |
+| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.19.0/packaging/gitlab/testguard.gitlab-ci.yml` |
 
 Requisitos, instalações offline, `ENOVERSIONS` e todas as opções de CI estão
 no [guia de instalação](https://github.com/raccioly/testguard/blob/main/docs/installation.md).

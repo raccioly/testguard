@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-11
+
+Automated weekly release — everything merged since `v0.18.3`.
+
+### Changed
+
+- feat(automation): Google Jules routines with source-side backpressure (#207)
+- fix: keep project git hooks off the scratch tree; make the suite hermetic (#206)
+- fix: every defect the docs audit found — reuse, crashes, --python, init, CI templates (#210)
+- chore(deps-dev): bump source-map-js from 1.2.1 to 1.2.2 (#209)
+- chore(deps-dev): bump source-map-js from 1.2.1 to 1.2.2 in /fixtures/known-answer-playwright (#208)
+- docs: a full docs/ tree, slim README, translations, and tests that keep them true (#205)
+- chore(homebrew): sha256 for v0.18.3 (#204)
+
+
 ### Security
 
 - GitHub Action: inputs reach the run step as environment variables instead of being pasted into the script, so a value containing quotes or `$(…)` is no longer executed as shell.
