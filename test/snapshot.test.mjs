@@ -4,12 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { snapshotWorkingTree, headSha, git } from '../src/git.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 describe('snapshotWorkingTree', () => {
   it('captures tracked edits AND untracked files in a dangling commit, leaving HEAD, index and status untouched', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-snap-'));
     const g = (...a) => {
-      const r = spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8' });
+      const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8' });
       if (r.status !== 0) throw new Error(r.stderr);
       return r.stdout.trim();
     };

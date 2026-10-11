@@ -8,6 +8,7 @@ import { computeRemovedClaims } from '../src/claims/removed.mjs';
 import { main } from '../src/cli.mjs';
 import { loadClaims } from '../src/claims/load.mjs';
 import { fingerprint } from '../spec/lib/fingerprint.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'fixtures', 'known-answer');
@@ -21,7 +22,7 @@ function project() {
   const dir = mkdtempSync(join(tmpdir(), 'tg-since-'));
   cpSync(FIXTURE, dir, { recursive: true, filter: (s) => !/node_modules|\.flake-counter|\.testguard/.test(s) });
   const g = (...args) => {
-    const r = spawnSync('git', ['-c', 'user.email=s@example.invalid', '-c', 'user.name=s', ...args], { cwd: dir, encoding: 'utf8' });
+    const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=s@example.invalid', '-c', 'user.name=s', ...args], { cwd: dir, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(r.stderr);
   };
   g('init', '-q');

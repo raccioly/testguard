@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { replay, calibrationFrom, findFixCommits, dedupeByPatch, classifyReplay } from '../src/replay/replay.mjs';
 import { validate } from '../spec/lib/validate.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'fixtures', 'known-answer');
@@ -21,7 +22,7 @@ function corpus() {
   cpSync(FIXTURE, dir, { recursive: true, filter: (s) => !/node_modules|\.flake-counter|\.testguard/.test(s) });
   symlinkSync(join(ROOT, 'node_modules'), join(dir, 'node_modules'), 'dir');
   const g = (...args) => {
-    const r = spawnSync('git', ['-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
+    const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
     return r.stdout;
   };
@@ -83,7 +84,16 @@ describe('the test the fix shipped', () => {
   g('commit', '-q', '-m', 'fix(redact): keep the raw input out of the audit row');
   const blindSha = g('rev-parse', 'HEAD').trim();
 
-  return { dir, g, caughtSha, blindSha };
+  // The project's own post-checkout hook, failing loudly. Repo-local config,
+  // so it outranks any global hooksPath the machine carries; replay reverts
+  // files with `git checkout`, which runs it unless replay says otherwise.
+  const hooks = join(dir, '.git', 'tg-hooks');
+  mkdirSync(hooks);
+  const hookFired = join(dir, '.git', 'tg-hook-fired');
+  writeFileSync(join(hooks, 'post-checkout'), `#!/bin/sh\necho "$@" >> '${hookFired}'\nexit 1\n`, { mode: 0o755 });
+  spawnSync('git', ['config', 'core.hooksPath', hooks], { cwd: dir });
+
+  return { dir, g, caughtSha, blindSha, hookFired };
 }
 
 describe('replay on a scripted corpus', () => {
@@ -131,6 +141,12 @@ describe('replay on a scripted corpus', () => {
     expect(errors, JSON.stringify(errors)).toEqual([]);
   });
 
+  it("never runs the project's post-checkout hook on its scratch tree, though a plain checkout would", () => {
+    expect(existsSync(c.hookFired)).toBe(false);
+    spawnSync('git', ['checkout', '-q', 'HEAD', '--', 'src/redact.mjs'], { cwd: c.dir });
+    expect(existsSync(c.hookFired)).toBe(true);
+  });
+
   it('left the corpus untouched: the worktree is removed and HEAD is where it was', () => {
     expect(c.g('status', '--porcelain')).toBe('');
     expect(c.g('rev-parse', 'HEAD').trim()).toBe(c.blindSha);
@@ -158,7 +174,7 @@ describe('replay output paths', () => {
     const { replayCommand } = await import('../src/commands/replay.mjs');
     const dir = mkdtempSync(join(tmpdir(), 'tg-replay-out-'));
     const out = mkdtempSync(join(tmpdir(), 'tg-replay-dest-'));
-    const g = (...args) => spawnSync('git', ['-c', 'user.email=r@x', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
+    const g = (...args) => spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=r@x', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
     g('init', '-q');
     writeFileSync(join(dir, 'a.mjs'), 'export const a = 1;\n');
     g('add', '-A');
@@ -178,7 +194,7 @@ describe('replay preconditions', () => {
   it('de-duplicates by patch-id: the same fix under two shas is one row', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-replay-dup-'));
     const g = (...args) => {
-      const r = spawnSync('git', ['-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
+      const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
       if (r.status !== 0) throw new Error(r.stderr);
       return r.stdout;
     };
@@ -210,7 +226,7 @@ describe('replay preconditions', () => {
   it('scopes to the project directory: a monorepo fix that also touches another package is replayed on this part of it', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-replay-mono-'));
     const g = (...args) => {
-      const r = spawnSync('git', ['-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
+      const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
       if (r.status !== 0) throw new Error(r.stderr);
       return r.stdout;
     };
@@ -249,7 +265,7 @@ describe('replay preconditions', () => {
     cpSync(FIXTURE, dir, { recursive: true, filter: (s) => !/node_modules|\.flake-counter|\.testguard/.test(s) });
     symlinkSync(join(ROOT, 'node_modules'), join(dir, 'node_modules'), 'dir');
     const g = (...args) => {
-      const r = spawnSync('git', ['-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
+      const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
       if (r.status !== 0) throw new Error(r.stderr);
       return r.stdout;
     };
@@ -293,7 +309,7 @@ describe('fresh', () => { it('is one', () => { expect(fresh()).toBe(1); }); });
 
   it('a range with no fix commit is a precondition failure, not an empty pass', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-replay-none-'));
-    const g = (...args) => spawnSync('git', ['-c', 'user.email=r@x', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
+    const g = (...args) => spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=r@x', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
     g('init', '-q');
     writeFileSync(join(dir, 'a.mjs'), 'export const a = 1;\n');
     g('add', '-A');

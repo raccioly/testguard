@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { readSpecDoc } from '../src/evidence/writer.mjs';
 import { main } from '../src/cli.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'fixtures', 'known-answer');
@@ -24,7 +25,7 @@ function repo() {
   cpSync(FIXTURE, root, { recursive: true, filter: (s) => !/node_modules|\.flake-counter|\.testguard/.test(s) });
   symlinkSync(join(ROOT, 'node_modules'), join(root, 'node_modules'), 'dir');
   const g = (...args) => {
-    const r = spawnSync('git', ['-c', 'user.email=g@example.invalid', '-c', 'user.name=g', ...args], { cwd: root, encoding: 'utf8' });
+    const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=g@example.invalid', '-c', 'user.name=g', ...args], { cwd: root, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(r.stderr);
     return r.stdout.trim();
   };

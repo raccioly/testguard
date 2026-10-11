@@ -10,8 +10,9 @@ import { initProject, hookCommand, GITIGNORE_LINES, COMMITTED_OUTPUTS, CI_DOWNLO
 import { USAGE, main } from '../src/cli.mjs';
 import { sweepPath, sweepEvidencePath } from '../src/commands/sweep.mjs';
 import { gatePath } from '../src/commands/gate.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
-const gitInit = (dir) => { const g = (...a) => spawnSync('git', ['-c', 'user.email=i@example.invalid', '-c', 'user.name=i', ...a], { cwd: dir }); g('init', '-q'); };
+const gitInit = (dir) => { const g = (...a) => spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=i@example.invalid', '-c', 'user.name=i', ...a], { cwd: dir }); g('init', '-q'); };
 
 describe('the README documents the hook the code actually emits', () => {
   const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');

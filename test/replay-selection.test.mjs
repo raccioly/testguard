@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { replay, findFixCommits, dedupeByPatch } from '../src/replay/replay.mjs';
 import { validate } from '../spec/lib/validate.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 // Full native replay regressions remain in replay.test.mjs. These histories
 // isolate selection and admission so their proof need not replay other bugs.
@@ -13,7 +14,7 @@ describe('replay selection and admission', () => {
   it('de-duplicates by patch-id: the same fix under two shas is one row', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-replay-dup-'));
     const g = (...args) => {
-      const r = spawnSync('git', ['-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8', timeout: 5000 });
+      const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8', timeout: 5000 });
       if (r.status !== 0) throw new Error(r.stderr);
       return r.stdout;
     };
@@ -46,7 +47,7 @@ describe('replay selection and admission', () => {
   it('scopes to the project directory: a monorepo fix that also touches another package is replayed on this part of it', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-replay-mono-'));
     const g = (...args) => {
-      const r = spawnSync('git', ['-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8', timeout: 5000 });
+      const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8', timeout: 5000 });
       if (r.status !== 0) throw new Error(r.stderr);
       return r.stdout;
     };
@@ -84,7 +85,7 @@ describe('replay selection and admission', () => {
 
   it('does not calibrate entirely new source as a bug with a prior version', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-replay-new-source-'));
-    const g = (...args) => execFileSync('git', ['-c', 'user.email=fixture@example.invalid', '-c', 'user.name=fixture', ...args], { cwd: dir, timeout: 5000, encoding: 'utf8' });
+    const g = (...args) => execFileSync('git', [...FIXTURE_GIT, '-c', 'user.email=fixture@example.invalid', '-c', 'user.name=fixture', ...args], { cwd: dir, timeout: 5000, encoding: 'utf8' });
     try {
       mkdirSync(join(dir, 'src')); mkdirSync(join(dir, 'test'));
       // A controlled command is enough here: the admission must refuse this

@@ -13,6 +13,7 @@ import { loadClaims } from '../src/claims/load.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { writeSpecDoc, readSpecDoc } from '../src/evidence/writer.mjs';
 import { main } from '../src/cli.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const capture = () => {
   const lines = { out: [], err: [] };
@@ -37,7 +38,7 @@ describe('probe reproduces the known-answer fixture', () => {
     cpSync(FIXTURE, scratch, { recursive: true, filter: (src) => !/node_modules|\.flake-counter/.test(src) });
     symlinkSync(join(ROOT, 'node_modules'), join(scratch, 'node_modules'), 'dir');
     const g = (...args) => {
-      const r = spawnSync('git', ['-c', 'user.email=fixture@example.invalid', '-c', 'user.name=fixture', ...args], { cwd: scratch, encoding: 'utf8' });
+      const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=fixture@example.invalid', '-c', 'user.name=fixture', ...args], { cwd: scratch, encoding: 'utf8' });
       if (r.status !== 0) throw new Error(r.stderr);
     };
     g('init', '-q');
@@ -70,7 +71,7 @@ describe('probe reproduces the known-answer fixture', () => {
 
   it('ran in a scratch worktree and left the source tree untouched', () => {
     expect(evidence.run.mode).toBe('worktree');
-    const status = spawnSync('git', ['status', '--porcelain'], { cwd: scratch, encoding: 'utf8' }).stdout;
+    const status = spawnSync('git', [...FIXTURE_GIT, 'status', '--porcelain'], { cwd: scratch, encoding: 'utf8' }).stdout;
     expect(status).toBe('');
     expect(existsSync(join(scratch, '.testguard'))).toBe(false);
   });
@@ -312,7 +313,7 @@ describe('probe reproduces the known-answer fixture', () => {
     it('--include-dirty probes the working tree: an uncommitted test that kills a survivor turns it killed, HEAD untouched', async () => {
       const file = join(scratch, 'test', 'redact.test.mjs');
       const original = readFileSync(file, 'utf8');
-      const headBefore = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: scratch, encoding: 'utf8' }).stdout.trim();
+      const headBefore = spawnSync('git', [...FIXTURE_GIT, 'rev-parse', 'HEAD'], { cwd: scratch, encoding: 'utf8' }).stdout.trim();
       writeFileSync(file, original + `
 it('fails closed on a missing scope (uncommitted)', async () => {
   await expect(redact('x', RULES, {}, { writeAudit: vi.fn() })).rejects.toThrow(/scope/);
@@ -324,7 +325,7 @@ it('fails closed on a missing scope (uncommitted)', async () => {
         expect(ev.records[0].verdict).toBe('killed');
         expect(ev.run.repo.snapshot).toMatch(/^[a-f0-9]{40}$/);
         expect(ev.run.repo.head).toBe(headBefore);
-        expect(spawnSync('git', ['rev-parse', 'HEAD'], { cwd: scratch, encoding: 'utf8' }).stdout.trim()).toBe(headBefore);
+        expect(spawnSync('git', [...FIXTURE_GIT, 'rev-parse', 'HEAD'], { cwd: scratch, encoding: 'utf8' }).stdout.trim()).toBe(headBefore);
         expect(validate('evidence', ev).errors).toEqual([]);
       } finally {
         writeFileSync(file, original);

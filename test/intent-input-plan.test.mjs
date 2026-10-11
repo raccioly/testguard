@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { tmpdir, devNull } from 'node:os';
 import { join } from 'node:path';
 import { planIntentInput } from '../src/scaffold/plan-intent-input.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 vi.mock('node:child_process', async original => ({ ...await original() }));
 vi.mock('node:fs', async original => ({ ...await original() }));
@@ -17,7 +18,7 @@ function directory() { const root = fs.realpathSync(fs.mkdtempSync(join(tmpdir()
 function history(format = 'sha1') {
   const root = directory(), nested = join(root, 'child[1]'); fs.mkdirSync(nested);
   const git = (...args) => {
-    const result = child.spawnSync('git', ['-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', '-c', `core.hooksPath=${devNull}`, ...args], { cwd: root, encoding: 'utf8', timeout: 5000 });
+    const result = child.spawnSync('git', [...FIXTURE_GIT, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', '-c', `core.hooksPath=${devNull}`, ...args], { cwd: root, encoding: 'utf8', timeout: 5000 });
     if (result.status !== 0) throw new Error(result.stderr); return result.stdout.trim();
   };
   git('init', '-q', `--object-format=${format}`);

@@ -11,6 +11,7 @@ import { loadClaims } from '../src/claims/load.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { run, discoverTests } from '../src/probe/runners/node-test.mjs';
 import { selectRunner } from '../src/probe/runners/index.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'fixtures/known-answer-node');
@@ -20,7 +21,7 @@ describe('native Node known-answer proof', () => {
   beforeAll(async () => {
     dir = mkdtempSync(join(tmpdir(), 'tg-node-fixture-'));
     cpSync(FIXTURE, dir, { recursive: true });
-    for (const args of [['init','-q'],['add','.'],['-c','user.name=fixture','-c','user.email=fixture@example.invalid','commit','-qm','fixture']]) execFileSync('git',args,{cwd:dir,timeout:5000});
+    for (const args of [['init','-q'],['add','.'],['-c','user.name=fixture','-c','user.email=fixture@example.invalid','commit','-qm','fixture']]) execFileSync('git',[...FIXTURE_GIT, ...args],{cwd:dir,timeout:5000});
     claims = loadClaims(join(dir,'testguard.claims.json'));
     evidence = await probe({ projectDir:dir, claims, runnerName:'node-test', confirmRuns:3, budgetMs:5000, mode:'worktree', toolVersion:'test' });
   }, 30_000);
@@ -43,8 +44,8 @@ describe('native Node known-answer proof', () => {
     }
   });
   it('restores every target and removes its scratch worktree after failures/timeouts', () => {
-    expect(execFileSync('git',['status','--porcelain'],{cwd:dir,encoding:'utf8'})).toBe('');
-    expect(execFileSync('git',['worktree','list','--porcelain'],{cwd:dir,encoding:'utf8'}).match(/^worktree /gm)).toHaveLength(1);
+    expect(execFileSync('git',[...FIXTURE_GIT, 'status','--porcelain'],{cwd:dir,encoding:'utf8'})).toBe('');
+    expect(execFileSync('git',[...FIXTURE_GIT, 'worktree','list','--porcelain'],{cwd:dir,encoding:'utf8'}).match(/^worktree /gm)).toHaveLength(1);
     expect(readFileSync(join(dir,'src/policy.mjs'),'utf8')).toBe(readFileSync(join(FIXTURE,'src/policy.mjs'),'utf8'));
   });
   it('reuses matching Node evidence and remeasures across framework identity or worker policy', async () => {
@@ -73,7 +74,7 @@ test('live fault',async()=>{if(!await ready()){writeFileSync('live.json',JSON.st
       const subset = { ...claims, claims: claims.claims.filter((c) => c.id === 'NODE-READY') };
       subset.claims[0].faults[0].replace = 'export async function ready() {\n  return false;';
       writeFileSync(join(scratch, 'testguard.claims.json'), JSON.stringify(subset));
-      for (const args of [['init','-q'],['add','.'],['-c','user.name=fixture','-c','user.email=fixture@example.invalid','commit','-qm','fixture']]) execFileSync('git',args,{cwd:scratch,timeout:5000});
+      for (const args of [['init','-q'],['add','.'],['-c','user.name=fixture','-c','user.email=fixture@example.invalid','commit','-qm','fixture']]) execFileSync('git',[...FIXTURE_GIT, ...args],{cwd:scratch,timeout:5000});
       child = spawn(process.execPath, [join(ROOT, 'cli/testguard.mjs'), 'probe', scratch, '--runner', 'node-test', '--in-place', '--budget', '30000', '--quiet'], { stdio: ['ignore', 'pipe', 'pipe'] });
       let diagnostic = ''; for (const stream of [child.stdout, child.stderr]) stream.on('data', (bytes) => { diagnostic = (diagnostic + bytes).slice(-4000); });
       const closed = new Promise((resolve) => child.once('close', (code, signal) => resolve({ code, signal })));

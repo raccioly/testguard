@@ -17,13 +17,14 @@ import { fingerprint } from '../spec/lib/fingerprint.mjs';
 import { defenderSelection } from '../src/probe/attribution.mjs';
 import { resolveDefenders } from '../src/probe/runners/shared.mjs';
 import { discoverDefenders } from '../src/probe/discover.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'known-answer');
 
 /** Turn a project directory into a one-commit repository so a change can be measured. */
 function gitInit(dir) {
   const g = (...args) => {
-    const r = spawnSync('git', ['-c', 'user.email=s@example.invalid', '-c', 'user.name=s', ...args], { cwd: dir, encoding: 'utf8' });
+    const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=s@example.invalid', '-c', 'user.name=s', ...args], { cwd: dir, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(r.stderr);
   };
   g('init', '-q'); g('add', '-A'); g('commit', '-q', '-m', 'base');
@@ -295,7 +296,7 @@ describe('computeStatus — every state, with a conforming document', () => {
     expect(validate('status', s).errors).toEqual([]);
     // a clean baseline at HEAD itself: no note
     const { spawnSync } = require('node:child_process');
-    const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
+    const head = spawnSync('git', [...FIXTURE_GIT, 'rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
     writeSpecDoc('baseline', join(dir, '.testguard', 'baseline.json'), { ...b, head, dirty: false });
     expect(baselineNotes(computeStatus({ projectDir: dir }))).toEqual([]);
     // a clean baseline at a commit that is NOT in HEAD's history (rewritten or foreign): a different note

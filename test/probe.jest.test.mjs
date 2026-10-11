@@ -10,6 +10,7 @@ import { probe } from '../src/probe/probe.mjs';
 import { loadClaims } from '../src/claims/load.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { selectRunner } from '../src/probe/runners/index.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'fixtures', 'known-answer-jest');
@@ -24,7 +25,7 @@ describe('probe reproduces the known-answer fixture with jest', () => {
     scratch = mkdtempSync(join(tmpdir(), 'testguard-jest-'));
     cpSync(FIXTURE, scratch, { recursive: true, filter: (src) => !/node_modules|\.flake-counter/.test(src) });
     symlinkSync(join(ROOT, 'node_modules'), join(scratch, 'node_modules'), 'dir');
-    const g = (...args) => { const r = spawnSync('git', ['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', ...args], { cwd: scratch, encoding: 'utf8' }); if (r.status !== 0) throw new Error(r.stderr); };
+    const g = (...args) => { const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=f@example.invalid', '-c', 'user.name=f', ...args], { cwd: scratch, encoding: 'utf8' }); if (r.status !== 0) throw new Error(r.stderr); };
     g('init', '-q'); g('add', '-A'); g('commit', '-q', '-m', 'fixture');
     evidence = await probe({ projectDir: scratch, claims: loadClaims(join(scratch, 'testguard.claims.json')), confirmRuns: expected.confirmRuns, mode: 'worktree', runnerName: 'jest', escalate: false, budgetMs: 60_000, toolVersion: 'test' });
   }, 300_000);

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { probe } from '../src/probe/probe.mjs';
 import { validate } from '../spec/lib/validate.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 it('kills a fault with its override, not the unrelated inherited defender', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'tg-focused-defender-'));
@@ -18,7 +19,7 @@ it('kills a fault with its override, not the unrelated inherited defender', asyn
     }
     writeFileSync(join(dir, '.gitignore'), 'node_modules\n');
     for (const args of [['init', '-q'], ['add', '-A'], ['commit', '-qm', 'fixture']]) {
-      const result = spawnSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@example.invalid', ...args], { cwd: dir, encoding: 'utf8' });
+      const result = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.name=test', '-c', 'user.email=test@example.invalid', ...args], { cwd: dir, encoding: 'utf8' });
       if (result.status !== 0) throw new Error(result.stderr);
     }
     symlinkSync(join(process.cwd(), 'node_modules'), join(dir, 'node_modules'), 'dir');

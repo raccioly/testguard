@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { main, commandUsage, USAGE } from '../src/cli.mjs';
 import { SOURCE_EXT, explainExclusions, DEFAULT_EXCLUDES } from '../src/gate/changed.mjs';
 import { validate } from '../spec/lib/validate.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const capture = () => { const lines = { out: [], err: [] }; return { lines, io: { out: (s) => lines.out.push(s), err: (s) => lines.err.push(s) } }; };
@@ -22,7 +23,7 @@ const dirs = [];
 const gitDir = () => {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'tg-surface-')));
   dirs.push(dir);
-  const g = (...args) => spawnSync('git', ['-c', 'user.email=s@example.invalid', '-c', 'user.name=s', ...args], { cwd: dir, encoding: 'utf8' });
+  const g = (...args) => spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=s@example.invalid', '-c', 'user.name=s', ...args], { cwd: dir, encoding: 'utf8' });
   g('init', '-q');
   g('commit', '-q', '--allow-empty', '-m', 'init');
   return dir;
@@ -144,7 +145,7 @@ describe('replay --calibration-out says where the calibration goes', () => {
   it('writes the calibration at that path and the replay at --out, both conforming', async () => {
     const dir = gitDir();
     const w = (rel, body) => { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), body); };
-    const g = (...args) => spawnSync('git', ['-c', 'user.email=s@example.invalid', '-c', 'user.name=s', ...args], { cwd: dir, encoding: 'utf8' });
+    const g = (...args) => spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=s@example.invalid', '-c', 'user.name=s', ...args], { cwd: dir, encoding: 'utf8' });
     w('package.json', JSON.stringify({ name: 'calout', private: true, devDependencies: { vitest: '*' } }));
     symlinkSync(join(ROOT, 'node_modules'), join(dir, 'node_modules'), 'dir');
     w('src/calc.mjs', 'export const clamp = (n, hi) => n;\n');

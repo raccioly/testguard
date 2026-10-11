@@ -10,6 +10,7 @@ import { main } from '../src/cli.mjs';
 import { decideAdmission } from '../src/admit/admit.mjs';
 import { readSpecDoc } from '../src/evidence/writer.mjs';
 import { validate } from '../spec/lib/validate.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'fixtures', 'known-answer');
@@ -46,7 +47,7 @@ describe('testguard admit on the known-answer fixture', () => {
     cpSync(FIXTURE, scratch, { recursive: true, filter: (src) => !/node_modules|\.flake-counter/.test(src) });
     symlinkSync(join(ROOT, 'node_modules'), join(scratch, 'node_modules'), 'dir');
     const g = (...args) => {
-      const r = spawnSync('git', ['-c', 'user.email=fixture@example.invalid', '-c', 'user.name=fixture', ...args], { cwd: scratch, encoding: 'utf8' });
+      const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=fixture@example.invalid', '-c', 'user.name=fixture', ...args], { cwd: scratch, encoding: 'utf8' });
       if (r.status !== 0) throw new Error(r.stderr);
     };
     g('init', '-q');
@@ -106,7 +107,7 @@ it('fails closed on a missing scope (uncommitted)', async () => {
       expect(await main(['admit', testFile(), '--claim', 'REDACT-003', '--budget', '30000'], a.io)).toBe(0);
       expect(a.lines.out.join('\n')).toMatch(/^ADMITTED — test\/redact\.test\.mjs passes on HEAD and fails on the fault of REDACT-003, 3\/3\. Commit it\.$/m);
       // the tree, HEAD and index are untouched: the test is still uncommitted
-      expect(spawnSync('git', ['status', '--porcelain'], { cwd: scratch, encoding: 'utf8' }).stdout).toMatch(/^ M test\/redact\.test\.mjs/m);
+      expect(spawnSync('git', [...FIXTURE_GIT, 'status', '--porcelain'], { cwd: scratch, encoding: 'utf8' }).stdout).toMatch(/^ M test\/redact\.test\.mjs/m);
 
       const b = capture();
       expect(await main(['admit', testFile(), '--claim', 'REDACT-003', '--fault', 'F1', '--confirm', '1', '--budget', '30000', '--json'], b.io)).toBe(0);

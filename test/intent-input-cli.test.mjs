@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { main } from '../src/cli.mjs';
 import { scaffoldCommand } from '../src/commands/scaffold.mjs';
 import { validate } from '../spec/lib/validate.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const roots = [];
 function fixture() {
@@ -39,7 +40,7 @@ describe('read-only intent input CLI', () => {
     expect(readdirSync(root).sort()).toEqual(before);
   });
   it.each(['root', 'nested'])('inspects actual %s history without changing dirty files or Git state', async scope => {
-    const root = fixture(), git = args => execFileSync('git', ['-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', ...args], { cwd: root, encoding: 'utf8' }).trim();
+    const root = fixture(), git = args => execFileSync('git', [...FIXTURE_GIT, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', ...args], { cwd: root, encoding: 'utf8' }).trim();
     git(['init', '-q']); mkdirSync(join(root, 'child[1]'));
     writeFileSync(join(root, 'child[1]', 'testguard.claims.json'), '{"schemaVersion":1,"claims":[]}');
     writeFileSync(join(root, 'guard.mjs'), 'export const x = 1;');

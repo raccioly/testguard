@@ -9,6 +9,7 @@ import { loadClaims } from '../src/claims/load.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { resetInterpreterCache } from '../src/probe/runners/python.mjs';
 import { PreconditionError } from '../src/probe/worktree.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'fixtures', 'known-answer-python');
@@ -25,7 +26,7 @@ const HAS_PYTHON = which(PYTHON, ['-c', 'import sys']);
 const HAS_PYTEST = HAS_PYTHON && which(PYTHON, ['-c', 'import pytest']);
 
 const git = (cwd, ...args) => {
-  const r = spawnSync('git', ['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', ...args], { cwd, encoding: 'utf8' });
+  const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=f@example.invalid', '-c', 'user.name=f', ...args], { cwd, encoding: 'utf8' });
   if (r.status !== 0) throw new Error(r.stderr);
 };
 

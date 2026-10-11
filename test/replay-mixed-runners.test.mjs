@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { buildReplayRunnerUniverse, partitionReplayDefenders, replay } from '../src/replay/replay.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const hasPython = spawnSync('python3', ['-c', 'import sys'], { encoding: 'utf8' }).status === 0;
@@ -85,7 +86,7 @@ class ExistingDetector(unittest.TestCase):
         self.assertEqual(value(), 1)
 `);
   const git = (...args) => {
-    const result = spawnSync('git', ['-c', 'user.email=replay@example.invalid', '-c', 'user.name=Replay', ...args], { cwd: dir, encoding: 'utf8' });
+    const result = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=replay@example.invalid', '-c', 'user.name=Replay', ...args], { cwd: dir, encoding: 'utf8' });
     if (result.status !== 0) throw new Error(result.stderr);
     return result.stdout;
   };

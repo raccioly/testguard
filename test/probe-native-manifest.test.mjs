@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { probe } from '../src/probe/probe.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const claim = { schemaVersion: 1, claims: [{ id: 'C-1', statement: 's', source: { kind: 'manual' }, severity: 'low', producedBy: { producer: 'human' },
@@ -12,7 +13,7 @@ const claim = { schemaVersion: 1, claims: [{ id: 'C-1', statement: 's', source: 
 
 const repository = (prefix) => {
   const dir = mkdtempSync(join(tmpdir(), prefix));
-  const git = (...args) => spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...args], { cwd: dir, encoding: 'utf8' });
+  const git = (...args) => spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...args], { cwd: dir, encoding: 'utf8' });
   git('init', '-q');
   return { dir, git };
 };

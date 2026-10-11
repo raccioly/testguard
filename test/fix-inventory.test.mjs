@@ -5,6 +5,7 @@ import { tmpdir, devNull } from 'node:os';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { readFixCommitInventory } from '../src/scaffold/fix-input.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 vi.mock('node:child_process', async original => ({ ...await original() }));
 vi.mock('node:perf_hooks', async original => { const actual = await original(); return { ...actual, performance: { now: () => actual.performance.now() } }; });
@@ -12,7 +13,7 @@ const roots = [];
 function fixture(format = 'sha1') {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'testguard-fix-inventory-'))); roots.push(root);
   const git = (...args) => {
-    const run = child.spawnSync('git', ['-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', '-c', `core.hooksPath=${devNull}`, ...args], { cwd: root, encoding: 'utf8', timeout: 5000 });
+    const run = child.spawnSync('git', [...FIXTURE_GIT, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', '-c', `core.hooksPath=${devNull}`, ...args], { cwd: root, encoding: 'utf8', timeout: 5000 });
     if (run.status !== 0) throw new Error(run.stderr); return run.stdout.trim();
   };
   git('init', '-q', `--object-format=${format}`); mkdirSync(join(root, 'nested'));

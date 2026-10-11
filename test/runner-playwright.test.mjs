@@ -15,6 +15,7 @@ import { loadClaims } from '../src/claims/load.mjs';
 import { PreconditionError } from '../src/probe/worktree.mjs';
 import { spawnSync } from 'node:child_process';
 import { cpSync, symlinkSync } from 'node:fs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SAMPLE = JSON.parse(readFileSync(join(ROOT, 'test', 'samples', 'playwright-report.json'), 'utf8'));
@@ -149,7 +150,7 @@ describe('an owned defender whose runner is not resolvable', () => {
       const claims = JSON.parse(readFileSync(join(dir, 'testguard.claims.json'), 'utf8'));
       claims.claims = [{ ...claims.claims[0], defendedBy: ['e2e/redact.spec.mjs'] }];
       writeFileSync(join(dir, 'testguard.claims.json'), JSON.stringify(claims));
-      const g = (...a) => spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir });
+      const g = (...a) => spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir });
       g('init', '-q'); g('add', '-A'); g('commit', '-q', '-m', 'x');
       playwright.resetConfigCache();
       // The project's node_modules has vitest but no @playwright/test. A global

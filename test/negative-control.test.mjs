@@ -11,6 +11,7 @@ import { classify } from '../src/probe/classify.mjs';
 import { probe } from '../src/probe/probe.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { RUNNERS } from '../src/probe/runners/index.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -48,7 +49,7 @@ describe('classify — the negative control is consulted at exactly one point', 
  */
 function unreachableSubjectRepo() {
   const dir = mkdtempSync(join(tmpdir(), 'tg-nc-'));
-  const g = (...a) => spawnSync('git', ['-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8' });
+  const g = (...a) => spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...a], { cwd: dir, encoding: 'utf8' });
   g('init', '-q');
   mkdirSync(join(dir, 'src'));
   mkdirSync(join(dir, 'test'));
@@ -111,8 +112,8 @@ describe('a fault that never runs is reported as unverifiable, not as a survivor
     // restored it fails every escalation run and is reported as an undeclared
     // killer — a finding invented entirely by the probe's own leftovers.
     writeFileSync(join(dir, 'test', 'c.test.mjs'), "import { expect, it } from 'vitest';\nimport { a } from '../src/a.mjs';\nit('is defined', () => expect(a).toBeTypeOf('function'));\n");
-    spawnSync('git', ['-c', 'user.email=t@e.invalid', '-c', 'user.name=t', 'add', '-A'], { cwd: dir });
-    spawnSync('git', ['-c', 'user.email=t@e.invalid', '-c', 'user.name=t', 'commit', '-qm', 'three'], { cwd: dir });
+    spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@e.invalid', '-c', 'user.name=t', 'add', '-A'], { cwd: dir });
+    spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@e.invalid', '-c', 'user.name=t', 'commit', '-qm', 'three'], { cwd: dir });
     try {
       const ev = await probe({ projectDir: dir, claims, mode: 'in-place', confirmRuns: 1, budgetMs: 90_000, escalate: true, toolVersion: 't' });
       const r = ev.records[0];
@@ -143,7 +144,7 @@ describe('a fault that never runs is reported as unverifiable, not as a survivor
     // Same repo, but now the defender imports the subject and asserts something
     // the fault does not change — a genuine blind spot rather than an absent one.
     writeFileSync(join(dir, 'test', 'a.test.mjs'), "import { expect, it } from 'vitest';\nimport { a } from '../src/a.mjs';\nit('returns a number', () => expect(typeof a()).toBe('number'));\n");
-    spawnSync('git', ['-c', 'user.email=t@e.invalid', '-c', 'user.name=t', 'commit', '-qam', 'two'], { cwd: dir });
+    spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@e.invalid', '-c', 'user.name=t', 'commit', '-qam', 'two'], { cwd: dir });
     try {
       const ev = await probe({ projectDir: dir, claims, mode: 'in-place', confirmRuns: 1, budgetMs: 60_000, escalate: false, toolVersion: 't' });
       expect(ev.records[0]).toMatchObject({ verdict: 'survived', detail: { negativeControl: 'reached' } });

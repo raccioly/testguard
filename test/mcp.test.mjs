@@ -12,6 +12,7 @@ import { TOOLS, TOOL_NAMES } from '../src/mcp/tools.mjs';
 import { initProject } from '../src/init/init.mjs';
 import { main } from '../src/cli.mjs';
 import { validate } from '../spec/lib/validate.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'fixtures', 'known-answer');
@@ -79,7 +80,7 @@ describe('the tools agree with the CLI, on a real project', () => {
     writeFileSync(claimsPath, JSON.stringify(claims, null, 2) + '\n');
     symlinkSync(join(ROOT, 'node_modules'), join(scratch, 'node_modules'), 'dir');
     const g = (...args) => {
-      const r = spawnSync('git', ['-c', 'user.email=m@example.invalid', '-c', 'user.name=m', ...args], { cwd: scratch, encoding: 'utf8' });
+      const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=m@example.invalid', '-c', 'user.name=m', ...args], { cwd: scratch, encoding: 'utf8' });
       if (r.status !== 0) throw new Error(r.stderr);
     };
     g('init', '-q');

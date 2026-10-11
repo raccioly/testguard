@@ -5,6 +5,7 @@ import { tmpdir, devNull } from 'node:os';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { readFixCommitMetadata } from '../src/scaffold/fix-input.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 vi.mock('node:child_process', async original => ({ ...await original() }));
 vi.mock('node:perf_hooks', async original => { const actual = await original(); return { ...actual, performance: { now: () => actual.performance.now() } }; });
@@ -12,7 +13,7 @@ const roots = [];
 function fixture(objectFormat = 'sha1') {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'testguard-fix-input-'))); roots.push(root);
   const git = (...args) => {
-    const run = child.spawnSync('git', ['-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', '-c', `core.hooksPath=${devNull}`, ...args], { cwd: root, encoding: 'utf8' });
+    const run = child.spawnSync('git', [...FIXTURE_GIT, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', '-c', `core.hooksPath=${devNull}`, ...args], { cwd: root, encoding: 'utf8' });
     if (run.status !== 0) throw new Error(run.stderr); return run.stdout.trim();
   };
   git('init', '-q', `--object-format=${objectFormat}`); writeFileSync(join(root, 'guard.mjs'), 'export const x = 1;'); git('add', '.'); git('commit', '-qm', 'Initial source');
@@ -81,7 +82,7 @@ describe('local fix commit metadata', () => {
     if (reason === 'unsafe-subject') bytes = Buffer.concat([bytes, Buffer.from('x'.repeat(1025))]);
     if (reason === 'malformed-commit') bytes = Buffer.from(`tree ${f.git('rev-parse', 'HEAD^{tree}')}\nparent ${f.parent}\n`);
     if (reason === 'object-read-unavailable') bytes = Buffer.concat([bytes, Buffer.alloc(129 * 1024, 32)]);
-    const stored = child.spawnSync('git', ['hash-object', '--literally', '-t', 'commit', '-w', '--stdin'], { cwd: f.root, input: bytes, encoding: 'utf8' });
+    const stored = child.spawnSync('git', [...FIXTURE_GIT, 'hash-object', '--literally', '-t', 'commit', '-w', '--stdin'], { cwd: f.root, input: bytes, encoding: 'utf8' });
     expect(stored.status).toBe(0);
     expect(() => readFixCommitMetadata({ projectDir: f.root, commit: stored.stdout.trim() })).toThrow(new RegExp(reason));
   });
@@ -101,7 +102,7 @@ describe('local fix commit metadata', () => {
     expect(() => readFixCommitMetadata({ projectDir: f.root, commit: f.commit })).toThrow(/object-read-unavailable|object-byte-limit/);
   });
   it('refuses mismatched object bytes even if the subprocess reports success', () => {
-    const f = fixture(); const bytes = child.spawnSync('git', ['cat-file', 'commit', f.parent], { cwd: f.root }).stdout;
+    const f = fixture(); const bytes = child.spawnSync('git', [...FIXTURE_GIT, 'cat-file', 'commit', f.parent], { cwd: f.root }).stdout;
     vi.spyOn(child, 'spawnSync').mockReturnValue({ status: 0, stdout: bytes });
     expect(() => readFixCommitMetadata({ projectDir: f.root, commit: f.commit })).toThrow(/object-identity-mismatch/);
   });

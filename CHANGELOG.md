@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `admit`, `sweep` and `replay` list `--runner`, `--runner-cmd`, `--node-modules` and `--python`.
   - `--python` and `--serial` describe what they actually do.
 - `fixtures/known-answer-python/README.md` shows UNREACHED-001 as unverifiable (subject-not-executed), matching `expected.json`.
+- `probe` and `replay` no longer run the project's git hooks on their scratch tree. `git worktree add` and replay's revert of a fixed file both trigger `post-checkout`, so a failing hook (Git LFS's whenever `git-lfs` is not on PATH, a husky or lefthook script) failed a probe that would otherwise have succeeded, and a slow one slowed every run. Hooks are disabled for those two commands only; filters, LFS smudge included, still apply. Claimed as `TG-SCRATCH-NEVER-RUNS-PROJECT-HOOKS`.
+- The test suite no longer depends on the machine's global git config. Fixtures committed through it, so a global `core.hooksPath` or `commit.gpgsign=true` turned 142 tests red while CI stayed green. Fixtures now pin their own git options (`test/helpers/git.mjs`), and a new CI `hermeticity` job runs the suite under a deliberately hostile config. That job is what found the hook bug above.
 
 ### Changed
 

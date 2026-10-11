@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { replay } from '../src/replay/replay.mjs';
 import { validate } from '../spec/lib/validate.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -23,7 +24,7 @@ function corpus() {
   const dir = mkdtempSync(join(tmpdir(), 'tg-replay-onefile-'));
   const w = (rel, body) => { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), body); };
   const g = (...args) => {
-    const r = spawnSync('git', ['-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
+    const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=r@example.invalid', '-c', 'user.name=r', ...args], { cwd: dir, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
   };
   w('package.json', JSON.stringify({ name: 'onefile', private: true, devDependencies: { vitest: '*' } }, null, 2));

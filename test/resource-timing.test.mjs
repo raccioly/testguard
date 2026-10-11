@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { probe, sameWorkerPolicy } from '../src/probe/probe.mjs';
 import { costReport } from '../src/probe/cost.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 it('counts real invocations once despite shared baselines and historical verdict reuse', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'tg-resource-timing-'));
@@ -15,7 +16,7 @@ it('counts real invocations once despite shared baselines and historical verdict
     writeFileSync(join(dir, 'test/guard.test.mjs'), "import {value} from '../src/guard.mjs';\n");
     writeFileSync(join(dir, 'runner.cjs'), `const fs=require('node:fs');const pass=fs.readFileSync('src/guard.mjs','utf8').includes('value = 1');fs.writeFileSync(process.argv.at(-1),JSON.stringify({success:pass,numTotalTests:1,numPassedTests:Number(pass),numFailedTests:Number(!pass),testResults:[{name:'test/guard.test.mjs',assertionResults:[{status:pass?'passed':'failed',fullName:'value equals one',failureMessages:pass?[]:['AssertionError: expected one']}]}]}));`);
     for (const args of [['init', '-q'], ['add', '.'], ['-c', 'user.email=fixture@example.invalid', '-c', 'user.name=fixture', 'commit', '-qm', 'fixture']]) {
-      execFileSync('git', args, { cwd: dir, timeout: 5000 });
+      execFileSync('git', [...FIXTURE_GIT, ...args], { cwd: dir, timeout: 5000 });
     }
     const claims = { schemaVersion: 1, claims: [{ id: 'RESOURCE', statement: 'The value is one.', source: { kind: 'spec', ref: 'fixture' }, severity: 'high', defendedBy: ['test/guard.test.mjs'], faults: [2,3].map((value) => ({ id: 'F'+value, description: 'Change the value.', faultClass: 'literal-changed', file: 'src/guard.mjs', find: 'value = 1', replace: 'value = '+value })) }] };
     const opts = { projectDir: dir, claims, runnerCommand: `${JSON.stringify(process.execPath)} runner.cjs {files} {out}`, confirmRuns: 3, budgetMs: 3000 };
@@ -53,7 +54,7 @@ it('remeasures native evidence when the worker ceiling changes', async () => {
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ type: 'module' }));
     writeFileSync(join(dir, 'src/value.mjs'), 'export const value = 1;\n');
     writeFileSync(join(dir, 'test/value.test.mjs'), "import {it,expect} from 'vitest';import {value} from '../src/value.mjs';it('value',()=>expect(value).toBe(1));\n");
-    for (const args of [['init', '-q'], ['add', '.'], ['-c', 'user.email=fixture@example.invalid', '-c', 'user.name=fixture', 'commit', '-qm', 'fixture']]) execFileSync('git', args, { cwd: dir, timeout: 5000 });
+    for (const args of [['init', '-q'], ['add', '.'], ['-c', 'user.email=fixture@example.invalid', '-c', 'user.name=fixture', 'commit', '-qm', 'fixture']]) execFileSync('git', [...FIXTURE_GIT, ...args], { cwd: dir, timeout: 5000 });
     const claims = { schemaVersion: 1, claims: [{ id: 'WORKERS', statement: 'Value stays one.', source: { kind: 'spec', ref: 'fixture' }, severity: 'high', defendedBy: ['test/value.test.mjs'], faults: [{ id: 'F1', description: 'Change value.', faultClass: 'literal-changed', file: 'src/value.mjs', find: 'value = 1', replace: 'value = 2' }] }] };
     const opts = { projectDir: dir, claims, runnerName: 'vitest', nodeModules: new URL('../node_modules', import.meta.url).pathname, confirmRuns: 1, budgetMs: 5000 };
     const first = await probe(opts);

@@ -3,6 +3,7 @@ import {tmpdir} from 'node:os';
 import {dirname,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
+import { FIXTURE_GIT } from './git.mjs';
 const FIXTURE=join(dirname(fileURLToPath(import.meta.url)),'..','..','fixtures','known-answer');
 /** A copy of the fixture as its own repository, with a helper to commit. */
 export function repo({ nested = false } = {}) {
@@ -22,7 +23,7 @@ export function repo({ nested = false } = {}) {
   delete anchors[1].expectHits;
   writeFileSync(claimsPath, JSON.stringify(claims, null, 2) + '\n');
   const g = (...args) => {
-    const r = spawnSync('git', ['-c', 'user.email=g@example.invalid', '-c', 'user.name=g', ...args], { cwd: root, encoding: 'utf8' });
+    const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=g@example.invalid', '-c', 'user.name=g', ...args], { cwd: root, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(r.stderr);
     return r.stdout.trim();
   };

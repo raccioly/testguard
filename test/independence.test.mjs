@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { classifyIndependence } from '../src/probe/independence.mjs';
 import { rank } from '../src/probe/rank.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 /** A repository with a known authorship history: who wrote what, and when. */
 function repo() {
@@ -12,7 +13,7 @@ function repo() {
   mkdirSync(join(dir, 'src'), { recursive: true });
   mkdirSync(join(dir, 'test'), { recursive: true });
   const g = (env, ...args) => {
-    const r = spawnSync('git', ['-c', `user.email=${env}`, '-c', `user.name=${env}`, ...args], { cwd: dir, encoding: 'utf8' });
+    const r = spawnSync('git', [...FIXTURE_GIT, '-c', `user.email=${env}`, '-c', `user.name=${env}`, ...args], { cwd: dir, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(r.stderr);
   };
   const write = (rel, body) => writeFileSync(join(dir, rel), body);
