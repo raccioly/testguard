@@ -339,20 +339,7 @@
               "$ref": "urn:claimspec:v1:common#/$defs/severity"
             },
             "source": {
-              "type": "object",
-              "required": [
-                "kind"
-              ],
-              "properties": {
-                "kind": {
-                  "$ref": "urn:claimspec:v1:common#/$defs/claimSourceKind"
-                },
-                "ref": {
-                  "type": "string",
-                  "maxLength": 512
-                }
-              },
-              "additionalProperties": false
+              "$ref": "urn:claimspec:v1:common#/$defs/claimSource"
             },
             "producedBy": {
               "$ref": "urn:claimspec:v1:common#/$defs/provenance"

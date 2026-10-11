@@ -46,21 +46,7 @@
           "maxLength": 2000
         },
         "source": {
-          "description": "Declared origin of claim intent. A source label or opaque reference does not authenticate independence, chronology or correctness. Producer provenance and measured test independence are separate.",
-          "type": "object",
-          "required": [
-            "kind"
-          ],
-          "properties": {
-            "kind": {
-              "$ref": "urn:claimspec:v1:common#/$defs/claimSourceKind"
-            },
-            "ref": {
-              "type": "string",
-              "maxLength": 512
-            }
-          },
-          "additionalProperties": false
+          "$ref": "urn:claimspec:v1:common#/$defs/claimSource"
         },
         "severity": {
           "$ref": "urn:claimspec:v1:common#/$defs/severity"
