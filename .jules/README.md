@@ -61,6 +61,19 @@ branch `main`. Paste the prompt verbatim.
 | runner-scout | Weekly, Wednesday | `Follow .jules/routines/runner-scout.md exactly. Read .jules/RULES.md first. If preflight prints STOP, end the task with no changes and no pull request.` |
 | docs-drift | Weekly, Friday | `Follow .jules/routines/docs-drift.md exactly. Read .jules/RULES.md first. If preflight prints STOP, end the task with no changes and no pull request.` |
 
+**A new task can show `Inactive`.** A task created from the Task Input box
+can stay `Inactive` even though its menu offers "Pause schedule". Pause it,
+then resume it, and it shows `Active`. Check the badge after creating each
+task, because an `Inactive` task never runs.
+
+**The VM is a shallow clone.** Jules runs `git clone --depth 1` and sets a
+global `core.hooksPath /dev/null`.
+
+- The routines only diff against `origin/main` and build scratch worktrees
+  from `HEAD`, so both work in that clone.
+- Do not write a routine step that needs history, such as `git log` over
+  many commits or `replay` over old fixes.
+
 That is three tasks a week at most. On the free plan's 15 tasks a day the
 quota is never the limit; the review queue is.
 
