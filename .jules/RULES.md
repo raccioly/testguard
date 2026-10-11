@@ -47,12 +47,31 @@ must be killed:
 node cli/testguard.mjs probe . --claim <ID> --include-dirty
 ```
 
-## 5. If the suite is red before you change anything
+## 5. Never ask a question: decide, or stop
+
+Nobody answers a scheduled run. A question leaves the task in "waiting for
+your input" forever, and the finding is lost with it. That has already
+happened on sibling projects, with real defects found.
+
+When you reach a choice these rules do not settle:
+
+- **Take the pessimistic option** if one is within scope. Pessimistic means
+  a verdict rounds toward unproven, nothing is claimed that is not proven, and
+  nothing is weakened. Then continue.
+- **Otherwise, end the task** with no pull request. The task summary is
+  three parts:
+  - the question;
+  - each option with its consequence;
+  - the evidence: commands and output.
+
+  A maintainer reads the summary.
+
+## 6. If the suite is red before you change anything
 
 That is your environment, not the code: CI on `main` is green. Do not fix it.
 End the task and describe the failure in the summary.
 
-## 6. Never
+## 7. Never
 
 - edit `fixtures/**/expected.json`. Those are oracles, verified by hand.
 - delete or weaken a test or an assertion, or edit an existing test file.
@@ -69,7 +88,7 @@ End the task and describe the failure in the summary.
 - quote names, paths or text from any private codebase. Use neutral domains
   only.
 
-## 7. What merges without a maintainer
+## 8. What merges without a maintainer
 
 Two kinds of change can merge on a green CI with no maintainer:
 
