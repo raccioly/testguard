@@ -85,9 +85,9 @@ expect(store.writeAudit).toHaveBeenCalledWith(
 | npm | `npm i -D testguard-cli`，然后 `npx testguard probe` |
 | pip | `pip install testguard-cli`，然后 `testguard probe`（需要 Node ≥ 20） |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.20.0` |
+| GitHub Action | `uses: raccioly/testguard@v0.20.1` |
 | pre-commit | `repo: https://github.com/raccioly/testguard`，钩子 `testguard-claims`、`testguard-gate`、`testguard-probe` |
-| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.20.0/packaging/gitlab/testguard.gitlab-ci.yml` |
+| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.20.1/packaging/gitlab/testguard.gitlab-ci.yml` |
 
 环境要求、离线安装、`ENOVERSIONS` 以及所有 CI 选项，见
 [安装指南](https://github.com/raccioly/testguard/blob/main/docs/installation.md)。

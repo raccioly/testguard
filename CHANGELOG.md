@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-10-12
+
+Automated weekly release — everything merged since `v0.20.0`.
+
+### Changed
+
+- chore(homebrew): sha256 for v0.20.0 (#216)
+
+
 ## [0.20.0] - 2026-10-11
 
 Automated weekly release — everything merged since `v0.19.0`.
