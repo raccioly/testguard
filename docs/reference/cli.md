@@ -209,7 +209,6 @@ spec before it is written.
 | `--verbose` | off | Also print every killed fault. |
 | `--quiet` | off | Print only the summary and the evidence path. |
 | `--cost` | off | Also report what this run's defenders cost. |
-| `--changed <ref>` | detected | With `--json`: include claim coverage of the change in the status document. |
 | `--json` | off | Print the status document plus this run's result. |
 
 Where the evidence goes, unless `--out` says otherwise:
