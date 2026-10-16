@@ -287,7 +287,7 @@ probe costs, use `probe --cost` or `claims --cost`; see the
 
 | Variable | Read by | Meaning |
 |---|---|---|
-| `TESTGUARD_CHANGED_REF` | `gate`, `sweep`, `status`, `brief`, `probe --json`, the MCP tools | The reference to measure a change against when `--changed` is absent. Checked before the CI variables below. |
+| `TESTGUARD_CHANGED_REF` | `gate`, `sweep`, `status`, `brief`, the MCP tools | The reference to measure a change against when `--changed` is absent. Checked before the CI variables below. |
 | `TESTGUARD_NODE_MODULES` | `probe`, `admit`, `sweep`, `replay` | A `node_modules` directory to link into the scratch worktree. `--node-modules` wins. |
 | `TESTGUARD_PYTHON` | `probe`, `claims --check-anchors`, `admit`, `sweep`, `replay` | The Python interpreter for `.py` defenders. `--python` wins when both are given; the two mean the same thing: a bare name such as `python3` is looked up on `PATH`, anything containing `/` is a path. |
 | `TESTGUARD_GITLAB_TOKEN` | the GitLab CI template only | A project or group access token with `api` scope, used when `post_note: true` to post the brief as a merge-request note. `CI_JOB_TOKEN` cannot write notes. The CLI never reads it. See the [GitLab guide](../guides/ci/gitlab.md). |
