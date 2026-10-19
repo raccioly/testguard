@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.2] - 2026-10-19
+
+Automated weekly release — everything merged since `v0.20.1`.
+
+### Changed
+
+- [jules:docs-drift] probe — remove removed --changed flag (#220)
+- chore(homebrew): sha256 for v0.20.1 (#218)
+
+
 ## [0.20.1] - 2026-10-12
 
 Automated weekly release — everything merged since `v0.20.0`.

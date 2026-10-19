@@ -31,9 +31,9 @@ packages in total.
 | npm devDependency | `npm i -D testguard-cli` then `npx testguard probe` | a JavaScript or TypeScript project: version pinned in the lockfile, and the local install the agent layer prefers |
 | pip | `pip install testguard-cli` then `testguard probe` | a Python team that does not want to touch npm directly (still needs Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` | a machine-wide `testguard` on `PATH` |
-| GitHub Action | `uses: raccioly/testguard@v0.20.1` | CI on GitHub |
+| GitHub Action | `uses: raccioly/testguard@v0.20.2` | CI on GitHub |
 | pre-commit | `repo: https://github.com/raccioly/testguard` with a release tag as `rev:` ([below](#pre-commit)) | local hooks on commit and push |
-| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.20.1/packaging/gitlab/testguard.gitlab-ci.yml` | CI on GitLab |
+| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.20.2/packaging/gitlab/testguard.gitlab-ci.yml` | CI on GitLab |
 
 ### npx
 
@@ -114,7 +114,7 @@ tarball, checked against a `sha256` recorded at release time.
 ```yaml
 - uses: actions/checkout@v7
   with: { fetch-depth: 0 }
-- uses: raccioly/testguard@v0.20.1
+- uses: raccioly/testguard@v0.20.2
   with: { command: gate }
 ```
 
@@ -128,7 +128,7 @@ and complete pull-request and main-branch workflows, are in
 ```yaml
 repos:
   - repo: https://github.com/raccioly/testguard
-    rev: v0.20.1
+    rev: v0.20.2
     hooks:
       - id: testguard-claims
       - id: testguard-gate
@@ -144,7 +144,7 @@ three hooks, their stages and their arguments are in
 
 ```yaml
 include:
-  - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.20.1/packaging/gitlab/testguard.gitlab-ci.yml'
+  - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.20.2/packaging/gitlab/testguard.gitlab-ci.yml'
     inputs: { dir: . }
 ```
 

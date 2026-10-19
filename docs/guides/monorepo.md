@@ -215,12 +215,12 @@ jobs:
           node-version: 22
       - run: npm ci               # every workspace's dependencies, from the root
       - name: gate
-        uses: raccioly/testguard@v0.20.1
+        uses: raccioly/testguard@v0.20.2
         with:
           command: gate
           working-directory: ${{ matrix.project }}
       - name: probe
-        uses: raccioly/testguard@v0.20.1
+        uses: raccioly/testguard@v0.20.2
         with:
           command: probe
           working-directory: ${{ matrix.project }}

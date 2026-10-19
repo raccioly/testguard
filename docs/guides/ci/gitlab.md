@@ -17,7 +17,7 @@ move together:
 
 ```yaml
 include:
-  - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.20.1/packaging/gitlab/testguard.gitlab-ci.yml'
+  - remote: 'https://raw.githubusercontent.com/raccioly/testguard/v0.20.2/packaging/gitlab/testguard.gitlab-ci.yml'
     inputs:
       dir: backend          # where testguard.claims.json lives (default ".")
       post_note: true       # post the brief on the merge request; needs TESTGUARD_GITLAB_TOKEN
