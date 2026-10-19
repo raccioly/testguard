@@ -147,9 +147,9 @@ falsa.
 | npm | `npm i -D testguard-cli` y luego `npx testguard probe` |
 | pip | `pip install testguard-cli` y luego `testguard probe` (requiere Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.20.1` |
+| GitHub Action | `uses: raccioly/testguard@v0.20.2` |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-gate`, `testguard-probe` |
-| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.20.1/packaging/gitlab/testguard.gitlab-ci.yml` |
+| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.20.2/packaging/gitlab/testguard.gitlab-ci.yml` |
 
 Los requisitos, las instalaciones sin conexión, `ENOVERSIONS` y todas las
 opciones de CI están en la

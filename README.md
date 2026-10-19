@@ -129,9 +129,9 @@ raises coverage. TestGuard admits it because it fails when the claim is false.
 | npm | `npm i -D testguard-cli` then `npx testguard probe` |
 | pip | `pip install testguard-cli` then `testguard probe` (needs Node ≥ 20) |
 | Homebrew | `brew tap raccioly/tap && brew install testguard` |
-| GitHub Action | `uses: raccioly/testguard@v0.20.1` |
+| GitHub Action | `uses: raccioly/testguard@v0.20.2` |
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-gate`, `testguard-probe` |
-| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.20.1/packaging/gitlab/testguard.gitlab-ci.yml` |
+| GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.20.2/packaging/gitlab/testguard.gitlab-ci.yml` |
 
 Requirements, offline installs, `ENOVERSIONS` and every CI option are in the
 [installation guide](https://github.com/raccioly/testguard/blob/main/docs/installation.md).
