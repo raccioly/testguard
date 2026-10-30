@@ -297,9 +297,6 @@ says which install answered (`local install`, `npx cache`, `pnpm dlx cache`,
 | `--max <n>` | `20` | Items in the brief, 1 to 50. |
 | `--evidence <path>` | `<dir>/.testguard/evidence.json` | Evidence to brief from. |
 | `--baseline <path>` | `<dir>/.testguard/baseline.json` if present | Baseline that marks findings as known. |
-| `--changed <ref>` | detected | Reference for the unclaimed-changes section. A detected reference that does not resolve is silent here. |
-| `--include-dirty` | off | With a reference, measure the working tree. |
-| `--out <path>` | `<dir>/.testguard/brief.json` | Where the brief document is written (ignored with `--text`/`--markdown`). |
 | `--json` | off | Print the brief document. |
 
 **Exit:** `0`; `2` when there is no evidence and neither `--text` nor
