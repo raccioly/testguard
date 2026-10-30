@@ -161,7 +161,7 @@ jobs:
           # `bash -e` aborts the step before any branch on its status can run,
           # and `|| code=$?` is the one form errexit does not trip on.
           code=0
-          npx -y docguard-cli@0.41.5 guard > "$RUNNER_TEMP/docguard-guard.txt" 2>&1 || code=$?
+          npx -y docguard-cli@0.45.0 guard > "$RUNNER_TEMP/docguard-guard.txt" 2>&1 || code=$?
           cat "$RUNNER_TEMP/docguard-guard.txt"
           if [ "$code" -eq 2 ]; then
             echo "::warning::DocGuard reported warnings (exit 2); see the output above."
@@ -172,7 +172,7 @@ jobs:
 
       - name: DocGuard — maturity score (reported, not gated)
         if: always()
-        run: npx -y docguard-cli@0.41.5 score || true
+        run: npx -y docguard-cli@0.45.0 score || true
 
       # ── Every change needs a claim: the gate runs on this repository's own
       #    pull requests. A new source file without a claim (or an excusing
