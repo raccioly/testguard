@@ -32,6 +32,6 @@ Follow `.jules/RULES.md` throughout.
    - Where the docs are right and the CLI is wrong, that is a bug: change
      nothing, and describe it in the task summary.
 7. Run the checks in `.jules/RULES.md` §4, plus
-   `npx -y docguard-cli@0.41.5 guard`, then open the pull request.
+   `npx -y docguard-cli@0.45.0 guard`, then open the pull request.
 
 A docs-only change merges on a green CI without a maintainer.
