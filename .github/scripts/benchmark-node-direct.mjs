@@ -25,7 +25,7 @@ import { detectContention } from '../../src/probe/contention.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const { values } = parseArgs({ options: {
   out: { type: 'string' }, 'before-ref': { type: 'string' },
-  rounds: { type: 'string', default: '5' }, 'fault-workers': { type: 'string', default: '2' },
+  rounds: { type: 'string', default: '5' }, 'fault-workers': { type: 'string', default: '3' },
   'max-serial-ratio': { type: 'string', default: '1.25' }, 'max-fanout-ratio': { type: 'string', default: '0.85' },
 } });
 assert(values.out && /^[0-9a-f]{40}$/.test(values['before-ref'] ?? ''), '--out and an exact --before-ref commit SHA are required');
@@ -124,7 +124,7 @@ try {
   await wave('fanout', 'proof', false);
   const mean = (strategy) => results.filter((result) => result.strategy === strategy).reduce((sum, result) => sum + result.elapsedMs, 0) / 2;
 
-  const speed = await speedStudy();
+  const speed = await speedStudy(before);
   const summary = {
     version: process.versions.node,
     toolHead: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
@@ -152,7 +152,7 @@ try {
  * the runner's speed lands on every strategy alike) and only medians are
  * compared, as ratios.
  */
-async function speedStudy() {
+async function speedStudy(before) {
   const sh = (...args) => execFileSync('git', args, { cwd: speedDir, encoding: 'utf8', timeout: 10000 }).trim();
   mkdirSync(join(speedDir, 'src'));
   mkdirSync(join(speedDir, 'test'));
