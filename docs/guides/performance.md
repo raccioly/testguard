@@ -243,7 +243,9 @@ from scratch even when your source has not changed.
 One kind of change reuse cannot see: anything outside the hashed inputs that
 changes a verdict while the defenders stay green, such as an environment
 variable, a package upgraded inside the same virtualenv, or a service your
-tests read. A change that turns the defenders red is caught by the live run.
+tests read, a `setupFiles`/`globalSetup` file the runner config names by
+string, or a lockfile above the project directory in a monorepo. A change that
+turns the defenders red is caught by the live run.
 Pass `--no-reuse` after one that does not.
 
 In CI, restore the previous run's evidence from a cache and write to the same

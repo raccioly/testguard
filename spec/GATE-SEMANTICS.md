@@ -266,7 +266,9 @@ Rules that follow from the table:
    **One live baseline licenses every carry-forward.** No hash sees the
    environment: installed packages, the interpreter, a data file a test reads,
    a bare specifier that resolves through a `node_modules` symlink to a
-   workspace package (outside the project closure). So before a prior record
+   workspace package (outside the project closure), a setup or global-setup
+   file a runner configuration names by string rather than imports, a lockfile
+   above the project directory in a monorepo. So before a prior record
    with a non-empty defender set is carried forward, that defender set runs
    once on unmodified source. That run is the first run of rule 1's shared
    baseline, so it costs one run per defender set per command, and a fault

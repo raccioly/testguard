@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the baseline, so a red defender is probed in full; `run.measurements` gains
   `reuseBaselineRuns`. `status` staleness and the origin-policy freshness check
   apply the same closure and predicate. Evidence written before this change is
-  re-probed once. An indeterminate closure makes `--require-origin` policy
+  re-probed once, and until then `status` reports each of its records as
+  stale ("predates dependency hashing"). An indeterminate closure makes `--require-origin` policy
   `unavailable`.
 - The module lexer behind defender discovery now reads regex literals,
   numeric literals and template expressions containing quotes or nested
