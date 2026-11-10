@@ -216,6 +216,13 @@ const semantic = {
       if (n >= 3 && doc.run.provisional === true) errors.push({ path: '/run/provisional', message: `confirmRuns ${n} is confirmed; provisional must be absent or false` });
     }
     if (doc.run.runners && doc.run.runner && !doc.run.runners.some((x) => x.name === doc.run.runner.name)) errors.push({ path: '/run/runners', message: 'runners must include the project runner named in run.runner' });
+    // GATE-SEMANTICS rule 8: the instrument named is the tool that wrote the
+    // document, and the reuse tally is the records' own.
+    if (doc.run.instrument && doc.run.instrument.toolVersion !== doc.tool?.version) errors.push({ path: '/run/instrument/toolVersion', message: `instrument toolVersion ${doc.run.instrument.toolVersion} is not the tool that wrote this evidence (${doc.tool?.version})` });
+    if (doc.run.reuse) {
+      const reused = doc.records.filter((r) => r.reusedFrom).length;
+      if (doc.run.reuse.reused !== reused || doc.run.reuse.measured !== doc.records.length - reused) errors.push({ path: '/run/reuse', message: `run.reuse must count the records: ${reused} reused, ${doc.records.length - reused} measured` });
+    }
     if (doc.run.repo.ignoredDirty && doc.run.repo.snapshot) errors.push({ path: '/run/repo/ignoredDirty', message: 'a working-tree snapshot has no ignored dirty files: the tree was probed as it is' });
     doc.records.forEach((r, i) => {
       const p = `/records/${i}`;
@@ -261,6 +268,12 @@ const semantic = {
           errors.push({ path: `${p}/detail`, message: 'flaky-defender requires a non-green baseline or mixed pass/fail probe runs' });
         }
       }
+      // GATE-SEMANTICS rule 8: an import closure that could not be followed
+      // says why, and can never have licensed a carried-forward verdict.
+      const closure = r.inputs.dependencyClosure;
+      if (closure === 'indeterminate' && !r.inputs.dependencyIssues?.length) errors.push({ path: `${p}/inputs/dependencyIssues`, message: 'an indeterminate dependency closure must name at least one reason' });
+      if (closure === 'complete' && r.inputs.dependencyIssues) errors.push({ path: `${p}/inputs/dependencyIssues`, message: 'a complete dependency closure has no issues' });
+      if (closure === 'indeterminate' && r.reusedFrom) errors.push({ path: `${p}/reusedFrom`, message: 'a record whose dependency closure is indeterminate is never reused (GATE-SEMANTICS rule 8)' });
       if (r.verdict === 'nocover' && !r.defenders.nocover) {
         errors.push({ path: `${p}/defenders/nocover`, message: 'nocover verdict requires defenders.nocover = true' });
       }

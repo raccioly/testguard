@@ -292,3 +292,87 @@ export function classifyPythonDefenders(projectDir, targetRel, candidates) {
   }
   return { canDetect, mocking, signals };
 }
+
+/**
+ * Dotted module name → project files, for every `.py` file under the project.
+ * A name two files share (`src/pkg/mod.py` and `tests/pkg/mod.py`) maps to
+ * both: which one Python loads depends on `sys.path`, so both are inputs.
+ */
+export function pyModuleIndex(projectDir) {
+  const index = new Map();
+  for (const rel of walk(projectDir)) {
+    if (!PY.test(rel)) continue;
+    const { dotted } = pyModuleName(projectDir, rel);
+    if (!dotted) continue;
+    if (!index.has(dotted)) index.set(dotted, []);
+    index.get(dotted).push(rel);
+  }
+  return index;
+}
+
+const COMPUTED_PY_IMPORT = /(?:import_module|__import__)\s*\(\s*(?!['"][\w.]+['"]\s*[,)])/;
+const RELATIVE_FROM = /^\s*from\s+(\.+)([\w.]*)\s+import\s/;
+
+/**
+ * Every project `.py` file the given files load, transitively, the Python
+ * counterpart of the JavaScript resolver's `closure`. Matched by module name,
+ * as Python matches: an import of `pkg.mod` reaches `pkg/__init__.py` and
+ * `pkg/mod.py`. pytest also loads every `conftest.py` from the project root
+ * down to a test's directory, so those are inputs of any file below them.
+ *
+ * Unfollowable is `indeterminate`, never smaller: an `import_module()` or
+ * `__import__()` whose argument is not a string literal, and a relative import
+ * that names no project module. Absolute names that match no project file are
+ * the standard library or installed packages, outside this closure.
+ */
+export function pyClosure(projectDir, relFiles, { index = pyModuleIndex(projectDir), limits = {} } = {}) {
+  const cap = { maxModules: 256, maxFileBytes: 1_048_576, maxTotalBytes: 16_777_216, ...limits };
+  const files = new Set();
+  const issues = [];
+  let bytes = 0;
+  const queue = [];
+  const add = (rel) => { if (!files.has(rel)) { files.add(rel); queue.push(rel); } };
+  for (const rel of relFiles) {
+    add(rel);
+    for (let dir = dirname(rel); ; dir = dirname(dir)) {
+      const conftest = dir === '.' ? 'conftest.py' : `${dir}/conftest.py`;
+      if (existsSync(join(projectDir, conftest))) add(conftest);
+      if (dir === '.' || dir === '/' || dir === '') break;
+    }
+  }
+  while (queue.length) {
+    const rel = queue.shift();
+    if (files.size > cap.maxModules) { issues.push({ code: 'graph-limit', file: rel }); break; }
+    let source;
+    try {
+      const buffer = readFileSync(join(projectDir, rel));
+      bytes += buffer.length;
+      if (buffer.length > cap.maxFileBytes || bytes > cap.maxTotalBytes) { issues.push({ code: 'graph-limit', file: rel }); break; }
+      source = buffer.toString('utf8');
+    } catch {
+      issues.push({ code: 'unreadable-module', file: rel });
+      continue;
+    }
+    const self = pyModuleName(projectDir, rel).dotted;
+    // The package a module lives in is executed before it: `pkg/__init__.py` for `pkg.mod`.
+    const parts = self.split('.');
+    for (let n = 1; n < parts.length; n++) for (const file of index.get(parts.slice(0, n).join('.')) ?? []) add(file);
+    if (COMPUTED_PY_IMPORT.test(source)) issues.push({ code: 'computed-specifier', file: rel });
+    const selfPackage = packageOf(projectDir, rel);
+    for (const line of logicalLines(source)) {
+      const relative = RELATIVE_FROM.exec(line);
+      if (!relative) continue;
+      const base = pyImports(line, selfPackage)[0];
+      if (!base || !index.has(base)) issues.push({ code: 'unreadable-module', file: rel, specifier: `${relative[1]}${relative[2]}` });
+    }
+    for (const dotted of pyImports(source, selfPackage)) {
+      const segments = dotted.split('.');
+      for (let n = 1; n <= segments.length; n++) for (const file of index.get(segments.slice(0, n).join('.')) ?? []) add(file);
+    }
+  }
+  return {
+    status: issues.length ? 'indeterminate' : 'complete',
+    files: [...files].sort(),
+    ...(issues.length ? { issues } : {}),
+  };
+}

@@ -141,7 +141,8 @@ npx testguard-cli probe . --progress ndjson 2>events.ndjson  # machine-readable 
 {"event":"verdict","claim":"REDACT-001","fault":"F1","verdict":"survived","severity":"critical","file":"demo/redact.py","at":"…"}
 ```
 
-The stages are `baseline`, `baseline-flake` (finishing the baseline runs after
+The stages are `reuse-baseline` (the one live run that licenses carrying a
+verdict forward), `baseline`, `baseline-flake` (finishing the baseline runs after
 a red one, so "failed once in three" can be told from "fails every time"),
 `probe`, `negative-control` and `escalation`. A verdict reused from earlier
 evidence carries `"reused": true`.
@@ -203,6 +204,13 @@ changed. All of these must match the evidence at the output path:
 
 - the fault itself (its content hash) and the claim's metadata;
 - the target file's hash and every selected defender's hash;
+- everything the target and the defenders import, transitively, inside the
+  project (`inputs.dependencyHashes`), plus the lockfiles, `package.json`,
+  `pyproject.toml` and runner/compiler config at the project root. Python
+  closures include every `conftest.py` above each file. When an import cannot
+  be followed — a computed `import(name)`, `require(x)` or
+  `importlib.import_module(name)`, a relative import that resolves to no file —
+  the closure is `indeterminate` and that fault is probed every time;
 - the requested and resolved defender sets and where they came from;
 - the test universe and the discovery inputs. For built-in runners this
   binds the runner, its version and the hashes of its config files,
@@ -212,6 +220,13 @@ changed. All of these must match the evidence at the output path:
 - the runner the evidence records (`run.runner`): the engine that ran, its
   version, and where it was resolved from (`project`, `path`, `builtin`);
 - `--confirm` and the worker policy (`--workers`, `--serial`).
+
+Then one more check that no hash can make: the defender set runs once on
+unmodified source. Green, and every fault it defends is reused; red, and each
+is probed in full. That run is the first run of the shared baseline, so it
+costs one run per defender set, never one per fault, and
+`run.measurements.reuseBaselineRuns` counts it. Evidence written before this
+rule has no `dependencyHashes` and is probed again once.
 
 A record produced by a probe error is never reused, and neither is one whose
 defenders failed to load (`defenders-failed-to-load`): that is a statement
@@ -226,9 +241,12 @@ names. A cold run, a changed runner config or a changed worker policy probes
 from scratch even when your source has not changed.
 
 One kind of change reuse cannot see: anything outside the hashed inputs that
-changes a verdict without breaking the load, such as an environment variable,
-a package upgraded inside the same virtualenv, or a service your tests read.
-Pass `--no-reuse` after one.
+changes a verdict while the defenders stay green, such as an environment
+variable, a package upgraded inside the same virtualenv, or a service your
+tests read, a `setupFiles`/`globalSetup` file the runner config names by
+string, or a lockfile above the project directory in a monorepo. A change that
+turns the defenders red is caught by the live run.
+Pass `--no-reuse` after one that does not.
 
 In CI, restore the previous run's evidence from a cache and write to the same
 path, so only claims whose inputs changed are probed again. TestGuard's own CI

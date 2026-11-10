@@ -85,7 +85,27 @@ complete, confirmed run writes it, which is why a provisional or partial run
 goes to its own file and can never be frozen into a baseline by accident.
 
 The next `probe` reads its own output file to reuse verdicts whose recorded
-inputs have not changed (`--no-reuse` turns that off).
+inputs have not changed (`--no-reuse` turns that off). Those inputs include
+`inputs.dependencyHashes`, the hashes of everything the target and its
+defenders import plus the root lockfiles and runner config, and
+`inputs.dependencyClosure`: `complete`, or `indeterminate` with the reasons in
+`inputs.dependencyIssues` when an import could not be followed. An
+indeterminate record, or one written before these fields existed, is never
+reused. Before any record is reused its defender set runs once, unmodified;
+`run.measurements.reuseBaselineRuns` counts those runs. `run.instrument` names
+the TestGuard version and a digest of the resolver and runner configuration;
+evidence from another version or digest is never reused. `run.reuse` counts the
+records carried forward and the records measured. Reuse trusts this file: if
+the people a gate judges can write it, run that gate with `--no-reuse`.
+
+The file is written atomically (a temporary file, then a rename), so an
+interrupted run never leaves a truncated document behind.
+
+**For tools that read this file.** `inputs.targetHash` and
+`inputs.defenderHashes` are unchanged; `inputs.dependencyHashes` was added beside
+them. A consumer judging whether a record is still fresh must compare all three
+against the current tree: the first two alone miss a changed helper that the
+target or a defender imports.
 
 ### evidence-provisional.json and evidence-partial.json
 

@@ -1,6 +1,7 @@
 import { assertNotCancelled } from '../probe/runners/lifecycle.mjs';
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { mkdirSync, writeFileSync, readFileSync, renameSync, rmSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { basename, dirname, join } from 'node:path';
 import { validate } from '../../spec/lib/validate.mjs';
 
 export class SpecDocError extends Error {}
@@ -24,7 +25,24 @@ export function writeSpecDoc(kind, path, doc, { publish } = {}) {
     return publish(output);
   }
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, output);
+  writeAtomic(path, output);
+}
+
+/**
+ * Write to an exclusive temporary file beside the target, then rename it into
+ * place. A rename within one directory is atomic, so a run killed mid-write
+ * leaves either the previous document or the new one — never a truncated file
+ * a later probe would read as its prior evidence.
+ */
+export function writeAtomic(path, output) {
+  const temp = join(dirname(path), `.${basename(path)}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`);
+  try {
+    writeFileSync(temp, output, { flag: 'wx' });
+    renameSync(temp, path);
+  } catch (error) {
+    rmSync(temp, { force: true });
+    throw error;
+  }
 }
 
 /** Read a spec document, refusing one that does not conform. */

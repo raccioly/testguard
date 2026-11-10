@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Verdict reuse no longer carries a kill over a red suite (#232).** Reuse
+  compared only the target and defender files, so breaking a helper the target
+  imports reused the old `killed`. Evidence now records
+  `inputs.dependencyHashes` (the transitive project import closure of the
+  target and every defender, plus root lockfiles, manifests and runner config;
+  Python by module name, including ancestor `conftest.py`) and
+  `inputs.dependencyClosure`. Reuse requires equal hashes and a `complete`
+  closure; a computed `import()`/`require()`/`import_module()`, an unresolvable
+  relative import or an over-limit graph makes it `indeterminate` (reasons in
+  `inputs.dependencyIssues`) and that fault is probed every time. Before any
+  record is carried forward its defender set runs once unmodified, shared with
+  the baseline, so a red defender is probed in full; `run.measurements` gains
+  `reuseBaselineRuns`. `status` staleness and the origin-policy freshness check
+  apply the same closure and predicate. Evidence written before this change is
+  re-probed once, and until then `status` reports each of its records as
+  stale ("predates dependency hashing"). An indeterminate closure makes `--require-origin` policy
+  `unavailable`.
+- **Reuse names its instrument, and says how much it reused (#232).** Evidence
+  records `run.instrument` (TestGuard version plus a digest of resolver alias
+  sources and root runner config/lockfiles); evidence from another version or
+  digest is never reused. `run.reuse: { reused, measured }` is in the evidence
+  and in `probe --json`. `GATE-SEMANTICS.md` now states that a gate over
+  authors who can write the evidence file must run `--no-reuse`.
+- A `timeout` or `flaky-defender` record is never reused: like `probe-error`
+  it describes the run's environment, and a green live baseline today does not
+  make an old timeout the current answer. `status` reports evidence from
+  another TestGuard version or configuration digest as stale, in one line.
+- Spec documents are written atomically (exclusive temporary file, then
+  rename): a run killed mid-write no longer leaves a truncated evidence file
+  the next probe reads as prior evidence.
+- The module lexer behind defender discovery now reads regex literals,
+  numeric literals and template expressions containing quotes or nested
+  templates; before, a module with `/'/` in it was unreadable and discovery
+  through it was indeterminate.
+
 ## [0.20.1] - 2026-10-12
 
 Automated weekly release — everything merged since `v0.20.0`.
