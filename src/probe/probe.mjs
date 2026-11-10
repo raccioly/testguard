@@ -22,6 +22,7 @@ import { fingerprint } from '../../spec/lib/fingerprint.mjs';
 import { recordedOriginSummary } from '../../spec/lib/origins.mjs';
 import { persistenceSignalsFor } from '../supply/persistence.mjs';
 import { collectOwnedManifests, hashNativeTestUniverse, hashCustomCommandUniverse } from './universe.mjs';
+import { createDependencyHasher } from './dependencies.mjs';
 
 
 /** Is `child` the same file as `root`, or under it? Both must already be real paths. */
@@ -117,7 +118,7 @@ export async function probe({
   resetInterpreterCache(); // Cache only within this measurement, never across commands.
   const measuredStart = performance.now();
   const startedAt = new Date().toISOString();
-  const measurements = { elapsedMs: 0, runnerMs: 0, overheadMs: 0, runnerInvocations: 0 };
+  const measurements = { elapsedMs: 0, runnerMs: 0, overheadMs: 0, runnerInvocations: 0, reuseBaselineRuns: 0 };
   const timedRun = async (runner, opts) => {
     assertNotCancelled();
     const start = performance.now();
@@ -310,6 +311,9 @@ export async function probe({
       : hashNativeTestUniverse(manifests);
     const baselineCache = new Map();
     const discoveryHashCache = new Map();
+    // Hashes and parses are cached only where the tree cannot change between
+    // faults: the scratch worktree. In place, the user's tree is live.
+    const dependencyHasher = createDependencyHasher(iso.projectDir, { cache: iso.mode === 'worktree' });
     // The negative control is charged per (target file, defender set): two
     // claims over the same file with the same defenders ask the same question.
     const controlCache = new Map();
@@ -351,6 +355,36 @@ export async function probe({
       }
       return mergeRuns(parts);
     };
+    /**
+     * The defenders' runs on unmodified source, shared by every fault with the
+     * same defender set and topped up on demand: reuse asks for one run, a
+     * full probe for N, and the first run is the same run. The rules are the
+     * ones a single loop used to apply: stop at the first non-green run, and
+     * when that run FAILED, finish the remaining runs so a flaky defender can
+     * be told from a broken one. A prefix that already stopped is never
+     * extended with more normal runs.
+     */
+    const ensureBaseline = async (defenders, want, stage, { reuse = false } = {}) => {
+      const key = defenders.join('\n');
+      if (!baselineCache.has(key)) baselineCache.set(key, { runs: [], loadMessage: undefined, flakeFinished: false });
+      const entry = baselineCache.get(key);
+      const stopped = () => entry.runs.length > 0 && entry.runs[entry.runs.length - 1].outcome !== 'pass';
+      while (entry.runs.length < want && !stopped()) {
+        stage(reuse ? 'reuse-baseline' : 'baseline', entry.runs.length + 1, want);
+        const res = await runDefenders(defenders);
+        if (reuse) measurements.reuseBaselineRuns++;
+        entry.runs.push(res.run);
+        if (res.run.outcome !== 'pass') entry.loadMessage = res.loadMessage;
+      }
+      if (want === confirmRuns && !entry.flakeFinished && entry.runs.length < confirmRuns && entry.runs[entry.runs.length - 1].outcome === 'fail') {
+        for (let i = entry.runs.length; i < confirmRuns; i++) {
+          stage('baseline-flake', i + 1, confirmRuns);
+          entry.runs.push((await runDefenders(defenders)).run);
+        }
+        entry.flakeFinished = true;
+      }
+      return entry;
+    };
     /** Which runner each defender runs under, when more than the project runner is involved. */
     const byRunner = (files) => {
       const groups = partitionConfigured(files);
@@ -388,7 +422,7 @@ export async function probe({
         try {
           if (!declared && mockInfo.indeterminate.length > 0) {
             record = discoveryIndeterminateRecord({ ...common, inputs: safeInputs(iso.projectDir, fault, defenders, { testUniverseHash, discoveryHashes }), indeterminate: mockInfo.indeterminate });
-          } else record = await probeOne({ ...common, allTests, iso, isoReal, onWarn, confirmRuns, escalate, baselineCache, controlCache, fatalEditFor, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, testUniverseHash, discoveryHashes,
+          } else record = await probeOne({ ...common, allTests, iso, isoReal, onWarn, confirmRuns, escalate, controlCache, fatalEditFor, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, testUniverseHash, discoveryHashes, ensureBaseline, dependencyHasher,
             historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root,
             // A path from the runner is absolute inside the SCRATCH worktree, or
             // project-relative. Either way history is read from the real repository,
@@ -558,7 +592,7 @@ async function negativeControl({ file, defenders, iso, runDefenders, fatalEditFo
   return reached;
 }
 
-async function probeOne({ claim, fault, defenders, discovered, allTests, iso, isoReal, onWarn = () => {}, confirmRuns, escalate, baselineCache, controlCache, fatalEditFor, runDefenders, stage, prior, priorRunId, byRunner, mocking = [], signals = [], historyRef, historyDir, toRepoPath, testUniverseHash, discoveryHashes = {} }) {
+async function probeOne({ claim, fault, defenders, discovered, allTests, iso, isoReal, onWarn = () => {}, confirmRuns, escalate, ensureBaseline, dependencyHasher, controlCache, fatalEditFor, runDefenders, stage, prior, priorRunId, byRunner, mocking = [], signals = [], historyRef, historyDir, toRepoPath, testUniverseHash, discoveryHashes = {} }) {
   const targetPath = join(iso.projectDir, fault.file);
   const targetExists = existsSync(targetPath);
   const inputs = {
@@ -566,13 +600,25 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
     defenderHashes: Object.fromEntries(defenders.map((f) => [f, hashFile(join(iso.projectDir, f))])),
     testUniverseHash,
     discoveryHashes,
+    // Everything the target and the defenders import, and the lockfiles and
+    // runner configuration around them: a broken helper changes the answer
+    // as surely as a broken target does.
+    ...dependencyHasher.inputsFor([fault.file, ...defenders]),
   };
 
   const subject = subjectOf(fault, sha256);
 
-  // Same source, same defenders, same N, same fault: the verdict cannot have changed.
+  // Same source, same imports, same defenders, same N, same fault — and the
+  // defenders still green right now. The hashes cannot see the environment
+  // (installed packages, the interpreter, a data file a test reads), so one
+  // live unmodified run of the defender set licenses the carry-forward. It is
+  // the first run of the shared baseline, so a fault that is probed after all
+  // pays nothing twice. Not green: the fault is probed in full.
   if (isReusable(prior, { claim, inputs, ...defenderSelection(claim, fault), resolved: defenders, contentHash: subject.contentHash })) {
-    return { ...prior, defenders: { ...prior.defenders, ...defenderSelection(claim, fault) }, reusedFrom: prior.reusedFrom ?? priorRunId };
+    const live = defenders.length ? await ensureBaseline(defenders, 1, stage, { reuse: true }) : null;
+    if (!live || live.runs.every((run) => run.outcome === 'pass')) {
+      return { ...prior, defenders: { ...prior.defenders, ...defenderSelection(claim, fault) }, reusedFrom: prior.reusedFrom ?? priorRunId };
+    }
   }
 
   const detail = { baselineRuns: [], probeRuns: [] };
@@ -584,34 +630,13 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
     anchor = targetExists ? locate(readFileSync(targetPath, 'utf8'), fault) : { status: 'file-missing', hits: 0, expected: fault.expectHits ?? 1 };
 
     if (anchor.status === 'ok') {
-      const key = defenders.join('\n');
-      if (!baselineCache.has(key)) {
-        const runs = [];
-        let loadMessage;
-        for (let i = 0; i < confirmRuns; i++) {
-          stage('baseline', i + 1, confirmRuns);
-          const res = await runDefenders(defenders);
-          runs.push(res.run);
-          if (res.run.outcome !== 'pass') {
-            loadMessage = res.loadMessage;
-            break;
-          }
-        }
-        // The decision stops at the first non-green run — nothing about this
-        // fault can be trusted after it. But "failed once in three" and "fails
-        // every time" are different problems for whoever has to fix the
-        // defender, and the only way to tell them apart is to finish the runs.
-        // Paid once per defender set, and only when it is already broken.
-        if (runs.length < confirmRuns && runs[runs.length - 1].outcome === 'fail') {
-          for (let i = runs.length; i < confirmRuns; i++) {
-            stage('baseline-flake', i + 1, confirmRuns);
-            runs.push((await runDefenders(defenders)).run);
-          }
-        }
-        baselineCache.set(key, { runs, loadMessage });
-      }
-      const baseline = baselineCache.get(key);
-      detail.baselineRuns = baseline.runs;
+      // The decision stops at the first non-green run — nothing about this
+      // fault can be trusted after it. But "failed once in three" and "fails
+      // every time" are different problems for whoever has to fix the
+      // defender, and the only way to tell them apart is to finish the runs.
+      // Paid once per defender set, and only when it is already broken.
+      const baseline = await ensureBaseline(defenders, confirmRuns, stage);
+      detail.baselineRuns = [...baseline.runs];
       // Observed instability of the defenders on UNMODIFIED source: `fail` is
       // the tests running and disagreeing with themselves. A load error or a
       // timeout is not flakiness — nothing was measured about stability — so

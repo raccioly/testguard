@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 export const IMPORT_LIMITS = Object.freeze({
   maxFileBytes: 1_048_576,
@@ -66,6 +66,69 @@ function decodeString(source, start) {
   throw new SyntaxError('unterminated string literal');
 }
 
+// After these words an expression starts, so a `/` opens a regular expression.
+const REGEX_PRECEDING_WORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw', 'case', 'do', 'else', 'yield', 'await']);
+
+/**
+ * Whether a `/` after `prev` starts a regular-expression literal rather than a
+ * division. The usual lexer heuristic: after an operand (a name, a number, a
+ * string, a closing paren or bracket) it divides; anywhere an expression may
+ * start, it is a literal. Without this, a quote inside a regex reads as an
+ * unterminated string and the whole module becomes unreadable.
+ */
+function regexAllowedAfter(prev) {
+  if (!prev) return true;
+  if (prev.type === 'id') return REGEX_PRECEDING_WORDS.has(prev.value);
+  if (prev.type !== 'punc') return false;
+  return prev.value !== ')' && prev.value !== ']';
+}
+
+/** End index of the regex literal starting at `start`, or -1 if it is not one. */
+function skipRegex(source, start) {
+  let inClass = false;
+  let i = start + 1;
+  for (; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === '\n' || ch === '\r') return -1;
+    if (ch === '\\') { i++; continue; }
+    if (inClass) { if (ch === ']') inClass = false; continue; }
+    if (ch === '[') inClass = true;
+    else if (ch === '/') break;
+  }
+  if (i >= source.length || i === start + 1) return -1;
+  i++;
+  while (i < source.length && /[A-Za-z]/.test(source[i])) i++;
+  return i;
+}
+
+/** End index of the template literal starting at the backtick at `start`, `${…}` expressions included. */
+function skipTemplate(source, start) {
+  for (let i = start + 1; i < source.length;) {
+    const ch = source[i];
+    if (ch === '\\') { i += 2; continue; }
+    if (ch === '`') return i + 1;
+    if (ch === '$' && source[i + 1] === '{') { i = skipTemplateExpression(source, i + 2); continue; }
+    i++;
+  }
+  throw new SyntaxError('unterminated template literal');
+}
+
+/** End index just past the `}` closing a template `${` expression that starts at `start`. */
+function skipTemplateExpression(source, start) {
+  let depth = 0;
+  for (let i = start; i < source.length;) {
+    const ch = source[i];
+    if (ch === '"' || ch === "'") { i = decodeString(source, i).end; continue; }
+    if (ch === '`') { i = skipTemplate(source, i); continue; }
+    if (ch === '/' && source[i + 1] === '/') { const end = source.indexOf('\n', i); if (end === -1) break; i = end; continue; }
+    if (ch === '/' && source[i + 1] === '*') { const end = source.indexOf('*/', i + 2); if (end === -1) break; i = end + 2; continue; }
+    if (ch === '{') depth++;
+    else if (ch === '}') { if (depth === 0) return i + 1; depth--; }
+    i++;
+  }
+  throw new SyntaxError('unterminated template literal');
+}
+
 /** A deliberately small lexer: enough grammar to read module boundaries, never executable code. */
 export function tokenizeModule(source) {
   const tokens = [];
@@ -98,16 +161,28 @@ export function tokenizeModule(source) {
       continue;
     }
     if (ch === '`') {
-      const start = i++;
-      let closed = false;
-      while (i < source.length) {
-        if (source[i] === '\\') i += 2;
-        else if (source[i] === '`') { i++; closed = true; break; }
-        else i++;
-      }
-      if (!closed) throw new SyntaxError('unterminated template literal');
+      const start = i;
+      i = skipTemplate(source, i);
       tokens.push({ type: 'template', value: null, index: start, lineBreakBefore });
       lineBreakBefore = false;
+      continue;
+    }
+    if (ch === '/' && regexAllowedAfter(tokens[tokens.length - 1])) {
+      const end = skipRegex(source, i);
+      if (end !== -1) {
+        tokens.push({ type: 'regex', value: null, index: i, lineBreakBefore });
+        lineBreakBefore = false;
+        i = end;
+        continue;
+      }
+    }
+    if (/[0-9]/.test(ch) || (ch === '.' && /[0-9]/.test(source[i + 1] ?? ''))) {
+      // A numeric literal is one operand, so a `/` after it is division.
+      let end = i + 1;
+      while (end < source.length && /[\w.]/.test(source[end])) end++;
+      tokens.push({ type: 'num', value: source.slice(i, end), index: i, lineBreakBefore });
+      lineBreakBefore = false;
+      i = end;
       continue;
     }
     if (/[A-Za-z_$]/.test(ch)) {
@@ -776,7 +851,122 @@ export function createImportResolver(projectDir, { aliases = [], configFiles = [
     };
   }
 
-  return { relation, resolveSpecifier };
+  /**
+   * Every project file the given modules load, transitively — the input set a
+   * verdict about them depends on. Unlike `relation`, nothing here is directed
+   * at a target: each specifier a module names is followed, because a change
+   * anywhere in what a defender or its subject loads can change the answer.
+   *
+   * Over-inclusion is the safe side (a needless re-probe costs a run); under-
+   * inclusion is a reused verdict nobody measured. So an ambiguous resolution
+   * includes every candidate, and anything that cannot be followed — a
+   * computed `import(x)`/`require(x)`, a project-relative or aliased specifier
+   * that resolves to nothing, a module the lexer cannot read, or a graph over
+   * `IMPORT_LIMITS` — makes the closure `indeterminate` instead of silently
+   * smaller. Bare specifiers that match no alias are packages: outside the
+   * project, and outside this closure.
+   */
+  function closure(absFiles) {
+    const ctx = context();
+    const files = new Set();
+    let frontier = [];
+    for (const abs of absFiles) {
+      let real;
+      try { real = realpathSync(resolve(abs)); } catch { addIssue(ctx, 'unreadable-module', resolve(abs)); continue; }
+      if (inside(root, real) && !files.has(real)) { files.add(real); frontier.push(real); }
+    }
+    for (let depth = 0; frontier.length; depth++) {
+      if (depth > cap.maxDepth) { addIssue(ctx, 'graph-limit', frontier[0]); break; }
+      const next = [];
+      for (const file of frontier) {
+        if (!SOURCE_EXTENSIONS.includes(extname(file))) {
+          // Data a module imports (JSON, CSS): an input, but it imports nothing.
+          if (!ctx.modules.has(file)) {
+            if (ctx.modules.size >= cap.maxModules) { addIssue(ctx, 'graph-limit', file); continue; }
+            let size;
+            try { size = statSync(file).size; } catch { addIssue(ctx, 'unreadable-module', file); continue; }
+            if (size > cap.maxFileBytes || ctx.bytes + size > cap.maxTotalBytes) { addIssue(ctx, 'graph-limit', file); continue; }
+            ctx.modules.add(file);
+            ctx.bytes += size;
+          }
+          continue;
+        }
+        const parsed = readModule(file, ctx);
+        if (!parsed) continue;
+        if (parsed.uncertain.length) addIssue(ctx, 'unsupported-syntax', file);
+        const { specifiers, optional, computed } = closureSpecifiers(parsed);
+        if (computed) addIssue(ctx, 'computed-specifier', file);
+        for (const specifier of specifiers) {
+          if (++ctx.edges > cap.maxEdges) { addIssue(ctx, 'graph-limit', file, specifier); break; }
+          if (!specifier.startsWith('.')) for (const config of configFiles) ctx.dependencies.add(resolve(root, config));
+          const found = resolveSpecifier(file, specifier);
+          if (found.status === 'missing') {
+            // A mock factory may name a module that does not exist (a virtual
+            // mock); nothing loads, so nothing is missing from the closure.
+            if (!optional.has(specifier)) addIssue(ctx, 'unreadable-module', file, specifier);
+            continue;
+          }
+          const targets = found.status === 'resolved' ? [found.file] : found.status === 'ambiguous' ? found.candidates : [];
+          for (const target of targets) {
+            if (!inside(root, target) || files.has(target)) continue;
+            files.add(target);
+            next.push(target);
+            // Jest/Vitest substitute an adjacent `__mocks__` file for a mocked
+            // module without a factory. It is loaded instead, so it is an input.
+            const manual = join(dirname(target), '__mocks__', basename(target));
+            if (optional.has(specifier) && existsSync(manual)) {
+              const real = realpathSync(manual);
+              if (!files.has(real)) { files.add(real); next.push(real); }
+            }
+          }
+        }
+      }
+      frontier = next;
+    }
+    for (const file of ctx.dependencies) if (inside(root, file) && existsSync(file)) files.add(file);
+    const issues = [...ctx.issues].sort((a, b) => `${a.file}\0${a.code}\0${a.specifier ?? ''}`.localeCompare(`${b.file}\0${b.code}\0${b.specifier ?? ''}`));
+    return {
+      status: issues.length ? 'indeterminate' : 'complete',
+      files: [...files].filter((file) => inside(root, file)).map(rel).sort(),
+      ...(issues.length ? { issues } : {}),
+    };
+  }
+
+  return { relation, resolveSpecifier, closure };
+}
+
+// Test-framework calls whose first argument names a module that may be loaded
+// in place of, or alongside, an import (`vi.mock`, `jest.requireActual`, ...).
+const MODULE_NAMING_CALLS = new Set(['mock', 'doMock', 'unmock', 'importActual', 'importMock', 'requireActual', 'requireMock']);
+
+/**
+ * The specifiers a parsed module may load, for `closure`. Reads the parser's
+ * own lists and scans the tokens once more for what the parser ignores: a
+ * dynamic `import()` or `require()` whose argument is not a single string
+ * literal (`computed`), an `import('x', { with })` form, and the module names
+ * test frameworks take (`optional`: they may name a virtual module).
+ */
+function closureSpecifiers(parsed) {
+  const specifiers = new Set([...parsed.runtime, ...parsed.stars, ...parsed.cjsStars, ...parsed.requests.map((request) => request.specifier)]);
+  for (const origins of parsed.explicit.values()) for (const origin of origins) if (origin.kind === 'remote') specifiers.add(origin.specifier);
+  const optional = new Set();
+  let computed = false;
+  const { tokens } = parsed;
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token.type !== 'id' || !punct(tokens[i + 1], '(')) continue;
+    const member = punct(tokens[i - 1], '.');
+    const arg = tokens[i + 2];
+    const literal = arg?.type === 'string' && (punct(tokens[i + 3], ')') || punct(tokens[i + 3], ','));
+    if ((token.value === 'import' && !member) || (token.value === 'require' && !member && !identifier(tokens[i - 1], 'function'))) {
+      if (literal) specifiers.add(arg.value);
+      else computed = true;
+    } else if (member && MODULE_NAMING_CALLS.has(token.value) && literal) {
+      specifiers.add(arg.value);
+      if (!parsed.runtime.includes(arg.value)) optional.add(arg.value);
+    }
+  }
+  return { specifiers: [...specifiers].sort(), optional, computed };
 }
 
 /** Convenience for callers that do not need to share the resolver's parse cache. */

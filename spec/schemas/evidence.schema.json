@@ -196,6 +196,11 @@
             "runnerInvocations": {
               "type": "integer",
               "minimum": 0
+            },
+            "reuseBaselineRuns": {
+              "description": "Live unmodified defender runs executed only to license carrying a prior verdict forward (one per defender set per command, shared with the full baseline). Already counted in `runnerInvocations` and `runnerMs`. Optional for backward compatibility.",
+              "type": "integer",
+              "minimum": 0
             }
           },
           "additionalProperties": false
@@ -676,7 +681,42 @@
               "additionalProperties": {
                 "$ref": "urn:claimspec:v1:common#/$defs/sha256"
               }
+            },
+            "dependencyHashes": {
+              "description": "Content hashes of the transitive project-file import closure of the fault target and every resolved defender (JavaScript through the import resolver, Python by module name including ancestor conftest.py files), plus the lockfiles, package manifests and runner/compiler configuration present at the project root. Reuse requires equality. Optional for backward compatibility: a record without it is never reusable.",
+              "type": "object",
+              "propertyNames": {
+                "$ref": "urn:claimspec:v1:common#/$defs/repoPath"
+              },
+              "additionalProperties": {
+                "$ref": "urn:claimspec:v1:common#/$defs/sha256"
+              }
+            },
+            "dependencyClosure": {
+              "description": "`complete` when every import was followed; `indeterminate` when one could not be (a computed dynamic import or require, a project-relative or aliased specifier that resolves to nothing, an unreadable module, or a graph over the resolver limits). An indeterminate record is never reusable.",
+              "enum": ["complete", "indeterminate"]
+            },
+            "dependencyIssues": {
+              "description": "Why the closure is indeterminate (at most 16). Present only when `dependencyClosure` is `indeterminate`.",
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "required": ["code", "file"],
+                "properties": {
+                  "code": { "enum": ["computed-specifier", "unreadable-module", "unsupported-syntax", "graph-limit"] },
+                  "file": { "type": "string", "minLength": 1, "maxLength": 4096 },
+                  "specifier": { "type": "string", "minLength": 1, "maxLength": 4096 }
+                },
+                "additionalProperties": false
+              }
             }
+          },
+          "dependentRequired": {
+            "dependencyHashes": ["dependencyClosure"],
+            "dependencyClosure": ["dependencyHashes"],
+            "dependencyIssues": ["dependencyClosure"]
           },
           "additionalProperties": false
         },

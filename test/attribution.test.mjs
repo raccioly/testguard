@@ -143,13 +143,13 @@ describe('the subject record makes a fault edit visible', () => {
 describe('reuse — a prior verdict may only stand for the fault that produced it', () => {
   const fault = { id: 'F1', description: 'd', file: 'src/a.mjs', faultClass: 'guard-removed', producedBy: { producer: 'human' }, find: 'if (ok) {', replace: 'if (true) {' };
   const current = () => ({
-    inputs: { targetHash: 'T', defenderHashes: { 'a.test.mjs': 'D' } },
+    inputs: { targetHash: 'T', defenderHashes: { 'a.test.mjs': 'D' }, dependencyHashes: { 'src/a.mjs': 'T', 'src/helper.mjs': 'H' }, dependencyClosure: 'complete' },
     requested: ['a.test.mjs'],
     resolved: ['a.test.mjs'],
     contentHash: subjectOf(fault, sha256).contentHash,
   });
   const prior = (over = {}) => ({
-    inputs: { targetHash: 'T', defenderHashes: { 'a.test.mjs': 'D' } },
+    inputs: { targetHash: 'T', defenderHashes: { 'a.test.mjs': 'D' }, dependencyHashes: { 'src/a.mjs': 'T', 'src/helper.mjs': 'H' }, dependencyClosure: 'complete' },
     defenders: { requested: ['a.test.mjs'], resolved: ['a.test.mjs'] },
     subject: subjectOf(fault, sha256),
     ...over,
@@ -157,6 +157,25 @@ describe('reuse — a prior verdict may only stand for the fault that produced i
 
   it('reuses when the source, the defenders and the fault are all unchanged', () => {
     expect(isReusable(prior(), current())).toBe(true);
+  });
+
+  it('never reuses across a changed, added or removed import (#232)', () => {
+    const withDeps = (dependencyHashes, dependencyClosure = 'complete') => ({ ...current(), inputs: { ...current().inputs, dependencyHashes, dependencyClosure } });
+    expect(isReusable(prior(), withDeps({ 'src/a.mjs': 'T', 'src/helper.mjs': 'H2' }))).toBe(false);
+    expect(isReusable(prior(), withDeps({ 'src/a.mjs': 'T', 'src/helper.mjs': 'H', 'src/new.mjs': 'N' }))).toBe(false);
+    expect(isReusable(prior(), withDeps({ 'src/a.mjs': 'T' }))).toBe(false);
+    // Key order is not a change.
+    expect(isReusable(prior(), withDeps({ 'src/helper.mjs': 'H', 'src/a.mjs': 'T' }))).toBe(true);
+  });
+
+  it('never reuses an indeterminate closure, on either side, or a record that predates dependency hashing (#232)', () => {
+    const indeterminate = { ...current(), inputs: { ...current().inputs, dependencyClosure: 'indeterminate' } };
+    expect(isReusable(prior(), indeterminate)).toBe(false);
+    expect(isReusable(prior({ inputs: { ...prior().inputs, dependencyClosure: 'indeterminate' } }), current())).toBe(false);
+    const legacy = prior();
+    delete legacy.inputs.dependencyHashes;
+    delete legacy.inputs.dependencyClosure;
+    expect(isReusable(legacy, current())).toBe(false);
   });
 
   it('binds reuse to the recorded claim metadata instead of promoting changed declarations', () => {
@@ -227,6 +246,8 @@ describe('reuse — a prior verdict may only stand for the fault that produced i
         defenderHashes: { 'a.test.mjs': 'D' },
         testUniverseHash: 'U1',
         discoveryHashes: { 'barrel.mjs': 'B1' },
+        dependencyHashes: { 'src/a.mjs': 'T', 'src/helper.mjs': 'H' },
+        dependencyClosure: 'complete',
       },
     });
     const withDiscovery = (testUniverseHash, discoveryHashes) => ({

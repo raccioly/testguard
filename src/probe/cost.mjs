@@ -127,7 +127,7 @@ export function renderCost(report, { limit = 10 } = {}) {
   const out = [];
   if (report.measurements) {
     const m = report.measurements;
-    out.push(`actual elapsed ${secs(m.elapsedMs)}; fresh runners ${secs(m.runnerMs)} across ${m.runnerInvocations} invocations; setup/discovery/other overhead ${secs(m.overheadMs)}`);
+    out.push(`actual elapsed ${secs(m.elapsedMs)}; fresh runners ${secs(m.runnerMs)} across ${m.runnerInvocations} invocations${m.reuseBaselineRuns ? ` (${m.reuseBaselineRuns} live baseline run${m.reuseBaselineRuns === 1 ? '' : 's'} licensing reuse)` : ''}; setup/discovery/other overhead ${secs(m.overheadMs)}`);
   }
   if (!report.records) return 'no evidence records — run `testguard probe` first; cost is read back from the runs it records.';
   out.push(`${report.records} fault record${report.records === 1 ? '' : 's'} cost ${secs(report.totalMs)} across ${report.totalRuns} defender runs${report.reusedRecords ? ` (${report.reusedRecords} reused; their runs are what they cost when reuse does not apply)` : ''}.`);

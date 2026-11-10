@@ -164,7 +164,13 @@ describe('probe reproduces the known-answer fixture', () => {
       expect(await main(['probe', scratch, '--budget', '30000'], io)).toBe(0);
       expect(Date.now() - started).toBeLessThan(5000);
       const again = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json'));
-      expect(again.records.every((r) => r.reusedFrom === evidence.run.id)).toBe(true);
+      // Reuse is licensed by one live unmodified run of each defender set. The
+      // fixture's flaky defender fails every other run, so its record is
+      // carried forward only when that run happened to be green; otherwise it
+      // is measured again — and is still flaky.
+      expect(again.records.filter((r) => r.claim.id !== 'FLAKY-001').every((r) => r.reusedFrom === evidence.run.id)).toBe(true);
+      expect(again.records.find((r) => r.claim.id === 'FLAKY-001').verdict).toBe('flaky-defender');
+      expect(again.run.measurements.reuseBaselineRuns).toBeGreaterThan(0);
       expect(lines.out.join('\n')).toMatch(/0 new since baseline, 10 baselined/);
     }, 30_000);
 

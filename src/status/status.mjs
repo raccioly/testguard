@@ -7,6 +7,7 @@ import { hashFile, sha256 } from '../util/hash.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { defenderSelection, sameClaimMetadata } from '../probe/attribution.mjs';
+import { createDependencyHasher, dependencyChanges } from '../probe/dependencies.mjs';
 import { coAuthorshipWarning, sortForReport, renderOrigins, renderOriginPolicy } from '../render.mjs';
 import { evaluateOriginPolicy } from '../probe/origin-policy.mjs';
 import { declaredOriginSummary } from '../../spec/lib/origins.mjs';
@@ -172,6 +173,9 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   // ── Staleness: does the evidence still describe this claims file and this tree? ──
   const probed = new Map(evidence.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]));
   const discoveryHashCache = new Map();
+  // The same closure walk and the same comparison `probe` uses to decide reuse,
+  // so a changed import is stale here exactly when a re-probe would re-measure.
+  let dependencyHasher;
   for (const key of faultIndex.keys()) if (!probed.has(key)) doc.stale.push(`fault ${key} has never been probed`);
   for (const [key, r] of probed) {
     const cur = faultIndex.get(key);
@@ -206,6 +210,8 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
       if (!h) doc.stale.push(`${d} now defends ${key} but was not probed`);
       else if (existsSync(join(projectDir, d)) && hashFile(join(projectDir, d)) !== h) doc.stale.push(`${d} changed since ${key} was probed`);
     }
+    dependencyHasher ??= createDependencyHasher(projectDir);
+    doc.stale.push(...dependencyChanges(r.inputs, dependencyHasher.inputsFor([cur.fault.file, ...defenders]), key));
   }
   doc.stale = [...new Set(doc.stale)];
 
