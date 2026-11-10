@@ -9059,6 +9059,636 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-FAN-OUT-PUBLISHES-THE-SERIAL-RECORDS",
+      "statement": "Under --fault-workers, records and onProgress follow claim/fault order whatever order the trees finish in, and a timeout or inconsistent probe measured beside other faults is measured again alone and reported from that serial measurement.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A verdict only contention produced is reported as measured.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "        if (contended && needsSerialRemeasure(record)) remeasure.push({ index, state });",
+          "replace": "        if (false) remeasure.push({ index, state });",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Fan-out records are published in completion order, bypassing the ordered emitter.",
+          "faultClass": "call-removed",
+          "file": "src/probe/probe.mjs",
+          "find": "        else emitter.settle(index, record);",
+          "replace": "        else { records.push(record); onProgress(record); }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-MATCHES-THE-KNOWN-ANSWERS",
+      "statement": "The native known-answer fixture probed with --fault-workers 4 reproduces its oracle verdicts in claim/fault order, and marks exactly its contended timeout and inconsistent probe as re-measured serially.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers-known-answer.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The fan-out believes it is uncontended and never re-measures.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/probe.mjs",
+          "find": "      const contended = slots.length > 1;",
+          "replace": "      const contended = false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A serial re-measure is not recorded on the record it replaced.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "        record.detail.remeasuredSerially = true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-RE-MEASURES-ONLY-WHAT-CONTENTION-MADE",
+      "statement": "Only a freshly measured timeout or flaky-defender/inconsistent-probe is re-measured serially; a red baseline (measured alone before the fan-out) and a reused record are not.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A contended timeout is reported without a serial re-measure.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  if (record.verdict === 'timeout') return true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Every flaky-defender, including a red baseline, is re-measured.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  return record.verdict === 'flaky-defender' && record.detail?.reason === 'inconsistent-probe';",
+          "replace": "  return record.verdict === 'flaky-defender';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-IS-DETERMINISTIC",
+      "statement": "The fan-out publishes results strictly in index order, dispatches nothing after a failure while letting in-flight faults finish, and rethrows the lowest-index failure, never the first to arrive.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Results are emitted before their predecessors settle.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/fan-out.mjs",
+          "find": "      while (cursor < count && settled[cursor]) emit(values[cursor], cursor++);",
+          "replace": "      while (cursor < count) emit(values[cursor], cursor++);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The first failure to arrive is thrown instead of the lowest index.",
+          "faultClass": "return-altered",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  if (failures.length) throw failures.sort((a, b) => a.index - b.index)[0].error;",
+          "replace": "  if (failures.length) throw failures[0].error;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "New faults are dispatched after a failure.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/fan-out.mjs",
+          "find": "    while (failures.length === 0 && next < items.length) {",
+          "replace": "    while (next < items.length) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-CHARGES-OVERLAPPING-RUNNER-TIME-ONCE",
+      "statement": "Runner time is wall-clock time with at least one runner executing: the sum of serial invocations, the union of overlapping ones, so elapsedMs = runnerMs + overheadMs holds with no negative overhead.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every start resets the interval, losing the earlier overlapping run.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/fan-out.mjs",
+          "find": "      if (active++ === 0) since = now();",
+          "replace": "      active++; since = now();",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Every stop charges the whole interval, double-counting overlap.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/fan-out.mjs",
+          "find": "      if (--active === 0) total += now() - since;",
+          "replace": "      --active; total += now() - since;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAULT-WORKERS-BIND-REUSE",
+      "statement": "A measurement taken under a fault fan-out never stands in for a serial one, nor for a different fan-out; a serial measurement may stand in for any.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Reuse ignores the fault fan-out entirely.",
+          "faultClass": "return-altered",
+          "file": "src/probe/probe.mjs",
+          "find": "  return previous === current || previous === 1;",
+          "replace": "  return true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The worker policy no longer consults the fan-out.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "  if (!sameFaultWorkers(previousRun?.faultWorkers, faultWorkers)) return false;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-NEEDS-SCRATCH-TREES",
+      "statement": "A fault fan-out is refused in place, at the API and the CLI, and evidence that records one in place, or a serial re-measure without one, does not conform.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "probe accepts a fan-out in the user tree.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "  if (mode === 'in-place' && faultWorkers > 1) throw new PreconditionError('--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place');\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The CLI passes an in-place fan-out through.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/probe.mjs",
+          "find": "  if (faultWorkers > 1 && values['in-place']) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The validator admits an in-place fan-out.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "    if (doc.run.faultWorkers > 1 && doc.run.mode === 'in-place') errors.push(",
+          "replace": "    if (false) errors.push(",
+          "defendedBy": [
+            "spec/conformance/fault-workers.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The validator admits a serial re-measure with no fan-out.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (r.detail.remeasuredSerially && !(doc.run.faultWorkers > 1)) {",
+          "replace": "      if (false) {",
+          "defendedBy": [
+            "spec/conformance/fault-workers.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-WORKTREE-ALLOCATION-IS-LOCKED",
+      "statement": "Scratch-worktree allocation and removal hold one lock in the git common directory; a live owner is waited on (then refused, never bypassed) and only a provably dead owner on this host is broken.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/worktree-lock.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The lock file is opened without exclusive create, so two processes both hold it.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/worktree-lock.mjs",
+          "find": "      fd = openSync(path, 'wx');",
+          "replace": "      fd = openSync(path, 'w');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Every lock is treated as stale and broken.",
+          "faultClass": "return-altered",
+          "file": "src/probe/worktree-lock.mjs",
+          "find": "  return !alive(owner.pid);",
+          "replace": "  return true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "createScratch adds its worktree without the lock.",
+          "faultClass": "call-removed",
+          "file": "src/probe/worktree.mjs",
+          "find": "  withWorktreeLock(lockDir, () => addWorktree(repoRoot, dest, sha));",
+          "replace": "  addWorktree(repoRoot, dest, sha);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SCRATCH-GIT-IGNORES-THE-CALLERS-GIT-ENVIRONMENT",
+      "statement": "Every git call that creates, removes or prunes a scratch tree runs with inherited GIT_* variables stripped, terminal prompts disabled, and hooks and fsmonitor off.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/worktree-lock.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Inherited GIT_* variables reach the scratch git call.",
+          "faultClass": "guard-removed",
+          "file": "src/git.mjs",
+          "find": "  const clean = Object.fromEntries(Object.entries(env).filter(([key]) => !/^GIT_/i.test(key)));",
+          "replace": "  const clean = { ...env };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "fsmonitor is left on for scratch trees.",
+          "faultClass": "element-removed",
+          "file": "src/git.mjs",
+          "find": "export const NO_HOOKS = Object.freeze(['-c', `core.hooksPath=${devNull}`, '-c', 'core.fsmonitor=false']);",
+          "replace": "export const NO_HOOKS = Object.freeze(['-c', `core.hooksPath=${devNull}`]);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Terminal prompts stay enabled.",
+          "faultClass": "field-dropped",
+          "file": "src/git.mjs",
+          "find": "  return { ...clean, GIT_TERMINAL_PROMPT: '0' };",
+          "replace": "  return clean;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-LEAVES-NO-SCRATCH-TREE",
+      "statement": "Every scratch tree a fan-out creates is removed when the probe returns, and an interrupted probe (SIGINT, exit 130) removes them too.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers-lifecycle.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The fan-out trees are not removed when the probe returns.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "    for (const scratch of extraTrees.reverse()) scratch.cleanup();\n",
+          "replace": "",
+          "defendedBy": [
+            "test/probe-fault-workers.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A scratch tree is not registered for removal on cancellation.",
+          "faultClass": "call-removed",
+          "file": "src/probe/worktree.mjs",
+          "find": "  const unregister = registerCleanup(remove);",
+          "replace": "  const unregister = registerCleanup(() => {});",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAULT-WORKERS-REACH-THE-CLI",
+      "statement": "probe --fault-workers <n> is parsed, validated and passed to the probe, and the run records it.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers-lifecycle.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The CLI does not accept the option.",
+          "faultClass": "element-removed",
+          "file": "src/cli.mjs",
+          "find": "        'fault-workers': { type: 'string' },\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The CLI drops the requested fan-out.",
+          "faultClass": "literal-changed",
+          "file": "src/commands/probe.mjs",
+          "find": "    faultWorkers,\n    commandBudget,",
+          "replace": "    faultWorkers: 1,\n    commandBudget,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A malformed count is accepted.",
+          "faultClass": "return-altered",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : null;",
+          "replace": "  return parsed;",
+          "defendedBy": [
+            "test/fan-out.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-NAMES-ITS-OWN-LOAD",
+      "statement": "Contention advice names --fault-workers when the probe fans out, and the probe warns when its own fan-out alone oversubscribes the available CPUs.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An oversubscribing fan-out is never warned about.",
+          "faultClass": "return-altered",
+          "file": "src/probe/contention.mjs",
+          "find": "  if (!(cpus >= 1) || load <= cpus) return undefined;",
+          "replace": "  return undefined;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Contention advice ignores the fan-out.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/contention.mjs",
+          "find": "  const fanOut = faultWorkers > 1",
+          "replace": "  const fanOut = false",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-PROJECT-REALLY-CONTENDS",
+      "statement": "The fan-out acceptance project keeps its oracle observable: its SLOW defender times out only while another faulted suite is running, so the serial re-measure path is exercised rather than assumed.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The SLOW defender never hangs, so contention is never produced.",
+          "faultClass": "condition-forced",
+          "file": "test/helpers/fan-out-project.mjs",
+          "find": "      if (readdirSync(markers).length > 0) await new Promise((resolve) => setTimeout(resolve, 60_000));",
+          "replace": "      if (false) await new Promise((resolve) => setTimeout(resolve, 60_000));",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Faulted suites leave no marker, so the SLOW defender cannot see them.",
+          "faultClass": "statement-deleted",
+          "file": "test/helpers/fan-out-project.mjs",
+          "find": "  writeFileSync(mine, '');\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
     }
   ]
 }

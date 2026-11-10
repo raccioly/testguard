@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `killKind` on every kill: each failed test is classified `assertion` or `exception` from structured error identity (never message wording), `testRun.exceptionFailures` sits beside `assertionFailures`, and a `killed` record carries `detail.killKind` (`assertion`, `exception-only`, `mixed`). The default verdict is unchanged: an exception the fault provokes still kills.
 - `probe --require-assertion-kill` (and `admit`): an exception-only kill fails the policy, exit 1, verdict still `killed`. `status` and `brief` count exception-only kills as a named weakness.
+- **`probe --fault-workers <n>` probes several faults at once (#237).** Each
+  fault in flight gets its own scratch worktree; the default 1 is the serial
+  run exactly. Baselines are still measured once per defender set, alone,
+  before the fan-out, and records keep claim/fault order. A `timeout` or
+  `inconsistent-probe` measured beside other faults is measured again alone
+  before it is reported (`detail.remeasuredSerially: true`). The evidence
+  records `run.faultWorkers`; fan-out evidence is never reused by a serial
+  probe. Refused with `--in-place`. `run.measurements.runnerMs` now charges
+  overlapping runner invocations once (their union), which equals the old sum
+  for a serial run.
+- Scratch-worktree creation and removal take a lock in the git common
+  directory (stale when its owner pid is gone), so two probes of one repository
+  cannot allocate or prune each other's trees. Git calls on scratch trees drop
+  inherited `GIT_*` variables (a probe run from a git hook no longer reads the
+  hook's `GIT_INDEX_FILE`) and disable prompts and fsmonitor.
 
 ### Changed
 

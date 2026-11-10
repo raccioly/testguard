@@ -261,7 +261,11 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - run: npm ci --omit=dev
-      - name: Matched native probes against the exact base commit
+      # Also the speed check for --fault-workers (#237): base and head probe one
+      # CPU-bound project on THIS runner in interleaved rounds, and the medians
+      # are compared as ratios (head serial vs base; head fan-out vs base), so a
+      # slow or noisy runner moves every strategy alike and cannot fail it alone.
+      - name: Matched native probes and the fan-out speed ratio against the exact base commit
         env:
           BEFORE_REF: ${{ github.event.pull_request.base.sha }}
         run: node .github/scripts/benchmark-node-direct.mjs --before-ref "$BEFORE_REF" --out "$RUNNER_TEMP/native-performance"

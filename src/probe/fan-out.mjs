@@ -33,32 +33,24 @@ export function needsSerialRemeasure(record) {
 /**
  * Publish results in index order whatever order they finish in. `settle(i, v)`
  * stores a result; every result whose predecessors are all settled is passed
- * to `emit` immediately, in order. `hold(i)` marks an index as not yet final
- * (a record waiting for its serial re-measure): it and everything after it
- * wait until `settle(i, v)` is called again. The order a consumer sees is
- * therefore the claim/fault order of a serial run, deterministically.
+ * to `emit` immediately, in order. An index that is never settled — a record
+ * waiting for its serial re-measure — holds back everything after it. The
+ * order a consumer sees is therefore the claim/fault order of a serial run,
+ * deterministically.
  */
 export function orderedEmitter(count, emit) {
   const values = new Array(count);
-  const state = new Array(count).fill('pending'); // pending | held | settled
+  const settled = new Array(count).fill(false);
   let cursor = 0;
-  const flush = () => {
-    while (cursor < count && state[cursor] === 'settled') emit(values[cursor], cursor++);
-  };
   return {
     settle(i, value) {
       if (!Number.isInteger(i) || i < 0 || i >= count) throw new RangeError(`index ${i} outside 0..${count - 1}`);
       if (i < cursor) throw new Error(`index ${i} was already emitted`);
       values[i] = value;
-      state[i] = 'settled';
-      flush();
-    },
-    hold(i) {
-      if (i < cursor) throw new Error(`index ${i} was already emitted`);
-      state[i] = 'held';
+      settled[i] = true;
+      while (cursor < count && settled[cursor]) emit(values[cursor], cursor++);
     },
     get emitted() { return cursor; },
-    values: () => values.slice(),
   };
 }
 

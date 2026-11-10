@@ -201,6 +201,7 @@ spec before it is written.
 | `--python <path>` | `TESTGUARD_PYTHON`, then `$VIRTUAL_ENV`, then `.venv`, `venv`, `.env` in the project, then `python3`, `python` on `PATH` | Interpreter for `.py` defenders, resolved against your working tree. A bare name is looked up on `PATH`. An explicit interpreter is the only one tried: it is never replaced by another. |
 | `--workers <n>` | `1` | Maximum built-in runner workers. Python stays serial. |
 | `--serial` | off | One worker, even when `--workers` is higher (vitest `--no-file-parallelism`, jest `--runInBand`, playwright `--workers=1`). With the default `--workers 1` it changes nothing. pytest always runs with `-p no:xdist`, with or without it. |
+| `--fault-workers <n>` | `1` | Probe up to n faults at once, each in its own scratch worktree. Baselines are still measured once per defender set, alone, before the fan-out. Records keep claim/fault order; a `timeout` or inconsistent probe measured beside other faults is re-measured alone before it is reported (`detail.remeasuredSerially`). Recorded as `run.faultWorkers`; not with `--in-place`. See [performance](../guides/performance.md#probe-several-faults-at-once). |
 | `--no-escalate` | off | Do not re-run survivors against the whole suite. Escalation runs the whole suite up to N times per survivor. |
 | `--no-reuse` | off | Re-probe claims whose recorded inputs have not changed. |
 | `--allow-empty` | off | Adoption only: a valid claims file with zero claims exits `0` instead of `2`, writes no evidence, and says verification was skipped. Has no effect with `--claim`. |
@@ -244,7 +245,8 @@ cannot hide); `2` precondition (an empty claims file
 without `--allow-empty`, a runner that does not resolve, a dirty defender or
 target with the implicit HEAD, an exhausted command budget, an unavailable
 origin policy); `3` usage (`--confirm` not a positive integer, `--budget` or
-`--command-budget` below 1000, `--workers` not a positive integer, an unknown
+`--command-budget` below 1000, `--workers` or `--fault-workers` not a positive
+integer, `--fault-workers` above 1 with `--in-place`, an unknown
 `--progress` mode, an empty `--claim`).
 
 **`--json` schema:** [`status.schema.json`](../../spec/schemas/status.schema.json),

@@ -77,14 +77,3 @@ test('slow', async () => {
   g('commit', '-qm', 'fan-out project');
   return { dir, markers, claims, worktrees: () => g('worktree', 'list', '--porcelain').split('\n').filter((line) => line.startsWith('worktree ')).length };
 }
-
-/** A record with everything a timing or the fan-out itself may change removed: every `durationMs`, and `remeasuredSerially`. */
-export function projection(record) {
-  const strip = (value) => {
-    if (Array.isArray(value)) return value.map(strip);
-    if (!value || typeof value !== 'object') return value;
-    return Object.fromEntries(Object.entries(value).filter(([key]) => key !== 'durationMs').map(([key, v]) => [key, strip(v)]));
-  };
-  const { remeasuredSerially, ...detail } = record.detail;
-  return { id: `${record.claim.id}/${record.subject.id}`, ...strip({ ...record, detail }) };
-}
