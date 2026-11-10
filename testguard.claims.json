@@ -8488,7 +8488,8 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/attribution.test.mjs"
+        "test/attribution.test.mjs",
+        "test/reuse-soundness.test.mjs"
       ],
       "faults": [
         {
@@ -8515,6 +8516,21 @@
           "replace": "  if (!recorded?.dependencyHashes) return false;",
           "defendedBy": [
             "test/attribution.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "probe records no dependency inputs, so a changed helper is reused.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "    ...dependencyHasher.inputsFor([fault.file, ...defenders]),\n",
+          "replace": "",
+          "defendedBy": [
+            "test/reuse-soundness.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",
@@ -8707,6 +8723,21 @@
           "replace": "",
           "defendedBy": [
             "test/resource-timing.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The acceptance helper's defender stops reading the data file no hash covers, so the live-baseline case proves nothing.",
+          "faultClass": "argument-swapped",
+          "file": "test/helpers/reuse-project.mjs",
+          "find": "  assert.equal(total(1, 2), expected.sum);",
+          "replace": "  assert.equal(total(1, 2), 3);",
+          "defendedBy": [
+            "test/reuse-live-baseline.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",

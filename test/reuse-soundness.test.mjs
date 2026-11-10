@@ -1,7 +1,7 @@
 // Issue #232: a reused verdict must be about the code the defenders run today.
 // Reuse compared the target and defender files only, so breaking a helper the
 // target imports carried a prior `killed` forward over a red suite.
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { probe } from '../src/probe/probe.mjs';
@@ -11,12 +11,15 @@ import { commit, options, project } from './helpers/reuse-project.mjs';
 describe('verdict reuse is bound to what the target and defenders import (#232)', () => {
   let dir;
   let first;
-  beforeEach(async () => {
+  // One measured probe shared by every case; the cases run in order. The first
+  // three leave the tree as measured, the last two change it. This file is a
+  // claim's defender, so every probe here is paid for on every fault.
+  beforeAll(async () => {
     dir = project();
     first = await probe(options(dir));
     expect(first.records[0].verdict).toBe('killed');
   }, 30_000);
-  afterEach(() => { if (dir) rmSync(dir, { recursive: true, force: true }); });
+  afterAll(() => { if (dir) rmSync(dir, { recursive: true, force: true }); });
 
   it('records the import closure of the target and its defenders as complete', () => {
     const { inputs } = first.records[0];
@@ -24,26 +27,6 @@ describe('verdict reuse is bound to what the target and defenders import (#232)'
     expect(Object.keys(inputs.dependencyHashes)).toEqual(expect.arrayContaining(['src/helper.mjs', 'src/price.mjs', 'test/price.test.mjs', 'package.json']));
     expect(validate('evidence', first).errors).toEqual([]);
   });
-
-  it('a helper broken so the defender goes red is neither reused nor killed', async () => {
-    writeFileSync(join(dir, 'src/helper.mjs'), 'export function round(x) {\n  return Number.NaN;\n}\n');
-    commit(dir);
-    const second = await probe(options(dir, first));
-    const record = second.records[0];
-    expect(record.reusedFrom).toBeUndefined();
-    expect(record.verdict).not.toBe('killed');
-    expect(record.verdict).toBe('flaky-defender');
-  }, 30_000);
-
-  it('a helper changed while the defender stays green is re-measured, not reused', async () => {
-    writeFileSync(join(dir, 'src/helper.mjs'), 'export function round(x) {\n  return Math.round(x * 1000) / 1000;\n}\n');
-    commit(dir);
-    const second = await probe(options(dir, first));
-    const record = second.records[0];
-    expect(record.reusedFrom).toBeUndefined();
-    expect(record.verdict).toBe('killed');
-    expect(record.detail.probeRuns).toHaveLength(3);
-  }, 30_000);
 
   it('evidence written by another TestGuard version is readable and never reused', async () => {
     const older = structuredClone(first);
@@ -64,6 +47,26 @@ describe('verdict reuse is bound to what the target and defenders import (#232)'
     const second = await probe(options(dir, legacy));
     expect(second.records[0].reusedFrom).toBeUndefined();
     expect(second.records[0].verdict).toBe('killed');
+  }, 30_000);
+
+  it('a helper broken so the defender goes red is neither reused nor killed', async () => {
+    writeFileSync(join(dir, 'src/helper.mjs'), 'export function round(x) {\n  return Number.NaN;\n}\n');
+    commit(dir);
+    const second = await probe(options(dir, first));
+    const record = second.records[0];
+    expect(record.reusedFrom).toBeUndefined();
+    expect(record.verdict).not.toBe('killed');
+    expect(record.verdict).toBe('flaky-defender');
+  }, 30_000);
+
+  it('a helper changed while the defender stays green is re-measured, not reused', async () => {
+    writeFileSync(join(dir, 'src/helper.mjs'), 'export function round(x) {\n  return Math.round(x * 1000) / 1000;\n}\n');
+    commit(dir);
+    const second = await probe(options(dir, first));
+    const record = second.records[0];
+    expect(record.reusedFrom).toBeUndefined();
+    expect(record.verdict).toBe('killed');
+    expect(record.detail.probeRuns).toHaveLength(3);
   }, 30_000);
 
 });
