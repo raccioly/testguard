@@ -21,6 +21,8 @@ const capture = () => {
 };
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+// The CLI below reuses this evidence only if the same TestGuard version wrote it (#232).
+const TOOL_VERSION = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
 const FIXTURE = join(ROOT, 'fixtures', 'known-answer');
 
 /**
@@ -51,7 +53,7 @@ describe('probe reproduces the known-answer fixture', () => {
       confirmRuns: expected.confirmRuns,
       mode: 'worktree',
       budgetMs: 30_000,
-      toolVersion: 'test',
+      toolVersion: TOOL_VERSION,
     });
   }, 180_000);
 
@@ -160,9 +162,7 @@ describe('probe reproduces the known-answer fixture', () => {
 
     it('probe again: every verdict is reused (inputs unchanged) and nothing is new against the baseline → exit 0', async () => {
       const { lines, io } = capture();
-      const started = Date.now();
       expect(await main(['probe', scratch, '--budget', '30000'], io)).toBe(0);
-      expect(Date.now() - started).toBeLessThan(5000);
       const again = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json'));
       // Reuse is licensed by one live unmodified run of each defender set. The
       // fixture's flaky defender fails every other run, so its record is
@@ -170,7 +170,14 @@ describe('probe reproduces the known-answer fixture', () => {
       // is measured again — and is still flaky.
       expect(again.records.filter((r) => r.claim.id !== 'FLAKY-001').every((r) => r.reusedFrom === evidence.run.id)).toBe(true);
       expect(again.records.find((r) => r.claim.id === 'FLAKY-001').verdict).toBe('flaky-defender');
-      expect(again.run.measurements.reuseBaselineRuns).toBeGreaterThan(0);
+      // What reuse costs is counted, not timed (a wall clock measures the
+      // machine): exactly one live run per distinct defender set, and nothing
+      // else unless the flaky record had to be measured again.
+      const defenderSets = new Set(evidence.records.filter((r) => r.defenders.resolved.length).map((r) => r.defenders.resolved.join('\n')));
+      expect(again.run.measurements.reuseBaselineRuns).toBe(defenderSets.size);
+      const flakyReused = Boolean(again.records.find((r) => r.claim.id === 'FLAKY-001').reusedFrom);
+      if (flakyReused) expect(again.run.measurements.runnerInvocations).toBe(defenderSets.size);
+      else expect(again.run.measurements.runnerInvocations).toBeGreaterThan(defenderSets.size);
       expect(lines.out.join('\n')).toMatch(/0 new since baseline, 10 baselined/);
     }, 30_000);
 
