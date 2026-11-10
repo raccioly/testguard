@@ -91,6 +91,21 @@ describe('the instrument digest', () => {
     expect(instrumentOf(root, '1.2.3').digest).not.toBe(before);
   });
 
+  it('changes when an alias source outside the root files changes (a referenced or extended tsconfig)', () => {
+    const root = project({
+      'tsconfig.json': '{"files":[],"references":[{"path":"./tsconfig.app.json"}]}',
+      'tsconfig.app.json': '{"extends":"./tsconfig.base.json","compilerOptions":{"paths":{"@/*":["./src/*"]}}}',
+      'tsconfig.base.json': '{"compilerOptions":{"strict":true}}',
+      'src/a.ts': '',
+    });
+    const before = instrumentOf(root, '1.2.3').digest;
+    writeFileSync(join(root, 'tsconfig.app.json'), '{"extends":"./tsconfig.base.json","compilerOptions":{"paths":{"@/*":["./lib/*"]}}}');
+    const afterApp = instrumentOf(root, '1.2.3').digest;
+    expect(afterApp).not.toBe(before);
+    writeFileSync(join(root, 'tsconfig.base.json'), '{"compilerOptions":{"strict":false}}');
+    expect(instrumentOf(root, '1.2.3').digest).not.toBe(afterApp);
+  });
+
   it('does not change when ordinary source changes: records hash that', () => {
     const root = project(files);
     const before = instrumentOf(root, '1.2.3').digest;
