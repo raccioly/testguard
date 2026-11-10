@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `killKind` on every kill: each failed test is classified `assertion` or `exception` from structured error identity (never message wording), `testRun.exceptionFailures` sits beside `assertionFailures`, and a `killed` record carries `detail.killKind` (`assertion`, `exception-only`, `mixed`). The default verdict is unchanged: an exception the fault provokes still kills.
+- `probe --require-assertion-kill` (and `admit`): an exception-only kill fails the policy, exit 1, verdict still `killed`. `status` and `brief` count exception-only kills as a named weakness.
+
+### Changed
+
+- `assertionFailures` is now assertion-only; a kill is `assertionFailures + exceptionFailures > 0`. Evidence written earlier has no `exceptionFailures` or `killKind` and reads as before; under the policy a kill with no recorded kind fails (unknown rounds toward unproven).
+- vitest and Playwright runs add an injected reporter beside the JSON one (a sidecar file in the temp dir) to read error identity; a custom `--runner-cmd` without `failureDetails` classifies every failure as an exception.
+
 ## [0.20.1] - 2026-10-12
 
 Automated weekly release — everything merged since `v0.20.0`.

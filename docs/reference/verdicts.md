@@ -19,13 +19,37 @@ is a pass. Text output prints every verdict but `killed` in capitals.
 
 | Verdict | Printed | Meaning | Gates |
 |---|---|---|---|
-| `killed` | `killed` | Every one of N probe runs failed with a genuine assertion failure, on defenders that were green N/N on unmodified code. The claim is defended. | no |
+| `killed` | `killed` | Every one of N probe runs failed in a test body, by an assertion or by an exception the fault provoked, on defenders that were green N/N on unmodified code. The claim is defended; `detail.killKind` says how (below). | no |
 | `survived` | `SURVIVED` | Every one of N probe runs passed with the fault applied. A real blind spot. | yes |
 | `nocover` | `NOCOVER` | No test defends the claim: the declared globs resolve to nothing, or no test file imports the target without mocking it. Nothing was even tried. | yes |
 | `unverifiable` | `UNVERIFIABLE` | The fault could not be probed: its anchor moved or matches more than once, the defenders failed to load, discovery was indeterminate, or the defenders never execute the target. Nothing was learned. | yes |
 | `fault-invalid` | `FAULT-INVALID` | The replacement does not load or compile. A bad fault, not a finding about the tests. | yes |
 | `timeout` | `TIMEOUT` | The defenders exceeded `--budget` with the fault applied. A hang is not a detection. | yes |
 | `flaky-defender` | `FLAKY-DEFENDER` | The defenders were not green N/N on unmodified code, or the N probe runs disagreed. No verdict about the fault can be trusted until the defenders are fixed. | yes |
+
+### How a fault was killed
+
+A kill by an assertion proves the suite checks the behavior. A kill only by an
+exception proves the suite **reaches** the code: the fault made it throw and a
+test went red, but nothing rejected a value. Where tests are written by an
+agent, that second kind is exactly the hollow test that should not count as
+proof, so every `killed` record says which it was. The verdict is unchanged.
+
+| `detail.killKind` | Meaning |
+|---|---|
+| `assertion` | Every probe run had at least one assertion-classified failing test. |
+| `exception-only` | No run had one. A test with no assertion went red because the code threw. |
+| `mixed` | Some runs had one and some did not. |
+
+The runner decides from structured error identity (an `AssertionError`, a
+matcher result, a failed `expect` step, a Python exception type), never from
+message text; an error it cannot read is an exception. `expect(fn).not.toThrow()`
+and `assert.doesNotThrow` are assertions. `probe --require-assertion-kill`
+(and `admit`) turns the distinction into a gate: any `exception-only` kill, or a
+kill from evidence that predates the field, fails the run with exit 1, and the
+verdict stays `killed`. `status` and `brief` count exception-only kills as a
+weakness next to the co-authored count. The rule and its known limits are
+rule 3 of the [gate semantics](../../spec/GATE-SEMANTICS.md).
 
 "Gates" means the verdict fails `probe` (exit `1`) unless it is in the
 baseline or its claim is below `--severity`. When a baseline exists, `probe`

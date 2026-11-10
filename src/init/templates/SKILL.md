@@ -132,6 +132,7 @@ code by construction. So, for every source file you create or change:
 | `FAULT-INVALID` | the replacement does not compile | fix the fault definition |
 | `TIMEOUT` | the fault makes the code hang | write an assertion that fails on it; a hang is not a detection |
 | `FLAKY-DEFENDER` | defenders not green 3/3, or disagreed across runs | fix the flake first; no verdict is trustworthy until then |
+| `killed` with `[killed by exception only: no assertion failed]`, or "N kills are by crash, not by assertion" | the fault made the code throw and a test went red, but nothing checked a value | add an assertion on the behavior the claim states; a test that merely calls the code is reach, not proof. `probe --require-assertion-kill` fails on these |
 
 ## The fix loop
 

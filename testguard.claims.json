@@ -3,6 +3,111 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-KILL-KIND-IS-RECORDED-FROM-ERROR-IDENTITY",
+      "statement": "A kill records whether an assertion or only an exception rejected the fault, read from the error's structured identity and never its message text; an unreadable error counts as an exception, the default verdict is unchanged, and --require-assertion-kill fails exception-only kills and kills with no recorded kind.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/assertion-policy.test.mjs",
+        "test/runner-failure-kind.test.mjs",
+        "test/runner-node-report.test.mjs",
+        "spec/conformance/kill-kind.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A run with no assertion failure is still called an assertion kill.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/kill-kind.mjs",
+          "find": "  return withAssertion === 0 ? 'exception-only' : 'mixed';",
+          "replace": "  return 'mixed';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An AssertionError by name or ERR_ASSERTION code is read as an exception.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "  if (detail.code === 'ERR_ASSERTION' || detail.name === 'AssertionError') return true;",
+          "replace": "  if (detail.code === 'ERR_ASSERTION' || detail.name === 'AssertionError') return false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An error shape the runner cannot read counts as an assertion instead of an exception.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "export const failureKind = (details) => (Array.isArray(details) && details.some(isAssertionDetail) ? 'assertion' : 'exception');",
+          "replace": "export const failureKind = (details) => (Array.isArray(details) && details.some(isAssertionDetail) ? 'assertion' : 'assertion');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Exception failures are not counted, so an exception-only kill reads as a kill with nothing in it.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "  const exceptionFailures = settled.length - assertionFailures;",
+          "replace": "  const exceptionFailures = 0;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The policy fails a kill that had an assertion in some runs.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/assertion-policy.mjs",
+          "find": "record.detail?.killKind !== 'assertion' && record.detail?.killKind !== 'mixed';",
+          "replace": "record.detail?.killKind !== 'assertion';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "A node:assert failure inside a node-test body is read as an exception.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/node/report.mjs",
+          "find": "(error.cause.code === 'ERR_ASSERTION' || error.cause.name === 'AssertionError')",
+          "replace": "(error.cause.code === 'NEVER')",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "The validator trusts any killKind a record claims.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "          if (r.detail.killKind !== derived) errors.push(",
+          "replace": "          if (false) errors.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-NODE-DIRECT-KEEPS-FAILURE-BOUNDARIES",
       "statement": "Single-entry native confirmations preserve CLI entry identity and ordinary tests alongside only declarations, preserve owned reporting when project code edits its environment, and refuse import or out-of-test failures even beside completed assertion rejections.",
       "source": {
