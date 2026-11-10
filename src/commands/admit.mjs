@@ -1,7 +1,8 @@
 import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
-import { existsSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
-import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
+import { existsSync, realpathSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { repoRoot } from '../git.mjs';
+import { loadClaims, defaultClaimsPath, claimsSourceOf } from '../claims/load.mjs';
 import { probe } from '../probe/probe.mjs';
 import { writeSpecDoc } from '../evidence/writer.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
@@ -15,7 +16,15 @@ import { runnerOptions } from './runner-options.mjs';
 
 /** The project is wherever the claims file is, walking up from the test file; else cwd. */
 function findProjectDir(testAbs, claimsFlag) {
-  if (claimsFlag) return dirname(resolve(claimsFlag));
+  if (claimsFlag) {
+    const dir = realpathSync(dirname(resolve(claimsFlag)));
+    const rel = relative(dir, testAbs);
+    if (rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)) return dir;
+    // A claims file kept outside the project says nothing about where the
+    // project is: fault and defender paths are relative to the repository the
+    // test lives in.
+    try { return repoRoot(dirname(testAbs)); } catch { return resolve('.'); }
+  }
   let dir = dirname(testAbs);
   for (let hop = 0; hop < 20; hop++) {
     if (existsSync(defaultClaimsPath(dir))) return dir;
@@ -64,13 +73,16 @@ export async function admitCommand({ file, values, version }, io) {
     io.err('--confirm must be a positive integer and --budget at least 1000');
     return 3;
   }
-  const testAbs = resolve(file);
-  if (!existsSync(testAbs)) throw new PreconditionError(`no such file: ${file}`);
+  if (!existsSync(resolve(file))) throw new PreconditionError(`no such file: ${file}`);
+  // The repository root git reports is a real path; compare like with like.
+  const testAbs = realpathSync(resolve(file));
   const projectDir = findProjectDir(testAbs, values.claims);
   const testRel = relative(projectDir, testAbs);
   if (testRel.startsWith('..')) throw new PreconditionError(`${file} is outside the project directory ${projectDir}`);
 
-  const all = loadClaims(values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir));
+  const claimsPath = values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir);
+  const all = loadClaims(claimsPath);
+  const claimsSource = claimsSourceOf(projectDir, claimsPath);
   const claim = all.claims.find((c) => c.id === claimId);
   if (!claim) throw new PreconditionError(`--claim: unknown claim id ${claimId}`);
   const faults = values.fault ? claim.faults.filter((f) => f.id === values.fault) : claim.faults;
@@ -93,7 +105,7 @@ export async function admitCommand({ file, values, version }, io) {
 
   const provisional = confirmRuns < 3;
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
-  const command = `testguard probe --claim ${claimId} --include-dirty --confirm ${confirmRuns} --no-escalate`;
+  const command = `testguard probe --claim ${claimId} --include-dirty --confirm ${confirmRuns} --no-escalate${claimsSource ? ' --claims <claims-file>' : ''}`;
   const evidence = await probe({
     projectDir,
     claims: { ...all, claims: [{ ...claim, faults }] },
@@ -116,6 +128,7 @@ export async function admitCommand({ file, values, version }, io) {
   if (process.stderr.isTTY && !values.quiet && !values.json) process.stderr.write('\r\x1b[K');
   const outPath = values.out ? resolve(values.out) : join(projectDir, '.testguard', 'evidence-partial.json');
   commandBudget?.assertOpen();
+  if (claimsSource) evidence.run.claimsSource = claimsSource;
   writeSpecDoc('evidence', outPath, evidence);
 
   const decision = decideAdmission(evidence.records);

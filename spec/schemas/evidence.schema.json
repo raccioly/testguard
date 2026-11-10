@@ -172,6 +172,9 @@
         "method": {
           "$ref": "urn:claimspec:v1:common#/$defs/method"
         },
+        "claimsSource": {
+          "$ref": "urn:claimspec:v1:common#/$defs/claimsSource"
+        },
         "instrument": {
           "description": "What measured this evidence beyond what each record hashes: the TestGuard version and a digest of the resolver alias sources and root runner configuration and lockfiles. Evidence from another version or digest is readable and never reusable. Optional for backward compatibility; evidence without it is never reusable.",
           "type": "object",

@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Probe a change (#234).** `probe --changed <ref>` probes only the claims a
+  change can have affected: a fault's target, a defender (named or discovered)
+  or anything in their import closure differs between `merge-base(<ref>, HEAD)`
+  and HEAD (or the working tree with `--include-dirty`). A rename selects
+  through its old and new path, a deletion counts, a closure that cannot be
+  followed selects the claim. Intersects with `--claim`; writes
+  `evidence-partial.json`. `run.scope` reports `selectedCount` and
+  `changed: {ref, outcome, files, matchedClaims, unmatchedFiles}`. Three
+  outcomes are kept apart: claims selected; none selected (an explicit line,
+  `selectedCount: 0`, exit 0, or exit 2 with the new `--fail-on-empty-selection`,
+  no evidence written); and `undetermined` (ref does not resolve, no merge base,
+  git failed or timed out: exit 2, nothing probed, never an empty change). Every
+  git call on the path is a named site, failed in turn by the test suite.
+  `--require-origin` refuses `--changed`, as it does `--claim`. `git.mjs`
+  reports a timed-out call as such.
+- **Results keyed by claim id (#234).** `probe --json` carries `run.claims[]`:
+  `{id, result: proven | unproven | could-not-verify, faults: {total, killed,
+  survived, nocover, unverifiable, faultInvalid, timeout, flakyDefender},
+  reasons: [{faultId, verdict, reason?}]}`, derived by a pure function
+  (survived or nocover → unproven; all killed and at least one → proven; else
+  could-not-verify) that the validator re-derives and enforces.
+- **External claims files are a supported contract (#234).** `--claims` may
+  point outside the project for `probe`, `claims`, `admit` and `status`. The
+  evidence records `run.claimsSource: {external: true, sha256}` and never the
+  path; `status` reports `claimsSource` and omits `paths.claims`; nothing is
+  written beside the file. `status` previously ignored `--claims`; `admit`
+  took the claims file's directory for the project.
+- **`claim-thin` (#234).** `claims` and `status` flag a claim with fewer than
+  two faults, or whose faults share one class, as advisory `thinClaims`.
 ### Fixed
 
 - **Verdict reuse no longer carries a kill over a red suite (#232).** Reuse

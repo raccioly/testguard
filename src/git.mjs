@@ -4,15 +4,24 @@ import { devNull, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 
-export class GitError extends Error {}
+export class GitError extends Error {
+  /** `timedOut`: git did not finish in time, which is not the same finding as git refusing. */
+  constructor(message, { timedOut = false } = {}) {
+    super(message);
+    this.timedOut = timedOut;
+  }
+}
 
-export function gitRaw(args, cwd, env) {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: 30_000, maxBuffer: 16 * 1024 * 1024, env: env ? { ...process.env, ...env } : process.env });
-  if (r.status !== 0) throw new GitError(`git ${args.join(' ')}: ${(r.stderr || r.stdout).trim()}`);
+export function gitRaw(args, cwd, env, { timeoutMs = 30_000 } = {}) {
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, env: env ? { ...process.env, ...env } : process.env });
+  if (r.status !== 0) {
+    const timedOut = r.error?.code === 'ETIMEDOUT';
+    throw new GitError(`git ${args.join(' ')}: ${timedOut ? `timed out after ${timeoutMs} ms` : (r.stderr || r.stdout || r.error?.message || '').trim()}`, { timedOut });
+  }
   return r.stdout;
 }
 
-export const git = (args, cwd, env) => gitRaw(args, cwd, env).trim();
+export const git = (args, cwd, env, options) => gitRaw(args, cwd, env, options).trim();
 
 export const repoRoot = (dir) => git(['rev-parse', '--show-toplevel'], dir);
 

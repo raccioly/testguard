@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
-import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
+import { loadClaims, defaultClaimsPath, claimsSourceOf } from '../claims/load.mjs';
+import { thinClaims, renderThin } from '../claims/thin.mjs';
 import { scanAnnotations, reconcile, annotationAdvisory } from '../claims/annotations.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefendersDetailed } from '../probe/discover.mjs';
@@ -37,6 +38,8 @@ export async function claimsCommand({ projectDir, values, suppliedOptions, versi
   const path = values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir);
   if (values.annotate || values.apply) return annotationsCommand({ projectDir, path, values, suppliedOptions, version }, io);
   const claims = loadClaims(path);
+  const claimsSource = claimsSourceOf(projectDir, path);
+  const thin = thinClaims(claims.claims);
   const annotations = scanAnnotations(projectDir);
   const drift = reconcile(claims, annotations);
   const advisory = annotationAdvisory(claims, annotations, { customClaims: Boolean(values.claims) });
@@ -62,12 +65,13 @@ export async function claimsCommand({ projectDir, values, suppliedOptions, versi
   }
 
   if (values.json) {
-    io.out(JSON.stringify({ path, claims, annotations, drift, annotationAdvisory: advisory, ...(hasOverrides ? { narrowedDefenders } : {}), ...(anchorChecks ? { anchorChecks } : {}), ...(removed ? { removed } : {}), ...(cost ? { cost } : {}) }, null, 2));
+    io.out(JSON.stringify({ ...(claimsSource ? { claimsSource } : { path }), claims, thinClaims: thin, annotations, drift, annotationAdvisory: advisory, ...(hasOverrides ? { narrowedDefenders } : {}), ...(anchorChecks ? { anchorChecks } : {}), ...(removed ? { removed } : {}), ...(cost ? { cost } : {}) }, null, 2));
   } else {
     const annotated = new Set(drift.annotated);
-    io.out(`${claims.claims.length} claims in ${path} — ${annotated.size} carry a @claim annotation in source (test files are not scanned)`);
+    io.out(`${claims.claims.length} claims in ${claimsSource ? `an external claims file (sha256 ${claimsSource.sha256.slice(0, 12)})` : path} — ${annotated.size} carry a @claim annotation in source (test files are not scanned)`);
     io.out('');
     for (const note of advisory.notes) io.out(note);
+    for (const line of renderThin(thin)) io.out(line);
     const signalLines = [];
     for (const c of claims.claims) {
       const declared = c.defendedBy?.length > 0;
