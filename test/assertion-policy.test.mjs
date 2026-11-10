@@ -9,6 +9,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { main } from '../src/cli.mjs';
+import { probe } from '../src/probe/probe.mjs';
+import { loadClaims } from '../src/claims/load.mjs';
 import { classify } from '../src/probe/classify.mjs';
 import { isKillRun, killKindOf, killKindReasonOf, killingFailures } from '../src/probe/kill-kind.mjs';
 import { assertionPolicyRequest, evaluateAssertionPolicy, isWeakKill, renderAssertionPolicy } from '../src/probe/assertion-policy.mjs';
@@ -211,6 +213,19 @@ describe('the real CLI: a defender with no assertion, a fault that throws', () =
     expect(await main(['status', dir, '--require-assertion-kill'], c.io)).toBe(3);
     expect(c.l.err.join('\n')).toMatch(/only valid on probe and admit/);
   });
+
+  it('legacy evidence (no killKind): re-measured on a tool-version change; if reused at the same version it keeps no kind and fails the policy', async () => {
+    const options = { projectDir: dir, claims: loadClaims(join(dir, 'testguard.claims.json')), runnerName: 'vitest', confirmRuns: 3, budgetMs: 60_000, escalate: false };
+    const legacy = await probe({ ...options, toolVersion: '1.0.0' });
+    for (const r of legacy.records) { delete r.detail.killKind; for (const x of r.detail.probeRuns) delete x.exceptionFailures; }
+    const sameVersion = await probe({ ...options, toolVersion: '1.0.0', previous: legacy });
+    expect(sameVersion.records.map((r) => r.reusedFrom !== undefined)).toEqual([true, true]);
+    expect(sameVersion.records.map((r) => r.detail.killKind)).toEqual([undefined, undefined]);
+    expect(evaluateAssertionPolicy(sameVersion.records).state).toBe('failed');
+    const newVersion = await probe({ ...options, toolVersion: '1.1.0', previous: legacy });
+    expect(newVersion.records.map((r) => r.reusedFrom)).toEqual([undefined, undefined]);
+    expect(newVersion.records.map((r) => r.detail.killKind).sort()).toEqual(['assertion', 'exception-only']);
+  }, 240_000);
 
   it('a pre-kind evidence record that was reused fails the policy: unknown rounds toward unproven', () => {
     const legacy = { claim: { id: 'L' }, subject: { id: 'F1' }, verdict: 'killed', detail: {} };
