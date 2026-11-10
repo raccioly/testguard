@@ -29,3 +29,17 @@ export function killKindOf(probeRuns) {
   if (withAssertion === kills.length) return 'assertion';
   return withAssertion === 0 ? 'exception-only' : 'mixed';
 }
+
+/**
+ * Why an `exception-only` kill may not mean a hollow suite: every exception
+ * failure in every run is one the runner never classified (a custom
+ * `--runner-cmd` whose report carries no `failureDetails`, or a runner that
+ * could not report identity). Nothing could be read, so the kill is
+ * exception-only by default, not by evidence.
+ */
+export function killKindReasonOf(probeRuns, killKind) {
+  if (killKind !== 'exception-only') return undefined;
+  const kills = (probeRuns ?? []).filter(isKillRun);
+  return kills.length > 0 && kills.every((run) => (run.kindNotReported ?? 0) > 0 && run.kindNotReported === (run.exceptionFailures ?? 0))
+    ? 'kind-not-reported-by-runner' : undefined;
+}

@@ -39,7 +39,7 @@
           "type": "array", "uniqueItems": true,
           "items": {
             "type": "object", "required": ["claimId", "faultId"],
-            "properties": { "claimId": { "$ref": "#/$defs/identifier" }, "faultId": { "$ref": "#/$defs/identifier" } },
+            "properties": { "claimId": { "$ref": "#/$defs/identifier" }, "faultId": { "$ref": "#/$defs/identifier" }, "reason": { "enum": ["kind-not-reported-by-runner"] } },
             "additionalProperties": false
           }
         }

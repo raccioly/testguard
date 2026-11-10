@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { main } from '../src/cli.mjs';
 import { classify } from '../src/probe/classify.mjs';
-import { isKillRun, killKindOf, killingFailures } from '../src/probe/kill-kind.mjs';
+import { isKillRun, killKindOf, killKindReasonOf, killingFailures } from '../src/probe/kill-kind.mjs';
 import { assertionPolicyRequest, evaluateAssertionPolicy, isWeakKill, renderAssertionPolicy } from '../src/probe/assertion-policy.mjs';
 import { renderRecord } from '../src/render.mjs';
 import { readSpecDoc } from '../src/evidence/writer.mjs';
@@ -38,6 +38,29 @@ describe('killKindOf — pure', () => {
     expect(isKillRun(run(0, 0))).toBe(false);
     expect(isKillRun({ ...pass })).toBe(false);
     expect(isKillRun({ outcome: 'error', assertionFailures: 1, exceptionFailures: 1 })).toBe(false);
+  });
+});
+
+describe('killKindReasonOf — exception-only because nothing could be read', () => {
+  const unread = (n, e = n) => ({ outcome: 'fail', assertionFailures: 0, exceptionFailures: e, kindNotReported: n, timeouts: 0 });
+  it('is set when every exception failure in every run went unreported', () => {
+    expect(killKindReasonOf([unread(2), unread(1), unread(1)], 'exception-only')).toBe('kind-not-reported-by-runner');
+  });
+  it('is not set when any exception was a reported exception, or in any single run', () => {
+    expect(killKindReasonOf([unread(1, 2), unread(1), unread(1)], 'exception-only')).toBeUndefined();
+    expect(killKindReasonOf([unread(1), unread(0, 1), unread(1)], 'exception-only')).toBeUndefined();
+    expect(killKindReasonOf([run(0, 1), run(0, 1)], 'exception-only')).toBeUndefined();
+  });
+  it('is only ever about an exception-only kill', () => {
+    expect(killKindReasonOf([unread(1)], 'mixed')).toBeUndefined();
+    expect(killKindReasonOf([unread(1)], 'assertion')).toBeUndefined();
+    expect(killKindReasonOf([], 'exception-only')).toBeUndefined();
+  });
+  it('the policy carries it per kill and the line says nothing could be read', () => {
+    const rec = (id, reason) => ({ claim: { id }, subject: { id: 'F1' }, verdict: 'killed', detail: { killKind: 'exception-only', ...(reason ? { killKindReason: reason } : {}) } });
+    const policy = evaluateAssertionPolicy([rec('A', 'kind-not-reported-by-runner'), rec('B')]);
+    expect(policy.exceptionOnlyKills).toEqual([{ claimId: 'A', faultId: 'F1', reason: 'kind-not-reported-by-runner' }, { claimId: 'B', faultId: 'F1' }]);
+    expect(renderAssertionPolicy(policy)).toMatch(/A\/F1 \(kind-not-reported-by-runner: the runner reported no error identity.*B\/F1\./);
   });
 });
 
@@ -165,6 +188,22 @@ describe('the real CLI: a defender with no assertion, a fault that throws', () =
     expect(out).toMatchObject({ admitted: false, assertionPolicy: { state: 'failed' }, faults: [{ id: 'F1', verdict: 'killed', killKind: 'exception-only' }] });
     const asserting = capture();
     expect(await main(['admit', join(dir, 'test', 'assert.test.mjs'), '--claim', 'P-ASSERT', '--runner', 'vitest', '--require-assertion-kill'], asserting.io)).toBe(0);
+  }, 180_000);
+
+  it('--runner-cmd without failureDetails: both kills are exception-only because nothing could be read, said per kill', async () => {
+    const vitestBin = join(ROOT, 'node_modules', 'vitest', 'vitest.mjs');
+    const cmd = `${process.execPath} ${vitestBin} run {files} --reporter=json --outputFile={out}`;
+    const json = capture();
+    expect(await main(['probe', dir, '--runner-cmd', cmd, '--no-escalate', '--no-reuse', '--require-assertion-kill', '--json'], json.io)).toBe(1);
+    const doc = JSON.parse(json.l.out.join('\n'));
+    expect(validate('status', doc).errors).toEqual([]);
+    const reason = 'kind-not-reported-by-runner';
+    expect(doc.run.assertionPolicy.exceptionOnlyKills).toEqual([{ claimId: 'P-ASSERT', faultId: 'F1', reason }, { claimId: 'P-CRASH', faultId: 'F1', reason }]);
+    const evidence = readSpecDoc('evidence', join(dir, '.testguard', 'evidence.json'));
+    expect(evidence.records.map((r) => [r.detail.killKind, r.detail.killKindReason])).toEqual([['exception-only', reason], ['exception-only', reason]]);
+    const text = capture();
+    await main(['probe', dir, '--runner-cmd', cmd, '--no-escalate', '--no-reuse', '--require-assertion-kill'], text.io);
+    expect(text.l.out.join('\n')).toMatch(/P-ASSERT\/F1 \(kind-not-reported-by-runner: the runner reported no error identity/);
   }, 180_000);
 
   it('the flag is refused on every other command, exit 3', async () => {

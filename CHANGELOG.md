@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `assertionFailures` is now assertion-only; a kill is `assertionFailures + exceptionFailures > 0`. Evidence written earlier has no `exceptionFailures` or `killKind` and reads as before; under the policy a kill with no recorded kind fails (unknown rounds toward unproven).
+- Under `--require-assertion-kill`, an exception-only kill whose runner reported no error identity (a custom `--runner-cmd` without `failureDetails`) says so per kill: `reason: "kind-not-reported-by-runner"` (`testRun.kindNotReported`, `detail.killKindReason`).
 - vitest and Playwright runs add an injected reporter beside the JSON one (a sidecar file in the temp dir) to read error identity; a custom `--runner-cmd` without `failureDetails` classifies every failure as an exception.
 
 ## [0.20.1] - 2026-10-12

@@ -76,7 +76,7 @@ try {
         assert.equal(record.detail.probeRuns.length, 3);
         assert.equal(record.detail.baselineRuns.length, 3);
         assert(record.detail.baselineRuns.every((run) => run.outcome === 'pass'));
-        assert(record.detail.probeRuns.every((run) => run.outcome === 'fail' && run.assertionFailures + run.exceptionFailures > 0));
+        assert(record.detail.probeRuns.every((run) => run.outcome === 'fail' && run.assertionFailures + (run.exceptionFailures ?? 0) > 0));
       }
     }
     const projected = evidence.records.map(projection);

@@ -203,13 +203,21 @@ Rules that follow from the table:
    kill. An `AssertionError` raised by the code under test itself (an internal
    `assert`) is indistinguishable from the test's own and reads as an
    assertion, the optimistic side. jest keeps only a rewritten `message` for
-   a `node:assert` error, so a lone own `message` reads as an assertion and a
-   plain object thrown as `{ message }` is misread the same way. Playwright
+   a `node:assert` error, which is the same shape as a plain object thrown as
+   `{ message }`; such a lone `message` is an assertion only when the error
+   header (first line of the matching `failureMessages` entry, never a stack
+   frame or quoted text) names `AssertionError` or is jest's own assertion
+   header, `assert.<fn>(` or `expect(`; otherwise it is an exception. Playwright
    exposes only the failed `expect` step and the error's class name to a
    reporter; a failed `expect` step the test then swallowed, before failing
    some other way, is misread as an assertion. A custom `--runner-cmd`
    reports what its jest-compatible report carries; without `failureDetails`
-   every failure is an exception.
+   every failure is an exception, and when that is the only reason (every
+   exception failure of every run was one the runner gave nothing to classify,
+   counted as `testRun.kindNotReported`) the record says so with
+   `detail.killKindReason: "kind-not-reported-by-runner"` and the policy
+   repeats it per kill: the kill is exception-only by default, not by
+   evidence that the suite is hollow. It still fails the policy.
  Tools parse the runner's
    structured report, never its exit code, because the exit code cannot tell
    these apart. A runner's own retry mechanism does not change this: a test

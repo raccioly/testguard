@@ -50,8 +50,8 @@
           "description": "An error shape the runner cannot read counts as an assertion instead of an exception.",
           "faultClass": "return-altered",
           "file": "src/probe/runners/shared.mjs",
-          "find": "export const failureKind = (details) => (Array.isArray(details) && details.some(isAssertionDetail) ? 'assertion' : 'exception');",
-          "replace": "export const failureKind = (details) => (Array.isArray(details) && details.some(isAssertionDetail) ? 'assertion' : 'assertion');",
+          "find": "export const failureKind = (details, messages = []) => (Array.isArray(details) && details.some((d, i) => isAssertionDetail(d, messages?.[i])) ? 'assertion' : 'exception');",
+          "replace": "export const failureKind = (details, messages = []) => (Array.isArray(details) && details.some((d, i) => isAssertionDetail(d, messages?.[i])) ? 'assertion' : 'assertion');",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -100,6 +100,54 @@
           "file": "spec/lib/validate.mjs",
           "find": "          if (r.detail.killKind !== derived) errors.push(",
           "replace": "          if (false) errors.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F8",
+          "description": "The vitest reporter reads every failed test as an assertion.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/vitest/kinds-reporter.mjs",
+          "find": "const kindOf = (errors) => (errors ?? []).some(isAssertion) ? 'assertion' : 'exception';",
+          "replace": "const kindOf = (errors) => (errors ?? []).some(isAssertion) ? 'assertion' : 'assertion';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F9",
+          "description": "The Playwright reporter ignores a failed expect step.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/playwright/kinds-reporter.cjs",
+          "find": "    const assertion = this.expectFailed.has(test.id) ||",
+          "replace": "    const assertion = false ||",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F10",
+          "description": "A lone message is an assertion without any corroborating error header.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "typeof detail.message === 'string' && ASSERTION_HEADER.test(headerOf(message));",
+          "replace": "typeof detail.message === 'string';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F11",
+          "description": "kind-not-reported is claimed even when some exception failures were read.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/kill-kind.mjs",
+          "find": "run.kindNotReported === (run.exceptionFailures ?? 0))",
+          "replace": "run.kindNotReported <= (run.exceptionFailures ?? 0))",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

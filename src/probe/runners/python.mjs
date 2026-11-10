@@ -237,6 +237,7 @@ export function parseReport(report, durationMs) {
   const settled = failed.filter((t) => !timedOut.includes(t));
   const assertionFailures = settled.filter((t) => t.failureKind === 'assertion').length;
   const exceptionFailures = settled.length - assertionFailures;
+  const kindNotReported = settled.filter((t) => t.failureKind !== 'assertion' && t.failureKind !== 'exception').length;
   const xpass = all.filter((t) => t.outcome === 'xpass');
   const passed = all.filter((t) => t.outcome === 'passed').length;
   const total = all.length;
@@ -254,7 +255,7 @@ export function parseReport(report, durationMs) {
     : undefined;
 
   return {
-    run: { outcome, tests: summary, assertionFailures, exceptionFailures, durationMs },
+    run: { outcome, tests: summary, assertionFailures, exceptionFailures, ...(kindNotReported ? { kindNotReported } : {}), durationMs },
     timeouts: timedOut.length,
     loadMessage,
     failedTests: [...failed, ...xpass].map((t) => t.id),

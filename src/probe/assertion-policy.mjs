@@ -22,11 +22,11 @@ export const isWeakKill = (record) => record.verdict === 'killed' && record.deta
 
 export function evaluateAssertionPolicy(records) {
   const exceptionOnlyKills = records.filter(isWeakKill)
-    .map((r) => ({ claimId: r.claim.id, faultId: r.subject.id }))
+    .map((r) => ({ claimId: r.claim.id, faultId: r.subject.id, ...(r.detail.killKindReason ? { reason: r.detail.killKindReason } : {}) }))
     .sort((a, b) => a.claimId.localeCompare(b.claimId) || a.faultId.localeCompare(b.faultId));
   return { state: exceptionOnlyKills.length ? 'failed' : 'passed', exceptionOnlyKills };
 }
 
 export const renderAssertionPolicy = (policy) => policy.state === 'passed'
   ? 'assertion policy: passed; every kill was made by at least one assertion'
-  : `assertion policy: failed; ${policy.exceptionOnlyKills.length} kill${policy.exceptionOnlyKills.length === 1 ? ' was' : 's were'} by exception only, not by assertion: ${policy.exceptionOnlyKills.map((k) => `${k.claimId}/${k.faultId}`).join(', ')}. The suite reached the code but never checked a value; add an assertion on the behavior`;
+  : `assertion policy: failed; ${policy.exceptionOnlyKills.length} kill${policy.exceptionOnlyKills.length === 1 ? ' was' : 's were'} by exception only, not by assertion: ${policy.exceptionOnlyKills.map((k) => `${k.claimId}/${k.faultId}${k.reason ? ` (${k.reason}: the runner reported no error identity, so nothing could be read; the suite may not be hollow)` : ''}`).join(', ')}. Where the runner did report, the suite reached the code but never checked a value; add an assertion on the behavior`;

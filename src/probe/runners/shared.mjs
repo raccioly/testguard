@@ -194,22 +194,27 @@ export function firstInformativeLine(message) {
  * `matcherResult` all say so. One more shape is read, and it is a quirk, not
  * a contract: jest-circus rewrites the message of a node:assert error and then
  * serializes only that own, enumerable `message`, dropping `name`, `code` and
- * `operator`, while an ordinary Error serializes as `{}`. A lone `message`
- * therefore reads as an assertion. A plain object thrown as `{ message }`
- * shares that shape and is misread the optimistic way; GATE-SEMANTICS rule 3
- * says so. Anything else, including no detail at all, is an exception.
+ * `operator`, while an ordinary Error serializes as `{}`. A plain object
+ * thrown as `{ message }` has the same shape, so a lone `message` is an
+ * assertion only when the runner's own error HEADER (the first line of the
+ * matching `failureMessages` entry, never a stack frame or quoted text) says
+ * so: it names the `AssertionError` class, or is jest's own assertion header,
+ * `assert.<fn>(` or `expect(`. Anything else, including no detail at all, is
+ * an exception.
  */
-export function isAssertionDetail(detail) {
+const ASSERTION_HEADER = /^(?:AssertionError\b|(?:Error: )?(?:assert|expect)\b[\w.]*\()/;
+const headerOf = (message) => String(message ?? '').replace(/\x1b\[[0-9;]*m/g, '').trimStart().split('\n')[0].trimEnd();
+export function isAssertionDetail(detail, message) {
   if (detail == null || typeof detail !== 'object') return false;
   if (detail.code === 'ERR_ASSERTION' || detail.name === 'AssertionError') return true;
   if (typeof detail.operator === 'string') return true;
   if (detail.matcherResult != null && typeof detail.matcherResult === 'object') return true;
   const keys = Object.keys(detail);
-  return keys.length === 1 && keys[0] === 'message' && typeof detail.message === 'string';
+  return keys.length === 1 && keys[0] === 'message' && typeof detail.message === 'string' && ASSERTION_HEADER.test(headerOf(message));
 }
 
 /** A failed test is an assertion when any of its errors is one. Absent details are an exception: the pessimistic side. */
-export const failureKind = (details) => (Array.isArray(details) && details.some(isAssertionDetail) ? 'assertion' : 'exception');
+export const failureKind = (details, messages = []) => (Array.isArray(details) && details.some((d, i) => isAssertionDetail(d, messages?.[i])) ? 'assertion' : 'exception');
 
 function isRunnerTimeout(test) {
   if (test.failureType === 'testTimeoutFailure') return true;
@@ -258,8 +263,11 @@ export function parseReport(report, durationMs, kinds) {
   const failedTests = results.map((t) => t.id);
   // Every failed test is exactly one of: a timeout, an assertion, an exception.
   const settled = results.filter((t) => !isRunnerTimeout(t));
-  const assertionFailures = settled.filter((t) => (t.failureDetails !== undefined ? failureKind(t.failureDetails) : t.sidecarKind) === 'assertion').length;
+  const kindOf = (t) => (t.failureDetails !== undefined ? failureKind(t.failureDetails, t.failureMessages) : t.sidecarKind);
+  const assertionFailures = settled.filter((t) => kindOf(t) === 'assertion').length;
   const exceptionFailures = settled.length - assertionFailures;
+  // An exception because the runner said so, or only because it reported nothing to read?
+  const kindNotReported = settled.filter((t) => t.failureDetails === undefined && t.sidecarKind === undefined).length;
   const tests = { total: report.numTotalTests ?? 0, passed: report.numPassedTests ?? 0, failed: report.numFailedTests ?? 0 };
 
   let outcome;
@@ -267,7 +275,7 @@ export function parseReport(report, durationMs, kinds) {
   else if (report.success) outcome = 'pass';
   else outcome = 'fail';
 
-  const run = { outcome, tests, assertionFailures, exceptionFailures, durationMs };
+  const run = { outcome, tests, assertionFailures, exceptionFailures, ...(kindNotReported ? { kindNotReported } : {}), durationMs };
   // jest opens a load failure with "● Test suite failed to run" and puts the
   // cause lines below; vitest puts it on the first line. Take the first line
   // that names an error, else the first non-empty one.

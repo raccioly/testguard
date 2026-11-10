@@ -44,6 +44,37 @@ describe('kill kinds — evidence', () => {
   });
 });
 
+describe('kill kinds — exception-only because the runner reported nothing', () => {
+  const unreported = () => {
+    const doc = example('evidence-kill-kinds');
+    const r = doc.records[1];
+    r.detail.probeRuns.forEach((x) => { x.kindNotReported = x.exceptionFailures; });
+    r.detail.killKindReason = 'kind-not-reported-by-runner';
+    doc.assertionPolicy.exceptionOnlyKills[0].reason = 'kind-not-reported-by-runner';
+    return doc;
+  };
+  it('conforms when every exception failure was unreported, and the policy entry repeats the reason', () => {
+    expect(validate('evidence', unreported()).errors).toEqual([]);
+  });
+  it('is refused when some exception failure was a reported one', () => {
+    const doc = unreported();
+    doc.records[1].detail.probeRuns[0].kindNotReported = 0;
+    expect(validate('evidence', doc).errors.map((e) => e.message).join('\n')).toMatch(/killKindReason is only valid/);
+  });
+  it('is refused on an assertion kill', () => {
+    const doc = unreported();
+    doc.records[0].detail.killKindReason = 'kind-not-reported-by-runner';
+    expect(validate('evidence', doc).ok).toBe(false);
+  });
+  it('the policy entry must carry exactly its record\'s reason', () => {
+    const doc = unreported();
+    delete doc.assertionPolicy.exceptionOnlyKills[0].reason;
+    expect(validate('evidence', doc).errors.map((e) => e.message).join('\n')).toMatch(/exactly the killKindReason/);
+    const other = unreported(); other.assertionPolicy.exceptionOnlyKills[0].reason = 'because';
+    expect(validate('evidence', other).ok).toBe(false);
+  });
+});
+
 describe('kill kinds — status', () => {
   const status = () => {
     const doc = example('status');

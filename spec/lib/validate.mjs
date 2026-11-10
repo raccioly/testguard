@@ -249,6 +249,12 @@ const semantic = {
           if (r.detail.killKind !== derived) errors.push({ path: `${p}/detail/killKind`, message: `killKind ${r.detail.killKind} contradicts the probe runs, which say ${derived}` });
         }
       }
+      if (r.detail?.killKindReason !== undefined) {
+        const runs = Array.isArray(r.detail.probeRuns) ? r.detail.probeRuns : [];
+        const derived = r.verdict === 'killed' && r.detail.killKind === 'exception-only' && runs.length > 0
+          && runs.every((x) => (x.kindNotReported ?? 0) > 0 && x.kindNotReported === (x.exceptionFailures ?? 0));
+        if (!derived) errors.push({ path: `${p}/detail/killKindReason`, message: 'killKindReason is only valid on an exception-only kill whose every exception failure was unreported by the runner' });
+      }
       // Every rule below reads those fields, so a record that is already
       // malformed must not also throw on the way to being reported.
       if (!injection || !r.defenders || !r.inputs || !Array.isArray(r.detail.baselineRuns) || !Array.isArray(r.detail.probeRuns)) return;
@@ -620,6 +626,8 @@ function assertionPolicyErrors(kind, doc) {
     const weak = new Set(doc.records.filter((r) => r.verdict === 'killed' && r.detail?.killKind !== 'assertion' && r.detail?.killKind !== 'mixed')
       .map((r) => key(r.claim.id, r.subject.id)));
     const listed = p.exceptionOnlyKills.map((x) => key(x.claimId, x.faultId));
+    const reasons = new Map(doc.records.map((r) => [key(r.claim.id, r.subject.id), r.detail?.killKindReason]));
+    if (p.exceptionOnlyKills.some((x) => x.reason !== reasons.get(key(x.claimId, x.faultId)))) errors.push({ path: '/assertionPolicy/exceptionOnlyKills', message: 'each entry carries exactly the killKindReason of its record' });
     if (listed.length !== new Set(listed).size || listed.length !== weak.size || listed.some((k) => !weak.has(k))) {
       errors.push({ path: '/assertionPolicy/exceptionOnlyKills', message: 'must list exactly the killed records whose kill is exception-only or carries no recorded kind' });
     }

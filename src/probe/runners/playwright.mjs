@@ -159,7 +159,8 @@ export function parseReport(report, durationMs, kinds) {
   const kindOf = (file, spec, t) => {
     const hit = entries.filter((e) => e.title === spec.title && e.line === spec.line && e.column === spec.column
       && (e.project ?? '') === (t.projectName ?? '') && typeof e.file === 'string' && file && (e.file === file || e.file.endsWith(`/${String(file).replace(/\\/g, '/')}`)));
-    return hit.length > 0 && hit.every((e) => e.kind === 'assertion') ? 'assertion' : 'exception';
+    if (hit.length === 0) return 'unreported';
+    return hit.every((e) => e.kind === 'assertion') ? 'assertion' : 'exception';
   };
   const tests = [];
   const walk = (suite) => {
@@ -182,6 +183,7 @@ export function parseReport(report, durationMs, kinds) {
   const settled = unexpected.filter((t) => !(t.finalResult === 'timedOut' || t.finalResult === 'interrupted'));
   const assertionFailures = settled.filter((t) => t.kind === 'assertion').length;
   const exceptionFailures = settled.length - assertionFailures;
+  const kindNotReported = settled.filter((t) => t.kind === 'unreported').length;
   const failedTests = [...unexpected, ...tests.filter((t) => t.status === 'flaky')].map((t) => t.id);
   const total = tests.length;
   const summary = { total, passed: expected, failed: unexpected.length + flaky };
@@ -194,7 +196,7 @@ export function parseReport(report, durationMs, kinds) {
   const loadMessage = outcome === 'error'
     ? (globalErrors.length ? firstInformativeLine(globalErrors.map((e) => e.message ?? '').join('\n')) : 'playwright found no tests')
     : undefined;
-  return { run: { outcome, tests: summary, assertionFailures, exceptionFailures, durationMs }, timeouts, loadMessage, failedTests, flaky };
+  return { run: { outcome, tests: summary, assertionFailures, exceptionFailures, ...(kindNotReported ? { kindNotReported } : {}), durationMs }, timeouts, loadMessage, failedTests, flaky };
 }
 
 /** The injected reporter that records each failed test's structured error identity; see its header. */

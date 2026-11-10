@@ -88,6 +88,7 @@ export function parseReport(report, durationMs) {
   // A report without the field (an older worker) is an exception: the pessimistic side.
   const assertionFailures = bodyFailures.filter((t) => t.error.assertion === true).length;
   const exceptionFailures = bodyFailures.length - assertionFailures;
+  const kindNotReported = bodyFailures.filter((t) => t.error.assertion === undefined).length;
   const names = new Map();
   for (const t of tests) { const key = `${t.file}::${t.name}`; names.set(key, (names.get(key) ?? 0) + 1); }
   const seen = new Map();
@@ -98,7 +99,7 @@ export function parseReport(report, durationMs) {
     if (!t.passed) failedTests.push(names.get(key) > 1 ? `${key} [case ${ordinal}]` : key);
   }
   return {
-    run: { outcome: loadErrors.length ? 'error' : report.failed || failed.length ? 'fail' : 'pass', tests: { total: tests.length, passed: tests.length - failed.length, failed: failed.length }, assertionFailures: loadErrors.length ? 0 : assertionFailures, exceptionFailures: loadErrors.length ? 0 : exceptionFailures, durationMs },
+    run: { outcome: loadErrors.length ? 'error' : report.failed || failed.length ? 'fail' : 'pass', tests: { total: tests.length, passed: tests.length - failed.length, failed: failed.length }, assertionFailures: loadErrors.length ? 0 : assertionFailures, exceptionFailures: loadErrors.length ? 0 : exceptionFailures, ...(!loadErrors.length && kindNotReported ? { kindNotReported } : {}), durationMs },
     timeouts: timeout.length,
     loadMessage: loadErrors.length ? report.diagnostic?.split(/\r?\n/).find((line) => /(?:\bError:|SyntaxError:|cannot find|unexpected token)/i.test(line))?.trim().slice(0, 1000) ?? loadErrors[0]?.error?.message : undefined,
     failedTests,

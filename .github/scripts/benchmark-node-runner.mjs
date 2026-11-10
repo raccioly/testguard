@@ -96,7 +96,7 @@ for(const [name,input,expected] of ${JSON.stringify(corpus)}) it(name,()=>{try{$
       assert.equal(r.verdict, 'killed', `${r.claim.id} must be caught by both frameworks`);
       assert.equal(r.detail.baselineRuns.length, 3); assert.equal(r.detail.probeRuns.length, 3);
       for (const run of r.detail.baselineRuns) { assert.equal(run.outcome, 'pass'); assert.equal(run.tests.total, corpus.length); }
-      for (const run of r.detail.probeRuns) { assert.equal(run.outcome, 'fail'); assert(run.assertionFailures + run.exceptionFailures > 0); assert.equal(run.tests.total, corpus.length); }
+      for (const run of r.detail.probeRuns) { assert.equal(run.outcome, 'fail'); assert(run.assertionFailures + (run.exceptionFailures ?? 0) > 0); assert.equal(run.tests.total, corpus.length); }
     }
     const workers = readFileSync(receipts, 'utf8').trim().split('\n').map(JSON.parse).filter((r) => !r.collect);
     assert.equal(workers.length, 15, 'three shared baseline runs plus four faults times three confirmations');
