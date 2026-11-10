@@ -61,7 +61,8 @@ probe
   --changed <ref>      probe only the claims the change since merge-base(<ref>, HEAD) can have affected: a fault's target, its defenders
                        or anything they import differs (a rename counts through its old and new path). Intersects with --claim and
                        writes .testguard/evidence-partial.json. A change git cannot measure (ref missing, no merge base, git failed
-                       or timed out) exits 2 and probes nothing; it is never read as an empty change. --json: run.scope.changed
+                       or timed out) exits 2 and probes nothing; it is never read as an empty change. Refused with --ref and
+                       --in-place (exit 3). --json: run.scope.changed
   --fail-on-empty-selection  with --changed: a change that selects no claim exits 2 instead of 0 (either way it says so and
                        lists the changed source files no claim covers: absence from the results is not a pass)
   --include-dirty      probe the working tree (a snapshot commit) instead of HEAD; uncommitted tests count

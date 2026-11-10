@@ -15,7 +15,7 @@ import { originPolicyRequest, evaluateOriginPolicy } from '../probe/origin-polic
 import { readNativeTestUniverse } from '../probe/universe.mjs';
 import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
 import { runnerOptions } from './runner-options.mjs';
-import { selectByChange, measuredScope, renderNoSelection } from './probe-scope.mjs';
+import { selectByChange, measuredScope, renderNoSelection, renderUnmatched } from './probe-scope.mjs';
 import { claimResults } from '../probe/claim-results.mjs';
 export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
 
@@ -100,6 +100,10 @@ export async function probeCommand({ projectDir, values, version }, io) {
   }
   if (values['fail-on-empty-selection'] && values.changed === undefined) {
     io.err('--fail-on-empty-selection needs --changed <ref>: only a change-based selection can come up empty');
+    return 3;
+  }
+  if (values.changed !== undefined && (values.ref !== undefined || values['in-place'])) {
+    io.err('--changed selects against the tree being probed, so it cannot be combined with --ref or --in-place');
     return 3;
   }
   let only = requested;
@@ -233,6 +237,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
     io.out(renderCost(costReport(evidence.records, { run: evidence.run })));
     io.out('');
   }
+  if (changedScope) for (const line of renderUnmatched(changedScope)) io.out(line);
   io.out(`evidence: ${outPath}${scope ? ` (partial: ${[scope.requestedClaims ? `${scope.requestedCount} claim${scope.requestedCount === 1 ? '' : 's'} requested` : null, scope.changed ? `${scope.selectedCount} selected by --changed ${scope.changed.ref}` : null, `${scope.probedCount} probed`].filter(Boolean).join(', ')}${scope.requestedClaims ? `: --claim ${scope.requestedClaims.join(',')}` : ''}; not the canonical evidence file)` : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
   return exitCode;

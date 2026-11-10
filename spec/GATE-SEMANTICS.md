@@ -962,6 +962,10 @@ note `not covered by any claim; absence from the results is not a pass`. This is
 the probe-side view of what `gate --changed` enforces; a clean result over a
 change whose files are listed there says nothing about those files.
 
+`--changed` measures the tree being probed (HEAD, or the working tree with
+`--include-dirty`), so it is refused with `--ref` and `--in-place` (exit `3`):
+the selection would describe another tree than the one measured.
+
 A `--changed` run is partial evidence: it writes `evidence-partial.json`, never
 the canonical file, and is never a baseline.
 

@@ -44,7 +44,10 @@ export function renderNoSelection(selection, { failOnEmpty }) {
     return [`error: cannot tell what changed since ${changed.ref} (${changed.reason.kind}): ${changed.reason.message}. Nothing was probed: a run narrowed to an unknown change would prove nothing.`];
   }
   const lines = [`--changed ${changed.ref}: no claim depends on anything that changed (${changed.files.length} file${changed.files.length === 1 ? '' : 's'} differ since merge-base ${changed.base.slice(0, 7)}); 0 claims selected, nothing probed. This is not a pass for the change: it says no claim was in its way.`];
-  if (changed.unmatchedFiles.length) lines.push(`${changed.unmatchedFiles.length} changed source file${changed.unmatchedFiles.length === 1 ? ' is' : 's are'} ${changed.note}: ${changed.unmatchedFiles.slice(0, 10).join(', ')}${changed.unmatchedFiles.length > 10 ? ', …' : ''}`);
+  lines.push(...renderUnmatched(changed));
   if (failOnEmpty) lines.push('exit 2: --fail-on-empty-selection treats an empty selection as a failure to prove anything.');
   return lines;
 }
+
+/** The changed source files no claim covers; absence from the results says nothing about them. */
+export const renderUnmatched = (changed) => changed.unmatchedFiles.length === 0 ? [] : [`${changed.unmatchedFiles.length} changed source file${changed.unmatchedFiles.length === 1 ? ' is' : 's are'} ${changed.note}: ${changed.unmatchedFiles.slice(0, 10).join(', ')}${changed.unmatchedFiles.length > 10 ? ', …' : ''}`];

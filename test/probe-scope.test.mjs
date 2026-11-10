@@ -132,6 +132,12 @@ describe('which claims a change selects', () => {
     expect(r.selected).toEqual(['TAX-DOUBLES']);
     expect(r.matchedClaims).toEqual(['TAX-DOUBLES']);
   });
+  it('selects every claim when an extended tsconfig that decides how imports resolve changed', () => {
+    const p = repo({ files: { 'tsconfig.json': '{ "extends": "./tsconfig.base.json" }\n', 'tsconfig.base.json': '{ "compilerOptions": { "paths": { "@/*": ["./src/*"] } } }\n' } });
+    edit(p.dir, 'tsconfig.base.json', '{ "compilerOptions": { "paths": { "@/*": ["./lib/*"] } } }\n');
+    commit(p.dir);
+    expect(scope(p).selected).toEqual(['PRICE-TOTAL', 'TAX-DOUBLES']);
+  });
   it('rejects a ref git would read as an option, without running git on it', () => {
     expect(scope(repo(), { ref: '--output=x' })).toMatchObject({ outcome: 'undetermined', reason: { kind: 'ref-unresolved' } });
   });
@@ -189,6 +195,19 @@ describe('probe --changed through the CLI', () => {
     const p = repo();
     expect((await run(['probe', p.dir, '--fail-on-empty-selection', ...common])).code).toBe(3);
     expect((await run(['probe', p.dir, '--changed', 'HEAD', '--require-origin', 'spec', ...common])).code).toBe(3);
+  });
+  it('refuses --changed with --ref or --in-place: the selection would describe another tree than the one probed', async () => {
+    const p = repo();
+    expect((await run(['probe', p.dir, '--changed', 'HEAD', '--ref', 'HEAD', ...common])).code).toBe(3);
+    expect((await run(['probe', p.dir, '--changed', 'HEAD', '--in-place', ...common])).code).toBe(3);
+  });
+  it('also lists the uncovered changed files after a measured run', async () => {
+    const p = repo();
+    edit(p.dir, 'src/tax.mjs', 'export const tax = (n) => n * 2 + 0;\n');
+    edit(p.dir, 'src/orphan.mjs', 'export const orphan = () => 2;\n');
+    commit(p.dir);
+    const r = await run(['probe', p.dir, '--changed', p.base, ...common]);
+    expect(r.out).toContain('not covered by any claim; absence from the results is not a pass: src/orphan.mjs');
   });
   it('an unknown --claim is an error whatever the change is', async () => {
     const p = repo();

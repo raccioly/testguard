@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`probe --changed <ref>` now selects claims (#234).** It used to run every claim and only add
+  change coverage to the `--json` status. It now probes only the claims the change reaches and writes
+  `evidence-partial.json`; it refuses `--ref` and `--in-place` (exit 3). Callers that relied on a full
+  probe plus change coverage should use `status --changed <ref>` or drop `--changed`.
+
 ### Added
 
 - **Probe a change (#234).** `probe --changed <ref>` probes only the claims a
