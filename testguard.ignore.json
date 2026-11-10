@@ -4,6 +4,13 @@
   "entries": [
     {
       "kind": "path",
+      "pattern": "test/assertion-policy.cli.test.mjs",
+      "reason": "Real-CLI acceptance for --require-assertion-kill: it probes a generated project several times (probe, --json, admit, --runner-cmd, legacy reuse), about a minute in total. Mandatory in npm test and CI. The claim TG-KILL-KIND-IS-RECORDED-FROM-ERROR-IDENTITY is defended by the fast pure tests in test/kill-kind.test.mjs; naming this file as a self-probe defender cost 2900 seconds of the gate's budget.",
+      "by": "claude",
+      "at": "2026-11-10T23:30:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/kill-kind.acceptance.test.mjs",
       "reason": "Real-runner acceptance for the kill kind: six runners, each a small generated project probed three times (about a minute in total). It is mandatory in npm test and CI. The claim TG-KILL-KIND-IS-RECORDED-FROM-ERROR-IDENTITY names the fast unit and conformance defenders instead; naming this file as a self-probe defender would re-run all six runners for every fault.",
       "by": "claude",

@@ -15,7 +15,7 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/assertion-policy.test.mjs",
+        "test/kill-kind.test.mjs",
         "test/runner-failure-kind.test.mjs",
         "test/runner-node-report.test.mjs",
         "spec/conformance/kill-kind.test.mjs"
