@@ -8477,7 +8477,7 @@
     },
     {
       "id": "TG-REUSE-BINDS-THE-IMPORT-CLOSURE",
-      "statement": "A prior verdict is carried forward only when the transitive project import closure of the fault target and its defenders, plus the root lockfiles and runner configuration, hashes the same and was followed completely; a closure that cannot be followed is never reused, and status and the origin-policy freshness check apply the same closure and comparison.",
+      "statement": "A prior verdict is carried forward only when the recorded and current dependency closures of the fault target and its defenders are both complete and hash the same; evidence that predates dependency hashing is never reused.",
       "source": {
         "kind": "spec",
         "ref": "spec/GATE-SEMANTICS.md"
@@ -8488,8 +8488,7 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/attribution.test.mjs",
-        "test/dependency-closure.test.mjs"
+        "test/attribution.test.mjs"
       ],
       "faults": [
         {
@@ -8521,9 +8520,27 @@
             "producer": "agent",
             "by": "claude"
           }
-        },
+        }
+      ]
+    },
+    {
+      "id": "TG-IMPORT-CLOSURE-NEVER-SHRINKS-SILENTLY",
+      "statement": "The dependency closure includes every project file the target and defenders load (regex literals and nested templates do not hide imports, Python closures include the conftest.py files pytest loads) plus the root lockfiles and runner configuration, and an import that cannot be followed makes it indeterminate rather than smaller.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/dependency-closure.test.mjs"
+      ],
+      "faults": [
         {
-          "id": "F3",
+          "id": "F1",
           "description": "A computed import() or require() no longer makes the closure indeterminate.",
           "faultClass": "literal-changed",
           "file": "src/probe/imports.mjs",
@@ -8538,7 +8555,7 @@
           }
         },
         {
-          "id": "F4",
+          "id": "F2",
           "description": "Lockfiles and runner configuration are left out of the hashed inputs.",
           "faultClass": "statement-deleted",
           "file": "src/probe/dependencies.mjs",
@@ -8553,7 +8570,7 @@
           }
         },
         {
-          "id": "F5",
+          "id": "F3",
           "description": "Python closures stop including the conftest.py files pytest loads first.",
           "faultClass": "condition-forced",
           "file": "src/probe/pyimports.mjs",
@@ -8568,7 +8585,7 @@
           }
         },
         {
-          "id": "F6",
+          "id": "F4",
           "description": "The lexer reads every slash as division, so a quote inside a regex literal makes the module unreadable.",
           "faultClass": "condition-forced",
           "file": "src/probe/imports.mjs",
@@ -8581,9 +8598,29 @@
             "producer": "agent",
             "by": "claude"
           }
-        },
+        }
+      ]
+    },
+    {
+      "id": "TG-FRESHNESS-SHARES-THE-REUSE-PREDICATE",
+      "statement": "status staleness and the origin-policy freshness check recompute the same dependency closure and apply the same comparison as verdict reuse, and evidence that reuses a record with an indeterminate closure does not conform.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/status-dependencies.test.mjs",
+        "test/policy-freshness.test.mjs",
+        "spec/conformance/dependency-closure.test.mjs"
+      ],
+      "faults": [
         {
-          "id": "F7",
+          "id": "F1",
           "description": "status stops reporting a changed import as stale.",
           "faultClass": "statement-deleted",
           "file": "src/status/status.mjs",
@@ -8598,7 +8635,7 @@
           }
         },
         {
-          "id": "F8",
+          "id": "F2",
           "description": "The origin-policy freshness check compares no dependency inputs.",
           "faultClass": "statement-deleted",
           "file": "src/probe/policy-freshness.mjs",
@@ -8613,12 +8650,12 @@
           }
         },
         {
-          "id": "F9",
+          "id": "F3",
           "description": "A reused record with an indeterminate closure conforms.",
-          "faultClass": "statement-deleted",
+          "faultClass": "condition-forced",
           "file": "spec/lib/validate.mjs",
-          "find": "      if (closure === 'indeterminate' && r.reusedFrom) errors.push({ path: `${p}/reusedFrom`, message: 'a record whose dependency closure is indeterminate is never reused (GATE-SEMANTICS rule 8)' });\n",
-          "replace": "",
+          "find": "      if (closure === 'indeterminate' && r.reusedFrom) errors.push(",
+          "replace": "      if (false && r.reusedFrom) errors.push(",
           "defendedBy": [
             "spec/conformance/dependency-closure.test.mjs"
           ],
@@ -8642,7 +8679,8 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/reuse-live-baseline.test.mjs"
+        "test/reuse-live-baseline.test.mjs",
+        "test/resource-timing.test.mjs"
       ],
       "faults": [
         {
@@ -8668,7 +8706,7 @@
           "find": "        if (reuse) measurements.reuseBaselineRuns++;\n",
           "replace": "",
           "defendedBy": [
-            "test/reuse-live-baseline.test.mjs"
+            "test/resource-timing.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",
