@@ -167,6 +167,8 @@ describe('dependency inputs and the shared predicate', () => {
     expect(dependencyChanges(recorded, { dependencyHashes: { 'a.mjs': '1', 'c.mjs': '3' }, dependencyClosure: 'complete' }, 'K')).toEqual(['b.mjs is no longer an input of K', 'c.mjs became an input of K since it was probed']);
     expect(dependencyChanges({}, recorded, 'K')).toEqual(['K predates dependency hashing and cannot be reused']);
     expect(dependencyChanges(recorded, { ...recorded, dependencyClosure: 'indeterminate' }, 'K')).toEqual([]);
+    // The target and defenders are reported by their own checks, never twice.
+    expect(dependencyChanges(recorded, { dependencyHashes: { 'a.mjs': 'X', 'b.mjs': '2' }, dependencyClosure: 'complete' }, 'K', { roots: ['a.mjs'] })).toEqual([]);
     expect(sameDependencies(recorded, { ...recorded, dependencyClosure: 'indeterminate' })).toBe(false);
   });
 });

@@ -116,12 +116,16 @@ export function createDependencyHasher(projectDir, { cache = true, limits } = {}
  * re-measures it, but it is not a change, and reporting it as stale would
  * leave `status` stale forever with nothing an agent could do about it.
  */
-export function dependencyChanges(recorded, current, key) {
+export function dependencyChanges(recorded, current, key, { roots = [] } = {}) {
   if (!recorded?.dependencyHashes) return [`${key} predates dependency hashing and cannot be reused`];
   const changes = [];
   const before = recorded.dependencyHashes;
   const after = current.dependencyHashes;
+  // The target and the defenders have their own lines (targetHash,
+  // defenderHashes); repeating them here would make those checks redundant.
+  const skip = new Set(roots);
   for (const file of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    if (skip.has(file)) continue;
     if (!(file in after)) changes.push(`${file} is no longer an input of ${key}`);
     else if (!(file in before)) changes.push(`${file} became an input of ${key} since it was probed`);
     else if (before[file] !== after[file]) changes.push(`${file} changed since ${key} was probed`); // same words as the target/defender lines, so they de-duplicate

@@ -8624,7 +8624,7 @@
           "description": "status stops reporting a changed import as stale.",
           "faultClass": "statement-deleted",
           "file": "src/status/status.mjs",
-          "find": "    doc.stale.push(...dependencyChanges(r.inputs, dependencyHasher.inputsFor([cur.fault.file, ...defenders]), key));\n",
+          "find": "    doc.stale.push(...dependencyChanges(r.inputs, dependencyHasher.inputsFor(roots), key, { roots }));\n",
           "replace": "",
           "defendedBy": [
             "test/status-dependencies.test.mjs"

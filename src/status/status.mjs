@@ -211,7 +211,8 @@ export function computeStatus({ projectDir, toolVersion, generatedAt = new Date(
       else if (existsSync(join(projectDir, d)) && hashFile(join(projectDir, d)) !== h) doc.stale.push(`${d} changed since ${key} was probed`);
     }
     dependencyHasher ??= createDependencyHasher(projectDir);
-    doc.stale.push(...dependencyChanges(r.inputs, dependencyHasher.inputsFor([cur.fault.file, ...defenders]), key));
+    const roots = [cur.fault.file, ...defenders];
+    doc.stale.push(...dependencyChanges(r.inputs, dependencyHasher.inputsFor(roots), key, { roots }));
   }
   // The instrument rule `probe` applies before any record (reusableRun): one
   // line for the whole document, because it re-measures every record at once.
