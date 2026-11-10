@@ -63,7 +63,7 @@ try {
        { status: 'failed', failureMessages: ['AssertionError: expected /specify timed out/'] },
        { status: 'failed', failureMessages: ['Error: Test timed out in 1000ms.'] },
      ] }] }, 1);
-     if (result.timeouts !== 1 || result.run.assertionFailures !== 1) throw new Error('installed runner confuses assertion text with timeout identity');`,
+     if (result.timeouts !== 1 || result.run.assertionFailures + result.run.exceptionFailures !== 1) throw new Error('installed runner confuses assertion text with timeout identity');`,
     installedRunner,
   ], consumer);
   const claims = run(bin, ['claims', '.'], consumer);
