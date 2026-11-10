@@ -24,6 +24,8 @@ mkdirSync(join(out, 'workers'), { mode: 0o700 }); // Refuse to overwrite a previ
 const tool = mkdtempSync(join(tmpdir(), 'tg-direct-reference-'));
 const dir = mkdtempSync(join(tmpdir(), 'tg-direct-bench-'));
 const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', timeout: 10000 }).trim();
+// The base commit predates `exceptionFailures`; a kill there was counted wholly in `assertionFailures`. Compare the sum.
+const comparable = ({ durationMs, exceptionFailures, kindNotReported, ...run }) => ({ ...run, assertionFailures: run.assertionFailures + (exceptionFailures ?? 0) });
 const projection = (record) => ({
   id: record.claim.id + '/' + record.subject.id,
   subject: record.subject,
@@ -33,8 +35,8 @@ const projection = (record) => ({
   targetHash: record.inputs?.targetHash,
   defenderHashes: record.inputs?.defenderHashes,
   discoveryHashes: record.inputs?.discoveryHashes,
-  baseline: (record.detail.baselineRuns ?? []).map(({ durationMs, ...run }) => run),
-  probe: (record.detail.probeRuns ?? []).map(({ durationMs, ...run }) => run),
+  baseline: (record.detail.baselineRuns ?? []).map(comparable),
+  probe: (record.detail.probeRuns ?? []).map(comparable),
   negativeControl: record.detail.negativeControl ?? null,
 });
 // testUniverseHash intentionally changes: it binds the changed adapter itself.
@@ -76,7 +78,7 @@ try {
         assert.equal(record.detail.probeRuns.length, 3);
         assert.equal(record.detail.baselineRuns.length, 3);
         assert(record.detail.baselineRuns.every((run) => run.outcome === 'pass'));
-        assert(record.detail.probeRuns.every((run) => run.outcome === 'fail' && run.assertionFailures > 0));
+        assert(record.detail.probeRuns.every((run) => run.outcome === 'fail' && run.assertionFailures + (run.exceptionFailures ?? 0) > 0));
       }
     }
     const projected = evidence.records.map(projection);

@@ -113,7 +113,7 @@ it('fails closed on a missing scope (uncommitted)', async () => {
       expect(await main(['admit', testFile(), '--claim', 'REDACT-003', '--fault', 'F1', '--confirm', '1', '--budget', '30000', '--json'], b.io)).toBe(0);
       const out = JSON.parse(b.lines.out.join('\n'));
       expect(out).toMatchObject({ admitted: true, provisional: true });
-      expect(out.faults).toEqual([{ id: 'F1', verdict: 'killed', hint: '' }]);
+      expect(out.faults).toEqual([{ id: 'F1', verdict: 'killed', killKind: 'assertion', hint: '' }]);
       const c = capture();
       expect(await main(['admit', testFile(), '--claim', 'REDACT-003', '--confirm', '1', '--budget', '30000'], c.io)).toBe(0);
       expect(c.lines.out.join('\n')).toMatch(/^ADMITTED\? — .*Provisional: confirm with --confirm 3/m);

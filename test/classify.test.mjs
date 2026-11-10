@@ -44,7 +44,7 @@ describe('classify — the order of checks is the spec', () => {
   });
 
   it('killed only with N/N assertion failures', () =>
-    expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [kill, kill, kill], confirmRuns: N })).toEqual({ verdict: 'killed' }));
+    expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [kill, kill, kill], confirmRuns: N })).toEqual({ verdict: 'killed', killKind: 'assertion' }));
 
   it('survived only with N/N passes', () =>
     expect(classify({ defenders: D, anchor: ok, baselineRuns: [pass, pass, pass], probeRuns: [pass, pass, pass], confirmRuns: N })).toEqual({ verdict: 'survived' }));

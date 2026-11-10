@@ -151,7 +151,7 @@ The verdict set is closed. Only one value is a pass.
 
 | Verdict | Meaning | Gates by default |
 |---|---|---|
-| `killed` | Fault applied; every one of N probe runs failed with a genuine assertion failure, on a defender set that was green N/N unmodified. | no |
+| `killed` | Fault applied; every one of N probe runs failed in a test body (by assertion or by an exception the fault provoked; rule 3), on a defender set that was green N/N unmodified. Carries `detail.killKind`. | no |
 | `survived` | Fault applied; every one of N probe runs passed. The claim is **unproven**. | **yes** |
 | `nocover` | No defending test exists: the declared globs resolve to nothing, or no test imports the subject. Worse than `survived` — nothing was even tried. | **yes** |
 | `unverifiable` | The claim could not be probed: the fault's anchor is missing or ambiguous, configured or symbol-level defender discovery was indeterminate (`defender-discovery-indeterminate`), its defenders failed to load (`defenders-failed-to-load`), probing it threw (`probe-error`), or the defenders do not execute the subject at all (`subject-not-executed`). Carries a `reason`. A loud, gating verdict — a claim that cannot be probed is not "skipped", it is undefended until someone fixes the fault or the defenders. Never confused with `flaky-defender`, which requires tests that *ran*. | **yes** |
@@ -169,10 +169,56 @@ Rules that follow from the table:
    rendering marks the verdicts as unconfirmed, and a provisional run is
    never frozen into a baseline. Provisional runs exist for the fix loop —
    a fast signal while writing a test — not for a gate.
-3. **Only a test body rejecting the behaviour kills.** A test that fails by
-   assertion — or by an exception the fault provoked inside it — counts. A
-   timeout does not, and a suite that fails to load does not: neither is
-   evidence that the suite defends the claim. Tools parse the runner's
+3. **Only a test body rejecting the behaviour kills, and a kill says how.** A
+   test that fails by assertion — or by an exception the fault provoked inside
+   it — counts. A timeout does not, and a suite that fails to load does not:
+   neither is evidence that the suite defends the claim.
+
+   *Two kinds of kill.* Every failed test is exactly one of: a timeout, an
+   **assertion** failure, or an **exception**. The runner reads which from the
+   error's structured identity — an `AssertionError` (by `name` or by
+   `code: ERR_ASSERTION`), a jest `matcherResult`, a framework's own failed
+   `expect` step, a Python `AssertionError` or pytest `fail`/`raises` outcome —
+   and never from message wording. An error whose shape the runner cannot read
+   is an exception: the pessimistic side. A test with several errors is an
+   assertion when any one of them is. The testRun records both counts,
+   `assertionFailures` and `exceptionFailures`; a run kills when their sum is
+   above zero, so the default verdicts are exactly what they were before the
+   split. A `killed` record then carries `detail.killKind`, derived from its N
+   probe runs: `assertion` (every run had at least one assertion failure),
+   `exception-only` (no run had one: the code threw and the suite went red,
+   which proves the suite **reaches** the code, not that it **checks** it), or
+   `mixed`. Evidence written before the split has neither field.
+
+   *The policy.* `probe --require-assertion-kill` (also on `admit`) fails
+   when any `killed` record is `exception-only` or carries no recorded kind:
+   exit 1, the verdict still `killed`, the policy result stored as
+   `assertionPolicy` and rendered beside the record. It adds no verdict and
+   never changes one. `mixed` passes. `status` and `brief` count exception-only
+   kills as a named weakness beside the co-authored count.
+
+   *Known limits, stated so they are not rediscovered.* A defender that
+   asserts only that the code does not throw (`expect(fn).not.toThrow()`,
+   `assert.doesNotThrow`) is an assertion, and a kill by it is an assertion
+   kill. An `AssertionError` raised by the code under test itself (an internal
+   `assert`) is indistinguishable from the test's own and reads as an
+   assertion, the optimistic side. jest keeps only a rewritten `message` for
+   a `node:assert` error, which is the same shape as a plain object thrown as
+   `{ message }`; such a lone `message` is an assertion only when the error
+   header (first line of the matching `failureMessages` entry, never a stack
+   frame or quoted text) names `AssertionError` or is jest's own assertion
+   header, `assert.<fn>(` or `expect(`; otherwise it is an exception. Playwright
+   exposes only the failed `expect` step and the error's class name to a
+   reporter; a failed `expect` step the test then swallowed, before failing
+   some other way, is misread as an assertion. A custom `--runner-cmd`
+   reports what its jest-compatible report carries; without `failureDetails`
+   every failure is an exception, and when that is the only reason (every
+   exception failure of every run was one the runner gave nothing to classify,
+   counted as `testRun.kindNotReported`) the record says so with
+   `detail.killKindReason: "kind-not-reported-by-runner"` and the policy
+   repeats it per kill: the kill is exception-only by default, not by
+   evidence that the suite is hollow. It still fails the policy.
+ Tools parse the runner's
    structured report, never its exit code, because the exit code cannot tell
    these apart. A runner's own retry mechanism does not change this: a test
    that failed and then passed on retry (Playwright's `flaky`) is a
@@ -183,8 +229,9 @@ Rules that follow from the table:
    assertion, stack frame, or source excerpt. Structured assertion identity
    does not hide a separate timeout in the same failed test.
    Python is read the same way: an `AssertionError` and any other
-   exception raised by the test body both count, because both are the suite
-   rejecting the behaviour; a collection error — a module that will not
+   exception raised by the test body both kill (as an assertion and as an
+   exception respectively), because both are the suite rejecting the
+   behaviour; a collection error — a module that will not
    import, which is what a replacement that does not parse looks like from
    Python — is a load failure and never a kill; and a test the suite expected
    to fail that passed (`xpass`) makes the run non-green without ever being an

@@ -12,8 +12,9 @@
  */
 
 import { isDeepStrictEqual } from 'node:util';
+import { isKillRun } from './kill-kind.mjs';
 
-const isKill = (r) => r.outcome === 'fail' && (r.assertionFailures ?? 0) > 0;
+const isKill = isKillRun;
 
 /** Compare only the claim metadata actually recorded in evidence. */
 export function sameClaimMetadata(recorded, current) {

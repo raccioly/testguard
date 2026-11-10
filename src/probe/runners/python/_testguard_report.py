@@ -22,10 +22,17 @@ Shape (schemaVersion 1):
       "tests": [{"id": "<file>::<name>", "file": str, "name": str,
                  "outcome": "passed"|"failed"|"skipped"|"xfail"|"xpass",
                  "phase": "setup"|"call"|"teardown",
-                 "exceptionType": str|null, "message": str|null}],
+                 "exceptionType": str|null, "message": str|null,
+                 "failureKind": "assertion"|"exception"|null}],
       "provenance": {"<relative target path>": "<absolute path actually
                       imported>" | null}
     }
+
+`failureKind` classifies a failed test from the exception's TYPE, never its
+text: `assertion` when the exception is an `AssertionError` (or a subclass, or
+pytest's own `fail`/`raises` outcome), `exception` otherwise. `null` on a test
+that did not fail; a reader treats a missing value as `exception`, the
+pessimistic side.
 
 `provenance` is the Python-specific precondition. A scratch git worktree
 isolates Node for free, because Node loads files by path. Python does not: an
@@ -53,6 +60,19 @@ def clip(text):
         return None
     s = str(text)
     return s if len(s) <= MAX_MESSAGE else s[:MAX_MESSAGE] + "\n… (truncated)"
+
+
+def kind_of(exc_type):
+    """`assertion` for an AssertionError subclass; `exception` for anything else, or for an unknown type."""
+    try:
+        return "assertion" if isinstance(exc_type, type) and issubclass(exc_type, AssertionError) else "exception"
+    except TypeError:
+        return "exception"
+
+
+def merge_kind(existing, new):
+    """A test with several errors is an assertion when any one of them is."""
+    return "assertion" if "assertion" in (existing, new) else new
 
 
 def targets():

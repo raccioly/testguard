@@ -206,6 +206,7 @@ spec before it is written.
 | `--no-escalate` | off | Do not re-run survivors against the whole suite. Escalation runs the whole suite up to N times per survivor. |
 | `--no-reuse` | off | Re-probe claims whose recorded inputs have not changed. |
 | `--allow-empty` | off | Adoption only: a valid claims file with zero claims exits `0` instead of `2`, writes no evidence, and says verification was skipped. Has no effect with `--claim`. |
+| `--require-assertion-kill` | off | Fail (exit 1) when any kill was made only by an uncaught exception and never by an assertion, or comes from evidence that records no kind. The verdict stays `killed`; the policy names the faults and is stored as `assertionPolicy`. Also valid on `admit`, where it refuses a test whose kills are all exception-only. A kill whose runner reported no error identity fails with `reason: "kind-not-reported-by-runner"`, per kill, in the text line and in `--json`: only a runner that reports identity can satisfy this policy. The built-in runners do. A custom `--runner-cmd` can if it writes a jest-shaped report (`testResults[].assertionResults[]`) with `failureDetails` per failed test: `matcherResult`, or `name: "AssertionError"`, or `code: "ERR_ASSERTION"`, or an `operator`. Without `failureDetails` every failure is an exception and the policy cannot pass. |
 | `--require-origin <kinds>` | none | Require every claim's declared source kind to be in this set (repeatable, comma-separated). Needs a complete confirmed run: refused with `--claim`, `--allow-empty`, `--ref`, `--ignore-dirty` or `--confirm` below 3. Labels do not authenticate independence. |
 | `--progress <mode>` | `auto` | `auto`, `tty`, `plain`, `ndjson` or `none`. Always on stderr. `--quiet` and `--json` imply `none` unless this is given explicitly. |
 | `--verbose` | off | Also print every killed fault. |
@@ -239,8 +240,9 @@ Detection, limits and per-runner behaviour are in
 [languages and runners](languages-and-runners.md).
 
 **Exit:** `0` no new gating finding at or above the severity floor; `1` at
-least one new finding, or a failed `--require-origin` policy (which baseline
-debt and severity floors cannot hide); `2` precondition (an empty claims file
+least one new finding, a failed `--require-origin` policy, or a failed
+`--require-assertion-kill` policy (which baseline debt and severity floors
+cannot hide); `2` precondition (an empty claims file
 without `--allow-empty`, a runner that does not resolve, a dirty defender or
 target with the implicit HEAD, an exhausted command budget, an unavailable
 origin policy, a `--changed` change git could not measure, an empty `--changed` selection under `--fail-on-empty-selection`); `3` usage (`--confirm` not a positive integer, `--budget` or

@@ -129,7 +129,7 @@ describe('native Node collection and runtime acceptance', () => {
   it('detects a genuine test-body exception and preserves its test identity', async () => {
     const dir = project({ 'test/a.test.mjs': body("test('exception', () => { throw new Error('bad behavior'); });") });
     const result = await execute(dir);
-    expect(result.run.outcome).toBe('fail'); expect(result.run.assertionFailures).toBe(1);
+    expect(result.run.outcome).toBe('fail'); expect(result.run.assertionFailures).toBe(0); expect(result.run.exceptionFailures).toBe(1);
     expect(result.failedTests).toEqual(['test/a.test.mjs::exception']);
   });
   it('does not double count a failing suite or accept skipped-only defenders', async () => {

@@ -12,6 +12,7 @@
   ],
   "properties": {
     "originPolicy": { "$ref": "urn:claimspec:v1:common#/$defs/originPolicy" },
+    "assertionPolicy": { "$ref": "urn:claimspec:v1:common#/$defs/assertionPolicy" },
     "origins": { "$ref": "urn:claimspec:v1:common#/$defs/originSummary" },
     "$schema": {
       "type": "string"
@@ -321,7 +322,17 @@
           "additionalProperties": false
         },
         "assertionFailures": {
-          "description": "Test-level failures that are neither timeouts nor load failures: the test body ran and rejected the behaviour, whether by an assertion or by an exception the fault caused. Only these count toward `killed`. A timeout or a suite that fails to load is not evidence that the suite defends the claim.",
+          "description": "Failed tests, neither timeouts nor load failures, whose failure was an ASSERTION: structured error identity (an AssertionError, a matcher result, a framework's own expect step), never message wording. A kill needs `assertionFailures + exceptionFailures > 0`.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "exceptionFailures": {
+          "description": "Failed tests, neither timeouts nor load failures, that failed by an exception the fault provoked rather than by an assertion, or whose error shape the runner could not read (the pessimistic side). Absent on evidence written before this field existed. A failed test is exactly one of: timeout, assertion, exception.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "kindNotReported": {
+          "description": "How many of `exceptionFailures` are exceptions only because the runner reported no error identity to read (a custom `--runner-cmd` report without `failureDetails`, a missing sidecar). Absent when zero.",
           "type": "integer",
           "minimum": 0
         },
@@ -479,6 +490,14 @@
                 }
               },
               "additionalProperties": false
+            },
+            "killKind": {
+              "description": "On `killed` records only: what kind of failure killed the fault. `assertion`: every probe run had at least one assertion-classified failing test. `exception-only`: no run had one, so the suite went red only because the code threw (it reached the code; it did not check a value). `mixed`: some runs did and some did not. Derived from `probeRuns`; absent on evidence written before this field existed. It never changes the verdict; `probe --require-assertion-kill` is the policy that reads it.",
+              "enum": ["assertion", "exception-only", "mixed"]
+            },
+            "killKindReason": {
+              "description": "On an `exception-only` kill only: `kind-not-reported-by-runner` when every exception failure in every run was one the runner gave nothing to classify. The kill is exception-only by default, not by evidence that the suite is hollow.",
+              "enum": ["kind-not-reported-by-runner"]
             },
             "independence": {
               "description": "L3 signal, on `killed` records only: was the killing defender last touched by the same change (or the same author) as the fault's target? A signal for ranking and reporting; it never changes a verdict.",

@@ -12,6 +12,7 @@ import { progressMode, stageReporter, clearStageLine, recordEvent, isProgressMod
 import { validate } from '../../spec/lib/validate.mjs';
 import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
 import { originPolicyRequest, evaluateOriginPolicy } from '../probe/origin-policy.mjs';
+import { assertionPolicyRequest, evaluateAssertionPolicy, renderAssertionPolicy, isWeakKill } from '../probe/assertion-policy.mjs';
 import { readNativeTestUniverse } from '../probe/universe.mjs';
 import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
 import { runnerOptions } from './runner-options.mjs';
@@ -43,6 +44,9 @@ export function partialScope(only, records) {
 export async function probeCommand({ projectDir, values, version }, io) {
   let eligibleKinds;
   try { eligibleKinds = originPolicyRequest(values); }
+  catch (e) { io.err(e.message); return 3; }
+  let requireAssertionKill;
+  try { requireAssertionKill = assertionPolicyRequest(values, 'probe'); }
   catch (e) { io.err(e.message); return 3; }
   const confirmRuns = Number(values.confirm);
   const budgetMs = Number(values.budget);
@@ -170,7 +174,8 @@ export async function probeCommand({ projectDir, values, version }, io) {
       // The discovery note is a property of the claim, not of each fault: say it once.
       const firstOfClaim = !discoveryNoted.has(r.claim.id);
       if (r.defenders.discovered) discoveryNoted.add(r.claim.id);
-      if (values.verbose || r.verdict !== 'killed') io.out(renderRecord(r, { provisional, showDiscovered: firstOfClaim }) + (r.reusedFrom ? '  (reused)' : ''));
+      // A kill is normally a count. Under the policy, the ones it will fail on are named as they land.
+      if (values.verbose || r.verdict !== 'killed' || (requireAssertionKill && isWeakKill(r))) io.out(renderRecord(r, { provisional, showDiscovered: firstOfClaim }) + (r.reusedFrom ? '  (reused)' : ''));
     },
   });
   commandBudget?.assertOpen();
@@ -196,12 +201,14 @@ export async function probeCommand({ projectDir, values, version }, io) {
   }
   const claimsSource = claimsSourceOf(projectDir, claimsPath);
   if (claimsSource) evidence.run.claimsSource = claimsSource;
+  if (requireAssertionKill) evidence.assertionPolicy = evaluateAssertionPolicy(evidence.records);
   commandBudget?.assertOpen();
   writeSpecDoc('evidence', outPath, evidence);
 
   const g = gate(evidence.records, baseline, { severityFloor: values.severity });
   const policy = evidence.originPolicy;
-  const exitCode = policy?.state === 'unavailable' ? 2 : policy?.state === 'failed' || g.new.length > 0 ? 1 : 0;
+  const weak = evidence.assertionPolicy;
+  const exitCode = policy?.state === 'unavailable' ? 2 : policy?.state === 'failed' || weak?.state === 'failed' || g.new.length > 0 ? 1 : 0;
   const scope = measuredScope({ requested, changed: changedScope, records: evidence.records });
   if (values.json) {
     const status = withChangedRef(resolveChangedRef({ explicit: values.changed, projectDir }), (changedRef) => computeStatus({
@@ -212,7 +219,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
         baseline: values.baseline ? resolve(values.baseline) : baselinePath(projectDir),
       },
     }), io.err);
-    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode, ...(evidence.run.reuse ? { reuse: evidence.run.reuse } : {}), ...(policy ? { originPolicy: policy } : {}), ...(scope ? { scope } : {}), claims: claimResults(evidence.records) }, ...(values.cost ? { cost: costReport(evidence.records, { run: evidence.run }) } : {}) };
+    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode, ...(evidence.run.reuse ? { reuse: evidence.run.reuse } : {}), ...(policy ? { originPolicy: policy } : {}), ...(weak ? { assertionPolicy: weak } : {}), ...(scope ? { scope } : {}), claims: claimResults(evidence.records) }, ...(values.cost ? { cost: costReport(evidence.records, { run: evidence.run }) } : {}) };
     const result = validate('status', doc);
     if (!result.ok) throw new Error(`probe JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
     io.out(JSON.stringify(doc, null, 2));
@@ -232,6 +239,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
   // Its own line: the summary ends with the origins line, which is not a sentence to append to.
   io.out(baseline ? `${g.new.length} new since baseline, ${g.baselined.length} baselined.` : 'No baseline.');
   if (policy) io.out(renderOriginPolicy(policy, { basis: 'current' }));
+  if (weak) io.out(renderAssertionPolicy(weak));
   if (values.cost) {
     io.out('');
     io.out(renderCost(costReport(evidence.records, { run: evidence.run })));

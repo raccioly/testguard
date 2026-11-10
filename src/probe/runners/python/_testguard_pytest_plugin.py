@@ -14,6 +14,12 @@ import os
 
 import _testguard_report as tg
 
+try:
+    from _pytest.outcomes import Failed as _Failed  # pytest.fail(), pytest.raises(...) "DID NOT RAISE"
+except ImportError:  # pragma: no cover — no pytest, no plugin
+    class _Failed(Exception):
+        pass
+
 _tests = {}            # nodeid -> record being assembled
 _files = {}            # nodeid -> absolute test file
 _collection_errors = []
@@ -51,6 +57,7 @@ def _record(nodeid):
             "phase": "call",
             "exceptionType": None,
             "message": None,
+            "failureKind": None,
         }
     return _tests[nodeid]
 
@@ -86,10 +93,17 @@ def pytest_exception_interact(node, call, report):
     phase, so the record already exists and is amended in place rather than
     read from a map that would still be empty.
     """
-    name = getattr(getattr(call, "excinfo", None), "typename", None)
+    excinfo = getattr(call, "excinfo", None)
+    name = getattr(excinfo, "typename", None)
     nodeid = getattr(report, "nodeid", "") or getattr(node, "nodeid", "")
     if name and nodeid in _tests:
         _tests[nodeid]["exceptionType"] = name
+    if nodeid in _tests and excinfo is not None:
+        # Failure kind by exception TYPE: an AssertionError, or pytest's own
+        # `fail`/`raises` outcome (`Failed`, which is not an AssertionError).
+        value = getattr(excinfo, "value", None)
+        kind = "assertion" if isinstance(value, (AssertionError, _Failed)) else "exception"
+        _tests[nodeid]["failureKind"] = tg.merge_kind(_tests[nodeid].get("failureKind"), kind)
 
 
 def pytest_collectreport(report):
