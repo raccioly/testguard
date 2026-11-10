@@ -206,6 +206,9 @@ const semantic = {
       if (Math.abs(m.elapsedMs - m.runnerMs - m.overheadMs) > 0.001) errors.push({ path: '/run/measurements', message: 'elapsedMs must equal runnerMs plus overheadMs' });
     }
     if (doc.run.serial && doc.run.workers !== undefined && doc.run.workers !== 1) errors.push({ path: '/run/workers', message: 'serial execution requires one worker' });
+    // One mutable tree cannot hold two faults at once: a fan-out is only ever
+    // measured in scratch worktrees.
+    if (doc.run.faultWorkers > 1 && doc.run.mode === 'in-place') errors.push({ path: '/run/faultWorkers', message: 'a fault fan-out needs scratch worktrees; in-place runs probe one fault at a time' });
     const injection = isInjection(doc.run);
     const n = doc.run.confirmRuns;
     // N-run agreement is what fault injection means by "confirmed". A method
@@ -379,6 +382,11 @@ const semantic = {
       // In-place is the mode where a vanished target is the user's own file
       // gone; it raises rather than records. A document claiming otherwise
       // describes a run that cannot have happened.
+      // A serial re-measure exists only because a fan-out measured the record
+      // first; a document without one describes a run that cannot have happened.
+      if (r.detail.remeasuredSerially && !(doc.run.faultWorkers > 1)) {
+        errors.push({ path: `${p}/detail/remeasuredSerially`, message: 'remeasuredSerially requires run.faultWorkers above one' });
+      }
       if (r.detail.restoreSkipped && doc.run.mode === 'in-place') {
         errors.push({ path: `${p}/detail/restoreSkipped`, message: 'restoreSkipped cannot occur in in-place mode, where a missing target is raised' });
       }

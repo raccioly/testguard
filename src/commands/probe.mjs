@@ -16,6 +16,7 @@ import { assertionPolicyRequest, evaluateAssertionPolicy, renderAssertionPolicy,
 import { readNativeTestUniverse } from '../probe/universe.mjs';
 import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
 import { runnerOptions } from './runner-options.mjs';
+import { parseFaultWorkers } from '../probe/fan-out.mjs';
 export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
@@ -51,6 +52,15 @@ export async function probeCommand({ projectDir, values, version }, io) {
   const workers = Number(values.workers ?? 1);
   if (!Number.isSafeInteger(workers) || workers < 1) {
     io.err('--workers must be a positive safe integer');
+    return 3;
+  }
+  const faultWorkers = parseFaultWorkers(values['fault-workers']);
+  if (faultWorkers === null) {
+    io.err('--fault-workers must be a positive safe integer');
+    return 3;
+  }
+  if (faultWorkers > 1 && values['in-place']) {
+    io.err('--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place');
     return 3;
   }
   const commandBudgetMs = parseCommandBudget(values['command-budget']);
@@ -117,6 +127,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
     budgetMs,
     workers,
     serial: values.serial || workers === 1,
+    faultWorkers,
     commandBudget,
     mode: values['in-place'] ? 'in-place' : 'worktree',
     ref: values.ref ?? 'HEAD',

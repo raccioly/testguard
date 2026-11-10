@@ -1718,7 +1718,7 @@
       "producedBy": { "producer": "agent", "by": "codex" },
       "defendedBy": ["test/fault-defender-orchestration.test.mjs"],
       "faults": [
-        { "id": "F1", "description": "The probe orchestrator substitutes claim-level declarations for the selected per-fault set.", "faultClass": "condition-forced", "file": "src/probe/probe.mjs", "find": "        const declared = requested.length ? resolveDefenders(iso.projectDir, requested) : null;", "replace": "        const declared = claim.defendedBy?.length ? resolveDefenders(iso.projectDir, claim.defendedBy) : null;", "producedBy": { "producer": "agent", "by": "codex" } }
+        { "id": "F1", "description": "The probe orchestrator substitutes claim-level declarations for the selected per-fault set.", "faultClass": "condition-forced", "file": "src/probe/probe.mjs", "find": "      const declared = requested.length ? resolveDefenders(iso.projectDir, requested) : null;", "replace": "      const declared = claim.defendedBy?.length ? resolveDefenders(iso.projectDir, claim.defendedBy) : null;", "producedBy": { "producer": "agent", "by": "codex" } }
       ]
     },
     {
@@ -4782,8 +4782,8 @@
           "description": "The throw escapes the per-fault body again: no evidence file, every prior verdict lost.",
           "faultClass": "guard-removed",
           "file": "src/probe/probe.mjs",
-          "find": "          if (err instanceof PreconditionError) throw err;",
-          "replace": "          throw err;",
+          "find": "      if (err instanceof PreconditionError) throw err;",
+          "replace": "      throw err;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -4813,8 +4813,8 @@
           "description": "The safety net swallows a precondition failure, so a run in which no verdict means anything reports one quiet unverifiable claim and exits on the others.",
           "faultClass": "guard-removed",
           "file": "src/probe/probe.mjs",
-          "find": "          if (err instanceof PreconditionError) throw err;",
-          "replace": "          if (false) throw err;",
+          "find": "      if (err instanceof PreconditionError) throw err;",
+          "replace": "      if (false) throw err;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -4904,8 +4904,8 @@
           "description": "Only an assertion failure counts as reached, so every defender that loads the subject is misreported as never executing it and its real verdict is thrown away.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "  const reached = run.outcome !== 'pass';",
-          "replace": "  const reached = run.outcome === 'fail';",
+          "find": "    const reached = run.outcome !== 'pass';",
+          "replace": "    const reached = run.outcome === 'fail';",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -4964,8 +4964,8 @@
           "description": "The control never restores, so the subject is left as unparseable rubbish and every later fault is measured against it.",
           "faultClass": "call-removed",
           "file": "src/probe/probe.mjs",
-          "find": "  } finally {\n    control.restore();\n  }",
-          "replace": "  } finally {\n    void control;\n  }",
+          "find": "    } finally {\n      control.restore();\n    }",
+          "replace": "    } finally {\n      void control;\n    }",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -5024,8 +5024,8 @@
           "description": "An applied fault is never restored, so the probe leaves its own edits in the tree and every later fault is measured against corrupted source.",
           "faultClass": "call-removed",
           "file": "src/probe/probe.mjs",
-          "find": "        } finally {\n          mutation.restore();",
-          "replace": "        } finally {\n          void mutation;",
+          "find": "    } finally {\n      mutation.restore();",
+          "replace": "    } finally {\n      void mutation;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -7572,7 +7572,7 @@
           "description": "Omit the worker-policy reuse admission check.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "    && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand })",
+          "find": "    && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand, faultWorkers })",
           "replace": "    && true",
           "producedBy": {
             "producer": "agent",
@@ -8403,8 +8403,8 @@
           "description": "The scratch worktree is added with the project hooks enabled.",
           "faultClass": "other",
           "file": "src/git.mjs",
-          "find": "git([...NO_HOOKS, 'worktree', 'add', '--detach', dest, ref], repo)",
-          "replace": "git(['worktree', 'add', '--detach', dest, ref], repo)",
+          "find": "spawnSync('git', [...NO_HOOKS, ...args]",
+          "replace": "spawnSync('git', [...args]",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
