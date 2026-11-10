@@ -110,6 +110,11 @@ function loadAliasContext(projectDir) {
   return context;
 }
 
+/** The files the alias rules were read from (absolute, real paths). */
+export function aliasConfigFiles(projectDir) {
+  return loadAliasContext(projectDir).configFiles;
+}
+
 export function loadAliases(projectDir) {
   return loadAliasContext(projectDir).rules;
 }

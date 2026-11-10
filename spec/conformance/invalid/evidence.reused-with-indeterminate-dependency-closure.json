@@ -46,6 +46,14 @@
       "overheadMs": 1100,
       "runnerInvocations": 4,
       "reuseBaselineRuns": 1
+    },
+    "instrument": {
+      "toolVersion": "0.1.0",
+      "digest": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    "reuse": {
+      "reused": 2,
+      "measured": 0
     }
   },
   "records": [

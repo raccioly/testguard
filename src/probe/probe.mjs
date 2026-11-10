@@ -22,7 +22,7 @@ import { fingerprint } from '../../spec/lib/fingerprint.mjs';
 import { recordedOriginSummary } from '../../spec/lib/origins.mjs';
 import { persistenceSignalsFor } from '../supply/persistence.mjs';
 import { collectOwnedManifests, hashNativeTestUniverse, hashCustomCommandUniverse } from './universe.mjs';
-import { createDependencyHasher } from './dependencies.mjs';
+import { createDependencyHasher, instrumentOf } from './dependencies.mjs';
 
 
 /** Is `child` the same file as `root`, or under it? Both must already be real paths. */
@@ -82,6 +82,32 @@ export function sameRunner(previousRun, current) {
   const recorded = previousRun?.runner;
   if (!recorded) return false;
   return recorded.name === current.name && recorded.version === current.version && recorded.source === current.source;
+}
+
+/**
+ * May anything in `previous` be carried forward into this run at all? The
+ * same N, the same worker policy, the same runner — and the same instrument:
+ * the TestGuard version that decided the verdicts and the resolver/runner
+ * configuration digest. Evidence from another version is readable, never
+ * reusable: a newer tool may decide verdicts by different rules.
+ */
+export function reusableRun(previous, { confirmRuns, workers, serial, runnerCommand, runner, instrument }) {
+  return Boolean(previous)
+    && previous.run.confirmRuns === confirmRuns
+    && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand })
+    && sameRunner(previous.run, runner)
+    && previous.tool?.version === instrument.toolVersion
+    && previous.run.instrument?.toolVersion === instrument.toolVersion
+    && previous.run.instrument?.digest === instrument.digest;
+}
+
+/**
+ * How much of a run was carried forward. A gate over authors who can write
+ * the evidence file must not trust the reused share (GATE-SEMANTICS rule 8).
+ */
+export function reuseSummary(records) {
+  const reused = records.filter((record) => record.reusedFrom).length;
+  return { reused, measured: records.length - reused };
 }
 
 /**
@@ -236,6 +262,7 @@ export async function probe({
   let runnerSource;
   let recordedRunner;
   let primaryManifest;
+  let instrument;
   let runner = RUNNERS[runnerName === 'auto' ? 'vitest' : runnerName];
   // A runner with more than one engine (Python: pytest or unittest) is recorded
   // by the engine that actually ran, never by the module's name. TestGuard does
@@ -320,9 +347,8 @@ export async function probe({
     // The runner that will LOAD the subject, which is not always the project
     // runner — a `.py` source file is Python's whatever the project runs.
     const fatalEditFor = (file) => runnerFor(iso.projectDir, file, runner).fatalEdit?.();
-    const prior = previous && previous.run.confirmRuns === confirmRuns
-      && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand })
-      && sameRunner(previous.run, recordedRunner)
+    instrument = instrumentOf(iso.projectDir, toolVersion);
+    const prior = reusableRun(previous, { confirmRuns, workers, serial, runnerCommand, runner: recordedRunner, instrument })
       ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
       : new Map();
     const partitionConfigured = (files) => {
@@ -464,6 +490,8 @@ export async function probe({
       // Where the runner came from is part of what was measured: recorded for
       // every resolved runner, as the schema documents, not only the builtin.
       runner: recordedRunner,
+      instrument,
+      reuse: reuseSummary(records),
       ...(runnersUsed.size > 1 ? { runners: [...runnersUsed].map(([n, v]) => ({ name: n, ...(v ? { version: v } : {}) })) } : {}),
       confirmRuns,
       measurements,

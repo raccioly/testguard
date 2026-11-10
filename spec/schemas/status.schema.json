@@ -166,6 +166,13 @@
         "records": { "type": "integer", "minimum": 0 },
         "newSinceBaseline": { "type": "integer", "minimum": 0 },
         "exitCode": { "enum": [0, 1, 2] },
+        "reuse": {
+          "description": "Copied from the evidence's run.reuse: records carried forward versus measured by this invocation.",
+          "type": "object",
+          "required": ["reused", "measured"],
+          "properties": { "reused": { "type": "integer", "minimum": 0 }, "measured": { "type": "integer", "minimum": 0 } },
+          "additionalProperties": false
+        },
         "scope": {
           "type": "object",
           "required": ["requestedClaims", "requestedCount", "probedClaims", "probedCount"],

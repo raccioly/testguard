@@ -45,6 +45,18 @@ describe('verdict reuse is bound to what the target and defenders import (#232)'
     expect(record.detail.probeRuns).toHaveLength(3);
   }, 30_000);
 
+  it('evidence written by another TestGuard version is readable and never reused', async () => {
+    const older = structuredClone(first);
+    older.tool.version = 'older';
+    older.run.instrument.toolVersion = 'older';
+    expect(validate('evidence', older).errors).toEqual([]);
+    const second = await probe(options(dir, older));
+    expect(second.records[0].reusedFrom).toBeUndefined();
+    expect(second.records[0].verdict).toBe('killed');
+    expect(second.run.instrument).toEqual({ toolVersion: 'test', digest: first.run.instrument.digest });
+    expect(second.run.reuse).toEqual({ reused: 0, measured: 1 });
+  }, 30_000);
+
   it('legacy evidence without dependencyHashes stays valid and is never reused', async () => {
     const legacy = structuredClone(first);
     for (const record of legacy.records) { delete record.inputs.dependencyHashes; delete record.inputs.dependencyClosure; }

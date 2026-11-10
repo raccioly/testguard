@@ -216,6 +216,13 @@ const semantic = {
       if (n >= 3 && doc.run.provisional === true) errors.push({ path: '/run/provisional', message: `confirmRuns ${n} is confirmed; provisional must be absent or false` });
     }
     if (doc.run.runners && doc.run.runner && !doc.run.runners.some((x) => x.name === doc.run.runner.name)) errors.push({ path: '/run/runners', message: 'runners must include the project runner named in run.runner' });
+    // GATE-SEMANTICS rule 8: the instrument named is the tool that wrote the
+    // document, and the reuse tally is the records' own.
+    if (doc.run.instrument && doc.run.instrument.toolVersion !== doc.tool?.version) errors.push({ path: '/run/instrument/toolVersion', message: `instrument toolVersion ${doc.run.instrument.toolVersion} is not the tool that wrote this evidence (${doc.tool?.version})` });
+    if (doc.run.reuse) {
+      const reused = doc.records.filter((r) => r.reusedFrom).length;
+      if (doc.run.reuse.reused !== reused || doc.run.reuse.measured !== doc.records.length - reused) errors.push({ path: '/run/reuse', message: `run.reuse must count the records: ${reused} reused, ${doc.records.length - reused} measured` });
+    }
     if (doc.run.repo.ignoredDirty && doc.run.repo.snapshot) errors.push({ path: '/run/repo/ignoredDirty', message: 'a working-tree snapshot has no ignored dirty files: the tree was probed as it is' });
     doc.records.forEach((r, i) => {
       const p = `/records/${i}`;

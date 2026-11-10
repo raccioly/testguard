@@ -283,6 +283,33 @@ Rules that follow from the table:
    not call it stale on that ground alone, because re-probing cannot make it
    determinate and an agent would loop. `--no-reuse` is unchanged.
 
+   **The instrument is part of the reuse key.** Evidence records
+   `run.instrument`: the TestGuard version that decided its verdicts (equal to
+   `tool.version`) and a digest of the configuration that shapes how
+   defenders are found and run and is not hashed per record — the resolver's
+   alias sources (tsconfig `paths` through `extends` and `references`,
+   vite/vitest `resolve.alias`, package.json `imports`) and the root runner
+   configuration and lockfiles. Evidence from another version or digest, or
+   with no `run.instrument`, is readable and never reusable: a newer tool may
+   decide verdicts by different rules.
+
+   **Reuse is a trust decision, and the evidence says how much of it there
+   was.** `run.reuse` counts the records carried forward (`reused`, each with
+   `reusedFrom`) and the records measured (`measured`); `probe --json` copies
+   it. Reuse trusts the previous evidence file: a hand-written record whose
+   hashes match is indistinguishable from a measured one. **A gate over
+   authors who can write the evidence file must run with `--no-reuse`.**
+
+   Evidence is written atomically — an exclusive temporary file in the same
+   directory, then a rename — so a run killed mid-write leaves the previous
+   document or the new one, never a truncated file a later probe reads as
+   prior evidence.
+
+   `inputs.targetHash` and `inputs.defenderHashes` keep their meaning;
+   `inputs.dependencyHashes` sits beside them. A consumer that judges
+   freshness must compare all three: the first two alone miss every change
+   to what the target and defenders import.
+
 9. **The fault must be the code that ran.** A green baseline proves the
    harness is not reporting everything as broken. It proves nothing about the
    opposite direction: a fault the interpreter never executes leaves the

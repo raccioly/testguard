@@ -177,7 +177,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
         baseline: values.baseline ? resolve(values.baseline) : baselinePath(projectDir),
       },
     }), io.err);
-    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode, ...(policy ? { originPolicy: policy } : {}), ...(scope ? { scope } : {}) }, ...(values.cost ? { cost: costReport(evidence.records, { run: evidence.run }) } : {}) };
+    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode, ...(evidence.run.reuse ? { reuse: evidence.run.reuse } : {}), ...(policy ? { originPolicy: policy } : {}), ...(scope ? { scope } : {}) }, ...(values.cost ? { cost: costReport(evidence.records, { run: evidence.run }) } : {}) };
     const result = validate('status', doc);
     if (!result.ok) throw new Error(`probe JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
     io.out(JSON.stringify(doc, null, 2));

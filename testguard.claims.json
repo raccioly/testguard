@@ -7419,8 +7419,8 @@
           "description": "Omit the worker-policy reuse admission check.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "      && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand })",
-          "replace": "      && true",
+          "find": "    && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand })",
+          "replace": "    && true",
           "producedBy": {
             "producer": "agent",
             "by": "codex"
@@ -7925,8 +7925,8 @@
           "description": "The probe never asks whether the previous run used the same runner.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "      && sameRunner(previous.run, recordedRunner)",
-          "replace": "      && true",
+          "find": "    && sameRunner(previous.run, runner)",
+          "replace": "    && true",
           "defendedBy": [
             "test/probe-runner-identity.test.mjs"
           ],
@@ -8707,6 +8707,103 @@
           "replace": "",
           "defendedBy": [
             "test/resource-timing.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-REUSE-NAMES-ITS-INSTRUMENT",
+      "statement": "Evidence written by another TestGuard version, or under a different resolver and runner configuration digest, or naming no instrument, is readable and never reused.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/reuse-instrument.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A different TestGuard version's evidence is reused.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "    && previous.tool?.version === instrument.toolVersion\n    && previous.run.instrument?.toolVersion === instrument.toolVersion\n",
+          "replace": "",
+          "defendedBy": [
+            "test/reuse-instrument.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The configuration digest ignores the resolver's alias sources.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/dependencies.mjs",
+          "find": "  for (const abs of aliasConfigFiles(root)) {",
+          "replace": "  for (const abs of []) {",
+          "defendedBy": [
+            "test/reuse-instrument.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-EVIDENCE-TALLIES-REUSE-AND-WRITES-ATOMICALLY",
+      "statement": "Evidence counts the records it carried forward and the records it measured, and a spec document is written to a temporary file and renamed into place so an interrupted write never leaves a truncated document.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/reuse-instrument.test.mjs",
+        "test/evidence-atomic-write.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Reused records are counted as measured.",
+          "faultClass": "return-altered",
+          "file": "src/probe/probe.mjs",
+          "find": "  return { reused, measured: records.length - reused };",
+          "replace": "  return { reused: 0, measured: records.length };",
+          "defendedBy": [
+            "test/reuse-instrument.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The document is written in place, so a crash mid-write truncates it.",
+          "faultClass": "statement-deleted",
+          "file": "src/evidence/writer.mjs",
+          "find": "  writeAtomic(path, output);\n}",
+          "replace": "  writeFileSync(path, output);\n}",
+          "defendedBy": [
+            "test/evidence-atomic-write.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",

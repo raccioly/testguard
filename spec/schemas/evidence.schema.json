@@ -172,6 +172,26 @@
         "method": {
           "$ref": "urn:claimspec:v1:common#/$defs/method"
         },
+        "instrument": {
+          "description": "What measured this evidence beyond what each record hashes: the TestGuard version and a digest of the resolver alias sources and root runner configuration and lockfiles. Evidence from another version or digest is readable and never reusable. Optional for backward compatibility; evidence without it is never reusable.",
+          "type": "object",
+          "required": ["toolVersion", "digest"],
+          "properties": {
+            "toolVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "digest": { "$ref": "urn:claimspec:v1:common#/$defs/sha256" }
+          },
+          "additionalProperties": false
+        },
+        "reuse": {
+          "description": "How many records this run carried forward from earlier evidence (`reused`, each with `reusedFrom`) and how many it measured. A gate over authors who can write the evidence file must run with --no-reuse (GATE-SEMANTICS rule 8).",
+          "type": "object",
+          "required": ["reused", "measured"],
+          "properties": {
+            "reused": { "type": "integer", "minimum": 0 },
+            "measured": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
         "measurements": {
           "type": "object",
           "required": [

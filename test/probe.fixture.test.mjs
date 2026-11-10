@@ -264,6 +264,7 @@ describe('probe reproduces the known-answer fixture', () => {
         probedCount: 2,
       });
       expect(out.cost.records).toBe(2);
+      expect(out.run.reuse.reused + out.run.reuse.measured).toBe(2);
       expect(validate('status', out).errors).toEqual([]);
       const b = capture();
       expect(await main(['probe', scratch, '--claim', ' , ', '--quiet'], b.io)).toBe(3);

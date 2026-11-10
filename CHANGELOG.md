@@ -26,6 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   re-probed once, and until then `status` reports each of its records as
   stale ("predates dependency hashing"). An indeterminate closure makes `--require-origin` policy
   `unavailable`.
+- **Reuse names its instrument, and says how much it reused (#232).** Evidence
+  records `run.instrument` (TestGuard version plus a digest of resolver alias
+  sources and root runner config/lockfiles); evidence from another version or
+  digest is never reused. `run.reuse: { reused, measured }` is in the evidence
+  and in `probe --json`. `GATE-SEMANTICS.md` now states that a gate over
+  authors who can write the evidence file must run `--no-reuse`.
+- Spec documents are written atomically (exclusive temporary file, then
+  rename): a run killed mid-write no longer leaves a truncated evidence file
+  the next probe reads as prior evidence.
 - The module lexer behind defender discovery now reads regex literals,
   numeric literals and template expressions containing quotes or nested
   templates; before, a module with `/'/` in it was unreadable and discovery

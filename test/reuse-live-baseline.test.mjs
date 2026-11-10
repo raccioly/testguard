@@ -25,6 +25,8 @@ describe('one live baseline before any reuse (#232)', () => {
     expect(second.records[0].reusedFrom).toBe(first.run.id);
     expect(second.run.measurements.runnerInvocations).toBe(1);
     expect(second.run.measurements.reuseBaselineRuns).toBe(1);
+    expect(second.run.reuse).toEqual({ reused: 1, measured: 0 });
+    expect(first.run.reuse).toEqual({ reused: 0, measured: 1 });
     expect(validate('evidence', second).errors).toEqual([]);
   }, 30_000);
 

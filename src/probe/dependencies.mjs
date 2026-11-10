@@ -14,7 +14,7 @@
 import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { sha256 } from '../util/hash.mjs';
-import { projectImportResolver } from './rank.mjs';
+import { aliasConfigFiles, projectImportResolver } from './rank.mjs';
 import { pyClosure, pyModuleIndex } from './pyimports.mjs';
 
 export { sameDependencies } from './attribution.mjs';
@@ -127,4 +127,23 @@ export function dependencyChanges(recorded, current, key) {
     else if (before[file] !== after[file]) changes.push(`${file} changed since ${key} was probed`); // same words as the target/defender lines, so they de-duplicate
   }
   return changes;
+}
+
+/**
+ * `run.instrument`: what measured the evidence, beyond what each record
+ * hashes. The tool version (a newer TestGuard may decide verdicts differently)
+ * and a digest of the configuration that shapes how defenders are found and
+ * run: the resolver's alias sources (tsconfig `paths` through `extends` and
+ * `references`, vite/vitest `resolve.alias`, package.json `imports`) and the
+ * root runner configuration and lockfiles. Computed once per command.
+ */
+export function instrumentOf(projectDir, toolVersion) {
+  const root = realpathSync(resolve(projectDir));
+  const files = new Set(DEPENDENCY_MANIFEST_FILES.filter((file) => existsSync(join(root, file))));
+  for (const abs of aliasConfigFiles(root)) {
+    const rel = relative(root, abs).split(sep).join('/');
+    if (rel && !rel.startsWith('..') && !isAbsolute(rel)) files.add(rel);
+  }
+  const hashes = Object.fromEntries([...files].sort().map((file) => [file, hashInside(root, file)]));
+  return { toolVersion, digest: sha256(JSON.stringify({ schemaVersion: 1, files: hashes })) };
 }
