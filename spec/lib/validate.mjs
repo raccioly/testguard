@@ -238,6 +238,17 @@ const semantic = {
           if (!Array.isArray(r.detail[k])) errors.push({ path: `${p}/detail/${k}`, message: `fault-injection requires detail.${k} on every record` });
         }
       }
+      // `killKind` is derived data: only a kill has one, and it must equal what
+      // the recorded probe runs say. Checked before the early return below so
+      // that a stray value on any record is still refused.
+      if (r.detail?.killKind !== undefined) {
+        if (r.verdict !== 'killed') errors.push({ path: `${p}/detail/killKind`, message: 'killKind is a property of a kill; only killed records carry it' });
+        else if (Array.isArray(r.detail.probeRuns) && r.detail.probeRuns.length > 0) {
+          const withAssertion = r.detail.probeRuns.filter((x) => (x.assertionFailures ?? 0) > 0).length;
+          const derived = withAssertion === r.detail.probeRuns.length ? 'assertion' : withAssertion === 0 ? 'exception-only' : 'mixed';
+          if (r.detail.killKind !== derived) errors.push({ path: `${p}/detail/killKind`, message: `killKind ${r.detail.killKind} contradicts the probe runs, which say ${derived}` });
+        }
+      }
       // Every rule below reads those fields, so a record that is already
       // malformed must not also throw on the way to being reported.
       if (!injection || !r.defenders || !r.inputs || !Array.isArray(r.detail.baselineRuns) || !Array.isArray(r.detail.probeRuns)) return;
@@ -248,8 +259,8 @@ const semantic = {
         if (probeRuns.length !== n) errors.push({ path: `${p}/detail/probeRuns`, message: `${r.verdict} requires exactly confirmRuns (${n}) probe runs, got ${probeRuns.length}` });
         if (baselineRuns.some((b) => b.outcome !== 'pass')) errors.push({ path: `${p}/detail/baselineRuns`, message: `${r.verdict} is only valid on a green baseline` });
       }
-      if (r.verdict === 'killed' && !probeRuns.every((x) => x.outcome === 'fail' && (x.assertionFailures ?? 0) > 0)) {
-        errors.push({ path: `${p}/detail/probeRuns`, message: 'killed requires every probe run to fail with at least one assertion failure' });
+      if (r.verdict === 'killed' && !probeRuns.every((x) => x.outcome === 'fail' && (x.assertionFailures ?? 0) + (x.exceptionFailures ?? 0) > 0)) {
+        errors.push({ path: `${p}/detail/probeRuns`, message: 'killed requires every probe run to fail with at least one failing test body (an assertion or an exception), never a timeout or a load failure' });
       }
       if (r.verdict === 'survived' && !probeRuns.every((x) => x.outcome === 'pass')) {
         errors.push({ path: `${p}/detail/probeRuns`, message: 'survived requires every probe run to pass' });
@@ -457,8 +468,8 @@ const semantic = {
       }
       // Only a test body rejecting the reverted source counts as caught —
       // the same rule as `killed`, for the same reason.
-      if (r.verdict === 'caught' && !r.runs.every((x) => x.outcome === 'fail' && (x.assertionFailures ?? 0) > 0)) {
-        errors.push({ path: `${p}/runs`, message: 'caught requires every run to fail with at least one assertion failure' });
+      if (r.verdict === 'caught' && !r.runs.every((x) => x.outcome === 'fail' && (x.assertionFailures ?? 0) + (x.exceptionFailures ?? 0) > 0)) {
+        errors.push({ path: `${p}/runs`, message: 'caught requires every run to fail with at least one failing test body (an assertion or an exception)' });
       }
       if (r.verdict === 'blind' && !r.runs.every((x) => x.outcome === 'pass')) {
         errors.push({ path: `${p}/runs`, message: 'blind requires every run to pass: the suite stayed green on known-broken code' });
@@ -598,6 +609,30 @@ const semantic = {
   },
 };
 
+// `--require-assertion-kill` is a pure function of the records it ran on, so a
+// recorded result is checked against them: no kill by exception can be hidden,
+// and nothing else can be accused.
+function assertionPolicyErrors(kind, doc) {
+  const errors = [];
+  const p = doc.assertionPolicy;
+  if (kind === 'evidence' && p) {
+    const key = (claimId, faultId) => JSON.stringify([claimId, faultId]);
+    const weak = new Set(doc.records.filter((r) => r.verdict === 'killed' && r.detail?.killKind !== 'assertion' && r.detail?.killKind !== 'mixed')
+      .map((r) => key(r.claim.id, r.subject.id)));
+    const listed = p.exceptionOnlyKills.map((x) => key(x.claimId, x.faultId));
+    if (listed.length !== new Set(listed).size || listed.length !== weak.size || listed.some((k) => !weak.has(k))) {
+      errors.push({ path: '/assertionPolicy/exceptionOnlyKills', message: 'must list exactly the killed records whose kill is exception-only or carries no recorded kind' });
+    }
+    if ((p.state === 'failed') !== (listed.length > 0)) errors.push({ path: '/assertionPolicy/state', message: 'state is failed exactly when exceptionOnlyKills is non-empty' });
+  }
+  if (kind === 'status' && doc.run?.assertionPolicy) {
+    const q = doc.run.assertionPolicy;
+    if ((q.state === 'failed') !== (q.exceptionOnlyKills.length > 0)) errors.push({ path: '/run/assertionPolicy/state', message: 'state is failed exactly when exceptionOnlyKills is non-empty' });
+    if (q.state === 'failed' && doc.run.exitCode === 0) errors.push({ path: '/run/exitCode', message: 'a failed assertion policy cannot exit 0' });
+  }
+  return errors;
+}
+
 /**
  * Validate a document against a Guard-spec kind: JSON Schema first, then the
  * semantic rules for that kind. Returns { ok, errors: [{ path, message }] }.
@@ -615,5 +650,6 @@ export function validate(kind, doc) {
   const errors = semantic[kind] ? semantic[kind](doc) : [];
   errors.push(...originErrors(kind, doc));
   errors.push(...originPolicyErrors(kind, doc));
+  errors.push(...assertionPolicyErrors(kind, doc));
   return { ok: errors.length === 0, errors };
 }

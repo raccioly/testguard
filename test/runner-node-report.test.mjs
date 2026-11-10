@@ -4,15 +4,36 @@ import { parseReport, validateReport } from '../src/probe/runners/node-test.mjs'
 import { createReport } from '../src/probe/runners/node/report.mjs';
 
 const item = (extra = {}) => ({ file: 'test/a.test.mjs', name: 'rejects bad input', container: false, suite: false, skipped: false, passed: true, ...extra });
-const error = (failureType = 'testCodeFailure', extra = {}) => ({ failureType, code: 'ERR_TEST_FAILURE', message: 'failure', fileExit: false, ...extra });
+const error = (failureType = 'testCodeFailure', extra = {}) => ({ failureType, code: 'ERR_TEST_FAILURE', message: 'failure', fileExit: false, assertion: true, ...extra });
 const envelope = (cases, extra = {}) => ({ schemaVersion: 1, engine: 'node-test', version: process.versions.node, collect: false, complete: true,
   failed: cases.some((t) => !t.passed && !t.skipped), entries: [{ file: '/project/test/a.test.mjs', pid: 123, version: process.versions.node }], cases, ...extra });
 
 describe('native Node structured report contract', () => {
   it('counts a genuine test-body rejection without doubling its failed suite', () => {
     const result = parseReport(envelope([item({ passed: false, error: error() }), item({ name: 'suite', suite: true, passed: false, error: error('subtestsFailed') })]), 5);
-    expect(result.run).toEqual({ outcome: 'fail', tests: { total: 1, passed: 0, failed: 1 }, assertionFailures: 1, durationMs: 5 });
+    expect(result.run).toEqual({ outcome: 'fail', tests: { total: 1, passed: 0, failed: 1 }, assertionFailures: 1, exceptionFailures: 0, durationMs: 5 });
     expect(result.failedTests).toEqual(['test/a.test.mjs::rejects bad input']);
+  });
+  it('classifies a failed test body by the cause it carries, never by its message', () => {
+    const asserted = parseReport(envelope([item({ passed: false, error: error('testCodeFailure', { message: 'boom' }) })]), 1);
+    expect(asserted.run).toMatchObject({ assertionFailures: 1, exceptionFailures: 0 });
+    // The same words, a cause that is not an assertion: an exception.
+    const thrown = parseReport(envelope([item({ passed: false, error: error('testCodeFailure', { message: 'AssertionError: expected 1 to be 2', assertion: false }) })]), 1);
+    expect(thrown.run).toMatchObject({ assertionFailures: 0, exceptionFailures: 1 });
+    // A report that does not say (an older worker) is the pessimistic side.
+    const unsaid = error('testCodeFailure'); delete unsaid.assertion;
+    expect(parseReport(envelope([item({ passed: false, error: unsaid })]), 1).run).toMatchObject({ assertionFailures: 0, exceptionFailures: 1 });
+    expect(() => validateReport(envelope([item({ passed: false, error: error('testCodeFailure', { assertion: 'yes' }) })]))).toThrow();
+  });
+  it('reads node:assert causes as assertions, and anything else as an exception, from a real event stream', () => {
+    const report = createReport({ projectDir: '/project', version: process.versions.node });
+    const fail = (name, cause) => { report.accept({ type: 'test:start', data: { name, nesting: 1, file: '/project/test/a.test.mjs' } }); report.accept({ type: 'test:fail', data: { name, nesting: 1, file: '/project/test/a.test.mjs', details: { type: 'test', error: Object.assign(new Error('x'), { failureType: 'testCodeFailure', code: 'ERR_TEST_FAILURE', cause }) } } }); };
+    fail('strict', Object.assign(new Error('m'), { code: 'ERR_ASSERTION', name: 'AssertionError', operator: 'strictEqual' }));
+    fail('doesNotThrow', Object.assign(new Error('m'), { code: 'ERR_ASSERTION', name: 'AssertionError', operator: 'doesNotThrow' }));
+    fail('typeerror', new TypeError('boom'));
+    fail('string', 'thrown string');
+    const cases = report.finish([]).cases;
+    expect(cases.map((c) => c.error.assertion)).toEqual([true, true, false, false]);
   });
   it('gives timeout text inside an assertion no timeout identity', () => {
     const result = parseReport(envelope([item({ passed: false, error: error('testCodeFailure', { message: 'expected "timed out"' }) })]), 1);

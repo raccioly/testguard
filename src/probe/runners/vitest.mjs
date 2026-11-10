@@ -1,4 +1,9 @@
-import { TEST_GLOBS, runProcess, checkRunner, runnerArgv, listTestFiles } from './shared.mjs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { randomBytes } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { TEST_GLOBS, runProcess, checkRunner, runnerArgv, listTestFiles, parseReport } from './shared.mjs';
 import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs, normalizeDiscoveredFiles, runDiscoveryProcess } from './discovery.mjs';
 
 export const name = 'vitest';
@@ -28,8 +33,24 @@ export async function discoverTests({ projectDir, version, timeoutMs, maxOutputB
 // --serial: one file at a time in one process, so a contended machine cannot turn a slow suite into a TIMEOUT verdict.
 /** The command line, as data. Exported so it is falsifiable without spawning anything. */
 export const argvFor = (projectDir, files, outFile, { serial = false, workers = 1 } = {}) =>
-  [...runnerArgv(projectDir, 'vitest', 'vitest'), 'run', ...files, '--reporter=json', `--outputFile=${outFile}`, `--maxWorkers=${serial ? 1 : workers}`, ...(serial || workers === 1 ? ['--no-file-parallelism'] : [])];
-export const run = (opts) => runProcess({ ...opts, argv: (files, outFile) => argvFor(opts.projectDir, files, outFile, opts) });
+  [...runnerArgv(projectDir, 'vitest', 'vitest'), 'run', ...files, '--reporter=json', `--reporter=${KINDS_REPORTER}`, `--outputFile=${outFile}`, `--maxWorkers=${serial ? 1 : workers}`, ...(serial || workers === 1 ? ['--no-file-parallelism'] : [])];
+/**
+ * vitest's JSON report keeps only error stack text, so a second, injected
+ * reporter records each failed test's structured error identity in a sidecar
+ * file. Missing or unreadable sidecar: every failure is an exception, which
+ * is the pessimistic side. A `--runner-cmd` never gets it.
+ */
+export const KINDS_REPORTER = join(dirname(fileURLToPath(import.meta.url)), 'vitest', 'kinds-reporter.mjs');
+
+export async function run(opts) {
+  const sidecar = join(tmpdir(), `testguard-vitest-kinds-${randomBytes(6).toString('hex')}.json`);
+  const readKinds = () => {
+    try { return existsSync(sidecar) ? JSON.parse(readFileSync(sidecar, 'utf8')) : undefined; } catch { return undefined; }
+  };
+  try {
+    return await runProcess({ ...opts, env: { ...opts.env, TESTGUARD_VITEST_KINDS: sidecar }, parse: (report, durationMs) => parseReport(report, durationMs, readKinds()), argv: (files, outFile) => argvFor(opts.projectDir, files, outFile, opts) });
+  } finally { rmSync(sidecar, { force: true }); }
+}
 
 /**
  * The negative control's edit: content this runner's loader cannot possibly

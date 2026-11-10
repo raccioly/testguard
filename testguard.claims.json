@@ -428,8 +428,8 @@
       "faults": [{
         "id": "F1", "description": "Skip early origin policy request admission before reading claims.",
         "faultClass": "statement-deleted", "file": "src/cli.mjs",
-        "find": "  try { originPolicyRequest(values, command); }",
-        "replace": "  try { /* skipped early policy admission */ }",
+        "find": "  try { originPolicyRequest(values, command); assertionPolicyRequest(values, command); }",
+        "replace": "  try { /* skipped early policy admission */ assertionPolicyRequest(values, command); }",
         "producedBy": { "producer": "agent", "by": "codex" },
         "defendedBy": ["test/origin-policy-admission.test.mjs"]
       }]
@@ -1665,8 +1665,8 @@
           "description": "One killing run is enough to report killed (optimistic bias).",
           "faultClass": "condition-forced",
           "file": "src/probe/classify.mjs",
-          "find": "if (probeRuns.length === confirmRuns && killedRuns.length === confirmRuns) return { verdict: 'killed' };",
-          "replace": "if (killedRuns.length >= 1) return { verdict: 'killed' };",
+          "find": "if (probeRuns.length === confirmRuns && killedRuns.length === confirmRuns) return { verdict: 'killed', killKind: killKindOf(probeRuns) };",
+          "replace": "if (killedRuns.length >= 1) return { verdict: 'killed', killKind: killKindOf(probeRuns) };",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -3180,8 +3180,8 @@
           "description": "Timed-out tests are counted as assertion failures; a hang would kill.",
           "faultClass": "other",
           "file": "src/probe/runners/playwright.mjs",
-          "find": "  const assertionFailures = unexpected.length - timeouts;",
-          "replace": "  const assertionFailures = unexpected.length;",
+          "find": "  const settled = unexpected.filter((t) => !(t.finalResult === 'timedOut' || t.finalResult === 'interrupted'));",
+          "replace": "  const settled = unexpected;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -4332,8 +4332,8 @@
           "description": "A timed-out test counts toward assertion failures, so a hang becomes a kill.",
           "faultClass": "variable-swap",
           "file": "src/probe/runners/python.mjs",
-          "find": "    run: { outcome, tests: summary, assertionFailures: failed.length - timedOut.length, durationMs },",
-          "replace": "    run: { outcome, tests: summary, assertionFailures: failed.length, durationMs },",
+          "find": "  const settled = failed.filter((t) => !timedOut.includes(t));",
+          "replace": "  const settled = failed;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -5817,8 +5817,8 @@
           "description": "Probe computes the co-authored count but drops the warning from its human summary.",
           "faultClass": "statement-deleted",
           "file": "src/render.mjs",
-          "find": "  const quality = coAuthored ? `\\n${coAuthorshipWarning(coAuthored, kills.length)}` : '';",
-          "replace": "  const quality = '';",
+          "find": "  const quality = (coAuthored ? `\\n${coAuthorshipWarning(coAuthored, kills.length)}` : '') + (exceptionOnly",
+          "replace": "  const quality = ('') + (exceptionOnly",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -7349,8 +7349,8 @@
           "description": "Launch Playwright through npm rather than the project-resolved CLI.",
           "faultClass": "call-removed",
           "file": "src/probe/runners/playwright.mjs",
-          "find": "  [...runnerArgv(projectDir, '@playwright/test', 'playwright'), 'test', '--reporter=json', `--workers=${serial ? 1 : workers}`, ...files];",
-          "replace": "  ['npx', 'playwright', 'test', '--reporter=json', `--workers=${serial ? 1 : workers}`, ...files];",
+          "find": "  [...runnerArgv(projectDir, '@playwright/test', 'playwright'), 'test', `--reporter=${KINDS_REPORTER.includes(',') ? 'json' : `json,${KINDS_REPORTER}`}`, `--workers=${serial ? 1 : workers}`, ...files];",
+          "replace": "  ['npx', 'playwright', 'test', `--reporter=${KINDS_REPORTER.includes(',') ? 'json' : `json,${KINDS_REPORTER}`}`, `--workers=${serial ? 1 : workers}`, ...files];",
           "producedBy": {
             "producer": "agent",
             "by": "codex"

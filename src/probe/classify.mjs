@@ -1,3 +1,5 @@
+import { isKillRun, killKindOf } from './kill-kind.mjs';
+
 /**
  * The verdict function. Pure: everything it needs is passed in, so every
  * branch is unit-testable without a runner.
@@ -26,9 +28,9 @@ export function classify({ defenders, anchor, baselineRuns, probeRuns, confirmRu
   }
   if (probeRuns.some((r) => r.outcome === 'timeout' || r.timeouts > 0)) return { verdict: 'timeout', reason: 'test-timed-out' };
 
-  const killedRuns = probeRuns.filter((r) => r.outcome === 'fail' && r.assertionFailures > 0);
+  const killedRuns = probeRuns.filter(isKillRun);
   const passedRuns = probeRuns.filter((r) => r.outcome === 'pass');
-  if (probeRuns.length === confirmRuns && killedRuns.length === confirmRuns) return { verdict: 'killed' };
+  if (probeRuns.length === confirmRuns && killedRuns.length === confirmRuns) return { verdict: 'killed', killKind: killKindOf(probeRuns) };
   if (probeRuns.length === confirmRuns && passedRuns.length === confirmRuns) {
     // The negative control. A green baseline proves the defenders can PASS; it
     // says nothing about whether they can fail because of THIS file. If the

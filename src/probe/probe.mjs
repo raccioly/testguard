@@ -683,8 +683,9 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
     }
   }
 
-  const { verdict, reason } = classify({ defenders, anchor, baselineRuns: detail.baselineRuns, probeRuns: rawProbeRuns, confirmRuns, subjectReached });
+  const { verdict, reason, killKind } = classify({ defenders, anchor, baselineRuns: detail.baselineRuns, probeRuns: rawProbeRuns, confirmRuns, subjectReached });
   if (reason && !detail.reason) detail.reason = reason;
+  if (killKind) detail.killKind = killKind;
   if (anchor && anchor.status !== 'ok' && anchor.status !== 'file-missing' && anchor.status !== 'defenders-failed-to-load') detail.anchor = { hits: anchor.hits, expected: anchor.expected };
 
   const blast = targetExists ? blastRadius(iso.projectDir, fault.file) : 0;

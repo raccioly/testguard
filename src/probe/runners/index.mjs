@@ -135,7 +135,7 @@ export function mergeRuns(parts) {
   const outcome = runs.some((r) => r.outcome === 'error') ? 'error' : runs.some((r) => r.outcome === 'timeout') ? 'timeout' : runs.some((r) => r.outcome === 'fail') ? 'fail' : 'pass';
   const sum = (k) => runs.reduce((n, r) => n + (r.tests[k] ?? 0), 0);
   return {
-    run: { outcome, tests: { total: sum('total'), passed: sum('passed'), failed: sum('failed') }, assertionFailures: runs.reduce((n, r) => n + r.assertionFailures, 0), durationMs: runs.reduce((n, r) => n + r.durationMs, 0) },
+    run: { outcome, tests: { total: sum('total'), passed: sum('passed'), failed: sum('failed') }, assertionFailures: runs.reduce((n, r) => n + r.assertionFailures, 0), exceptionFailures: runs.reduce((n, r) => n + (r.exceptionFailures ?? 0), 0), durationMs: runs.reduce((n, r) => n + r.durationMs, 0) },
     timeouts: parts.reduce((n, p) => n + (p.timeouts ?? 0), 0),
     loadMessage: parts.find((p) => p.loadMessage)?.loadMessage,
     failedTests: parts.flatMap((p) => p.failedTests ?? []),
