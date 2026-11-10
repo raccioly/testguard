@@ -29,8 +29,12 @@ it('SIGINT in the middle of a fan-out exits 130 and leaves no scratch worktree',
     // the fan-out is reliably still in flight when the signal arrives.
     const { child, done } = cli(['probe', project.dir, '--runner', 'node-test', '--fault-workers', '3', '--budget', '20000', '--no-escalate', '--quiet', '--out', join(project.markers, 'evidence.json')], { TG_FANOUT_MARKERS: project.markers });
     let during = [];
+    let exited = false;
+    done.then(() => { exited = true; });
     const deadline = Date.now() + 30_000;
-    while (during.length < 3 && Date.now() < deadline) {
+    // Stop polling as soon as the probe is gone: a build that never fans out
+    // must fail here in seconds, not after the deadline.
+    while (during.length < 3 && !exited && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 25));
       during = scratchTrees(project.dir);
     }
