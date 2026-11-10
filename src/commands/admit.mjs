@@ -12,6 +12,7 @@ import { hintFor } from '../brief/brief.mjs';
 import { formatVerdict, PROVISIONAL_WARNING } from '../render.mjs';
 import { decideAdmission } from '../admit/admit.mjs';
 import { runnerOptions } from './runner-options.mjs';
+import { assertionPolicyRequest, evaluateAssertionPolicy, renderAssertionPolicy } from '../probe/assertion-policy.mjs';
 
 /** The project is wherever the claims file is, walking up from the test file; else cwd. */
 function findProjectDir(testAbs, claimsFlag) {
@@ -50,6 +51,7 @@ export async function admitCommand({ file, values, version }, io) {
     io.err(runner.error);
     return 3;
   }
+  const requireAssertionKill = assertionPolicyRequest(values, 'admit');
   const confirmRuns = Number(values.confirm);
   const budgetMs = Number(values.budget);
   const commandBudgetMs = parseCommandBudget(values['command-budget']);
@@ -116,24 +118,31 @@ export async function admitCommand({ file, values, version }, io) {
   if (process.stderr.isTTY && !values.quiet && !values.json) process.stderr.write('\r\x1b[K');
   const outPath = values.out ? resolve(values.out) : join(projectDir, '.testguard', 'evidence-partial.json');
   commandBudget?.assertOpen();
+  // The test kills every fault; the policy asks whether any assertion did the killing.
+  const policy = requireAssertionKill ? evaluateAssertionPolicy(evidence.records) : undefined;
+  if (policy) evidence.assertionPolicy = policy;
   writeSpecDoc('evidence', outPath, evidence);
 
   const decision = decideAdmission(evidence.records);
+  const admitted = decision.admitted && policy?.state !== 'failed';
   const result = {
-    admitted: decision.admitted,
+    admitted,
+    ...(policy ? { assertionPolicy: policy } : {}),
     provisional,
     claim: claimId,
     test: testRel,
-    faults: evidence.records.map((r) => ({ id: r.subject.id, verdict: r.verdict, ...(r.detail.reason ? { reason: r.detail.reason } : {}), hint: hintFor(r) })),
+    faults: evidence.records.map((r) => ({ id: r.subject.id, verdict: r.verdict, ...(r.detail.killKind ? { killKind: r.detail.killKind } : {}), ...(r.detail.reason ? { reason: r.detail.reason } : {}), hint: hintFor(r) })),
     evidence: outPath,
     command,
   };
   if (values.json) {
     io.out(JSON.stringify(result, null, 2));
   } else {
-    for (const r of evidence.records) io.out(`  ${formatVerdict(r.verdict, provisional).padEnd(15)} ${claimId}/${r.subject.id}  ${r.subject.description}${r.detail.reason ? `  [${r.detail.reason}]` : ''}`);
+    for (const r of evidence.records) io.out(`  ${formatVerdict(r.verdict, provisional).padEnd(15)} ${claimId}/${r.subject.id}  ${r.subject.description}${r.detail.reason ? `  [${r.detail.reason}]` : ''}${r.detail.killKind === 'exception-only' ? '  [killed by exception only: no assertion failed]' : ''}`);
     io.out('');
-    if (decision.admitted) {
+    if (decision.admitted && !admitted) {
+      io.out(`NOT ADMITTED: ${testRel} kills every fault of ${claimId}, but ${renderAssertionPolicy(policy)}`);
+    } else if (decision.admitted) {
       io.out(provisional
         ? `ADMITTED? — ${testRel} kills ${evidence.records.length === 1 ? 'the fault' : `all ${evidence.records.length} faults`} of ${claimId} at --confirm ${confirmRuns}. Provisional: confirm with --confirm 3 before committing.`
         : `ADMITTED — ${testRel} passes on HEAD and fails on ${evidence.records.length === 1 ? 'the fault' : `all ${evidence.records.length} faults`} of ${claimId}, ${confirmRuns}/${confirmRuns}. Commit it.`);
@@ -145,5 +154,5 @@ export async function admitCommand({ file, values, version }, io) {
     io.out(`evidence: ${outPath} (partial; not the canonical evidence file)`);
   }
   if (provisional && !values.quiet && !values.json) io.err(PROVISIONAL_WARNING(confirmRuns));
-  return decision.admitted ? 0 : 1;
+  return admitted ? 0 : 1;
 }

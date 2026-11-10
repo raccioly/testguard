@@ -68,7 +68,7 @@ export function validateReport(report) {
   for (const t of report.cases) {
     if (!t || typeof t.file !== 'string' || typeof t.name !== 'string'
       || ['container', 'suite', 'skipped', 'passed'].some((k) => typeof t[k] !== 'boolean')
-      || t.error !== undefined && (typeof t.error !== 'object' || t.error === null || typeof t.error.failureType !== 'string' || typeof t.error.code !== 'string' || typeof t.error.message !== 'string' || typeof t.error.fileExit !== 'boolean')) throw new DiscoveryError('malformed node-test result');
+      || t.error !== undefined && (typeof t.error !== 'object' || t.error === null || typeof t.error.failureType !== 'string' || typeof t.error.code !== 'string' || typeof t.error.message !== 'string' || typeof t.error.fileExit !== 'boolean' || t.error.assertion !== undefined && typeof t.error.assertion !== 'boolean')) throw new DiscoveryError('malformed node-test result');
     if (t.passed && t.error || !t.container && (!t.file || t.file.split('/').some((part) => part === '..' || part === '') || t.file.includes('\\') || t.file.startsWith('/') || !t.name)) throw new DiscoveryError('inconsistent node-test result identity');
   }
   if (report.failed !== report.cases.some((t) => !t.passed && !t.skipped)) throw new DiscoveryError('inconsistent node-test failure summary');
@@ -84,7 +84,11 @@ export function parseReport(report, durationMs) {
   const loadErrors = report.cases.filter((t) => !t.skipped && !t.passed
     && (t.container || t.suite ? t.error?.failureType !== 'subtestsFailed' : !['testCodeFailure', 'testTimeoutFailure'].includes(t.error?.failureType) || t.error?.fileExit));
   if (!tests.length || !report.entries.length) loadErrors.push({ error: { message: 'node-test executed no test bodies' } });
-  const assertionFailures = failed.filter((t) => t.error?.failureType === 'testCodeFailure' && !t.error.fileExit).length;
+  const bodyFailures = failed.filter((t) => t.error?.failureType === 'testCodeFailure' && !t.error.fileExit);
+  // A report without the field (an older worker) is an exception: the pessimistic side.
+  const assertionFailures = bodyFailures.filter((t) => t.error.assertion === true).length;
+  const exceptionFailures = bodyFailures.length - assertionFailures;
+  const kindNotReported = bodyFailures.filter((t) => t.error.assertion === undefined).length;
   const names = new Map();
   for (const t of tests) { const key = `${t.file}::${t.name}`; names.set(key, (names.get(key) ?? 0) + 1); }
   const seen = new Map();
@@ -95,7 +99,7 @@ export function parseReport(report, durationMs) {
     if (!t.passed) failedTests.push(names.get(key) > 1 ? `${key} [case ${ordinal}]` : key);
   }
   return {
-    run: { outcome: loadErrors.length ? 'error' : report.failed || failed.length ? 'fail' : 'pass', tests: { total: tests.length, passed: tests.length - failed.length, failed: failed.length }, assertionFailures: loadErrors.length ? 0 : assertionFailures, durationMs },
+    run: { outcome: loadErrors.length ? 'error' : report.failed || failed.length ? 'fail' : 'pass', tests: { total: tests.length, passed: tests.length - failed.length, failed: failed.length }, assertionFailures: loadErrors.length ? 0 : assertionFailures, exceptionFailures: loadErrors.length ? 0 : exceptionFailures, ...(!loadErrors.length && kindNotReported ? { kindNotReported } : {}), durationMs },
     timeouts: timeout.length,
     loadMessage: loadErrors.length ? report.diagnostic?.split(/\r?\n/).find((line) => /(?:\bError:|SyntaxError:|cannot find|unexpected token)/i.test(line))?.trim().slice(0, 1000) ?? loadErrors[0]?.error?.message : undefined,
     failedTests,

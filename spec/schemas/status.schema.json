@@ -160,6 +160,7 @@
       "required": ["id", "evidence", "provisional", "records", "newSinceBaseline", "exitCode"],
       "properties": {
         "originPolicy": { "$ref": "urn:claimspec:v1:common#/$defs/originPolicy" },
+        "assertionPolicy": { "$ref": "urn:claimspec:v1:common#/$defs/assertionPolicy" },
         "id": { "type": "string", "minLength": 1, "maxLength": 128 },
         "evidence": { "type": "string", "minLength": 1, "maxLength": 4096 },
         "provisional": { "type": "boolean" },
@@ -315,6 +316,7 @@
           "type": "integer",
           "minimum": 0
         },
+        "killedExceptionOnly": { "description": "Kills made only by an uncaught exception, never by an assertion: the suite reached the code but never checked a value. A named weakness, counted next to `killedCoAuthored`. Legacy records without a recorded kind are not counted.", "type": "integer", "minimum": 0 },
         "killedCoAuthored": { "description": "Kills whose defender was last touched by the same change (or author) as the code it guards — L3 independence. A signal, not a gate.", "type": "integer", "minimum": 0 },
         "flakyDefenderSets": { "description": "Distinct defender sets that failed at least once on unmodified source.", "type": "integer", "minimum": 0 },
         "worstFlakeRate": { "description": "Highest observed failures/runs on unmodified source across all records, 0–1. A number, so \"unstable\" stops being an adjective.", "type": "number", "minimum": 0, "maximum": 1 },

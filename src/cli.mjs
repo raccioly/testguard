@@ -21,6 +21,7 @@ import { admitCommand } from './commands/admit.mjs';
 import { sweepCommand } from './commands/sweep.mjs';
 import { concernsCommand } from './commands/concerns.mjs';
 import { originPolicyRequest } from './probe/origin-policy.mjs';
+import { assertionPolicyRequest } from './probe/assertion-policy.mjs';
 import { draftAppendRequest, intentInputRequest } from './scaffold/request.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
@@ -52,6 +53,8 @@ probe
   --severity <level>   gate only at or above   (default: low)
   --require-origin <kinds> complete confirmed probe only; repeatable comma-separated declared source kinds.
                        No kind authenticates independence. Policy failures ignore baseline debt and severity floors.
+  --require-assertion-kill  fail (exit 1) when any kill was made only by an uncaught exception, never by an assertion.
+                       The verdict stays killed; the policy names the faults. Also valid on admit.
   --ref <commit>       probe this commit in the scratch worktree (default: HEAD). An explicit --ref is honoured even when
                        defender/target files are dirty: a warning names them, the evidence records them (repo.ignoredDirty)
   --ignore-dirty       probe HEAD as committed although defender/target files are dirty (same warning and record)
@@ -121,7 +124,7 @@ replay     --workers <n> (default 1)  --serial  --budget <ms> (per run)
            --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>   runner selection, as for probe
            --python <path>   Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH
            reports, never gates: a bug that escaped is history, not a regression in this change
-admit      --workers <n> (default 1)  --serial  --budget <ms>  --command-budget <ms>
+admit      --workers <n> (default 1)  --serial  --budget <ms>  --command-budget <ms>  --require-assertion-kill
            --claim <ID> (required)  --fault <FID> (one fault only)  --confirm <n>  --json
            --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>   runner selection, as for probe
            --python <path>   Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH
@@ -210,6 +213,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         serial: { type: 'boolean', default: false },
         claim: { type: 'string', multiple: true },
         'require-origin': { type: 'string', multiple: true },
+        'require-assertion-kill': { type: 'boolean', default: false },
         fault: { type: 'string' },
         'include-dirty': { type: 'boolean', default: false },
         changed: { type: 'string' },
@@ -291,7 +295,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
     io.err('--annotate and --apply are only valid on claims');
     return 3;
   }
-  try { originPolicyRequest(values, command); }
+  try { originPolicyRequest(values, command); assertionPolicyRequest(values, command); }
   catch (e) { io.err(e.message); return 3; }
   const suppliedOptions = parsed.tokens.filter((token) => token.kind === 'option').map((token) => token.name);
   try { intentInputRequest({ command, values, suppliedOptions, files: positionals.slice(1) }); }

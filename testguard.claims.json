@@ -3,6 +3,159 @@
   "schemaVersion": 1,
   "claims": [
     {
+      "id": "TG-KILL-KIND-IS-RECORDED-FROM-ERROR-IDENTITY",
+      "statement": "A kill records whether an assertion or only an exception rejected the fault, read from the error's structured identity and never its message text; an unreadable error counts as an exception, the default verdict is unchanged, and --require-assertion-kill fails exception-only kills and kills with no recorded kind.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/kill-kind.test.mjs",
+        "test/runner-failure-kind.test.mjs",
+        "test/runner-node-report.test.mjs",
+        "spec/conformance/kill-kind.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A run with no assertion failure is still called an assertion kill.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/kill-kind.mjs",
+          "find": "  return withAssertion === 0 ? 'exception-only' : 'mixed';",
+          "replace": "  return 'mixed';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An AssertionError by name or ERR_ASSERTION code is read as an exception.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "  if (detail.code === 'ERR_ASSERTION' || detail.name === 'AssertionError') return true;",
+          "replace": "  if (detail.code === 'ERR_ASSERTION' || detail.name === 'AssertionError') return false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An error shape the runner cannot read counts as an assertion instead of an exception.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "export const failureKind = (details, messages = []) => (Array.isArray(details) && details.some((d, i) => isAssertionDetail(d, messages?.[i])) ? 'assertion' : 'exception');",
+          "replace": "export const failureKind = (details, messages = []) => (Array.isArray(details) && details.some((d, i) => isAssertionDetail(d, messages?.[i])) ? 'assertion' : 'assertion');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Exception failures are not counted, so an exception-only kill reads as a kill with nothing in it.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "  const exceptionFailures = settled.length - assertionFailures;",
+          "replace": "  const exceptionFailures = 0;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The policy fails a kill that had an assertion in some runs.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/assertion-policy.mjs",
+          "find": "record.detail?.killKind !== 'assertion' && record.detail?.killKind !== 'mixed';",
+          "replace": "record.detail?.killKind !== 'assertion';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "A node:assert failure inside a node-test body is read as an exception.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/node/report.mjs",
+          "find": "(error.cause.code === 'ERR_ASSERTION' || error.cause.name === 'AssertionError')",
+          "replace": "(error.cause.code === 'NEVER')",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "The validator trusts any killKind a record claims.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "          if (r.detail.killKind !== derived) errors.push(",
+          "replace": "          if (false) errors.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F8",
+          "description": "The vitest reporter reads every failed test as an assertion.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/vitest/kinds-reporter.mjs",
+          "find": "const kindOf = (errors) => (errors ?? []).some(isAssertion) ? 'assertion' : 'exception';",
+          "replace": "const kindOf = (errors) => (errors ?? []).some(isAssertion) ? 'assertion' : 'assertion';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F9",
+          "description": "The Playwright reporter ignores a failed expect step.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/playwright/kinds-reporter.cjs",
+          "find": "    const assertion = this.expectFailed.has(test.id) ||",
+          "replace": "    const assertion = false ||",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F10",
+          "description": "A lone message is an assertion without any corroborating error header.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "typeof detail.message === 'string' && ASSERTION_HEADER.test(headerOf(message));",
+          "replace": "typeof detail.message === 'string';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F11",
+          "description": "kind-not-reported is claimed even when some exception failures were read.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/kill-kind.mjs",
+          "find": "run.kindNotReported === (run.exceptionFailures ?? 0))",
+          "replace": "run.kindNotReported <= (run.exceptionFailures ?? 0))",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-NODE-DIRECT-KEEPS-FAILURE-BOUNDARIES",
       "statement": "Single-entry native confirmations preserve CLI entry identity and ordinary tests alongside only declarations, preserve owned reporting when project code edits its environment, and refuse import or out-of-test failures even beside completed assertion rejections.",
       "source": {
@@ -428,8 +581,8 @@
       "faults": [{
         "id": "F1", "description": "Skip early origin policy request admission before reading claims.",
         "faultClass": "statement-deleted", "file": "src/cli.mjs",
-        "find": "  try { originPolicyRequest(values, command); }",
-        "replace": "  try { /* skipped early policy admission */ }",
+        "find": "  try { originPolicyRequest(values, command); assertionPolicyRequest(values, command); }",
+        "replace": "  try { /* skipped early policy admission */ assertionPolicyRequest(values, command); }",
         "producedBy": { "producer": "agent", "by": "codex" },
         "defendedBy": ["test/origin-policy-admission.test.mjs"]
       }]
@@ -1665,8 +1818,8 @@
           "description": "One killing run is enough to report killed (optimistic bias).",
           "faultClass": "condition-forced",
           "file": "src/probe/classify.mjs",
-          "find": "if (probeRuns.length === confirmRuns && killedRuns.length === confirmRuns) return { verdict: 'killed' };",
-          "replace": "if (killedRuns.length >= 1) return { verdict: 'killed' };",
+          "find": "if (probeRuns.length === confirmRuns && killedRuns.length === confirmRuns) return { verdict: 'killed', killKind: killKindOf(probeRuns) };",
+          "replace": "if (killedRuns.length >= 1) return { verdict: 'killed', killKind: killKindOf(probeRuns) };",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -3180,8 +3333,8 @@
           "description": "Timed-out tests are counted as assertion failures; a hang would kill.",
           "faultClass": "other",
           "file": "src/probe/runners/playwright.mjs",
-          "find": "  const assertionFailures = unexpected.length - timeouts;",
-          "replace": "  const assertionFailures = unexpected.length;",
+          "find": "  const settled = unexpected.filter((t) => !(t.finalResult === 'timedOut' || t.finalResult === 'interrupted'));",
+          "replace": "  const settled = unexpected;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -4332,8 +4485,8 @@
           "description": "A timed-out test counts toward assertion failures, so a hang becomes a kill.",
           "faultClass": "variable-swap",
           "file": "src/probe/runners/python.mjs",
-          "find": "    run: { outcome, tests: summary, assertionFailures: failed.length - timedOut.length, durationMs },",
-          "replace": "    run: { outcome, tests: summary, assertionFailures: failed.length, durationMs },",
+          "find": "  const settled = failed.filter((t) => !timedOut.includes(t));",
+          "replace": "  const settled = failed;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -5817,8 +5970,8 @@
           "description": "Probe computes the co-authored count but drops the warning from its human summary.",
           "faultClass": "statement-deleted",
           "file": "src/render.mjs",
-          "find": "  const quality = coAuthored ? `\\n${coAuthorshipWarning(coAuthored, kills.length)}` : '';",
-          "replace": "  const quality = '';",
+          "find": "  const quality = (coAuthored ? `\\n${coAuthorshipWarning(coAuthored, kills.length)}` : '') + (exceptionOnly",
+          "replace": "  const quality = ('') + (exceptionOnly",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -7349,8 +7502,8 @@
           "description": "Launch Playwright through npm rather than the project-resolved CLI.",
           "faultClass": "call-removed",
           "file": "src/probe/runners/playwright.mjs",
-          "find": "  [...runnerArgv(projectDir, '@playwright/test', 'playwright'), 'test', '--reporter=json', `--workers=${serial ? 1 : workers}`, ...files];",
-          "replace": "  ['npx', 'playwright', 'test', '--reporter=json', `--workers=${serial ? 1 : workers}`, ...files];",
+          "find": "  [...runnerArgv(projectDir, '@playwright/test', 'playwright'), 'test', `--reporter=${KINDS_REPORTER.includes(',') ? 'json' : `json,${KINDS_REPORTER}`}`, `--workers=${serial ? 1 : workers}`, ...files];",
+          "replace": "  ['npx', 'playwright', 'test', `--reporter=${KINDS_REPORTER.includes(',') ? 'json' : `json,${KINDS_REPORTER}`}`, `--workers=${serial ? 1 : workers}`, ...files];",
           "producedBy": {
             "producer": "agent",
             "by": "codex"

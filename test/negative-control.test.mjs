@@ -36,7 +36,7 @@ describe('classify — the negative control is consulted at exactly one point', 
   });
 
   it('never asks about a kill — a kill already proves the defenders reached the code', () => {
-    expect(classify({ ...base, probeRuns: killed, subjectReached: false })).toEqual({ verdict: 'killed' });
+    expect(classify({ ...base, probeRuns: killed, subjectReached: false })).toEqual({ verdict: 'killed', killKind: 'assertion' });
   });
 });
 

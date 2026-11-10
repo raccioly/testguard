@@ -10,6 +10,7 @@ import { fileImportRelation } from '../probe/rank.mjs';
 import { IS_PY_TEST, pyFileImports } from '../probe/pyimports.mjs';
 import { isPython } from '../probe/discover.mjs';
 import { labelDiff } from './label.mjs';
+import { isKillRun } from '../probe/kill-kind.mjs';
 import { wilsonInterval, roundTo } from '../../spec/lib/wilson.mjs';
 
 const TEST_RE = /(^|\/)(__tests__|tests?)\//;
@@ -358,7 +359,7 @@ async function replayOne({ fix, iso, root, projectDir, python, confirmRuns, budg
  * spots the replay exists to find: mixed runs are never `caught`.
  */
 export function classifyReplay(runs) {
-  const isCatch = (r) => r.outcome === 'fail' && (r.assertionFailures ?? 0) > 0;
+  const isCatch = isKillRun;
   if (runs.length === 0) return { verdict: 'unverifiable', reason: 'no-runs' };
   if (runs.some((r) => r.outcome === 'error')) return { verdict: 'unverifiable', reason: 'suite-failed-to-load' };
   if (runs.every(isCatch)) return { verdict: 'caught' };

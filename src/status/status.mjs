@@ -8,7 +8,7 @@ import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { defenderSelection, sameClaimMetadata } from '../probe/attribution.mjs';
 import { createDependencyHasher, dependencyChanges, instrumentOf } from '../probe/dependencies.mjs';
-import { coAuthorshipWarning, sortForReport, renderOrigins, renderOriginPolicy } from '../render.mjs';
+import { coAuthorshipWarning, exceptionOnlyWarning, sortForReport, renderOrigins, renderOriginPolicy } from '../render.mjs';
 import { evaluateOriginPolicy } from '../probe/origin-policy.mjs';
 import { declaredOriginSummary } from '../../spec/lib/origins.mjs';
 import { intentHandoff } from '../scaffold/intent.mjs';
@@ -237,6 +237,7 @@ export function computeStatus({ projectDir, toolVersion, generatedAt = new Date(
   // L3 independence and observed flakiness, as numbers rather than adjectives.
   const kills = evidence.records.filter((r) => r.verdict === 'killed');
   if (kills.length) doc.counts.killedCoAuthored = kills.filter((r) => r.detail.independence?.class === 'co-authored').length;
+  if (kills.length) doc.counts.killedExceptionOnly = kills.filter((r) => r.detail.killKind === 'exception-only').length;
   const flaky = evidence.records.filter((r) => r.detail.flakeRate?.failures > 0);
   if (flaky.length) {
     doc.counts.flakyDefenderSets = new Set(flaky.map((r) => r.defenders.resolved.join('\n'))).size;
@@ -332,6 +333,7 @@ export function renderStatus(doc) {
   const coAuthored = doc.counts.killedCoAuthored ?? 0;
   const kills = doc.counts.byVerdict?.killed ?? 0;
   if (coAuthored) lines.push(`evidence: ${coAuthorshipWarning(coAuthored, kills)}`);
+  if (doc.counts.killedExceptionOnly) lines.push(`evidence: ${exceptionOnlyWarning(doc.counts.killedExceptionOnly, kills)}`);
   if (doc.changes) {
     const c = doc.changes;
     lines.push(`changes:  ${c.changed} file${c.changed === 1 ? '' : 's'} since ${c.ref}; ${c.evaluated} evaluated, ${c.excluded} excluded, ${c.uncovered.length} unclaimed`);
