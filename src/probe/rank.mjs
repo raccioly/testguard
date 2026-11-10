@@ -110,6 +110,11 @@ function loadAliasContext(projectDir) {
   return context;
 }
 
+/** The files the alias rules were read from (absolute, real paths). */
+export function aliasConfigFiles(projectDir) {
+  return loadAliasContext(projectDir).configFiles;
+}
+
 export function loadAliases(projectDir) {
   return loadAliasContext(projectDir).rules;
 }
@@ -224,4 +229,10 @@ const INDEPENDENCE_WEIGHT = { 'separate-change': 1, unknown: 0.95, 'co-authored'
 export function rank({ severity, sourceKind, blast, independence }) {
   const score = SEVERITY_WEIGHT[severity] * (SOURCE_WEIGHT[sourceKind] ?? 0.9) * (1 + Math.log2(1 + blast)) * (INDEPENDENCE_WEIGHT[independence] ?? 1);
   return { score: Number(score.toFixed(3)), blastRadius: blast, tier: severity };
+}
+
+/** The import resolver with this project's alias configuration, for callers that walk many files. */
+export function projectImportResolver(projectDir, { limits } = {}) {
+  const { rules, configFiles } = loadAliasContext(projectDir);
+  return createImportResolver(projectDir, { aliases: rules, configFiles, ...(limits ? { limits } : {}) });
 }
