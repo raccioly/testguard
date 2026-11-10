@@ -5958,9 +5958,9 @@
           "id": "F8",
           "description": "The semantic validator stops checking requested counts against the ids they summarize.",
           "faultClass": "condition-forced",
-          "file": "spec/lib/validate.mjs",
-          "find": "      if (scope.requestedCount !== scope.requestedClaims.length) errors.push({ path: '/run/scope/requestedCount', message: 'requestedCount must equal requestedClaims.length' });",
-          "replace": "      if (false) errors.push({ path: '/run/scope/requestedCount', message: 'requestedCount must equal requestedClaims.length' });",
+          "file": "spec/lib/run-result.mjs",
+          "find": "  if (scope.requestedClaims && scope.requestedCount !== scope.requestedClaims.length) errors.push({ path: '/run/scope/requestedCount', message: 'requestedCount must equal requestedClaims.length' });",
+          "replace": "  if (false) errors.push({ path: '/run/scope/requestedCount', message: 'requestedCount must equal requestedClaims.length' });",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -8899,6 +8899,374 @@
           "replace": "  if (false) return false;",
           "defendedBy": [
             "test/attribution.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PROBE-CHANGED-SELECTS-WHAT-A-CHANGE-REACHES",
+      "statement": "probe --changed selects a claim when a changed path (a rename counting through its old and its new path) is a fault target, a defender or anything in their import closure, selects a claim whose closure cannot be followed only when something changed, and leaves a requested claim out when the change did not reach it.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-scope.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The import closure of the target and defenders is not consulted, so a changed helper selects nothing.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/scope.mjs",
+          "find": "    for (const file of Object.keys(inputs.dependencyHashes)) named.add(file);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Only the new path of a rename is kept, so a claim naming the old path is not selected.",
+          "faultClass": "return-altered",
+          "file": "src/probe/scope.mjs",
+          "find": "flatMap((change) => change.paths)",
+          "replace": "flatMap((change) => change.paths.slice(-1))",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An unfollowable closure selects the claim even when nothing changed.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/scope.mjs",
+          "find": "(indeterminate && changed.files.length > 0)",
+          "replace": "indeterminate",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A requested claim the change did not reach is still selected.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/scope.mjs",
+          "find": "const selected = (only ?? claims.claims.map((claim) => claim.id)).filter((id) => matched.has(id));",
+          "replace": "const selected = (only ?? claims.claims.map((claim) => claim.id));",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PROBE-CHANGED-NEVER-READS-A-GIT-FAILURE-AS-NO-CHANGE",
+      "statement": "A git failure on the probe --changed path is reported as an undetermined change, classified as an unresolved ref, a missing merge base, a timeout or a git failure, exits 2 and probes nothing; it never reads as an empty change.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-scope.test.mjs",
+        "test/probe-scope-git.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A git call that times out is reported as an ordinary git failure.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/scope.mjs",
+          "find": "error.timedOut ? 'git-timeout' : failure(site)",
+          "replace": "failure(site)",
+          "defendedBy": [
+            "test/probe-scope-git.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A ref that does not resolve is reported as a generic git failure.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/scope.mjs",
+          "find": "(site === 'resolve-ref' ? 'ref-unresolved' :",
+          "replace": "(site === 'resolve-ref' ? 'git-failed' :",
+          "defendedBy": [
+            "test/probe-scope-git.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The merge-base site failing is reported as an unresolved ref, hiding the shallow-clone remedy.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/scope.mjs",
+          "find": "site === 'merge-base' ? 'no-merge-base' : 'git-failed'",
+          "replace": "site === 'merge-base' ? 'ref-unresolved' : 'git-failed'",
+          "defendedBy": [
+            "test/probe-scope-git.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "An undetermined change exits 0 as if it were an empty selection.",
+          "faultClass": "literal-changed",
+          "file": "src/commands/probe-scope.mjs",
+          "find": "return { outcome: 'undetermined', exitCode: 2,",
+          "replace": "return { outcome: 'undetermined', exitCode: 0,",
+          "defendedBy": [
+            "test/probe-scope.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CLAIM-RESULTS-ROUND-TOWARD-UNPROVEN",
+      "statement": "A claim result is proven only when at least one fault was measured and every fault was killed, any survived or nocover fault makes it unproven whatever else happened, anything else is could-not-verify, a verdict outside the closed set never counts as a kill, and the validator re-derives and refuses a result its counts do not support.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/claim-results.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A fault with no defender no longer makes the claim unproven.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/claim-results.mjs",
+          "find": "if (faults.survived > 0 || faults.nocover > 0) return 'unproven';",
+          "replace": "if (faults.survived > 0) return 'unproven';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A claim with no measured fault is proven.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/claim-results.mjs",
+          "find": "faults.total >= 1 && faults.killed === faults.total",
+          "replace": "faults.killed === faults.total",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A verdict outside the closed set is counted as a kill.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/claim-results.mjs",
+          "find": "if (counter) entry.faults[counter] += 1;",
+          "replace": "entry.faults[counter ?? 'killed'] += 1;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The validator stops re-deriving the result from its counts.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/run-result.mjs",
+          "find": "if (claim.result !== resultOf(f))",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CLAIM-THIN-IS-AN-ADVISORY-SIGNAL",
+      "statement": "claim-thin flags a claim with fewer than two faults or whose faults all share one class, names which, and is never derived from verdicts.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/claim-results.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A claim with one fault is not flagged.",
+          "faultClass": "literal-changed",
+          "file": "src/claims/thin.mjs",
+          "find": "claim.faults.length < 2 ?",
+          "replace": "claim.faults.length < 1 ?",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Faults of a single class are not flagged.",
+          "faultClass": "condition-forced",
+          "file": "src/claims/thin.mjs",
+          "find": "classes.length < 2 ? 'single-fault-class'",
+          "replace": "false ? 'single-fault-class'",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-EXTERNAL-CLAIMS-ARE-NAMED-BY-HASH-NEVER-BY-PATH",
+      "statement": "A claims file outside the project is recorded by the hash of its bytes and never by its path, the project's own claims file is never marked external, status reports claimsSource instead of a path, and admit takes the project from the repository the test lives in.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/external-claims.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The recorded hash is of the path, not of the file.",
+          "faultClass": "argument-swapped",
+          "file": "src/claims/load.mjs",
+          "find": "sha256: sha256(readFileSync(abs))",
+          "replace": "sha256: sha256(abs)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The project's own claims file is marked external.",
+          "faultClass": "condition-forced",
+          "file": "src/claims/load.mjs",
+          "find": "if (rel !== '' && rel !== '..' && !rel.startsWith('../') && !isAbsolute(rel)) return undefined;",
+          "replace": "if (false) return undefined;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "status keeps the relative path of an external claims file.",
+          "faultClass": "statement-deleted",
+          "file": "src/status/status.mjs",
+          "find": "  else doc.paths.claims = rel(paths.claims);",
+          "replace": "  doc.paths.claims = rel(paths.claims);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "admit takes the directory of an external claims file for the project.",
+          "faultClass": "variable-swap",
+          "file": "src/commands/admit.mjs",
+          "find": "try { return repoRoot(dirname(testAbs)); } catch { return resolve('.'); }",
+          "replace": "return dir;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SCOPE-FIXTURE-REPOSITORY-IS-REAL",
+      "statement": "The probe --changed fixture is a real repository whose price target imports a helper, and whose project can sit below the repository root, so the closure and project-path assertions measure the behavior they name.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-scope.test.mjs",
+        "test/probe-scope-git.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The price target stops importing the helper, so the closure assertion has nothing to follow.",
+          "faultClass": "statement-deleted",
+          "file": "test/helpers/scope-project.mjs",
+          "find": "import { round } from './helper.mjs';\\nexport const total",
+          "replace": "const round = (n) => n;\\nexport const total",
+          "defendedBy": [
+            "test/probe-scope.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A project below the repository root is created at the root.",
+          "faultClass": "variable-swap",
+          "file": "test/helpers/scope-project.mjs",
+          "find": "const dir = sub ? join(root, sub) : root;",
+          "replace": "const dir = root;",
+          "defendedBy": [
+            "test/probe-scope.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",

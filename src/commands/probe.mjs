@@ -190,9 +190,9 @@ export async function probeCommand({ projectDir, values, version }, io) {
     const fresh = originPolicyInputsFresh({ projectDir, claims: currentClaims, evidence, universe });
     evidence.originPolicy = evaluateOriginPolicy({ claims: currentClaims, evidence, eligibleKinds, fresh });
   }
-  commandBudget?.assertOpen();
   const claimsSource = claimsSourceOf(projectDir, claimsPath);
   if (claimsSource) evidence.run.claimsSource = claimsSource;
+  commandBudget?.assertOpen();
   writeSpecDoc('evidence', outPath, evidence);
 
   const g = gate(evidence.records, baseline, { severityFloor: values.severity });

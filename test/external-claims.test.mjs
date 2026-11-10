@@ -69,6 +69,9 @@ describe('an external claims file', () => {
     const doc = JSON.parse(status.out);
     expect(doc.state).toBe('clean');
     expect(JSON.stringify(doc)).not.toContain(outside);
+    // Named by hash, not by a relative path a `..`-rejecting consumer could not read.
+    expect(doc.paths.claims).toBeUndefined();
+    expect(doc.claimsSource).toEqual({ external: true, sha256: expect.stringMatching(/^[a-f0-9]{64}$/) });
     const admit = await run(['admit', join(dir, 'test/price.test.mjs'), '--claims', claims, '--claim', 'PRICE-TOTAL', '--runner', 'node-test', '--json']);
     expect(admit.err).not.toMatch(/^error:/m);
     expect(readdirSync(outside)).toEqual(['claims.json']);

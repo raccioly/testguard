@@ -71,7 +71,6 @@ export async function claimsCommand({ projectDir, values, suppliedOptions, versi
     io.out(`${claims.claims.length} claims in ${claimsSource ? `an external claims file (sha256 ${claimsSource.sha256.slice(0, 12)})` : path} — ${annotated.size} carry a @claim annotation in source (test files are not scanned)`);
     io.out('');
     for (const note of advisory.notes) io.out(note);
-    for (const line of renderThin(thin)) io.out(line);
     const signalLines = [];
     for (const c of claims.claims) {
       const declared = c.defendedBy?.length > 0;
@@ -110,6 +109,8 @@ export async function claimsCommand({ projectDir, values, suppliedOptions, versi
       else if (s.signal === 'target-attribute-patched') io.out(`attribute-patched  ${s.file} defends ${s.target} but replaces ${s.reason} (${s.claim}) — a fault in those attributes is where it is least likely to notice`);
       else io.out(`unasserted (annotated)  ${s.file} mocks ${s.target}: ${s.reason} (${s.claim})`);
     }
+    if (thin.length) io.out('');
+    for (const line of renderThin(thin)) io.out(line);
     if (drift.undeclared.length || drift.stale.length) io.out('');
     for (const a of drift.undeclared) io.out(`UNDECLARED   @claim ${a.id} at ${a.file}:${a.line} has no entry in the claims file — a claim with no fault model`);
     for (const c of drift.stale) io.out(`STALE        ${c.id} is annotation-sourced but no source file carries @claim ${c.id}`);
