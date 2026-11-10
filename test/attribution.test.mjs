@@ -272,6 +272,15 @@ describe('reuse — a prior verdict may only stand for the fault that produced i
     expect(isReusable(prior({ verdict: 'unverifiable', detail: { baselineRuns: [], probeRuns: [], reason: 'anchor-missing' } }), current())).toBe(true);
   });
 
+  it('never reuses a timeout or a flaky defender: both describe the run, not the code (#232)', () => {
+    const timedOut = prior({ verdict: 'timeout', detail: { baselineRuns: [], probeRuns: [] } });
+    expect(isReusable(timedOut, current())).toBe(false);
+    const flaky = prior({ verdict: 'flaky-defender', detail: { baselineRuns: [], probeRuns: [], reason: 'defenders-not-green' } });
+    expect(isReusable(flaky, current())).toBe(false);
+    // Every verdict about the code still reuses on identical inputs.
+    for (const verdict of ['killed', 'survived', 'nocover']) expect(isReusable(prior({ verdict, detail: { baselineRuns: [], probeRuns: [] } }), current()), verdict).toBe(true);
+  });
+
   it('never reuses a record whose defenders failed to load — that is the environment, not the code', () => {
     // A broken --runner-cmd, a missing node_modules or a virtualenv without the
     // test dependencies all leave the target and defenders byte-identical. The

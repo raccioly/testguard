@@ -164,20 +164,23 @@ describe('probe reproduces the known-answer fixture', () => {
       const { lines, io } = capture();
       expect(await main(['probe', scratch, '--budget', '30000'], io)).toBe(0);
       const again = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json'));
-      // Reuse is licensed by one live unmodified run of each defender set. The
-      // fixture's flaky defender fails every other run, so its record is
-      // carried forward only when that run happened to be green; otherwise it
-      // is measured again — and is still flaky.
-      expect(again.records.filter((r) => r.claim.id !== 'FLAKY-001').every((r) => r.reusedFrom === evidence.run.id)).toBe(true);
-      expect(again.records.find((r) => r.claim.id === 'FLAKY-001').verdict).toBe('flaky-defender');
-      // What reuse costs is counted, not timed (a wall clock measures the
-      // machine): exactly one live run per distinct defender set, and nothing
-      // else unless the flaky record had to be measured again.
-      const defenderSets = new Set(evidence.records.filter((r) => r.defenders.resolved.length).map((r) => r.defenders.resolved.join('\n')));
+      // Verdicts about the code are carried forward; verdicts about the run
+      // (the fixture's timeout and its deliberately flaky defender) are
+      // measured again, and come back the same. Reuse is licensed by one live
+      // unmodified run per defender set, counted rather than timed.
+      const environmental = new Set(['timeout', 'flaky-defender']);
+      const carried = evidence.records.filter((r) => !environmental.has(r.verdict));
+      const remeasured = evidence.records.filter((r) => environmental.has(r.verdict));
+      expect(remeasured.map((r) => r.verdict).sort()).toEqual(['flaky-defender', 'timeout']);
+      for (const r of carried) expect(again.records.find((x) => x.claim.id === r.claim.id && x.subject.id === r.subject.id).reusedFrom, `${r.claim.id}/${r.subject.id}`).toBe(evidence.run.id);
+      for (const r of remeasured) {
+        const now = again.records.find((x) => x.claim.id === r.claim.id && x.subject.id === r.subject.id);
+        expect(now.reusedFrom).toBeUndefined();
+        expect(now.verdict).toBe(r.verdict);
+      }
+      expect(again.run.reuse).toEqual({ reused: carried.length, measured: remeasured.length });
+      const defenderSets = new Set(carried.filter((r) => r.defenders.resolved.length).map((r) => r.defenders.resolved.join('\n')));
       expect(again.run.measurements.reuseBaselineRuns).toBe(defenderSets.size);
-      const flakyReused = Boolean(again.records.find((r) => r.claim.id === 'FLAKY-001').reusedFrom);
-      if (flakyReused) expect(again.run.measurements.runnerInvocations).toBe(defenderSets.size);
-      else expect(again.run.measurements.runnerInvocations).toBeGreaterThan(defenderSets.size);
       expect(lines.out.join('\n')).toMatch(/0 new since baseline, 10 baselined/);
     }, 30_000);
 

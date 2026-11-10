@@ -7,7 +7,7 @@ import { hashFile, sha256 } from '../util/hash.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { defenderSelection, sameClaimMetadata } from '../probe/attribution.mjs';
-import { createDependencyHasher, dependencyChanges } from '../probe/dependencies.mjs';
+import { createDependencyHasher, dependencyChanges, instrumentOf } from '../probe/dependencies.mjs';
 import { coAuthorshipWarning, sortForReport, renderOrigins, renderOriginPolicy } from '../render.mjs';
 import { evaluateOriginPolicy } from '../probe/origin-policy.mjs';
 import { declaredOriginSummary } from '../../spec/lib/origins.mjs';
@@ -42,11 +42,11 @@ const P = (projectDir) => ({
  * is computed from the recorded input hashes exactly as for a local run, so a
  * foreign document is trusted only for the faults whose inputs still match.
  */
-export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20, changedRef, includeDirty = false, evidence: evidenceOverride }) {
+export function computeStatus({ projectDir, toolVersion, generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20, changedRef, includeDirty = false, evidence: evidenceOverride }) {
   const rel = (p) => relative(projectDir, p) || '.';
   const doc = {
     schemaVersion: 1,
-    tool: { name: 'testguard', version: toolVersion },
+    tool: { name: 'testguard', version: toolVersion ?? '0.0.0' },
     generatedAt,
     state: 'no-claims',
     next: { action: 'scaffold', command: 'testguard scaffold <source-file>', why: `No testguard.claims.json in this project. Scaffold proposes mechanical faults, not intent. ${intentHandoff}` },
@@ -212,6 +212,19 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
     }
     dependencyHasher ??= createDependencyHasher(projectDir);
     doc.stale.push(...dependencyChanges(r.inputs, dependencyHasher.inputsFor([cur.fault.file, ...defenders]), key));
+  }
+  // The instrument rule `probe` applies before any record (reusableRun): one
+  // line for the whole document, because it re-measures every record at once.
+  // Only when the caller says which TestGuard is asking; a library caller
+  // that names no version has nothing to compare.
+  if (toolVersion !== undefined && evidence.records.length) {
+    const current = instrumentOf(projectDir, toolVersion);
+    const recorded = evidence.run.instrument;
+    if (evidence.tool?.version !== toolVersion || recorded?.toolVersion !== toolVersion) {
+      doc.stale.unshift(`evidence was measured by TestGuard ${recorded?.toolVersion ?? evidence.tool?.version ?? 'unknown'} and this is ${toolVersion}; the next probe re-measures every record`);
+    } else if (recorded?.digest !== current.digest) {
+      doc.stale.unshift('resolver or runner configuration (tsconfig paths, vite/vitest aliases, package.json imports, runner config, lockfiles) changed since the evidence was measured; the next probe re-measures every record');
+    }
   }
   doc.stale = [...new Set(doc.stale)];
 

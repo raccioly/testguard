@@ -27,6 +27,20 @@ describe('status staleness follows the import closure (#232)', () => {
     expect(stale.some((line) => line.startsWith('src/helper.mjs changed since PRICE-TOTAL/F1'))).toBe(true);
   });
 
+  it('agrees with probe on the instrument: another version or configuration digest is one stale line (#232)', () => {
+    writeFileSync(join(dir, '.testguard/evidence.json'), JSON.stringify(first));
+    const same = computeStatus({ projectDir: dir, toolVersion: 'test' }).stale;
+    expect(same.filter((line) => /TestGuard|configuration/.test(line))).toEqual([]);
+    const other = computeStatus({ projectDir: dir, toolVersion: '9.9.9' }).stale;
+    expect(other.filter((line) => line.startsWith('evidence was measured by TestGuard test and this is 9.9.9'))).toHaveLength(1);
+    writeFileSync(join(dir, 'tsconfig.json'), '{"compilerOptions":{"paths":{"@/*":["./src/*"]}}}');
+    try {
+      const changed = computeStatus({ projectDir: dir, toolVersion: 'test' });
+      expect(changed.state).toBe('evidence-stale');
+      expect(changed.stale.filter((line) => line.startsWith('resolver or runner configuration'))).toHaveLength(1);
+    } finally { rmSync(join(dir, 'tsconfig.json')); }
+  });
+
   it('reports evidence written before dependency hashing as stale once', () => {
     const legacy = structuredClone(first);
     for (const record of legacy.records) { delete record.inputs.dependencyHashes; delete record.inputs.dependencyClosure; }

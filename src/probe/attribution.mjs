@@ -151,6 +151,11 @@ export function isReusable(prior, current) {
   // requirements — and none of that is hashed below. Fixing it changes no
   // input, so the failure would keep being reported as the current answer.
   if (prior.detail?.reason === 'defenders-failed-to-load') return false;
+  // A timeout and a flaky defender are statements about the run's
+  // environment too — a loaded machine, a nondeterministic suite. A green live
+  // baseline today does not make yesterday's timeout today's answer.
+  if (prior.verdict === 'timeout') return false;
+  if (prior.verdict === 'flaky-defender') return false;
   const origin = prior.defenders.selectionSource ?? (prior.defenders.requested.length ? 'claim' : 'discovery');
   if (current.selectionSource && origin !== current.selectionSource) return false;
   const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);

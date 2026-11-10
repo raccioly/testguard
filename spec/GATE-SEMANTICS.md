@@ -291,7 +291,10 @@ Rules that follow from the table:
    vite/vitest `resolve.alias`, package.json `imports`) and the root runner
    configuration and lockfiles. Evidence from another version or digest, or
    with no `run.instrument`, is readable and never reusable: a newer tool may
-   decide verdicts by different rules.
+   decide verdicts by different rules. `status` applies the same rule and
+   reports it as one stale line for the whole document — another version, or
+   a changed configuration digest — so `status` never calls evidence fresh
+   that the next probe would re-measure in full.
 
    **Reuse is a trust decision, and the evidence says how much of it there
    was.** `run.reuse` counts the records carried forward (`reused`, each with
@@ -347,7 +350,11 @@ Rules that follow from the table:
    an interpreter without the test requirements changes none of the hashed
    inputs, so fixing the environment would otherwise leave the failure
    reported as the current answer. Re-measuring it costs one baseline run per
-   defender set. The one exception is a **precondition** failure — the
+   defender set. A record whose verdict is `timeout` or `flaky-defender` is
+   never reused either: each says the defenders could not be measured on that
+   machine at that time (a loaded runner, a nondeterministic suite), and a
+   green live baseline today (rule 8) does not make yesterday's timeout
+   today's answer. The one exception is a **precondition** failure — the
    interpreter loading the source from outside the probed tree, a runner that
    does not resolve — which is a statement about every verdict in the run and
    still refuses it outright.

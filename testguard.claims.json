@@ -8717,7 +8717,7 @@
     },
     {
       "id": "TG-REUSE-NAMES-ITS-INSTRUMENT",
-      "statement": "Evidence written by another TestGuard version, or under a different resolver and runner configuration digest, or naming no instrument, is readable and never reused.",
+      "statement": "Evidence written by another TestGuard version, or under a different resolver and runner configuration digest, or naming no instrument, is readable and never reused, and status reports it stale in one line.",
       "source": {
         "kind": "spec",
         "ref": "spec/GATE-SEMANTICS.md"
@@ -8728,7 +8728,8 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/reuse-instrument.test.mjs"
+        "test/reuse-instrument.test.mjs",
+        "test/status-dependencies.test.mjs"
       ],
       "faults": [
         {
@@ -8755,6 +8756,21 @@
           "replace": "  for (const abs of []) {",
           "defendedBy": [
             "test/reuse-instrument.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "status calls evidence from another TestGuard version fresh while probe re-measures it.",
+          "faultClass": "condition-forced",
+          "file": "src/status/status.mjs",
+          "find": "    if (evidence.tool?.version !== toolVersion || recorded?.toolVersion !== toolVersion) {",
+          "replace": "    if (false) {",
+          "defendedBy": [
+            "test/status-dependencies.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",
@@ -8804,6 +8820,54 @@
           "replace": "  writeFileSync(path, output);\n}",
           "defendedBy": [
             "test/evidence-atomic-write.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-REUSE-NEVER-CARRIES-A-RUN-VERDICT",
+      "statement": "A record whose verdict is timeout or flaky-defender is never reused: it describes the run's environment, and a green live baseline does not make it the current answer.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/attribution.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A timeout measured on a loaded machine is carried forward.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/attribution.mjs",
+          "find": "  if (prior.verdict === 'timeout') return false;\n",
+          "replace": "",
+          "defendedBy": [
+            "test/attribution.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A flaky-defender verdict is carried forward.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/attribution.mjs",
+          "find": "  if (prior.verdict === 'flaky-defender') return false;",
+          "replace": "  if (false) return false;",
+          "defendedBy": [
+            "test/attribution.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",

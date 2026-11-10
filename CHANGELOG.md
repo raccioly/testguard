@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   digest is never reused. `run.reuse: { reused, measured }` is in the evidence
   and in `probe --json`. `GATE-SEMANTICS.md` now states that a gate over
   authors who can write the evidence file must run `--no-reuse`.
+- A `timeout` or `flaky-defender` record is never reused: like `probe-error`
+  it describes the run's environment, and a green live baseline today does not
+  make an old timeout the current answer. `status` reports evidence from
+  another TestGuard version or configuration digest as stale, in one line.
 - Spec documents are written atomically (exclusive temporary file, then
   rename): a run killed mid-write no longer leaves a truncated evidence file
   the next probe reads as prior evidence.
