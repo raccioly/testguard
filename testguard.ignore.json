@@ -4,6 +4,13 @@
   "entries": [
     {
       "kind": "path",
+      "pattern": "test/kill-kind.acceptance.test.mjs",
+      "reason": "Real-runner acceptance for the kill kind: six runners, each a small generated project probed three times (about a minute in total). It is mandatory in npm test and CI. The claim TG-KILL-KIND-IS-RECORDED-FROM-ERROR-IDENTITY names the fast unit and conformance defenders instead; naming this file as a self-probe defender would re-run all six runners for every fault.",
+      "by": "claude",
+      "at": "2026-11-10T21:30:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/probe.node.test.mjs",
       "reason": "Independent native Node acceptance oracle plus real CLI cancellation and restoration checks. Mandatory in npm test and CI; focused native report/controller claims retain their own mutation defenders. Naming this complete ten-fault acceptance fixture as a self-probe defender would repeatedly pay for unrelated nested probes, as with the existing known-answer fixture exception.",
       "by": "maintainer",
