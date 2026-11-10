@@ -240,6 +240,47 @@ Rules that follow from the table:
    does not change verdicts or baseline fingerprints, and a source label
    still does not authenticate independent intent.
 
+   **What the target and defenders import is an input to reuse.** A verdict
+   is about the code the defenders run, and most of that code is not the
+   target file or the test file. Evidence records
+   `inputs.dependencyHashes`: content hashes of the transitive project-file
+   import closure of the fault target and of every resolved defender, plus
+   the lockfiles, package manifests and runner/compiler configuration files
+   present at the project root. JavaScript and TypeScript follow every static
+   import, re-export, literal `import()`/`require()`, and module named to a
+   test framework's `mock`/`importActual`/`requireActual` family (with an
+   adjacent `__mocks__` file); an ambiguous resolution includes every
+   candidate. Python follows module names, including the packages a module's
+   import runs first and every `conftest.py` from the project root down to
+   each file. Reuse requires the recorded and current maps to be equal.
+   When any import cannot be followed — a dynamic import, `require`,
+   `import_module` or `__import__` whose argument is not one string literal; a
+   project-relative or aliased specifier that resolves to no file; a module
+   the lexer cannot read; a graph over the resolver limits — the record
+   carries `inputs.dependencyClosure: "indeterminate"` with the reasons in
+   `inputs.dependencyIssues`, and is never reused: it is probed again every
+   time. A record without `dependencyHashes` predates this rule; it stays
+   readable and is never reused. A record carrying `reusedFrom` and an
+   indeterminate closure does not conform.
+
+   **One live baseline licenses every carry-forward.** No hash sees the
+   environment: installed packages, the interpreter, a data file a test reads,
+   a bare specifier that resolves through a `node_modules` symlink to a
+   workspace package (outside the project closure). So before a prior record
+   with a non-empty defender set is carried forward, that defender set runs
+   once on unmodified source. That run is the first run of rule 1's shared
+   baseline, so it costs one run per defender set per command, and a fault
+   probed after all pays nothing twice. Anything other than a green run
+   means no reuse: the fault is probed in full, and rule 1 decides the
+   verdict. The run is counted in `run.measurements.reuseBaselineRuns`.
+
+   `status` and the origin-policy freshness check compute the same closure
+   and apply the same comparison, so a changed import makes `status` stale
+   and makes origin-policy inputs unfresh. An indeterminate closure is never
+   fresh for the origin policy, which is then `unavailable`; `status` does
+   not call it stale on that ground alone, because re-probing cannot make it
+   determinate and an agent would loop. `--no-reuse` is unchanged.
+
 9. **The fault must be the code that ran.** A green baseline proves the
    harness is not reporting everything as broken. It proves nothing about the
    opposite direction: a fault the interpreter never executes leaves the
@@ -969,7 +1010,10 @@ cooperative around synchronous setup, and bounded OS cleanup can outlive it.
 Optional `run.measurements` records monotonic elapsed time, fresh runner execution
 time, invocation count and remaining setup/discovery/other overhead. Each real
 runner invocation is charged once, including negative controls and mixed-runner
-partitions; reused records and cached baselines create no invocation charge.
+partitions. Reused records and cached baselines create no invocation charge;
+the one live baseline run that licenses reuse of a defender set (rule 8) is a
+real invocation, charged once and also counted in optional
+`reuseBaselineRuns`.
 `elapsedMs = runnerMs + overheadMs`. Optional `run.workers` records the built-in
 worker ceiling and must be one for serial execution; custom commands omit it.
 Native evidence reuse requires the same recorded worker ceiling and serial policy.

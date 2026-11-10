@@ -261,6 +261,12 @@ const semantic = {
           errors.push({ path: `${p}/detail`, message: 'flaky-defender requires a non-green baseline or mixed pass/fail probe runs' });
         }
       }
+      // GATE-SEMANTICS rule 8: an import closure that could not be followed
+      // says why, and can never have licensed a carried-forward verdict.
+      const closure = r.inputs.dependencyClosure;
+      if (closure === 'indeterminate' && !r.inputs.dependencyIssues?.length) errors.push({ path: `${p}/inputs/dependencyIssues`, message: 'an indeterminate dependency closure must name at least one reason' });
+      if (closure === 'complete' && r.inputs.dependencyIssues) errors.push({ path: `${p}/inputs/dependencyIssues`, message: 'a complete dependency closure has no issues' });
+      if (closure === 'indeterminate' && r.reusedFrom) errors.push({ path: `${p}/reusedFrom`, message: 'a record whose dependency closure is indeterminate is never reused (GATE-SEMANTICS rule 8)' });
       if (r.verdict === 'nocover' && !r.defenders.nocover) {
         errors.push({ path: `${p}/defenders/nocover`, message: 'nocover verdict requires defenders.nocover = true' });
       }

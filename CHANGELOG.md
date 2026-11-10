@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Verdict reuse no longer carries a kill over a red suite (#232).** Reuse
+  compared only the target and defender files, so breaking a helper the target
+  imports reused the old `killed`. Evidence now records
+  `inputs.dependencyHashes` (the transitive project import closure of the
+  target and every defender, plus root lockfiles, manifests and runner config;
+  Python by module name, including ancestor `conftest.py`) and
+  `inputs.dependencyClosure`. Reuse requires equal hashes and a `complete`
+  closure; a computed `import()`/`require()`/`import_module()`, an unresolvable
+  relative import or an over-limit graph makes it `indeterminate` (reasons in
+  `inputs.dependencyIssues`) and that fault is probed every time. Before any
+  record is carried forward its defender set runs once unmodified, shared with
+  the baseline, so a red defender is probed in full; `run.measurements` gains
+  `reuseBaselineRuns`. `status` staleness and the origin-policy freshness check
+  apply the same closure and predicate. Evidence written before this change is
+  re-probed once. An indeterminate closure makes `--require-origin` policy
+  `unavailable`.
+- The module lexer behind defender discovery now reads regex literals,
+  numeric literals and template expressions containing quotes or nested
+  templates; before, a module with `/'/` in it was unreadable and discovery
+  through it was indeterminate.
+
 ## [0.20.1] - 2026-10-12
 
 Automated weekly release — everything merged since `v0.20.0`.

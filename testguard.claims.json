@@ -8474,6 +8474,208 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-REUSE-BINDS-THE-IMPORT-CLOSURE",
+      "statement": "A prior verdict is carried forward only when the transitive project import closure of the fault target and its defenders, plus the root lockfiles and runner configuration, hashes the same and was followed completely; a closure that cannot be followed is never reused, and status and the origin-policy freshness check apply the same closure and comparison.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/attribution.test.mjs",
+        "test/dependency-closure.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Reuse ignores what the target and defenders import.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/attribution.mjs",
+          "find": "    && sameDependencies(prior.inputs, current.inputs)\n",
+          "replace": "",
+          "defendedBy": [
+            "test/attribution.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An indeterminate recorded closure is accepted for reuse.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/attribution.mjs",
+          "find": "  if (!recorded?.dependencyHashes || recorded.dependencyClosure !== 'complete') return false;",
+          "replace": "  if (!recorded?.dependencyHashes) return false;",
+          "defendedBy": [
+            "test/attribution.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A computed import() or require() no longer makes the closure indeterminate.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/imports.mjs",
+          "find": "      else computed = true;",
+          "replace": "      else computed = false;",
+          "defendedBy": [
+            "test/dependency-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Lockfiles and runner configuration are left out of the hashed inputs.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/dependencies.mjs",
+          "find": "    for (const file of DEPENDENCY_MANIFEST_FILES) if (existsSync(join(root, file))) files.add(file);\n",
+          "replace": "",
+          "defendedBy": [
+            "test/dependency-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "Python closures stop including the conftest.py files pytest loads first.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/pyimports.mjs",
+          "find": "      if (existsSync(join(projectDir, conftest))) add(conftest);",
+          "replace": "      if (false) add(conftest);",
+          "defendedBy": [
+            "test/dependency-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "The lexer reads every slash as division, so a quote inside a regex literal makes the module unreadable.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/imports.mjs",
+          "find": "    if (ch === '/' && regexAllowedAfter(tokens[tokens.length - 1])) {",
+          "replace": "    if (false) {",
+          "defendedBy": [
+            "test/dependency-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "status stops reporting a changed import as stale.",
+          "faultClass": "statement-deleted",
+          "file": "src/status/status.mjs",
+          "find": "    doc.stale.push(...dependencyChanges(r.inputs, dependencyHasher.inputsFor([cur.fault.file, ...defenders]), key));\n",
+          "replace": "",
+          "defendedBy": [
+            "test/status-dependencies.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F8",
+          "description": "The origin-policy freshness check compares no dependency inputs.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/policy-freshness.mjs",
+          "find": "        ...dependencyHasher.inputsFor([fault.file, ...resolved]),\n",
+          "replace": "",
+          "defendedBy": [
+            "test/policy-freshness.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F9",
+          "description": "A reused record with an indeterminate closure conforms.",
+          "faultClass": "statement-deleted",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (closure === 'indeterminate' && r.reusedFrom) errors.push({ path: `${p}/reusedFrom`, message: 'a record whose dependency closure is indeterminate is never reused (GATE-SEMANTICS rule 8)' });\n",
+          "replace": "",
+          "defendedBy": [
+            "spec/conformance/dependency-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-REUSE-RUNS-ONE-LIVE-BASELINE",
+      "statement": "Before any prior verdict with defenders is carried forward, that defender set runs once on unmodified source, as the first run of the shared baseline; a run that is not green means the fault is probed in full, and the run is counted in run.measurements.reuseBaselineRuns.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/reuse-live-baseline.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The live run's outcome is ignored and the prior verdict is reused anyway.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "    if (!live || live.runs.every((run) => run.outcome === 'pass')) {",
+          "replace": "    if (true) {",
+          "defendedBy": [
+            "test/reuse-live-baseline.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The live run that licenses reuse is not counted.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "        if (reuse) measurements.reuseBaselineRuns++;\n",
+          "replace": "",
+          "defendedBy": [
+            "test/reuse-live-baseline.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
     }
   ]
 }
