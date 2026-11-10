@@ -181,6 +181,11 @@ testguard probe --fault-workers 4
   inconsistent probe measured while other faults were running is measured again
   alone before it is reported, and says so (`detail.remeasuredSerially`). A
   fan-out that keeps hitting that path is costing time, not honesty: lower n.
+  A defender that hangs until `--budget` is paid twice that way (once under
+  the fan-out, once alone); measured on the Python known-answer fixture with
+  a 60 s budget, its one hanging fault made `--fault-workers 4` slower than
+  serial (126 s against 75 s). Keep `--budget` close to what a healthy run
+  needs.
 - Pick n at or below your CPU count divided by `--workers`; the probe warns
   when it oversubscribes the machine. Each tree is one more checkout on disk
   (`node_modules` is linked, not copied).
