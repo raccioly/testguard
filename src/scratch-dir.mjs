@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { accessSync, constants, mkdtempSync, realpathSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { PreconditionError } from './probe/precondition-error.mjs';
@@ -66,8 +66,7 @@ export function resolveScratchDir(flag, env = process.env) {
   try {
     if (!statSync(path).isDirectory()) throw new Error('not a directory');
     real = realpathSync(path);
-    accessSync(real, constants.W_OK | constants.X_OK);
-    // An access check says yes to a root user on some read-only mounts' parents; creating and removing a directory is the real test.
+    // Creating and removing a directory is the real test of "writable": an access(2) check answers yes for root on a path that then fails.
     rmSync(mkdtempSync(join(real, '.testguard-writable-')), { recursive: true, force: true });
   } catch (error) {
     throw new PreconditionError(`scratch directory ${path} is not usable: ${error.code === 'ENOENT' ? 'it does not exist' : error.message}. Create a writable directory and pass it as --scratch-dir (or TESTGUARD_SCRATCH_DIR).`);

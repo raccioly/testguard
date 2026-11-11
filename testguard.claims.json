@@ -9059,6 +9059,589 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-SCRATCH-DIR-IS-CHECKED-BEFORE-ANY-WRITE",
+      "statement": "A scratch directory that does not exist, is not a directory or cannot be written is a precondition error that names the cause and writes nothing, and the --scratch-dir flag wins over TESTGUARD_SCRATCH_DIR.",
+      "source": {
+        "kind": "spec",
+        "ref": "CHANGELOG [Unreleased]"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/scratch-dir.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A scratch directory that cannot be written is accepted.",
+          "faultClass": "call-removed",
+          "file": "src/scratch-dir.mjs",
+          "find": "    rmSync(mkdtempSync(join(real, '.testguard-writable-')), { recursive: true, force: true });\n",
+          "replace": "",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A path that is a file is accepted as a scratch directory.",
+          "faultClass": "condition-forced",
+          "file": "src/scratch-dir.mjs",
+          "find": "if (!statSync(path).isDirectory()) throw new Error('not a directory');",
+          "replace": "if (false) throw new Error('not a directory');",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The environment variable outranks the flag.",
+          "faultClass": "variable-swap",
+          "file": "src/scratch-dir.mjs",
+          "find": "const named = flag ?? env.TESTGUARD_SCRATCH_DIR;",
+          "replace": "const named = env.TESTGUARD_SCRATCH_DIR ?? flag;",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SCRATCH-ROOT-IS-ONE-CALLS-DIRECTORY",
+      "statement": "Everything a run creates while it runs tests lives under the scratch directory that run was given: the scratch worktree, the temporary git index and the runner report file. The directory travels with the call, so two probes in one process never see each other's.",
+      "source": {
+        "kind": "spec",
+        "ref": "CHANGELOG [Unreleased]"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/scratch-dir.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The scratch root ignores the directory the call was given.",
+          "faultClass": "return-altered",
+          "file": "src/scratch-dir.mjs",
+          "find": "export const scratchRoot = () => context.getStore() ?? tmpdir();",
+          "replace": "export const scratchRoot = () => tmpdir();",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The temporary git index goes to the OS temp directory.",
+          "faultClass": "argument-swapped",
+          "file": "src/git.mjs",
+          "find": "const index = join(scratchRoot(), `testguard-index-",
+          "replace": "const index = join(tmpdir(), `testguard-index-",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The runner report file goes to the OS temp directory.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "const outFile = join(scratchRoot(), `testguard-run-",
+          "replace": "const outFile = join(tmpdir(), `testguard-run-",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The scratch worktree base ignores the directory the call was given.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/worktree.mjs",
+          "find": "scratchBase = scratchRoot(), nodeModules }",
+          "replace": "scratchBase = process.env.TMPDIR ?? '/tmp', nodeModules }",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CHILD-TEMP-STAYS-UNDER-SCRATCH",
+      "statement": "A test runner process started with a scratch directory configured gets its own temp and data directory under it (TMPDIR and XDG_DATA_HOME) and the directory is removed when the process closes; without a scratch directory the child keeps the operating system's.",
+      "source": {
+        "kind": "spec",
+        "ref": "CHANGELOG [Unreleased]"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/scratch-dir.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The child's per-user data directory is not redirected.",
+          "faultClass": "field-dropped",
+          "file": "src/scratch-dir.mjs",
+          "find": ", XDG_DATA_HOME: join(dir, 'data') }",
+          "replace": " }",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The child's temp directory is left behind when it closes.",
+          "faultClass": "statement-deleted",
+          "file": "src/scratch-dir.mjs",
+          "find": "dispose: () => { unregister(); remove(); },",
+          "replace": "dispose: () => { unregister(); },",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The child is given a private temp directory even when no scratch directory was named.",
+          "faultClass": "condition-forced",
+          "file": "src/scratch-dir.mjs",
+          "find": "if (base === undefined) return { env: {}, dispose: () => {} };",
+          "replace": "if (false) return { env: {}, dispose: () => {} };",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-NODE-MODULES-IS-NEVER-WRITTEN-THROUGH",
+      "statement": "The scratch worktree's node_modules is a directory of links to the install, so a tool cache written into it (.vite-temp, .vite, .cache) lands in the scratch tree and never in the install, and a read-only install still probes. The evidence signal says whether the install could be written, and carries no path.",
+      "source": {
+        "kind": "spec",
+        "ref": "CHANGELOG [Unreleased]"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/scratch-dir.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Tool cache directories of the install are linked into the scratch tree, so writes go through to the install.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/node-modules-link.mjs",
+          "find": "if (entry.startsWith('.') && !INSTALL_DOT_ENTRIES.has(entry)) continue;",
+          "replace": "",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The install's own dot-entries (.bin) are not linked.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/node-modules-link.mjs",
+          "find": "new Set(['.bin', '.pnpm',",
+          "replace": "new Set(['.pnpm',",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Every install is reported writable.",
+          "faultClass": "call-removed",
+          "file": "src/probe/node-modules-link.mjs",
+          "find": "    accessSync(target, constants.W_OK);\n    return true;",
+          "replace": "    return true;",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The signal says an install was writable if all, not any, of its links were.",
+          "faultClass": "variable-swap",
+          "file": "src/probe/worktree.mjs",
+          "find": "targets.some(writable)",
+          "replace": "targets.every(writable)",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-VITEST-DISCOVERY-WRITES-NOTHING-TO-A-READ-ONLY-INSTALL",
+      "statement": "Test discovery in the caller's own tree asks vitest 4 and later for the config loader that writes no temp file only when that tree's node_modules is not writable, so a read-only install does not refuse a dirty-tree probe and a writable one keeps its loader.",
+      "source": {
+        "kind": "spec",
+        "ref": "CHANGELOG [Unreleased]"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/scratch-dir.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The no-write loader is asked for only when the install is writable.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/vitest.mjs",
+          "find": "nearestNodeModulesWritable(projectDir) === false",
+          "replace": "nearestNodeModulesWritable(projectDir) === true",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The loader flag is passed to a vitest that predates it.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/vitest.mjs",
+          "find": "return major >= 4 &&",
+          "replace": "return major >= 0 &&",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-EVIDENCE-RECORDS-THE-WRITE-BOUNDARY-AS-SIGNALS",
+      "statement": "The evidence records, as signals and never as paths, whether a scratch directory was configured and whether the linked node_modules was writable when the run started; the schema refuses a host path there.",
+      "source": {
+        "kind": "spec",
+        "ref": "CHANGELOG [Unreleased]"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/scratch-dir.test.mjs",
+        "spec/conformance/schemas.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The scratch-directory signal always says default.",
+          "faultClass": "return-altered",
+          "file": "src/probe/worktree.mjs",
+          "find": "scratchDir: scratchConfigured() ? 'configured' : 'default',",
+          "replace": "scratchDir: 'default',",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A run with no node_modules reports one anyway.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/worktree.mjs",
+          "find": "...(targets.length ? { nodeModulesWritable",
+          "replace": "...(true ? { nodeModulesWritable",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The schema accepts any key in the write boundary.",
+          "faultClass": "literal-changed",
+          "file": "spec/schemas/evidence.schema.json",
+          "find": "            \"nodeModulesWritable\": {\n              \"type\": \"boolean\"\n            }\n          },\n          \"additionalProperties\": false",
+          "replace": "            \"nodeModulesWritable\": {\n              \"type\": \"boolean\"\n            }\n          },\n          \"additionalProperties\": true",
+          "defendedBy": [
+            "spec/conformance/schemas.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-A-REFUSAL-TO-START-EXITS-2",
+      "statement": "A refusal to start (a precondition error, from any module) is reported as an error with exit 2, not as a defect in TestGuard.",
+      "source": {
+        "kind": "spec",
+        "ref": "CHANGELOG [Unreleased]"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/scratch-dir.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A precondition error is reported as an internal defect.",
+          "faultClass": "condition-forced",
+          "file": "src/cli.mjs",
+          "find": "e instanceof ClaimsError || e instanceof PreconditionError || e instanceof GitError",
+          "replace": "e instanceof ClaimsError || e instanceof GitError",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A precondition error loses its message.",
+          "faultClass": "other",
+          "file": "src/probe/precondition-error.mjs",
+          "find": "export class PreconditionError extends Error {}",
+          "replace": "export class PreconditionError extends Object {}",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-WRITE-BOUNDARY-ACCEPTANCE-HELPERS-SEE-A-WRITE",
+      "statement": "The write-boundary acceptance helpers report a created, a removed and a modified path, copy a tree without following its symlinks, and remove write bits only, so the slow acceptance test cannot pass on an empty or blind listing.",
+      "source": {
+        "kind": "spec",
+        "ref": "CHANGELOG [Unreleased]"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/write-boundary.helpers.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A path whose size or mtime changed is not reported as modified.",
+          "faultClass": "condition-forced",
+          "file": "test/helpers/write-boundary.mjs",
+          "find": "before.has(k) && before.get(k) !== after.get(k)",
+          "replace": "before.has(k) && false",
+          "defendedBy": [
+            "test/write-boundary.helpers.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A removed path is not reported.",
+          "faultClass": "condition-forced",
+          "file": "test/helpers/write-boundary.mjs",
+          "find": "const removed = [...before.keys()].filter((k) => !after.has(k));",
+          "replace": "const removed = [];",
+          "defendedBy": [
+            "test/write-boundary.helpers.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The copy resolves symlinks instead of keeping them.",
+          "faultClass": "argument-swapped",
+          "file": "test/helpers/write-boundary.mjs",
+          "find": "spawnSync('cp', ['-R', from, to]",
+          "replace": "spawnSync('cp', ['-RL', from, to]",
+          "defendedBy": [
+            "test/write-boundary.helpers.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Making a tree read-only also removes the execute bit.",
+          "faultClass": "literal-changed",
+          "file": "test/helpers/write-boundary.mjs",
+          "find": "bits & ~0o222 : bits | 0o200",
+          "replace": "bits & ~0o333 : bits | 0o200",
+          "defendedBy": [
+            "test/write-boundary.helpers.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-NETWORK-GUARD-RECORDS-AND-REFUSES-NETWORK-USE",
+      "statement": "The guard the acceptance tests preload records, then refuses, a TCP connection, a TCP listen and a name lookup, and lets a local socket path through, so an empty log is evidence that no process opened a socket.",
+      "source": {
+        "kind": "spec",
+        "ref": "CHANGELOG [Unreleased]"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/scratch-dir.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A TCP connection is refused but not recorded.",
+          "faultClass": "call-removed",
+          "file": "test/helpers/no-network-guard.mjs",
+          "find": "  if (log) appendFileSync(log, `${process.pid} ${kind} ${detail}\\n`);\n",
+          "replace": "",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A TCP listen is let through.",
+          "faultClass": "condition-forced",
+          "file": "test/helpers/no-network-guard.mjs",
+          "find": "if (!local) refuse('listen',",
+          "replace": "if (false) refuse('listen',",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A local socket path is refused as if it were network.",
+          "faultClass": "condition-forced",
+          "file": "test/helpers/no-network-guard.mjs",
+          "find": "if (!local) refuse('connect',",
+          "replace": "if (true) refuse('connect',",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
     }
   ]
 }
