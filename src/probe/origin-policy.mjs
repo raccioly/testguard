@@ -14,8 +14,8 @@ export function originPolicyRequest(values, command = 'probe') {
   }
   const kinds = raw.flatMap((v) => v.split(',').map((k) => k.trim()));
   if (kinds.some((k) => !CLAIM_SOURCE_KINDS.includes(k))) throw new TypeError('--require-origin contains an empty or unsupported kind');
-  if (values.claim !== undefined || values['allow-empty'] || values.ref !== undefined || values['ignore-dirty']) {
-    throw new TypeError('--require-origin needs a complete current-project run without --claim, --allow-empty, --ref or --ignore-dirty');
+  if (values.claim !== undefined || values.changed !== undefined || values['allow-empty'] || values.ref !== undefined || values['ignore-dirty']) {
+    throw new TypeError('--require-origin needs a complete current-project run without --claim, --changed, --allow-empty, --ref or --ignore-dirty');
   }
   const n = Number(values.confirm ?? 3);
   if (!Number.isInteger(n) || n < 3) throw new TypeError('--require-origin requires --confirm of at least 3');

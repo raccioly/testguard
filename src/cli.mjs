@@ -44,7 +44,9 @@ export const USAGE = `testguard ${VERSION} — proves a test suite defends the c
   testguard admit <test> --claim <ID>   the two-gate rule as one verb: is this test green on HEAD and does it fail on every fault of the claim?
 
 probe
-  --claims <path>      claims file             (default: <dir>/testguard.claims.json)
+  --claims <path>      claims file             (default: <dir>/testguard.claims.json). May live outside the project
+                       (probe, claims, admit, status): fault files and defendedBy stay project-relative; evidence records
+                       run.claimsSource {external, sha256}, never the path
   --confirm <n>        runs per verdict        (default: 3)
   --budget <ms>        wall clock per run      (default: 120000)
   --command-budget <ms> cooperative measurement deadline for probe, sweep, replay, or admit. Caps async children; expiry exits 2 and writes no partial result
@@ -59,6 +61,13 @@ probe
                        defender/target files are dirty: a warning names them, the evidence records them (repo.ignoredDirty)
   --ignore-dirty       probe HEAD as committed although defender/target files are dirty (same warning and record)
   --claim <ID,ID>      probe only these claims; repeatable, order-preserving, and writes .testguard/evidence-partial.json
+  --changed <ref>      probe only the claims the change since merge-base(<ref>, HEAD) can have affected: a fault's target, its defenders
+                       or anything they import differs (a rename counts through its old and new path). Intersects with --claim and
+                       writes .testguard/evidence-partial.json. A change git cannot measure (ref missing, no merge base, git failed
+                       or timed out) exits 2 and probes nothing; it is never read as an empty change. Refused with --ref and
+                       --in-place (exit 3). --json: run.scope.changed
+  --fail-on-empty-selection  with --changed: a change that selects no claim exits 2 instead of 0 (either way it says so and
+                       lists the changed source files no claim covers: absence from the results is not a pass)
   --include-dirty      probe the working tree (a snapshot commit) instead of HEAD; uncommitted tests count
                        (without it, a dirty defender/target with the implicit HEAD is refused: the silent-mismatch trap)
   --verbose            also print each killed fault (default: only unproven ones, plus a count)
@@ -91,7 +100,8 @@ probe
   --no-reuse           re-probe claims whose inputs have not changed
   --allow-empty        adoption only: skip a valid empty claims file; writes no evidence; run gate separately
   --quiet              suppress the per-fault stream and ranked block; print only the summary and evidence path
-  --json               the status document plus this run's result (records, newSinceBaseline, exitCode)
+  --json               the status document plus this run's result (records, newSinceBaseline, exitCode, scope, claims[]:
+                       {id, result: proven|unproven|could-not-verify, faults: {counts}, reasons[]} keyed by claim id)
 
 scaffold   --claim <ID> (put every proposal under this claim; copies it if it exists)  --out <path>  --json
            --from-document <local-text-path> OR --from-fix <full-commit-ID> inspects read-only authoring inputs;
@@ -223,6 +233,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         fault: { type: 'string' },
         'include-dirty': { type: 'boolean', default: false },
         changed: { type: 'string' },
+        'fail-on-empty-selection': { type: 'boolean', default: false },
         since: { type: 'string' },
         exclude: { type: 'string', multiple: true },
         cap: { type: 'string' },
