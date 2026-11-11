@@ -1,6 +1,6 @@
 {
   "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine.",
-  "seconds": 3850,
+  "seconds": 4750,
   "measured": {
     "seconds": 816,
     "at": "2026-09-18",
@@ -66,6 +66,11 @@
       "seconds": 3850,
       "at": "2026-11-11",
       "why": "The ceiling goes DOWN from 4300. PR #254 (the suite runtime budget) ran the self-probe at 592 faults, all killed, on two heads with identical claims and defenders: 2901 s (run 43062166737, Node 22 leg) and 3366 s (run 43064382390, same leg); the earlier CI measurement was 3396 s. 3366 + 14% = 3837, rounded to 3850. The 465 s spread between two runs of the same code is the CI variance this headroom exists for (the cause of the lower run was not isolated). No claim or defender changed in this PR; the 4300 set at 3839 s / 567 faults was a ceiling over a run that no longer reproduces."
+    },
+    {
+      "seconds": 4750,
+      "at": "2026-11-11",
+      "why": "3850 was set the same day from two samples (2901 s and 3366 s) and was wrong within hours: PR #230, a workflow-actions bump with identical claims and defenders, measured 4159 s on the Node 22 leg (run for head 6ddb8ac) and failed by 309 s. Four CI measurements of the same 592 faults now span 2876 s to 4159 s, a 45% spread that is the runner, not the suite. 4159 + 14% = 4741, rounded to 4750. A ceiling in summed seconds cannot be tight while runner speed varies this much; normalizing the cost by a per-run speed reference is the real fix and is tracked as an issue."
     }
   ],
   "measuredInCI": {
