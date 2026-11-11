@@ -191,6 +191,16 @@
           },
           "additionalProperties": false
         },
+        "typecheck": {
+          "description": "The type check that judged every fault before any test ran (`probe --typecheck`): a hash of the command's identity (the flags of the project's own `tsc`, or the argv of a custom command) and the checker's version. Absent when the run did not type check. It is an input to reuse: a record measured without it is not reusable by a run with it, and the reverse.",
+          "type": "object",
+          "required": ["commandHash", "version"],
+          "properties": {
+            "commandHash": { "$ref": "urn:claimspec:v1:common#/$defs/sha256" },
+            "version": { "type": "string", "minLength": 1, "maxLength": 64 }
+          },
+          "additionalProperties": false
+        },
         "reuse": {
           "description": "How many records this run carried forward from earlier evidence (`reused`, each with `reusedFrom`) and how many it measured. A gate over authors who can write the evidence file must run with --no-reuse (GATE-SEMANTICS rule 8).",
           "type": "object",
@@ -433,9 +443,13 @@
           "required": [],
           "properties": {
             "reason": {
-              "description": "Machine-readable qualifier, e.g. `anchor-missing`, `anchor-ambiguous`, `defenders-not-green`, `replacement-does-not-compile`.",
+              "description": "Machine-readable qualifier, e.g. `anchor-missing`, `anchor-ambiguous`, `defenders-not-green`, `replacement-does-not-compile`, `replacement-does-not-typecheck`, `typecheck-timed-out`.",
               "type": "string",
               "maxLength": 256
+            },
+            "typecheck": {
+              "description": "How the type check judged this fault (present only when the run declares `run.typecheck`): `clean` (the replacement still type-checks), `diagnostics` (it does not: `fault-invalid`, `message` is the first diagnostic, no test ran), `timeout` (the check exceeded its budget: `timeout`), `not-applicable` (the checker does not judge this file, e.g. a `.py` file or a `.js` file the project does not check).",
+              "enum": ["clean", "diagnostics", "timeout", "not-applicable"]
             },
             "baselineRuns": {
               "description": "Defenders run on unmodified source, N times. Anything short of N/N pass is `flaky-defender`.",

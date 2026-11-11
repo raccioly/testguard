@@ -83,6 +83,12 @@ probe
                        unittest pin that choice and fail rather than fall back. The engine that ran is what the evidence records.)
   --runner-cmd "<cmd>" custom runner; must contain {files} and {out}, e.g. "pnpm vitest run {files} --reporter=json --outputFile={out}"
   --node-modules <dir> node_modules to link into the scratch worktree (or TESTGUARD_NODE_MODULES)
+  --typecheck[=<cmd>]  type check every fault before any test runs: a replacement that parses but does not type-check is
+                       fault-invalid (replacement-does-not-typecheck) and costs no test run. Default command: the project's own
+                       tsc --noEmit -p tsconfig.json --incremental (never a bundled compiler; a project without a tsconfig
+                       or a resolvable typescript needs <cmd>). <cmd> is an argv, never run through a shell. The unmodified
+                       tree is checked first: not clean is a precondition error (exit 2) naming the first diagnostic.
+                       Non-TypeScript targets are recorded detail.typecheck: not-applicable
   --python <path>      Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH.
                        Default: $VIRTUAL_ENV, then the project's .venv, venv, .env, then python3, then python on PATH.
                        Resolved against your working tree, never the scratch worktree.
@@ -152,6 +158,7 @@ gate       --changed <ref>   measure the change since merge-base(ref, HEAD); aut
            --ignore <path>   ignore file (default: <dir>/testguard.ignore.json; kind=path entries excuse files, with a reason)
            exit 0 every changed source file is claimed or excused · 1 unclaimed file · 2 cannot evaluate · 3 no reference
 claims     --check-anchors   locate every fault without running tests; JS/MJS and Python replacements are syntax-checked in memory
+           --typecheck[=<cmd>] with --check-anchors: also type check each TypeScript replacement, as for probe (a scratch worktree of the working tree)
            --annotate       read-only file-header preview (JS/TS/Python); --claim <ID,ID> selects claims
            --apply          explicit annotation writes, only with --annotate; retains private recovery on partial failure
            authoring is not verification; each invocation recomputes its plan. Results are stdout-only, never --out
@@ -205,7 +212,8 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
   let parsed;
   try {
     parsed = parseArgs({
-      args: argv,
+      // `--typecheck` alone means the project's own tsc; `--typecheck=<cmd>` names one.
+      args: argv.map((arg) => (arg === '--typecheck' ? '--typecheck=' : arg)),
       allowPositionals: true,
       tokens: true,
       options: {
@@ -251,6 +259,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         here: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'runner-cmd': { type: 'string' },
+        typecheck: { type: 'string' },
         python: { type: 'string' },
         runner: { type: 'string', default: 'auto' },
         'node-modules': { type: 'string' },
@@ -306,6 +315,10 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
   }
   if (values['calibration-out'] !== undefined && command !== 'replay') {
     io.err('--calibration-out is only valid on replay');
+    return 3;
+  }
+  if (values.typecheck !== undefined && !(command === 'probe' || (command === 'claims' && values['check-anchors']))) {
+    io.err('--typecheck is only valid on probe and on claims --check-anchors');
     return 3;
   }
   if ((values.annotate || values.apply) && command !== 'claims') {

@@ -95,7 +95,12 @@ reused. Before any record is reused its defender set runs once, unmodified;
 `run.measurements.reuseBaselineRuns` counts those runs. `run.instrument` names
 the TestGuard version and a digest of the resolver and runner configuration;
 evidence from another version or digest is never reused. `run.reuse` counts the
-records carried forward and the records measured. Reuse trusts this file: if
+records carried forward and the records measured. With `probe --typecheck`,
+`run.typecheck` names the checker (`commandHash` of the command's identity, and
+its `version`) and each record says how its fault was judged in
+`detail.typecheck`: `clean`, `diagnostics`, `timeout` or `not-applicable`. The
+type check is part of the reuse key: a record measured without it is never
+reused by a run with it, nor the reverse. Reuse trusts this file: if
 the people a gate judges can write it, run that gate with `--no-reuse`.
 
 The file is written atomically (a temporary file, then a rename), so an

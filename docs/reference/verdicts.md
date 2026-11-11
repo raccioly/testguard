@@ -23,7 +23,7 @@ is a pass. Text output prints every verdict but `killed` in capitals.
 | `survived` | `SURVIVED` | Every one of N probe runs passed with the fault applied. A real blind spot. | yes |
 | `nocover` | `NOCOVER` | No test defends the claim: the declared globs resolve to nothing, or no test file imports the target without mocking it. Nothing was even tried. | yes |
 | `unverifiable` | `UNVERIFIABLE` | The fault could not be probed: its anchor moved or matches more than once, the defenders failed to load, discovery was indeterminate, or the defenders never execute the target. Nothing was learned. | yes |
-| `fault-invalid` | `FAULT-INVALID` | The replacement does not load or compile. A bad fault, not a finding about the tests. | yes |
+| `fault-invalid` | `FAULT-INVALID` | The replacement does not load or compile, or (`--typecheck`) parses but does not type-check. A bad fault, not a finding about the tests. | yes |
 | `timeout` | `TIMEOUT` | The defenders exceeded `--budget` with the fault applied. A hang is not a detection. | yes |
 | `flaky-defender` | `FLAKY-DEFENDER` | The defenders were not green N/N on unmodified code, or the N probe runs disagreed. No verdict about the fault can be trusted until the defenders are fixed. | yes |
 
@@ -71,7 +71,9 @@ tags each unproven record `[NEW]`, `[baseline]` or `[below floor]`.
 | `unverifiable` | `probe-error` | Probing this fault threw. `detail.message` names what. |
 | `fault-invalid` | `replacement-does-not-compile` | The runner reported a parse or transform error. |
 | `fault-invalid` | `suite-failed-to-load` | The suite failed to load for another reason. |
+| `fault-invalid` | `replacement-does-not-typecheck` | `--typecheck`: the project's own type checker refuses the replacement. `detail.message` is the first diagnostic and `detail.typecheck` is `diagnostics`; no test ran (`baselineRuns` and `probeRuns` are empty). |
 | `timeout` | `test-timed-out` | A probe run timed out. |
+| `timeout` | `typecheck-timed-out` | `--typecheck`: the type check of this fault exceeded `--budget`. `detail.typecheck` is `timeout`. |
 | `flaky-defender` | `defenders-not-green` | Not N/N green on unmodified code. `detail.flakeRate` says how often. |
 | `flaky-defender` | `inconsistent-probe` | Some probe runs killed the fault and some did not. |
 
