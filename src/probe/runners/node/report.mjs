@@ -10,6 +10,10 @@ const errorIdentity = (error) => error == null ? undefined : {
   code: boundedText(error.code),
   message: boundedText(error.message ?? error),
   fileExit: Object.hasOwn(error, 'exitCode') || Object.hasOwn(error, 'signal'),
+  // A test body's failure arrives wrapped (`ERR_TEST_FAILURE`) with the thrown
+  // value as `cause`. It is an assertion when that value is a node:assert
+  // error: structured identity, never the message text.
+  assertion: error.cause != null && typeof error.cause === 'object' && (error.cause.code === 'ERR_ASSERTION' || error.cause.name === 'AssertionError'),
 };
 
 /** Pure report accumulator. File/suite summaries never count as assertion kills. */

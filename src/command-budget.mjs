@@ -12,6 +12,14 @@ import { performance } from 'node:perf_hooks';
  * Expiry is deliberately not a verdict: a partial result would make the
  * unattempted suffix look clean.
  */
+/**
+ * Expiry of the command budget. A PreconditionError, so the default behavior
+ * (refuse, exit 2, write nothing) is untouched; a distinct class so
+ * `--partial-on-budget` can tell "the time ran out" from every other
+ * precondition failure by identity and never by guessing from the clock.
+ */
+export class BudgetExhaustedError extends PreconditionError {}
+
 export class CommandBudget {
   constructor(limitMs, { now = () => performance.now() } = {}) {
     if (!Number.isInteger(limitMs) || limitMs < 1) throw new TypeError('command budget must be a positive integer');
@@ -30,7 +38,19 @@ export class CommandBudget {
 
   assertOpen() {
     if (this.remainingMs() === 0) {
-      throw new PreconditionError(`command budget of ${this.limitMs}ms exhausted; no partial result was written`);
+      throw new BudgetExhaustedError(`command budget of ${this.limitMs}ms exhausted; no partial result was written`);
+    }
+  }
+
+  /**
+   * A run the budget itself cut short is the deadline arriving, not a
+   * `timeout` verdict about the defenders. When the grant was capped below the
+   * per-run limit and the run timed out, the clock may still show a sliver
+   * left (the child was killed at the cap); the command is over all the same.
+   */
+  assertNotCut(grantedMs, perRunMs, timeouts = 0) {
+    if (grantedMs < perRunMs && timeouts > 0) {
+      throw new BudgetExhaustedError(`command budget of ${this.limitMs}ms exhausted; no partial result was written`);
     }
   }
 

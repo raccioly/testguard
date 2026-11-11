@@ -3,6 +3,7 @@ import { existsSync, rmSync, realpathSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { git, GitError, NO_HOOKS, repoRoot, headSha } from '../git.mjs';
+import { withScratchBase } from '../scratch-dir.mjs';
 import { createScratch, PreconditionError } from '../probe/worktree.mjs';
 import { selectRunner, discoverRunnerManifest, RUNNERS, OWNED_RUNNERS, mergeRuns } from '../probe/runners/index.mjs';
 import { parseCommandTemplate } from '../probe/runners/shared.mjs';
@@ -10,6 +11,7 @@ import { fileImportRelation } from '../probe/rank.mjs';
 import { IS_PY_TEST, pyFileImports } from '../probe/pyimports.mjs';
 import { isPython } from '../probe/discover.mjs';
 import { labelDiff } from './label.mjs';
+import { isKillRun } from '../probe/kill-kind.mjs';
 import { wilsonInterval, roundTo } from '../../spec/lib/wilson.mjs';
 
 const TEST_RE = /(^|\/)(__tests__|tests?)\//;
@@ -79,7 +81,9 @@ export function dedupeByPatch({ dir, commits }) {
  *
  * Runs in a scratch worktree; the caller's tree is never touched.
  */
-export async function replay({
+export const replay = (options) => withScratchBase(options.scratchBase, () => replayIn(options));
+
+async function replayIn({
   projectDir,
   range,
   confirmRuns = 3,
@@ -358,7 +362,7 @@ async function replayOne({ fix, iso, root, projectDir, python, confirmRuns, budg
  * spots the replay exists to find: mixed runs are never `caught`.
  */
 export function classifyReplay(runs) {
-  const isCatch = (r) => r.outcome === 'fail' && (r.assertionFailures ?? 0) > 0;
+  const isCatch = isKillRun;
   if (runs.length === 0) return { verdict: 'unverifiable', reason: 'no-runs' };
   if (runs.some((r) => r.outcome === 'error')) return { verdict: 'unverifiable', reason: 'suite-failed-to-load' };
   if (runs.every(isCatch)) return { verdict: 'caught' };

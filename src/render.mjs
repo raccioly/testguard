@@ -17,6 +17,9 @@ export const PROVISIONAL_WARNING = (n) => `PROVISIONAL — confirmRuns ${n} (< 3
 
 export const coAuthorshipWarning = (coAuthored, kills) => `${coAuthored} of ${kills} kills are co-authored with the code they defend — the test and the code were written in the same change, so those kills are not independent evidence.`;
 
+/** A kill by crash, not by assertion: named beside the co-authored count, as a weakness rather than a verdict. */
+export const exceptionOnlyWarning = (count, kills) => `${count} of ${kills} kills are by crash, not by assertion — the fault made the code throw and the suite went red, but no assertion rejected it, so those kills prove the suite reaches the code, not that it checks the behavior.`;
+
 export function renderRecord(r, { provisional = false, showDiscovered = true } = {}) {
   const head = `${formatVerdict(r.verdict, provisional).padEnd(15)} ${r.claim.id}/${r.subject.id}`.padEnd(38);
   let why = '';
@@ -28,6 +31,7 @@ export function renderRecord(r, { provisional = false, showDiscovered = true } =
   } else if (r.detail.reason) {
     why = `  [${r.detail.reason}]`;
   }
+  if (r.verdict === 'killed' && r.detail.killKind === 'exception-only') why += '  [killed by exception only: no assertion failed]';
   if (r.defenders.discovered && showDiscovered) why += '  (defenders discovered by import)';
   return `${head} ${r.claim.severity.padEnd(8)} ${r.subject.file}  ${r.subject.description}${why}`;
 }
@@ -46,7 +50,8 @@ export function renderSummary(records, run) {
   const where = run ? ` Probed ${run.repo.snapshot ? `working tree (snapshot ${run.repo.snapshot.slice(0, 7)} of ${run.repo.head.slice(0, 7)})` : run.mode === 'in-place' ? `in place at ${run.repo.head.slice(0, 7)}${run.repo.dirty ? ' (dirty)' : ''}` : run.repo.head.slice(0, 7)}.` : '';
   const kills = records.filter((r) => r.verdict === 'killed');
   const coAuthored = kills.filter((r) => r.detail.independence?.class === 'co-authored').length;
-  const quality = coAuthored ? `\n${coAuthorshipWarning(coAuthored, kills.length)}` : '';
+  const exceptionOnly = kills.filter((r) => r.detail.killKind === 'exception-only').length;
+  const quality = (coAuthored ? `\n${coAuthorshipWarning(coAuthored, kills.length)}` : '') + (exceptionOnly ? `\n${exceptionOnlyWarning(exceptionOnly, kills.length)}` : '');
   return `${run?.provisional ? 'PROVISIONAL: ' : ''}${records.length} faults probed: ${parts.join(', ')}. ${unproven.length} unproven fault${unproven.length === 1 ? '' : 's'} across ${claims} claim${claims === 1 ? '' : 's'}.${where}${quality}\n${renderOrigins(recordedOriginSummary(records))}`;
 }
 

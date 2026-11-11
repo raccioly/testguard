@@ -7,6 +7,7 @@ import { reproduces, decimals, MAX_PLACES } from './wilson.mjs';
 import { isDeepStrictEqual } from 'node:util';
 import { recordedOriginSummary } from './origins.mjs';
 import { authoringInputErrors } from './authoring-input.mjs';
+import { runErrors } from './run-result.mjs';
 
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 
@@ -83,12 +84,22 @@ function originPolicyErrors(kind, doc) {
     if (kind === 'status' && (p.claims !== doc.counts.claims || p.faults !== doc.counts.faults)) fail('policy denominators must match current status claims and faults');
     if (kind === 'brief' && p.state !== 'unavailable' && (p.claims !== doc.summary.claims || p.faults !== Object.values(doc.summary.byVerdict).reduce((a, b) => a + b, 0))) fail('recorded policy denominators must match the uncapped brief summary');
   }
-  if (kind === 'status' && doc.run) {
+  // A run that selected nothing measured nothing: no gate, no policy, nothing for the completed-probe rules to read.
+  if (kind === 'status' && doc.run?.id !== undefined) {
     const p = doc.run.originPolicy;
     const expected = p?.state === 'unavailable' ? 2 : p?.state === 'failed' || doc.run.newSinceBaseline > 0 ? 1 : 0;
     if (p && doc.run.exitCode !== expected) errors.push({ path: '/run/exitCode', message: 'exit code must preserve policy refusal/failure before baseline findings' });
-    if (!p && doc.run.exitCode === 2) errors.push({ path: '/run/exitCode', message: 'completed probe exit 2 requires an unavailable origin policy' });
-    if (p && (doc.run.scope || doc.run.provisional)) errors.push({ path: '/run/originPolicy', message: 'origin policy cannot certify a partial or provisional invocation' });
+    const failure = doc.run.failureKind;
+    if (!p && doc.run.exitCode === 2 && failure === undefined) errors.push({ path: '/run/exitCode', message: 'completed probe exit 2 requires an unavailable origin policy or an exhausted command budget (run.failureKind)' });
+    if (p && (doc.run.scope || doc.run.provisional || doc.run.budget)) errors.push({ path: '/run/originPolicy', message: 'origin policy cannot certify a partial, provisional or budget-limited invocation' });
+    // A run whose command budget ran out is never a pass, and says which kind of failure it is.
+    if ((failure !== undefined) !== (doc.run.budget?.exhausted === true)) errors.push({ path: '/run/failureKind', message: 'failureKind is present exactly when run.budget.exhausted is true' });
+    if (failure !== undefined) {
+      if (doc.run.exitCode === 0) errors.push({ path: '/run/exitCode', message: 'an exhausted command budget cannot exit 0: the faults not reached were not measured' });
+      if ((failure === 'incomplete') !== (doc.run.exitCode === 2)) errors.push({ path: '/run/failureKind', message: 'incomplete is exit 2; a finding or failed policy in the measured part (unproven+incomplete, policy+incomplete) is exit 1' });
+    }
+    if ((doc.run.unprovenAtLeast !== undefined) !== (failure === 'unproven+incomplete')) errors.push({ path: '/run/unprovenAtLeast', message: 'unprovenAtLeast accompanies failureKind unproven+incomplete, and only it' });
+    if (doc.run.budget && doc.run.budget.reached + doc.run.budget.notReached !== doc.run.records) errors.push({ path: '/run/budget', message: 'reached plus notReached must equal the record count' });
   }
   return errors;
 }
@@ -206,6 +217,9 @@ const semantic = {
       if (Math.abs(m.elapsedMs - m.runnerMs - m.overheadMs) > 0.001) errors.push({ path: '/run/measurements', message: 'elapsedMs must equal runnerMs plus overheadMs' });
     }
     if (doc.run.serial && doc.run.workers !== undefined && doc.run.workers !== 1) errors.push({ path: '/run/workers', message: 'serial execution requires one worker' });
+    // One mutable tree cannot hold two faults at once: a fan-out is only ever
+    // measured in scratch worktrees.
+    if (doc.run.faultWorkers > 1 && doc.run.mode === 'in-place') errors.push({ path: '/run/faultWorkers', message: 'a fault fan-out needs scratch worktrees; in-place runs probe one fault at a time' });
     const injection = isInjection(doc.run);
     const n = doc.run.confirmRuns;
     // N-run agreement is what fault injection means by "confirmed". A method
@@ -216,9 +230,36 @@ const semantic = {
       if (n >= 3 && doc.run.provisional === true) errors.push({ path: '/run/provisional', message: `confirmRuns ${n} is confirmed; provisional must be absent or false` });
     }
     if (doc.run.runners && doc.run.runner && !doc.run.runners.some((x) => x.name === doc.run.runner.name)) errors.push({ path: '/run/runners', message: 'runners must include the project runner named in run.runner' });
+    // GATE-SEMANTICS rule 8: the instrument named is the tool that wrote the
+    // document, and the reuse tally is the records' own.
+    if (doc.run.instrument && doc.run.instrument.toolVersion !== doc.tool?.version) errors.push({ path: '/run/instrument/toolVersion', message: `instrument toolVersion ${doc.run.instrument.toolVersion} is not the tool that wrote this evidence (${doc.tool?.version})` });
+    if (doc.run.reuse) {
+      const reused = doc.records.filter((r) => r.reusedFrom).length;
+      if (doc.run.reuse.reused !== reused || doc.run.reuse.measured !== doc.records.length - reused) errors.push({ path: '/run/reuse', message: `run.reuse must count the records: ${reused} reused, ${doc.records.length - reused} measured` });
+    }
     if (doc.run.repo.ignoredDirty && doc.run.repo.snapshot) errors.push({ path: '/run/repo/ignoredDirty', message: 'a working-tree snapshot has no ignored dirty files: the tree was probed as it is' });
+    // Completeness is cross-checked against the records, never asserted: a
+    // document that says it was not exhausted while holding a record the budget
+    // never reached would let the unmeasured suffix pass for measured.
+    const notReachedCount = doc.records.filter((r) => r.detail?.reason === 'not-reached-within-budget').length;
+    if (doc.run.budget) {
+      const b = doc.run.budget;
+      if (b.exhausted !== (notReachedCount > 0)) errors.push({ path: '/run/budget/exhausted', message: `exhausted must be true exactly when a record is not-reached-within-budget (${notReachedCount} found)` });
+      if (b.notReached !== notReachedCount) errors.push({ path: '/run/budget/notReached', message: `notReached ${b.notReached} disagrees with the ${notReachedCount} not-reached records` });
+      if (b.reached !== doc.records.length - notReachedCount) errors.push({ path: '/run/budget/reached', message: `reached ${b.reached} disagrees with the ${doc.records.length - notReachedCount} measured records` });
+      if (b.reached + b.notReached !== doc.records.length) errors.push({ path: '/run/budget', message: 'reached plus notReached must equal the record count' });
+    } else if (notReachedCount > 0) {
+      errors.push({ path: '/run/budget', message: 'a record not reached within the budget requires run.budget' });
+    }
+    if (doc.run.budget?.exhausted && doc.originPolicy) errors.push({ path: '/originPolicy', message: 'an origin policy cannot certify an exhausted run' });
     doc.records.forEach((r, i) => {
       const p = `/records/${i}`;
+      if (r.detail?.reason === 'not-reached-within-budget') {
+        // Nothing half-measured is ever written: a not-reached fault has no runs and no carried-forward verdict.
+        if (r.verdict !== 'unverifiable') errors.push({ path: `${p}/verdict`, message: 'a fault not reached within the budget is unverifiable, never a verdict' });
+        if (r.detail.baselineRuns?.length || r.detail.probeRuns?.length || r.detail.escalationRuns?.length) errors.push({ path: `${p}/detail`, message: 'a fault not reached within the budget has no runs: a half-measured record is never written' });
+        if (r.reusedFrom) errors.push({ path: `${p}/reusedFrom`, message: 'a not-reached record is never reused' });
+      }
       const expected = fingerprint({ claimId: r.claim.id, subjectId: r.subject.id, file: r.subject.file ?? '', verdict: r.verdict });
       if (r.fingerprint !== expected) errors.push({ path: `${p}/fingerprint`, message: `fingerprint does not match spec derivation (expected ${expected})` });
 
@@ -238,6 +279,23 @@ const semantic = {
           if (!Array.isArray(r.detail[k])) errors.push({ path: `${p}/detail/${k}`, message: `fault-injection requires detail.${k} on every record` });
         }
       }
+      // `killKind` is derived data: only a kill has one, and it must equal what
+      // the recorded probe runs say. Checked before the early return below so
+      // that a stray value on any record is still refused.
+      if (r.detail?.killKind !== undefined) {
+        if (r.verdict !== 'killed') errors.push({ path: `${p}/detail/killKind`, message: 'killKind is a property of a kill; only killed records carry it' });
+        else if (Array.isArray(r.detail.probeRuns) && r.detail.probeRuns.length > 0) {
+          const withAssertion = r.detail.probeRuns.filter((x) => (x.assertionFailures ?? 0) > 0).length;
+          const derived = withAssertion === r.detail.probeRuns.length ? 'assertion' : withAssertion === 0 ? 'exception-only' : 'mixed';
+          if (r.detail.killKind !== derived) errors.push({ path: `${p}/detail/killKind`, message: `killKind ${r.detail.killKind} contradicts the probe runs, which say ${derived}` });
+        }
+      }
+      if (r.detail?.killKindReason !== undefined) {
+        const runs = Array.isArray(r.detail.probeRuns) ? r.detail.probeRuns : [];
+        const derived = r.verdict === 'killed' && r.detail.killKind === 'exception-only' && runs.length > 0
+          && runs.every((x) => (x.kindNotReported ?? 0) > 0 && x.kindNotReported === (x.exceptionFailures ?? 0));
+        if (!derived) errors.push({ path: `${p}/detail/killKindReason`, message: 'killKindReason is only valid on an exception-only kill whose every exception failure was unreported by the runner' });
+      }
       // Every rule below reads those fields, so a record that is already
       // malformed must not also throw on the way to being reported.
       if (!injection || !r.defenders || !r.inputs || !Array.isArray(r.detail.baselineRuns) || !Array.isArray(r.detail.probeRuns)) return;
@@ -248,8 +306,8 @@ const semantic = {
         if (probeRuns.length !== n) errors.push({ path: `${p}/detail/probeRuns`, message: `${r.verdict} requires exactly confirmRuns (${n}) probe runs, got ${probeRuns.length}` });
         if (baselineRuns.some((b) => b.outcome !== 'pass')) errors.push({ path: `${p}/detail/baselineRuns`, message: `${r.verdict} is only valid on a green baseline` });
       }
-      if (r.verdict === 'killed' && !probeRuns.every((x) => x.outcome === 'fail' && (x.assertionFailures ?? 0) > 0)) {
-        errors.push({ path: `${p}/detail/probeRuns`, message: 'killed requires every probe run to fail with at least one assertion failure' });
+      if (r.verdict === 'killed' && !probeRuns.every((x) => x.outcome === 'fail' && (x.assertionFailures ?? 0) + (x.exceptionFailures ?? 0) > 0)) {
+        errors.push({ path: `${p}/detail/probeRuns`, message: 'killed requires every probe run to fail with at least one failing test body (an assertion or an exception), never a timeout or a load failure' });
       }
       if (r.verdict === 'survived' && !probeRuns.every((x) => x.outcome === 'pass')) {
         errors.push({ path: `${p}/detail/probeRuns`, message: 'survived requires every probe run to pass' });
@@ -261,9 +319,24 @@ const semantic = {
           errors.push({ path: `${p}/detail`, message: 'flaky-defender requires a non-green baseline or mixed pass/fail probe runs' });
         }
       }
+      // GATE-SEMANTICS rule 8: an import closure that could not be followed
+      // says why, and can never have licensed a carried-forward verdict.
+      const closure = r.inputs.dependencyClosure;
+      if (closure === 'indeterminate' && !r.inputs.dependencyIssues?.length) errors.push({ path: `${p}/inputs/dependencyIssues`, message: 'an indeterminate dependency closure must name at least one reason' });
+      if (closure === 'complete' && r.inputs.dependencyIssues) errors.push({ path: `${p}/inputs/dependencyIssues`, message: 'a complete dependency closure has no issues' });
+      if (closure === 'indeterminate' && r.reusedFrom) errors.push({ path: `${p}/reusedFrom`, message: 'a record whose dependency closure is indeterminate is never reused (GATE-SEMANTICS rule 8)' });
       if (r.verdict === 'nocover' && !r.defenders.nocover) {
         errors.push({ path: `${p}/defenders/nocover`, message: 'nocover verdict requires defenders.nocover = true' });
       }
+      // GATE-SEMANTICS rule 16: the type check decides before any test runs.
+      const tc = r.detail.typecheck;
+      if (tc !== undefined && !doc.run.typecheck) errors.push({ path: `${p}/detail/typecheck`, message: 'detail.typecheck requires a run that declares run.typecheck' });
+      if (tc === 'diagnostics' && (r.verdict !== 'fault-invalid' || r.detail.reason !== 'replacement-does-not-typecheck')) errors.push({ path: `${p}/detail/typecheck`, message: 'a type check that found diagnostics yields fault-invalid with reason replacement-does-not-typecheck' });
+      if (tc === 'timeout' && (r.verdict !== 'timeout' || r.detail.reason !== 'typecheck-timed-out')) errors.push({ path: `${p}/detail/typecheck`, message: 'a type check that timed out yields timeout with reason typecheck-timed-out' });
+      if ((tc === 'diagnostics' || tc === 'timeout') && (baselineRuns.length > 0 || probeRuns.length > 0)) errors.push({ path: `${p}/detail`, message: `a fault the type check refused spent no test run, but this record carries ${baselineRuns.length} baseline and ${probeRuns.length} probe runs` });
+      if (tc === 'diagnostics' && !r.detail.message) errors.push({ path: `${p}/detail/message`, message: 'a type check that found diagnostics names the first one in detail.message' });
+      if (r.detail.reason === 'replacement-does-not-typecheck' && tc !== 'diagnostics') errors.push({ path: `${p}/detail/reason`, message: 'replacement-does-not-typecheck is the type check\'s reason; detail.typecheck must be diagnostics' });
+      if (r.detail.reason === 'typecheck-timed-out' && tc !== 'timeout') errors.push({ path: `${p}/detail/reason`, message: 'typecheck-timed-out is the type check\'s reason; detail.typecheck must be timeout' });
       if (r.detail.flakeRate) {
         const { runs, failures } = r.detail.flakeRate;
         if (failures > runs) errors.push({ path: `${p}/detail/flakeRate`, message: `flakeRate failures (${failures}) exceed runs (${runs})` });
@@ -349,6 +422,14 @@ const semantic = {
       // In-place is the mode where a vanished target is the user's own file
       // gone; it raises rather than records. A document claiming otherwise
       // describes a run that cannot have happened.
+      // A serial re-measure exists only because a fan-out measured the record
+      // first; a document without one describes a run that cannot have happened.
+      if (r.detail.baselineRemeasuredSerially && !(doc.run.faultWorkers > 1)) {
+        errors.push({ path: `${p}/detail/baselineRemeasuredSerially`, message: 'baselineRemeasuredSerially requires run.faultWorkers above one' });
+      }
+      if (r.detail.remeasuredSerially && !(doc.run.faultWorkers > 1)) {
+        errors.push({ path: `${p}/detail/remeasuredSerially`, message: 'remeasuredSerially requires run.faultWorkers above one' });
+      }
       if (r.detail.restoreSkipped && doc.run.mode === 'in-place') {
         errors.push({ path: `${p}/detail/restoreSkipped`, message: 'restoreSkipped cannot occur in in-place mode, where a missing target is raised' });
       }
@@ -427,13 +508,7 @@ const semantic = {
       if (!doc.surface.history.available && doc.surface.history.commitsRead !== 0) errors.push({ path: '/surface/history/commitsRead', message: 'unavailable history must report zero commits read' });
       if (new Set(doc.surface.rankedUnclaimed.map((item) => item.file)).size !== doc.surface.rankedUnclaimed.length) errors.push({ path: '/surface/rankedUnclaimed', message: 'ranked unclaimed modules must be unique' });
     }
-    if (doc.run?.scope) {
-      const scope = doc.run.scope;
-      if (scope.requestedCount !== scope.requestedClaims.length) errors.push({ path: '/run/scope/requestedCount', message: 'requestedCount must equal requestedClaims.length' });
-      if (scope.probedCount !== scope.probedClaims.length) errors.push({ path: '/run/scope/probedCount', message: 'probedCount must equal probedClaims.length' });
-      const requested = new Set(scope.requestedClaims);
-      if (scope.probedClaims.some((id) => !requested.has(id))) errors.push({ path: '/run/scope/probedClaims', message: 'every probed claim must have been requested' });
-    }
+    if (doc.run) errors.push(...runErrors(doc.run));
     // One invocation result per document: `run` is what a probe measured,
     // `baseline` is what a baseline command wrote. A document carrying both
     // would attribute one command's result to the other.
@@ -457,8 +532,8 @@ const semantic = {
       }
       // Only a test body rejecting the reverted source counts as caught —
       // the same rule as `killed`, for the same reason.
-      if (r.verdict === 'caught' && !r.runs.every((x) => x.outcome === 'fail' && (x.assertionFailures ?? 0) > 0)) {
-        errors.push({ path: `${p}/runs`, message: 'caught requires every run to fail with at least one assertion failure' });
+      if (r.verdict === 'caught' && !r.runs.every((x) => x.outcome === 'fail' && (x.assertionFailures ?? 0) + (x.exceptionFailures ?? 0) > 0)) {
+        errors.push({ path: `${p}/runs`, message: 'caught requires every run to fail with at least one failing test body (an assertion or an exception)' });
       }
       if (r.verdict === 'blind' && !r.runs.every((x) => x.outcome === 'pass')) {
         errors.push({ path: `${p}/runs`, message: 'blind requires every run to pass: the suite stayed green on known-broken code' });
@@ -598,6 +673,32 @@ const semantic = {
   },
 };
 
+// `--require-assertion-kill` is a pure function of the records it ran on, so a
+// recorded result is checked against them: no kill by exception can be hidden,
+// and nothing else can be accused.
+function assertionPolicyErrors(kind, doc) {
+  const errors = [];
+  const p = doc.assertionPolicy;
+  if (kind === 'evidence' && p) {
+    const key = (claimId, faultId) => JSON.stringify([claimId, faultId]);
+    const weak = new Set(doc.records.filter((r) => r.verdict === 'killed' && r.detail?.killKind !== 'assertion' && r.detail?.killKind !== 'mixed')
+      .map((r) => key(r.claim.id, r.subject.id)));
+    const listed = p.exceptionOnlyKills.map((x) => key(x.claimId, x.faultId));
+    const reasons = new Map(doc.records.map((r) => [key(r.claim.id, r.subject.id), r.detail?.killKindReason]));
+    if (p.exceptionOnlyKills.some((x) => x.reason !== reasons.get(key(x.claimId, x.faultId)))) errors.push({ path: '/assertionPolicy/exceptionOnlyKills', message: 'each entry carries exactly the killKindReason of its record' });
+    if (listed.length !== new Set(listed).size || listed.length !== weak.size || listed.some((k) => !weak.has(k))) {
+      errors.push({ path: '/assertionPolicy/exceptionOnlyKills', message: 'must list exactly the killed records whose kill is exception-only or carries no recorded kind' });
+    }
+    if ((p.state === 'failed') !== (listed.length > 0)) errors.push({ path: '/assertionPolicy/state', message: 'state is failed exactly when exceptionOnlyKills is non-empty' });
+  }
+  if (kind === 'status' && doc.run?.assertionPolicy) {
+    const q = doc.run.assertionPolicy;
+    if ((q.state === 'failed') !== (q.exceptionOnlyKills.length > 0)) errors.push({ path: '/run/assertionPolicy/state', message: 'state is failed exactly when exceptionOnlyKills is non-empty' });
+    if (q.state === 'failed' && doc.run.exitCode === 0) errors.push({ path: '/run/exitCode', message: 'a failed assertion policy cannot exit 0' });
+  }
+  return errors;
+}
+
 /**
  * Validate a document against a Guard-spec kind: JSON Schema first, then the
  * semantic rules for that kind. Returns { ok, errors: [{ path, message }] }.
@@ -615,5 +716,6 @@ export function validate(kind, doc) {
   const errors = semantic[kind] ? semantic[kind](doc) : [];
   errors.push(...originErrors(kind, doc));
   errors.push(...originPolicyErrors(kind, doc));
+  errors.push(...assertionPolicyErrors(kind, doc));
   return { ok: errors.length === 0, errors };
 }

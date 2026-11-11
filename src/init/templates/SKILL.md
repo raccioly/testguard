@@ -89,6 +89,8 @@ which files exist. `state` is one of:
 
 Exit codes: `0` clean · `1` unproven claims (or drift, or unclaimed changes) · `2` precondition failed / nothing to do yet · `3` usage.
 
+Time-boxed run: `testguard probe --command-budget <ms> --partial-on-budget --json` never throws away what it proved. If `run.budget.exhausted` is true the run is **incomplete**: every fault with reason `not-reached-within-budget` was not measured (a claim with one is `could-not-verify`, not proven). `run.failureKind` is `unproven+incomplete` (exit 1, `run.unprovenAtLeast` is a floor, fix those survivors first) or `incomplete` (exit 2, nothing gating yet). The document is `evidence-partial.json`: it is never a baseline. Re-run, in the order you care about (`--claim` order), with a larger budget.
+
 ## Every change needs a claim
 
 Scaffold proposes mechanical faults, not intended behavior. New drafts declare
@@ -132,6 +134,7 @@ code by construction. So, for every source file you create or change:
 | `FAULT-INVALID` | the replacement does not compile | fix the fault definition |
 | `TIMEOUT` | the fault makes the code hang | write an assertion that fails on it; a hang is not a detection |
 | `FLAKY-DEFENDER` | defenders not green 3/3, or disagreed across runs | fix the flake first; no verdict is trustworthy until then |
+| `killed` with `[killed by exception only: no assertion failed]`, or "N kills are by crash, not by assertion" | the fault made the code throw and a test went red, but nothing checked a value | add an assertion on the behavior the claim states; a test that merely calls the code is reach, not proof. `probe --require-assertion-kill` fails on these |
 
 ## The fix loop
 
@@ -148,6 +151,15 @@ faults and probe the selected draft before promoting it to canonical claims.
 3. `testguard admit <test-file> --claim <ID>` — the two gates as one verb, on your uncommitted test, without touching the tree: `ADMITTED` (exit 0) means the test is green on HEAD and fails on every fault of the claim, 3/3; `NOT ADMITTED` (exit 1) names the first blocking fault and what to do. `--fault <FID>` judges one fault; `--confirm 1` gives a fast **provisional** `ADMITTED?` that must be confirmed at 3 before you commit. (`testguard probe --claim <ID> --include-dirty` is the same run with the full report.)
 4. When it is `ADMITTED` at `--confirm 3`, commit the test.
 5. When everything is killed or baselined, `testguard baseline` if `next` says so, and commit `.testguard/baseline.json`.
+
+## Proving one change
+
+`testguard probe --changed <base> --json` probes only the claims the change since `<base>` can have affected, and `run.claims[]` answers per claim id: `proven`, `unproven` (a fault survived or had no defender) or `could-not-verify` (the measurement did not happen: fix the claim or the flake, do not write a test for it). Read `run.scope` first:
+
+- `selectedCount: 0` is **not** a pass. It means no claim was in the change's way; `run.scope.changed.unmatchedFiles` lists the changed source files no claim covers. Add `--fail-on-empty-selection` to make an empty selection exit 2.
+- `run.scope.changed.outcome: "undetermined"` (exit 2) means git could not say what changed. Nothing was probed; fix the base ref or fetch history, then rerun. Never treat it as "no change".
+- A claims file kept outside the repository works with `--claims <path>`; results are still keyed by claim id, and `claimsSource.sha256` names the file.
+- `status` lists `thinClaims` (a claim with fewer than two faults, or faults of one class). Advisory: a kill of such a claim proves less.
 
 ## Rules that are not yours to bend
 

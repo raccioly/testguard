@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, realpathSync } from 'node:fs';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { validate } from '../../spec/lib/validate.mjs';
+import { sha256 } from '../util/hash.mjs';
 
 export class ClaimsError extends Error {}
 
@@ -20,4 +21,19 @@ export function loadClaims(path) {
     throw new ClaimsError(`claims file ${path} does not conform to the spec:\n${lines}`);
   }
   return doc;
+}
+
+/**
+ * What a measurement records about a claims file that lives outside the
+ * project under probe: that it was external, and its hash, never its path. The
+ * path is the caller's business and often a private one; the hash is enough to
+ * say which file a record was measured against. `undefined` for the project's
+ * own claims, which the repository already names.
+ */
+export function claimsSourceOf(projectDir, claimsPath) {
+  const root = realpathSync(resolve(projectDir));
+  const abs = realpathSync(resolve(claimsPath));
+  const rel = relative(root, abs);
+  if (rel !== '' && rel !== '..' && !rel.startsWith('../') && !isAbsolute(rel)) return undefined;
+  return { external: true, sha256: sha256(readFileSync(abs)) };
 }

@@ -26,7 +26,7 @@ const only = (...files) => ({ ...SAMPLE, suites: SAMPLE.suites.filter((s) => fil
 describe('playwright.parseReport — a real 1.63 JSON report, every status', () => {
   it('maps expected → pass', () => {
     const r = playwright.parseReport(only('toggle.spec.mjs'), 100);
-    expect(r.run).toEqual({ outcome: 'pass', tests: { total: 2, passed: 2, failed: 0 }, assertionFailures: 0, durationMs: 100 });
+    expect(r.run).toEqual({ outcome: 'pass', tests: { total: 2, passed: 2, failed: 0 }, assertionFailures: 0, exceptionFailures: 0, durationMs: 100 });
     expect(r.timeouts).toBe(0);
     expect(r.failedTests).toEqual([]);
   });
@@ -46,7 +46,7 @@ describe('playwright.parseReport — a real 1.63 JSON report, every status', () 
   it('unexpected/failed counts toward assertionFailures; unexpected/timedOut counts toward timeouts, never a kill; skipped is neither', () => {
     const r = playwright.parseReport(only('tmp-sample.spec.mjs'), 100);
     expect(r.run.tests).toEqual({ total: 3, passed: 0, failed: 2 });
-    expect(r.run.assertionFailures).toBe(1);
+    expect(r.run.assertionFailures + r.run.exceptionFailures).toBe(1);
     expect(r.timeouts).toBe(1);
     expect(r.failedTests.sort()).toEqual(['tmp-sample.spec.mjs::fails outright', 'tmp-sample.spec.mjs::times out']);
     const green = { outcome: 'pass', tests: { total: 3, passed: 3, failed: 0 }, assertionFailures: 0, durationMs: 1 };
@@ -57,7 +57,7 @@ describe('playwright.parseReport — a real 1.63 JSON report, every status', () 
   it('the whole sample: outcome fail, counts add up, ids are file::title', () => {
     const r = playwright.parseReport(SAMPLE, 1837);
     expect(r.run.tests).toEqual({ total: 6, passed: 2, failed: 3 });
-    expect(r.run.assertionFailures).toBe(1);
+    expect(r.run.assertionFailures + r.run.exceptionFailures).toBe(1);
     expect(r.timeouts).toBe(1);
     expect(r.flaky).toBe(1);
   });
@@ -124,13 +124,13 @@ describe('playwright config, ownership and per-file runner selection', () => {
 });
 
 describe('mergeRuns is pessimistic', () => {
-  const run = (outcome, extra = {}) => ({ run: { outcome, tests: { total: 1, passed: outcome === 'pass' ? 1 : 0, failed: outcome === 'fail' ? 1 : 0 }, assertionFailures: outcome === 'fail' ? 1 : 0, durationMs: 10 }, timeouts: 0, failedTests: outcome === 'fail' ? ['f'] : [], ...extra });
+  const run = (outcome, extra = {}) => ({ run: { outcome, tests: { total: 1, passed: outcome === 'pass' ? 1 : 0, failed: outcome === 'fail' ? 1 : 0 }, assertionFailures: outcome === 'fail' ? 1 : 0, exceptionFailures: 0, durationMs: 10 }, timeouts: 0, failedTests: outcome === 'fail' ? ['f'] : [], ...extra });
   it('any error → error; any timeout → timeout; any failure → failure; counts add', () => {
     expect(mergeRuns([run('pass'), run('error', { loadMessage: 'boom' })]).run.outcome).toBe('error');
     expect(mergeRuns([run('pass'), run('error', { loadMessage: 'boom' })]).loadMessage).toBe('boom');
     expect(mergeRuns([run('fail'), run('timeout', { timeouts: 1 })]).run.outcome).toBe('timeout');
     const m = mergeRuns([run('pass'), run('fail')]);
-    expect(m.run).toEqual({ outcome: 'fail', tests: { total: 2, passed: 1, failed: 1 }, assertionFailures: 1, durationMs: 20 });
+    expect(m.run).toEqual({ outcome: 'fail', tests: { total: 2, passed: 1, failed: 1 }, assertionFailures: 1, exceptionFailures: 0, durationMs: 20 });
     expect(m.failedTests).toEqual(['f']);
     expect(mergeRuns([run('pass'), run('pass')]).run.outcome).toBe('pass');
     const one = run('pass');
@@ -173,4 +173,28 @@ describe('runProcess for a runner that names its report through the environment'
     expect(r.run.outcome).toBe('error');
     expect(r.loadMessage).toMatch(/boom from env/); // came through the file the env named, parsed by playwright's parser
   }, 60_000);
+});
+
+describe('playwright.parseReport — assertion or exception, from the injected reporter\'s sidecar', () => {
+  const spec = (title, line, status = 'unexpected', finalResult = 'failed') => ({ title, file: 'a.spec.js', line, column: 1, tests: [{ projectName: '', status, results: [{ status: finalResult }] }] });
+  const report = { suites: [{ file: 'a.spec.js', specs: [spec('expects', 3), spec('throws', 4), spec('unlisted', 5), spec('hangs', 6, 'unexpected', 'timedOut')] }] };
+  const entry = (title, line, kind) => ({ file: '/p/e2e/a.spec.js', line, column: 1, title, project: '', kind });
+
+  it('splits failed tests by the recorded kind; a timeout is neither', () => {
+    const r = playwright.parseReport(report, 1, { version: 1, tests: [entry('expects', 3, 'assertion'), entry('throws', 4, 'exception'), entry('hangs', 6, 'assertion')] });
+    expect(r.run).toMatchObject({ assertionFailures: 1, exceptionFailures: 2 });
+    expect(r.timeouts).toBe(1);
+  });
+  it('a missing, unreadable or partial sidecar is the pessimistic side: exception', () => {
+    for (const kinds of [undefined, null, {}, { tests: 'x' }, { tests: [] }]) {
+      expect(playwright.parseReport(report, 1, kinds).run).toMatchObject({ assertionFailures: 0, exceptionFailures: 3 });
+    }
+  });
+  it('a test seen twice in the sidecar is an assertion only when every sighting is', () => {
+    const r = playwright.parseReport(report, 1, { tests: [entry('expects', 3, 'assertion'), entry('expects', 3, 'exception')] });
+    expect(r.run.assertionFailures).toBe(0);
+  });
+  it('asks Playwright for the injected reporter beside the JSON one', () => {
+    expect(playwright.argvFor('/p', ['e2e/a.spec.js'])).toContain(`--reporter=json,${playwright.KINDS_REPORTER}`);
+  });
 });

@@ -29,8 +29,10 @@ it('counts real invocations once despite shared baselines and historical verdict
     expect(first.run).not.toHaveProperty('serial');
     const second = await probe({ ...opts, previous: first });
     expect(second.records.every((r) => r.reusedFrom === first.run.id)).toBe(true);
-    expect(second.run.measurements.runnerInvocations).toBe(0);
-    expect(second.run.measurements.runnerMs).toBe(0);
+    // One live baseline run of the shared defender set licenses both reuses.
+    expect(second.run.measurements.runnerInvocations).toBe(1);
+    expect(second.run.measurements.reuseBaselineRuns).toBe(1);
+    expect(second.run.measurements.runnerMs).toBeGreaterThan(0);
     expect(costReport(second.records, { run: second.run }).totalMs).toBeGreaterThan(0);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }, 15000);

@@ -4,6 +4,34 @@
   "entries": [
     {
       "kind": "path",
+      "pattern": "test/write-boundary.acceptance.test.mjs",
+      "reason": "Real-runner acceptance for the declared write boundary: four fixtures (vitest, jest, unittest, Playwright), each probed in a sandbox with a read-only and a writable copy of node_modules and a before/after listing, a few minutes in total. Mandatory in npm test and CI. The claims about the boundary (TG-SCRATCH-ROOT-IS-ONE-CALLS-DIRECTORY, TG-NODE-MODULES-IS-NEVER-WRITTEN-THROUGH and the others) are defended by the fast tests in test/scratch-dir.test.mjs and test/write-boundary.helpers.test.mjs; naming this file as a self-probe defender would re-run four runners for every fault.",
+      "by": "claude",
+      "at": "2026-11-10T23:55:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/probe.typecheck.test.mjs",
+      "reason": "Real-compiler acceptance for --typecheck on fixtures/known-answer-typescript (hand-verified expected.json): about a minute of nested probes with a real tsc and vitest. Mandatory in npm test and CI, where the fixture's dependencies are installed and a missing install fails loudly. The behavior is claimed by the fast defenders test/typecheck-*.test.mjs files (a stub typescript), named in TG-TYPECHECK-*; naming this file as a self-probe defender would pay for real nested probes on every fault.",
+      "by": "claude",
+      "at": "2026-11-11T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/assertion-policy.cli.test.mjs",
+      "reason": "Real-CLI acceptance for --require-assertion-kill: it probes a generated project several times (probe, --json, admit, --runner-cmd, legacy reuse), about a minute in total. Mandatory in npm test and CI. The claim TG-KILL-KIND-IS-RECORDED-FROM-ERROR-IDENTITY is defended by the fast pure tests in test/kill-kind.test.mjs; naming this file as a self-probe defender cost 2900 seconds of the gate's budget.",
+      "by": "claude",
+      "at": "2026-11-10T23:30:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/kill-kind.acceptance.test.mjs",
+      "reason": "Real-runner acceptance for the kill kind: six runners, each a small generated project probed three times (about a minute in total). It is mandatory in npm test and CI. The claim TG-KILL-KIND-IS-RECORDED-FROM-ERROR-IDENTITY names the fast unit and conformance defenders instead; naming this file as a self-probe defender would re-run all six runners for every fault.",
+      "by": "claude",
+      "at": "2026-11-10T21:30:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/probe.node.test.mjs",
       "reason": "Independent native Node acceptance oracle plus real CLI cancellation and restoration checks. Mandatory in npm test and CI; focused native report/controller claims retain their own mutation defenders. Naming this complete ten-fault acceptance fixture as a self-probe defender would repeatedly pay for unrelated nested probes, as with the existing known-answer fixture exception.",
       "by": "maintainer",
@@ -172,6 +200,20 @@
       "reason": "Wiring for the Jules routines: it reads the public pull request list, the claims file and --help, then prints what the policy decided. Every decision (queue cap, decline window, weekly rotation, target lists) is a pure function in .github/scripts/jules-policy.mjs, claimed as TG-JULES-TRIAGE-BOUNDS-THE-QUEUE and TG-JULES-MERGE-GATE-HOLDS-BY-DEFAULT. Maintenance tooling; not shipped in the package.",
       "by": "maintainer",
       "at": "2026-10-10T18:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/probe-partial-budget.test.mjs",
+      "reason": "Acceptance for --partial-on-budget: it probes a generated four-claim project (serial, --fault-workers 3, a budget-capped hang, a reuse round trip, and the command in-process) with an injected clock, about twenty seconds in total. Mandatory in npm test and CI. The behavior it exercises is claimed where it lives and defended by fast pure tests: TG-PARTIAL-BUDGET-NEVER-REPORTS-UNMEASURED-AS-MEASURED, TG-NOT-REACHED-RECORD-IS-NEVER-REUSED, TG-COMMAND-BUDGET-EXPIRY-IS-TOLD-BY-IDENTITY-AND-A-CUT-RUN-IS-THE-DEADLINE and TG-EXHAUSTED-EVIDENCE-IS-CROSS-CHECKED name test/partial-budget.test.mjs and the conformance suite; naming this file would re-run all of it for every fault.",
+      "by": "claude",
+      "at": "2026-11-11T03:30:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/helpers/partial-budget-project.mjs",
+      "reason": "Fixture builder for test/probe-partial-budget.test.mjs, the slow acceptance test above: it builds a four-claim node:test project in a temporary git repository and asserts nothing. The claims that matter are defended by test/partial-budget.test.mjs and the conformance suite, which do not use it.",
+      "by": "claude",
+      "at": "2026-11-11T03:30:00Z"
     }
   ]
 }

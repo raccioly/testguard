@@ -29,6 +29,23 @@
       },
       "additionalProperties": false
     },
+    "assertionPolicy": {
+      "description": "An explicitly selected policy (`--require-assertion-kill`): every `killed` record must have been killed by at least one assertion-classified failure in some run. `failed` lists the killed faults whose kill was by exception only (or carries no recorded kind). The verdicts themselves are unchanged.",
+      "type": "object",
+      "required": ["state", "exceptionOnlyKills"],
+      "properties": {
+        "state": { "enum": ["passed", "failed"] },
+        "exceptionOnlyKills": {
+          "type": "array", "uniqueItems": true,
+          "items": {
+            "type": "object", "required": ["claimId", "faultId"],
+            "properties": { "claimId": { "$ref": "#/$defs/identifier" }, "faultId": { "$ref": "#/$defs/identifier" }, "reason": { "enum": ["kind-not-reported-by-runner"] } },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "originCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
     "originCounts": {
       "type": "object",
@@ -106,6 +123,16 @@
     "sha256": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
+    },
+    "claimsSource": {
+      "description": "A claims file that lives outside the project under probe, named by content and never by path: the path is the caller's and often a private one. Present only for an external file; the project's own claims file is already named by the repository.",
+      "type": "object",
+      "required": ["external", "sha256"],
+      "properties": {
+        "external": { "const": true },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
     },
     "gitSha": {
       "type": "string",

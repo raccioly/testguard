@@ -4,7 +4,7 @@ import { readBoundedJsonFile } from './discovery.mjs';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
-import { tmpdir } from 'node:os';
+import { childScope, scratchRoot } from '../../scratch-dir.mjs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { matchGlobs } from '../../util/glob.mjs';
@@ -65,7 +65,7 @@ export function terminateProcessTree(child) {
  * quotes; `{files}` expands to the test files (one argv entry each) and
  * `{out}` to the JSON report path. Everything else is passed through.
  */
-export function parseCommandTemplate(template) {
+export function splitCommandWords(template, flag = '--runner-cmd') {
   const words = [];
   let cur = '';
   let quote = null;
@@ -86,12 +86,16 @@ export function parseCommandTemplate(template) {
     }
   }
   if (has || cur) words.push(cur);
-  if (quote) throw new RangeError('unterminated quote in --runner-cmd');
+  if (quote) throw new RangeError(`unterminated quote in ${flag}`);
+  return words;
+}
+
+export function parseCommandTemplate(template) {
+  const words = splitCommandWords(template);
   if (!words.includes('{files}') || !words.some((w) => w.includes('{out}'))) throw new RangeError('--runner-cmd must contain {files} (as its own word) and {out}');
   return words;
 }
 
-/** `{files}` must be a word of its own (one argv entry per file); `{out}` may be embedded, e.g. `--outputFile={out}`. */
 export const expandCommand = (words, files, outFile) => words.flatMap((w) => (w === '{files}' ? files : [w.replaceAll('{out}', outFile)]));
 
 const resolvedRunners = new Map(); // `${projectDir}\0${pkg}` → { argv, version, source }
@@ -177,15 +181,44 @@ export const listTestFiles = (projectDir, globs = TEST_GLOBS) => matchGlobs(proj
 /**
  * Turn vitest's JSON report into a spec `testRun`.
  *
- * `assertionFailures` counts test-level failures that are neither timeouts nor
- * load failures — the test body ran and rejected the behaviour. Only those
- * can kill a fault. A suite that fails to load, or a test that times out, is
+ * `assertionFailures` + `exceptionFailures` count test-level failures that are
+ * neither timeouts nor load failures — the test body ran and rejected the
+ * behaviour — split by structured error identity. Only those can kill a fault. A suite that fails to load, or a test that times out, is
  * not evidence that the suite defends the claim.
  */
 export function firstInformativeLine(message) {
   const lines = message.split('\n').map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').trim()).filter(Boolean);
   return lines.find((l) => /error|syntax|unexpected|expected .+ but found|cannot find|failed to parse|transform failed/i.test(l) && !/^●/.test(l)) ?? lines[0] ?? '';
 }
+
+/**
+ * Is this serialized error an assertion, judged by structured identity and
+ * never by message wording? `code === 'ERR_ASSERTION'`, `name ===
+ * 'AssertionError'`, a string `operator` (node:assert, chai) or a jest
+ * `matcherResult` all say so. One more shape is read, and it is a quirk, not
+ * a contract: jest-circus rewrites the message of a node:assert error and then
+ * serializes only that own, enumerable `message`, dropping `name`, `code` and
+ * `operator`, while an ordinary Error serializes as `{}`. A plain object
+ * thrown as `{ message }` has the same shape, so a lone `message` is an
+ * assertion only when the runner's own error HEADER (the first line of the
+ * matching `failureMessages` entry, never a stack frame or quoted text) says
+ * so: it names the `AssertionError` class, or is jest's own assertion header,
+ * `assert.<fn>(` or `expect(`. Anything else, including no detail at all, is
+ * an exception.
+ */
+const ASSERTION_HEADER = /^(?:AssertionError\b|(?:Error: )?(?:assert|expect)\b[\w.]*\()/;
+const headerOf = (message) => String(message ?? '').replace(/\x1b\[[0-9;]*m/g, '').trimStart().split('\n')[0].trimEnd();
+export function isAssertionDetail(detail, message) {
+  if (detail == null || typeof detail !== 'object') return false;
+  if (detail.code === 'ERR_ASSERTION' || detail.name === 'AssertionError') return true;
+  if (typeof detail.operator === 'string') return true;
+  if (detail.matcherResult != null && typeof detail.matcherResult === 'object') return true;
+  const keys = Object.keys(detail);
+  return keys.length === 1 && keys[0] === 'message' && typeof detail.message === 'string' && ASSERTION_HEADER.test(headerOf(message));
+}
+
+/** A failed test is an assertion when any of its errors is one. Absent details are an exception: the pessimistic side. */
+export const failureKind = (details, messages = []) => (Array.isArray(details) && details.some((d, i) => isAssertionDetail(d, messages?.[i])) ? 'assertion' : 'exception');
 
 function isRunnerTimeout(test) {
   if (test.failureType === 'testTimeoutFailure') return true;
@@ -202,7 +235,23 @@ function isRunnerTimeout(test) {
   });
 }
 
-export function parseReport(report, durationMs) {
+/**
+ * `kinds` is the optional sidecar of a runner whose JSON report carries no
+ * structured error identity (vitest): `{ tests: [{ file, path, kind }] }`.
+ * Keyed by file and title path; a key shared by several failed tests counts as
+ * an assertion only when every one of them is.
+ */
+function sidecarKinds(kinds) {
+  const byKey = new Map();
+  for (const t of kinds?.tests ?? []) {
+    if (typeof t?.file !== 'string' || !Array.isArray(t.path)) continue;
+    const key = JSON.stringify([t.file, t.path]);
+    byKey.set(key, byKey.get(key) === 'exception' || t.kind !== 'assertion' ? 'exception' : 'assertion');
+  }
+  return byKey;
+}
+
+export function parseReport(report, durationMs, kinds) {
   // A report that parsed as JSON but carries no `testResults` is not a suite
   // that ran zero tests — it is a report of a shape this parser does not
   // understand, which is what `--runner-cmd` pointed at a non-jest reporter
@@ -212,10 +261,17 @@ export function parseReport(report, durationMs) {
   const unknownShape = report == null || typeof report !== 'object' || !Array.isArray(report.testResults);
   const files = report.testResults ?? [];
   const loadFailed = files.some((f) => f.status === 'failed' && (f.assertionResults?.length ?? 0) === 0);
-  const results = files.flatMap((f) => (f.assertionResults ?? []).map((t) => ({ ...t, id: `${f.name}::${t.fullName ?? t.title ?? ''}` }))).filter((t) => t.status === 'failed');
+  const sidecar = sidecarKinds(kinds);
+  const results = files.flatMap((f) => (f.assertionResults ?? []).map((t) => ({ ...t, id: `${f.name}::${t.fullName ?? t.title ?? ''}`, sidecarKind: sidecar.get(JSON.stringify([f.name, [...(t.ancestorTitles ?? []), t.title]])) }))).filter((t) => t.status === 'failed');
   const timeouts = results.filter(isRunnerTimeout).length;
   const failedTests = results.map((t) => t.id);
-  const assertionFailures = results.length - timeouts;
+  // Every failed test is exactly one of: a timeout, an assertion, an exception.
+  const settled = results.filter((t) => !isRunnerTimeout(t));
+  const kindOf = (t) => (t.failureDetails !== undefined ? failureKind(t.failureDetails, t.failureMessages) : t.sidecarKind);
+  const assertionFailures = settled.filter((t) => kindOf(t) === 'assertion').length;
+  const exceptionFailures = settled.length - assertionFailures;
+  // An exception because the runner said so, or only because it reported nothing to read?
+  const kindNotReported = settled.filter((t) => t.failureDetails === undefined && t.sidecarKind === undefined).length;
   const tests = { total: report.numTotalTests ?? 0, passed: report.numPassedTests ?? 0, failed: report.numFailedTests ?? 0 };
 
   let outcome;
@@ -223,7 +279,7 @@ export function parseReport(report, durationMs) {
   else if (report.success) outcome = 'pass';
   else outcome = 'fail';
 
-  const run = { outcome, tests, assertionFailures, durationMs };
+  const run = { outcome, tests, assertionFailures, exceptionFailures, ...(kindNotReported ? { kindNotReported } : {}), durationMs };
   // jest opens a load failure with "● Test suite failed to run" and puts the
   // cause lines below; vitest puts it on the first line. Take the first line
   // that names an error, else the first non-empty one.
@@ -243,15 +299,17 @@ export function parseReport(report, durationMs) {
  */
 export function runProcess({ projectDir, files, budgetMs = 120_000, command, commandTemplate, argv, env = {}, parse = parseReport, cleanupOnClose = false }) {
   assertNotCancelled();
-  const outFile = join(tmpdir(), `testguard-run-${randomBytes(6).toString('hex')}.json`);
+  const outFile = join(scratchRoot(), `testguard-run-${randomBytes(6).toString('hex')}.json`);
   const [cmd, ...args] = command
     ?? (commandTemplate ? expandCommand(commandTemplate, files, outFile) : argv(files, outFile));
   // A runner that names its report through the environment (Playwright) gets `{out}` substituted there too.
   const extraEnv = Object.fromEntries(Object.entries(env).map(([k, v]) => [k, String(v).replaceAll('{out}', outFile)]));
   const started = Date.now();
+  const scope = childScope();
 
   return new Promise((resolve) => {
-    const child = spawn(cmd, args, { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32', env: { ...process.env, CI: '1', FORCE_COLOR: '0', ...extraEnv } });
+    const child = spawn(cmd, args, { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32', env: { ...process.env, CI: '1', FORCE_COLOR: '0', ...scope.env, ...extraEnv } });
+    child.once('close', scope.dispose);
     registerChild(child, () => terminateProcessTree(child));
     child.stdout.resume(); // Reports are read from the file; drain logs to prevent pipe backpressure.
     let stderr = '';
@@ -272,14 +330,14 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
       const durationMs = Date.now() - started;
       let result;
       if (killed) {
-        result = { run: { outcome: 'timeout', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs }, timeouts: 1, loadMessage: `budget of ${budgetMs}ms exceeded; ${TIMEOUT_CLEANUP_WARNING}`, failedTests: [] };
+        result = { run: { outcome: 'timeout', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, exceptionFailures: 0, durationMs }, timeouts: 1, loadMessage: `budget of ${budgetMs}ms exceeded; ${TIMEOUT_CLEANUP_WARNING}`, failedTests: [] };
       } else if (!existsSync(outFile)) {
-        result = { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs }, timeouts: 0, loadMessage: stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? 'runner produced no report', failedTests: [] };
+        result = { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, exceptionFailures: 0, durationMs }, timeouts: 0, loadMessage: stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? 'runner produced no report', failedTests: [] };
       } else {
         try {
           result = parse(readBoundedJsonFile(outFile), durationMs);
         } catch (e) {
-          result = { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, durationMs }, timeouts: 0, loadMessage: `unreadable report: ${e.message}`, failedTests: [] };
+          result = { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, exceptionFailures: 0, durationMs }, timeouts: 0, loadMessage: `unreadable report: ${e.message}`, failedTests: [] };
         }
       }
       rmSync(outFile, { force: true });
