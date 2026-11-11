@@ -281,6 +281,24 @@ neither the file nor the script ships in the package. To see what your own
 probe costs, use `probe --cost` or `claims --cost`; see the
 [performance guide](../guides/performance.md).
 
+The ceilings are in **normalized seconds**. A CI runner's speed moved the same
+592 faults between 2876 s and 4159 s, so the check divides the summed run
+durations by a speed factor measured in the same job. The job times a fixed
+workload (`.github/scripts/measure-reference.mjs`: it starts `node --test` on
+a tiny project nine times and takes the median) immediately before and after
+the self-probe. The factor is the mean of those two medians over the
+`reference.baselineMs` recorded in the file, and the check prints the raw
+seconds, both medians, the factor and the normalized seconds every time.
+
+It fails closed. A missing measurement, a measurement of a different
+workload, or a factor outside `reference.factorRange` fails the check and says
+which; it never falls back to raw seconds. If the two medians differ by more
+than `reference.maxDrift` (the runner's speed moved during the probe), or the
+probe reused verdicts recorded on other runners, the run is low confidence: it
+can still pass, but a low-confidence run over a ceiling fails instead of being
+excused by a correction it cannot trust. Changing the workload means changing
+its name in the script and re-taking the baseline in the same pull request.
+
 ## Where TestGuard writes
 
 For a confined run (no network, read-only root, one writable workspace and one
