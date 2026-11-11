@@ -626,11 +626,16 @@ export async function probe({
       // 1. Everything before a baseline, for every fault, in order, on the
       //    clean first tree: input hashes, anchors and type checks are read
       //    before any fault is applied anywhere and before any baseline runs.
+      // A record already finished here (discovery indeterminate, a planning
+      // error) is published now: it depends on no baseline, so a command
+      // budget that runs out during the baselines must not take it along.
       const prePlanned = [];
-      for (const item of faults) {
+      for (const [index, item] of faults.entries()) {
         if (item.firstOfClaim) commandBudget?.assertOpen();
         commandBudget?.assertOpen();
-        prePlanned.push(await prePlanOne(item));
+        const p = await prePlanOne(item);
+        prePlanned.push(p);
+        if (p.record) emitter.settle(index, p.record);
       }
       // 2. Baselines: independent defender sets side by side, one per tree,
       //    each set's asks in serial order. A set that came out anything but
@@ -675,7 +680,8 @@ export async function probe({
       // 3. The rest of planning, in order, against the measured baselines.
       const pending = [];
       for (const [index, p] of prePlanned.entries()) {
-        const planned = p.record ? p : await finishPlanOne(p);
+        if (p.record) continue;
+        const planned = await finishPlanOne(p);
         if (planned.record) emitter.settle(index, planned.record);
         else if (!planned.state.mutate) emitter.settle(index, await measureOne(planned.state, primary));
         else pending.push({ index, state: planned.state });
