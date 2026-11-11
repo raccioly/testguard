@@ -65,7 +65,7 @@
     {
       "seconds": 3850,
       "at": "2026-11-11",
-      "why": "The ceiling goes DOWN from 4300. PR #254 (the suite runtime budget) ran the self-probe at 592 faults, all killed, on two heads with identical claims and defenders: 2901 s (run 43062166737, Node 22 leg) and 3366 s (run 43064382390, same leg); the earlier CI measurement was 3396 s. 3366 + 14% = 3837, rounded to 3850. The 465 s spread between two runs of the same code is the CI variance this headroom exists for (the lower run restored more reusable verdicts from the cache). No claim or defender changed in this PR; the 4300 set at 3839 s / 567 faults was a ceiling over a run that no longer reproduces."
+      "why": "The ceiling goes DOWN from 4300. PR #254 (the suite runtime budget) ran the self-probe at 592 faults, all killed, on two heads with identical claims and defenders: 2901 s (run 43062166737, Node 22 leg) and 3366 s (run 43064382390, same leg); the earlier CI measurement was 3396 s. 3366 + 14% = 3837, rounded to 3850. The 465 s spread between two runs of the same code is the CI variance this headroom exists for (the cause of the lower run was not isolated). No claim or defender changed in this PR; the 4300 set at 3839 s / 567 faults was a ceiling over a run that no longer reproduces."
     }
   ],
   "measuredInCI": {
