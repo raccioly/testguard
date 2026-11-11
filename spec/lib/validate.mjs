@@ -208,6 +208,9 @@ const semantic = {
       if (Math.abs(m.elapsedMs - m.runnerMs - m.overheadMs) > 0.001) errors.push({ path: '/run/measurements', message: 'elapsedMs must equal runnerMs plus overheadMs' });
     }
     if (doc.run.serial && doc.run.workers !== undefined && doc.run.workers !== 1) errors.push({ path: '/run/workers', message: 'serial execution requires one worker' });
+    // One mutable tree cannot hold two faults at once: a fan-out is only ever
+    // measured in scratch worktrees.
+    if (doc.run.faultWorkers > 1 && doc.run.mode === 'in-place') errors.push({ path: '/run/faultWorkers', message: 'a fault fan-out needs scratch worktrees; in-place runs probe one fault at a time' });
     const injection = isInjection(doc.run);
     const n = doc.run.confirmRuns;
     // N-run agreement is what fault injection means by "confirmed". A method
@@ -296,6 +299,15 @@ const semantic = {
       if (r.verdict === 'nocover' && !r.defenders.nocover) {
         errors.push({ path: `${p}/defenders/nocover`, message: 'nocover verdict requires defenders.nocover = true' });
       }
+      // GATE-SEMANTICS rule 16: the type check decides before any test runs.
+      const tc = r.detail.typecheck;
+      if (tc !== undefined && !doc.run.typecheck) errors.push({ path: `${p}/detail/typecheck`, message: 'detail.typecheck requires a run that declares run.typecheck' });
+      if (tc === 'diagnostics' && (r.verdict !== 'fault-invalid' || r.detail.reason !== 'replacement-does-not-typecheck')) errors.push({ path: `${p}/detail/typecheck`, message: 'a type check that found diagnostics yields fault-invalid with reason replacement-does-not-typecheck' });
+      if (tc === 'timeout' && (r.verdict !== 'timeout' || r.detail.reason !== 'typecheck-timed-out')) errors.push({ path: `${p}/detail/typecheck`, message: 'a type check that timed out yields timeout with reason typecheck-timed-out' });
+      if ((tc === 'diagnostics' || tc === 'timeout') && (baselineRuns.length > 0 || probeRuns.length > 0)) errors.push({ path: `${p}/detail`, message: `a fault the type check refused spent no test run, but this record carries ${baselineRuns.length} baseline and ${probeRuns.length} probe runs` });
+      if (tc === 'diagnostics' && !r.detail.message) errors.push({ path: `${p}/detail/message`, message: 'a type check that found diagnostics names the first one in detail.message' });
+      if (r.detail.reason === 'replacement-does-not-typecheck' && tc !== 'diagnostics') errors.push({ path: `${p}/detail/reason`, message: 'replacement-does-not-typecheck is the type check\'s reason; detail.typecheck must be diagnostics' });
+      if (r.detail.reason === 'typecheck-timed-out' && tc !== 'timeout') errors.push({ path: `${p}/detail/reason`, message: 'typecheck-timed-out is the type check\'s reason; detail.typecheck must be timeout' });
       if (r.detail.flakeRate) {
         const { runs, failures } = r.detail.flakeRate;
         if (failures > runs) errors.push({ path: `${p}/detail/flakeRate`, message: `flakeRate failures (${failures}) exceed runs (${runs})` });
@@ -381,6 +393,11 @@ const semantic = {
       // In-place is the mode where a vanished target is the user's own file
       // gone; it raises rather than records. A document claiming otherwise
       // describes a run that cannot have happened.
+      // A serial re-measure exists only because a fan-out measured the record
+      // first; a document without one describes a run that cannot have happened.
+      if (r.detail.remeasuredSerially && !(doc.run.faultWorkers > 1)) {
+        errors.push({ path: `${p}/detail/remeasuredSerially`, message: 'remeasuredSerially requires run.faultWorkers above one' });
+      }
       if (r.detail.restoreSkipped && doc.run.mode === 'in-place') {
         errors.push({ path: `${p}/detail/restoreSkipped`, message: 'restoreSkipped cannot occur in in-place mode, where a missing target is raised' });
       }

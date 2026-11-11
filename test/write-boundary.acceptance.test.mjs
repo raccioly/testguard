@@ -25,6 +25,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = join(ROOT, 'cli', 'testguard.mjs');
 const PYTHON = process.env.TESTGUARD_PYTHON || 'python3';
 const HAS_PYTHON = spawnSync(PYTHON, ['-c', 'import sys']).status === 0;
+const TS_FIXTURE = join(ROOT, 'fixtures', 'known-answer-typescript');
+const HAS_TS = existsSync(join(TS_FIXTURE, 'node_modules', 'typescript', 'package.json')) && existsSync(join(TS_FIXTURE, 'node_modules', 'vitest'));
 const PW_FIXTURE = join(ROOT, 'fixtures', 'known-answer-playwright');
 const HAS_PLAYWRIGHT = existsSync(join(PW_FIXTURE, 'node_modules', '@playwright', 'test')) && existsSync(join(PW_FIXTURE, 'node_modules', 'vitest'));
 
@@ -37,6 +39,8 @@ const ALL_FIXTURES = [
   { name: 'vitest', dir: 'known-answer', runner: 'vitest', nm: join(ROOT, 'node_modules'), dirty: true, writableRun: true },
   { name: 'jest', dir: 'known-answer-jest', runner: 'jest', nm: join(ROOT, 'node_modules') },
   { name: 'python (unittest)', dir: 'known-answer-python', runner: 'unittest', skip: !HAS_PYTHON },
+  // --typecheck (a real tsc, its build-info file in the scratch dir) with three faults at once, each in its own scratch worktree.
+  { name: 'typescript (--typecheck, --fault-workers 3)', dir: 'known-answer-typescript', runner: 'vitest', nm: join(TS_FIXTURE, 'node_modules'), extraArgs: ['--typecheck', '--fault-workers', '3'], skip: !HAS_TS },
   { name: 'playwright + vitest', dir: 'known-answer-playwright', runner: 'auto', nm: join(PW_FIXTURE, 'node_modules'), skip: !HAS_PLAYWRIGHT },
 ];
 const FIXTURES = FULL ? ALL_FIXTURES : ALL_FIXTURES.slice(0, 1).map((f) => ({ ...f, lean: true, writableRun: false }));
@@ -50,7 +54,7 @@ const git = (cwd, ...args) => {
  * Probe one fixture inside a sandbox and report what moved outside the boundary.
  * `nodeModules` is a private copy (or undefined for Python): read-only or writable.
  */
-function boundaryRun(fixture, expected, nodeModules, { dirty = false, changed = false } = {}) {
+function boundaryRun(fixture, expected, nodeModules, { dirty = false, changed = false, extraArgs = fixture.extraArgs ?? [] } = {}) {
   const sandbox = mkdtempSync(join(tmpdir(), 'tg-boundary-'));
   const project = join(sandbox, 'project');
   const scratch = makeDir(join(sandbox, 'scratch'));
@@ -71,7 +75,7 @@ function boundaryRun(fixture, expected, nodeModules, { dirty = false, changed = 
   const userDataDir = (rel) => process.platform !== 'linux' && (rel === 'home/Library' || rel.startsWith('home/Library/') || rel.startsWith('home/AppData'));
   const outside = (rel) => userDataDir(rel) || rel === join('project', '.git', 'worktrees') || rel.startsWith(join('project', '.git', 'worktrees') + '/') || rel === 'scratch' || rel.startsWith('scratch/') || rel === join('out', 'evidence.json');
   const before = listing(sandbox, outside);
-  const args = [CLI, 'probe', project, '--scratch-dir', scratch, '--out', out, '--runner', fixture.runner, '--confirm', String(expected.confirmRuns), '--budget', String(expected.budgetMs ?? 60_000), '--no-escalate', '--quiet', ...(changed ? ['--changed', 'HEAD~1'] : []), ...(nodeModules && !dirty ? ['--node-modules', nodeModules] : [])];
+  const args = [CLI, 'probe', project, '--scratch-dir', scratch, '--out', out, '--runner', fixture.runner, '--confirm', String(expected.confirmRuns), '--budget', String(expected.budgetMs ?? 60_000), '--no-escalate', '--quiet', ...(changed ? ['--changed', 'HEAD~1'] : []), ...extraArgs, ...(nodeModules && !dirty ? ['--node-modules', nodeModules] : [])];
   const networkLog = join(sandbox, '..', `${basename(sandbox)}.net.log`);
   writeFileSync(networkLog, '');
   // The guard rides NODE_OPTIONS into TestGuard and every Node runner it starts: a socket or a name lookup lands in the log and is refused.
@@ -80,7 +84,7 @@ function boundaryRun(fixture, expected, nodeModules, { dirty = false, changed = 
   const evidence = existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : undefined;
   const network = readFileSync(networkLog, 'utf8');
   rmSync(networkLog, { force: true });
-  return { sandbox, network, status: r.status, stderr: r.stderr, before, after, evidence, scratchLeft: readdirSync(scratch), tmpLeft: readdirSync(tmp), homeLeft: readdirSync(home) };
+  return { sandbox, network, status: r.status, stderr: r.stderr, before, after, evidence, scratchLeft: readdirSync(scratch).filter((name) => name !== 'testguard-locks'), /* the allocation lock's directory persists by design */ tmpLeft: readdirSync(tmp), homeLeft: readdirSync(home) };
 }
 
 const verdicts = (evidence) => Object.fromEntries(evidence.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r.verdict]));
@@ -104,7 +108,7 @@ describe.each(FIXTURES)('write boundary: $name', (fixture) => {
       ro = boundaryRun(fixture, expected, nmRo, { dirty: Boolean(fixture.lean) });
       if (fixture.lean) roDirty = ro;
       if (!fixture.nm || fixture.writableRun) rw = boundaryRun(fixture, expected, nmRw);
-      if (nmRo && fixture.dirty) roChanged = boundaryRun(fixture, expected, nmRo, { dirty: true, changed: true });
+      if (nmRo && fixture.dirty) roChanged = boundaryRun(fixture, expected, nmRo, { dirty: true, changed: true, extraArgs: ['--fault-workers', '3'] });
       if (nmRo && fixture.dirty && !fixture.lean) roDirty = boundaryRun(fixture, expected, nmRo, { dirty: true });
       if (rw) rw.nmChanges = nmRw ? changes(nmRwBefore, listing(nmRw)) : undefined;
     } finally {

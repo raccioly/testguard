@@ -156,7 +156,7 @@ The verdict set is closed. Only one value is a pass.
 | `nocover` | No defending test exists: the declared globs resolve to nothing, or no test imports the subject. Worse than `survived` — nothing was even tried. | **yes** |
 | `unverifiable` | The claim could not be probed: the fault's anchor is missing or ambiguous, configured or symbol-level defender discovery was indeterminate (`defender-discovery-indeterminate`), its defenders failed to load (`defenders-failed-to-load`), probing it threw (`probe-error`), or the defenders do not execute the subject at all (`subject-not-executed`). Carries a `reason`. A loud, gating verdict — a claim that cannot be probed is not "skipped", it is undefended until someone fixes the fault or the defenders. Never confused with `flaky-defender`, which requires tests that *ran*. | **yes** |
 | `timeout` | Probe run exceeded its budget. Not counted as a kill; the pessimistic reading is the safe one because flakiness biases the metric optimistically. | **yes** |
-| `fault-invalid` | The replacement does not load or compile. A bad fault, not a detection. | **yes** |
+| `fault-invalid` | The replacement does not load or compile (`replacement-does-not-compile`, `suite-failed-to-load`), or — under `--typecheck` — parses but does not type-check (`replacement-does-not-typecheck`, rule 16). A bad fault, not a detection. | **yes** |
 | `flaky-defender` | Defenders were not green N/N on unmodified source (`defenders-not-green`), or the N probe runs disagreed with each other (`inconsistent-probe`). Either way no verdict about the fault can be trusted; fix the defenders first. | **yes** |
 
 Rules that follow from the table:
@@ -550,6 +550,56 @@ Rules that follow from the table:
    hard-coded its assumptions as requirements.
    The verdict set stays closed and shared. What each method may legitimately
    report is part of defining it.
+
+16. **A replacement the compiler refuses is not a fault.** Under
+   `--typecheck[=<cmd>]` the project's own type checker judges every fault
+   before any test runs: the fault is applied, the checker runs, the fault is
+   restored. Diagnostics that the unmodified tree did not have make the verdict
+   `fault-invalid`, `detail.reason` `replacement-does-not-typecheck`,
+   `detail.typecheck` `diagnostics` and `detail.message` the first diagnostic;
+   `baselineRuns` and `probeRuns` are empty, because no test run was spent. A
+   check that exceeds its budget is `timeout` (`typecheck-timed-out`, never a
+   pass). The type check precedes rule 1's baseline because it is a property of
+   the fault, not of the defenders; `nocover` and an anchor that does not hit
+   still come first, since there is no fault to check.
+   **The unmodified tree is checked first** and must be clean. A tree that
+   already fails cannot be used to judge a fault, so the run is a precondition
+   failure (exit `2`) that names the first diagnostic and writes no evidence.
+   So is a checker that cannot run: no `tsconfig.json` and no command, a
+   `typescript` that cannot be resolved from the project, a `tsc` that cannot
+   read the configuration. A check that was asked for and cannot be made is
+   never a skipped check. A checker that dies mid-run without a diagnostic is
+   `unverifiable` (`probe-error`) for that fault, never `clean`.
+   The checker is the project's own `tsc --noEmit -p tsconfig.json`, never a
+   bundled compiler, or a custom command that is an argv and never a shell
+   string. The default runs `--incremental`; its build-info file lives under
+   the scratch area, is snapshotted after the baseline check, and is restored
+   before and after every fault, so one fault's diagnostics never reach the
+   next. A target the checker does not read (a `.py` file, a `.js` file the
+   project does not check with `allowJs` and `checkJs`, a `.ts` file the
+   tsconfig's program does not contain, any custom command's non-TypeScript
+   target) is recorded `detail.typecheck: "not-applicable"` and probed as
+   before: `clean` is never said about a file the checker did not read. (A
+   custom command cannot say what it reads, so for it only the extension
+   decides.) A program with no project file is a precondition failure for the
+   default command: nothing could be judged. A checked fault that stays valid
+   is `clean`.
+   **The checker is an instrument.** Evidence records
+   `run.typecheck: { commandHash, version }`: a hash of the command's identity
+   (its flags, or the custom argv) and the checker's version. It is part of the
+   reuse key (rule 8's instrument): a record measured without the type check is
+   not reusable by a run with it, and the reverse; so is one measured with a
+   different command or checker version. A record carrying `detail.typecheck`
+   requires a run that declares `run.typecheck`.
+   **Type validity belongs to the whole program**, which no per-fault hash sees
+   (a file added elsewhere can make a clean fault invalid). So when a run that
+   type checks would carry a record forward, it first type checks that fault
+   again — one check, no test run — and carries the record forward only if
+   `detail.typecheck` comes out the same; a `diagnostics` record is carried
+   forward without any test run, since none produced it. A custom command's
+   `version` is best-effort (the command's own `--version` plus the project's
+   `typescript` when it resolves); `--no-reuse` covers a checker that changes
+   under neither.
 
 ## Per-run and whole-command budgets are different
 
@@ -1217,7 +1267,8 @@ fresh time. Existing ordinary scaffold/append/probe behavior is unchanged.
 Built-in runners default to one worker. `--workers N` raises the worker ceiling
 for Vitest, Jest and Playwright; `--serial` overrides it to one. Python remains
 serial and disables pytest-xdist without installing or enabling any plugin.
-Faults and mixed-runner partitions remain sequential. This is a worker ceiling,
+Mixed-runner partitions remain sequential, and faults are probed one at a
+time unless `--fault-workers` fans them out (see [Fault fan-out](#fault-fan-out)). This is a worker ceiling,
 not OS CPU/memory containment; test-created threads, native libraries and custom
 `--runner-cmd` commands manage their own concurrency. Native discovery is bounded
 and uses one worker where applicable.
@@ -1241,9 +1292,13 @@ partitions. Reused records and cached baselines create no invocation charge;
 the one live baseline run that licenses reuse of a defender set (rule 8) is a
 real invocation, charged once and also counted in optional
 `reuseBaselineRuns`.
-`elapsedMs = runnerMs + overheadMs`. Optional `run.workers` records the built-in
+`elapsedMs = runnerMs + overheadMs`. `runnerMs` is wall-clock time during
+which at least one fresh runner invocation was executing: the sum of the
+invocations when faults run one at a time, the union of their intervals under
+a fault fan-out, so overlap is charged once and `overheadMs` is never negative. Optional `run.workers` records the built-in
 worker ceiling and must be one for serial execution; custom commands omit it.
-Native evidence reuse requires the same recorded worker ceiling and serial policy.
+Native evidence reuse requires the same recorded worker ceiling and serial policy,
+and a compatible fault fan-out (see [Fault fan-out](#fault-fan-out)).
 Older native evidence with no worker ceiling is remeasured; native and opaque
 custom-command policies are not interchangeable.
 Every reuse also requires the same recorded `run.runner`: name (the engine that
@@ -1265,3 +1320,75 @@ live per-run deadline as test execution.
 The regression suite caps outer concurrency at two workers in CI. Interactive
 runs reserve one available CPU and use at most two workers; a two-core machine
 therefore uses one. Nested built-in runners retain their one-worker default.
+
+## Fault fan-out
+
+`probe --fault-workers <n>` (default 1) probes up to n faults at once. Each
+fault in flight has its own scratch worktree at the probed commit; no two
+faults ever share a tree, so it is refused with `--in-place` (a usage error,
+exit 3, at the CLI; a precondition error through the API). n = 1 is the serial
+run exactly: the same invocations in the same order, and evidence without
+`run.faultWorkers`.
+
+1. **Plan, then measure.** Every fault is first planned in claim/fault order
+   on the first scratch tree with no fault applied anywhere: defender
+   resolution and discovery, every input hash, the anchor, verdict reuse, the
+   `--typecheck` check (so its incremental build-info lives in one tree only),
+   and the defender set's shared baseline (topped up in the order a serial run
+   would ask for it, so `runnerInvocations` and `reuseBaselineRuns` match). A
+   fault that never mutates (reused, no defenders, a bad anchor, a baseline
+   that is not green N/N) is finished there. Baselines are therefore measured
+   once per defender set, one at a time, never beside another suite, and are
+   frozen before the fan-out: a fault measured in another tree reads them, it
+   never runs them.
+2. **Fan-out.** The remaining faults are handed, in order, to at most n trees.
+   A fault's probe runs, its negative control and its escalation all run in
+   the tree that holds it. A negative control shared by two faults (same
+   target, same defenders) is paid once, by whichever asks first.
+3. **Order.** Records and the per-record progress stream (`onProgress`,
+   `--progress ndjson` verdicts) follow claim/fault order whatever order the
+   trees finish in. Apart from timings (`durationMs`, `run.measurements`),
+   `run.faultWorkers` and `detail.remeasuredSerially`, the evidence has the
+   content a serial run of the same commit would have. Per-stage progress lines
+   from different trees interleave.
+4. **Contention is not a verdict.** Per-run budgets (`--budget`) do not scale
+   with the fan-out. A record measured while another fault was in flight whose
+   verdict is `timeout`, or `flaky-defender` with reason `inconsistent-probe`,
+   is not reported from that measurement: after the fan-out it is measured
+   again with nothing else in flight, in a fresh scratch tree (the contended
+   run may have left state in its own), reusing its frozen baseline, and the
+   serial measurement is what the record reports, whatever its verdict, with
+   `detail.remeasuredSerially: true`. Records after it in order wait for it.
+   `defenders-not-green` is never re-measured: its baseline was never
+   contended. Validators reject `remeasuredSerially` on a document without
+   `run.faultWorkers` above one, and `run.faultWorkers` together with
+   `mode: "in-place"`.
+5. **Reuse.** `run.faultWorkers` is recorded only above one. A measurement
+   under a fan-out never stands in for a serial run or for a different
+   fan-out; a serial measurement (no `run.faultWorkers`) may stand in for any.
+6. **Contention advice.** The contention warning names `--fault-workers` when
+   the probe fans out, and the probe warns before the first run when n times
+   the runner's worker count exceeds the CPUs available to the process.
+7. **Lifecycle.** `--command-budget` is one deadline for every tree and is
+   checked before each fault is dispatched. On a failure no further fault is
+   dispatched, every fault in flight finishes and restores, every tree is
+   removed, and the failure of the lowest fault index is raised (the one a
+   serial run would have met first). Cancellation stops every tree's runners
+   and removes every tree. Interrupted runs leave no scratch worktree.
+8. **Shared worktree registry.** Scratch-worktree allocation and removal (add,
+   remove, prune) hold one lock file, `testguard-worktrees.lock`, keyed by the
+   git common directory and kept under TestGuard's scratch root (never inside
+   the repository), so two probes of one repository, or of its linked
+   worktrees, sharing a scratch root cannot allocate or prune each other's trees. The lock is held
+   only around those synchronous git calls. A lock whose owner pid is no longer
+   running on the same host is stale and is taken over; a live owner is waited
+   on for at most two minutes, after which the command fails rather than
+   proceed unlocked. Every git call that creates, removes or prunes a scratch
+   tree runs with inherited `GIT_*` variables removed, `GIT_TERMINAL_PROMPT=0`,
+   `core.hooksPath` set to the null device and `core.fsmonitor=false`.
+9. **Isolation is per tree, not per machine.** Python, `--runner-cmd` and every
+   built-in runner are supported; each tree has its own files and its own
+   working directory. `node_modules` is linked into every tree as for one, so
+   the disk cost is one checkout per tree. Tests that bind a fixed port, share
+   an external database or write outside the project tree can collide across
+   trees; whether to fan out is the project's decision.

@@ -88,6 +88,12 @@ probe
                        writable directory (or TESTGUARD_SCRATCH_DIR); default: the OS temp directory. Missing or unwritable
                        refuses the run (exit 2). Also written: --out, and git's worktree metadata under .git. The tests under
                        probe run project code: this bounds where TestGuard writes, it is not a sandbox
+  --typecheck[=<cmd>]  type check every fault before any test runs: a replacement that parses but does not type-check is
+                       fault-invalid (replacement-does-not-typecheck) and costs no test run. Default command: the project's own
+                       tsc --noEmit -p tsconfig.json --incremental (never a bundled compiler; a project without a tsconfig
+                       or a resolvable typescript needs <cmd>). <cmd> is an argv, never run through a shell. The unmodified
+                       tree is checked first: not clean is a precondition error (exit 2) naming the first diagnostic.
+                       Non-TypeScript targets are recorded detail.typecheck: not-applicable
   --python <path>      Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH.
                        Default: $VIRTUAL_ENV, then the project's .venv, venv, .env, then python3, then python on PATH.
                        Resolved against your working tree, never the scratch worktree.
@@ -95,6 +101,11 @@ probe
   --serial             one worker, even when --workers is higher (vitest --no-file-parallelism, jest --runInBand,
                        playwright --workers=1; pytest never loads xdist either way). The default --workers 1 is already
                        serial, so it only changes a run that raised --workers; probe warns and records contention either way
+  --fault-workers <n>  (probe) faults probed at once, each in its own scratch worktree (default: 1, one at a time).
+                       Baselines are still measured once per defender set, alone, before the fan-out; a TIMEOUT or
+                       inconsistent probe measured under it is re-measured serially before it is reported. Records keep
+                       claim/fault order. Not with --in-place. Tests that bind a fixed port or share an external
+                       resource can collide across trees: that is the project's call, keep the default for them
   --in-place           mutate the working tree instead of a scratch worktree
   --no-escalate        do not re-run survivors against the whole suite
   --no-reuse           re-probe claims whose inputs have not changed
@@ -152,6 +163,7 @@ gate       --changed <ref>   measure the change since merge-base(ref, HEAD); aut
            --ignore <path>   ignore file (default: <dir>/testguard.ignore.json; kind=path entries excuse files, with a reason)
            exit 0 every changed source file is claimed or excused · 1 unclaimed file · 2 cannot evaluate · 3 no reference
 claims     --check-anchors   locate every fault without running tests; JS/MJS and Python replacements are syntax-checked in memory
+           --typecheck[=<cmd>] with --check-anchors: also type check each TypeScript replacement, as for probe (a scratch worktree of the working tree)
            --annotate       read-only file-header preview (JS/TS/Python); --claim <ID,ID> selects claims
            --apply          explicit annotation writes, only with --annotate; retains private recovery on partial failure
            authoring is not verification; each invocation recomputes its plan. Results are stdout-only, never --out
@@ -208,7 +220,8 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
   let parsed;
   try {
     parsed = parseArgs({
-      args: argv,
+      // `--typecheck` alone means the project's own tsc; `--typecheck=<cmd>` names one.
+      args: argv.map((arg) => (arg === '--typecheck' ? '--typecheck=' : arg)),
       allowPositionals: true,
       tokens: true,
       options: {
@@ -228,6 +241,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         ref: { type: 'string' },
         'ignore-dirty': { type: 'boolean', default: false },
         workers: { type: 'string', default: '1' },
+        'fault-workers': { type: 'string' },
         serial: { type: 'boolean', default: false },
         claim: { type: 'string', multiple: true },
         'require-origin': { type: 'string', multiple: true },
@@ -253,6 +267,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         here: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'runner-cmd': { type: 'string' },
+        typecheck: { type: 'string' },
         python: { type: 'string' },
         runner: { type: 'string', default: 'auto' },
         'node-modules': { type: 'string' },
@@ -313,6 +328,10 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
   }
   if (values['scratch-dir'] !== undefined && !SCRATCH_COMMANDS.has(command)) {
     io.err('--scratch-dir is only valid on probe, sweep, replay and admit: the commands that run tests');
+    return 3;
+  }
+  if (values.typecheck !== undefined && !(command === 'probe' || (command === 'claims' && values['check-anchors']))) {
+    io.err('--typecheck is only valid on probe and on claims --check-anchors');
     return 3;
   }
   if ((values.annotate || values.apply) && command !== 'claims') {

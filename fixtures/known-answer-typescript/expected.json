@@ -1,0 +1,54 @@
+{
+  "confirmRuns": 3,
+  "expected": {
+    "TS-DISCOUNT/F1": {
+      "verdict": "killed",
+      "typecheck": "clean",
+      "why": "Verified by hand 2026-11-10: tsc --noEmit exits 0 with the fault applied; the price test fails by assertion (1000 at +25 percent is 1250, not 750) in three of three runs."
+    },
+    "TS-LABEL/F1": {
+      "verdict": "survived",
+      "typecheck": "clean",
+      "why": "Verified by hand: tsc exits 0 with toFixed(3); the only price test that touches label checks the dollar sign, so the defender stays green in three of three runs."
+    },
+    "TS-STRING/F1": {
+      "verdict": "fault-invalid",
+      "reason": "replacement-does-not-typecheck",
+      "typecheck": "diagnostics",
+      "diagnostic": "src/price.ts(2,3): error TS2322: Type 'string' is not assignable to type 'number'.",
+      "why": "Verified by hand: the replacement parses and esbuild strips the types, so the price test fails by assertion (\"750\" is not 750) in three of three runs and would be a kill. tsc --noEmit exits 2 with TS2322, so the build would have refused it. No test run is spent."
+    },
+    "TS-SIGNATURE/F1": {
+      "verdict": "fault-invalid",
+      "reason": "replacement-does-not-typecheck",
+      "typecheck": "diagnostics",
+      "diagnostic": "src/receipt.ts(8,10): error TS2554: Expected 2 arguments, but got 1.",
+      "why": "Verified by hand: the target itself still type-checks, its caller does not (tsc exits 2, TS2554, in src/receipt.ts). The receipt test stays green in three of three runs, so without the type check this is a survivor that says nothing. No test run is spent."
+    },
+    "TS-TOTAL/F1": {
+      "verdict": "killed",
+      "typecheck": "clean",
+      "why": "Verified by hand: tsc exits 0 after the two invalid faults before it; the receipt test fails by assertion (920, not 1080) in three of three runs. Its result must not carry the earlier diagnostics."
+    },
+    "TS-LEGACY/F1": {
+      "verdict": "killed",
+      "typecheck": "not-applicable",
+      "why": "Verified by hand: src/legacy.js is a JavaScript file and the tsconfig has no allowJs/checkJs, so the check does not apply; the legacy test fails by assertion (12, not 8) in three of three runs."
+    },
+    "TS-BANNER/F1": {
+      "verdict": "killed",
+      "typecheck": "not-applicable",
+      "why": "Verified by hand: tools/banner.ts is a TypeScript file the tsconfig does not include, so tsc --noEmit exits 0 with or without the fault and never read it; the banner test fails by assertion in three of three runs. A clean here would be a statement about nothing."
+    }
+  },
+  "expectedWithoutTypecheck": {
+    "TS-STRING/F1": {
+      "verdict": "killed",
+      "why": "The same hand run without tsc: the string result fails the assertion in three of three runs."
+    },
+    "TS-SIGNATURE/F1": {
+      "verdict": "survived",
+      "why": "The same hand run without tsc: the receipt test never notices the extra parameter."
+    }
+  }
+}

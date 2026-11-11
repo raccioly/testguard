@@ -1718,7 +1718,7 @@
       "producedBy": { "producer": "agent", "by": "codex" },
       "defendedBy": ["test/fault-defender-orchestration.test.mjs"],
       "faults": [
-        { "id": "F1", "description": "The probe orchestrator substitutes claim-level declarations for the selected per-fault set.", "faultClass": "condition-forced", "file": "src/probe/probe.mjs", "find": "        const declared = requested.length ? resolveDefenders(iso.projectDir, requested) : null;", "replace": "        const declared = claim.defendedBy?.length ? resolveDefenders(iso.projectDir, claim.defendedBy) : null;", "producedBy": { "producer": "agent", "by": "codex" } }
+        { "id": "F1", "description": "The probe orchestrator substitutes claim-level declarations for the selected per-fault set.", "faultClass": "condition-forced", "file": "src/probe/probe.mjs", "find": "      const declared = requested.length ? resolveDefenders(iso.projectDir, requested) : null;", "replace": "      const declared = claim.defendedBy?.length ? resolveDefenders(iso.projectDir, claim.defendedBy) : null;", "producedBy": { "producer": "agent", "by": "codex" } }
       ]
     },
     {
@@ -4782,8 +4782,8 @@
           "description": "The throw escapes the per-fault body again: no evidence file, every prior verdict lost.",
           "faultClass": "guard-removed",
           "file": "src/probe/probe.mjs",
-          "find": "          if (err instanceof PreconditionError) throw err;",
-          "replace": "          throw err;",
+          "find": "      if (err instanceof PreconditionError) throw err;",
+          "replace": "      throw err;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -4813,8 +4813,8 @@
           "description": "The safety net swallows a precondition failure, so a run in which no verdict means anything reports one quiet unverifiable claim and exits on the others.",
           "faultClass": "guard-removed",
           "file": "src/probe/probe.mjs",
-          "find": "          if (err instanceof PreconditionError) throw err;",
-          "replace": "          if (false) throw err;",
+          "find": "      if (err instanceof PreconditionError) throw err;",
+          "replace": "      if (false) throw err;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -4904,8 +4904,8 @@
           "description": "Only an assertion failure counts as reached, so every defender that loads the subject is misreported as never executing it and its real verdict is thrown away.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "  const reached = run.outcome !== 'pass';",
-          "replace": "  const reached = run.outcome === 'fail';",
+          "find": "    const reached = run.outcome !== 'pass';",
+          "replace": "    const reached = run.outcome === 'fail';",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -4964,8 +4964,8 @@
           "description": "The control never restores, so the subject is left as unparseable rubbish and every later fault is measured against it.",
           "faultClass": "call-removed",
           "file": "src/probe/probe.mjs",
-          "find": "  } finally {\n    control.restore();\n  }",
-          "replace": "  } finally {\n    void control;\n  }",
+          "find": "    } finally {\n      control.restore();\n    }",
+          "replace": "    } finally {\n      void control;\n    }",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -5024,8 +5024,8 @@
           "description": "An applied fault is never restored, so the probe leaves its own edits in the tree and every later fault is measured against corrupted source.",
           "faultClass": "call-removed",
           "file": "src/probe/probe.mjs",
-          "find": "        } finally {\n          mutation.restore();",
-          "replace": "        } finally {\n          void mutation;",
+          "find": "    } finally {\n      mutation.restore();",
+          "replace": "    } finally {\n      void mutation;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -7572,7 +7572,7 @@
           "description": "Omit the worker-policy reuse admission check.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "    && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand })",
+          "find": "    && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand, faultWorkers })",
           "replace": "    && true",
           "producedBy": {
             "producer": "agent",
@@ -8403,8 +8403,8 @@
           "description": "The scratch worktree is added with the project hooks enabled.",
           "faultClass": "other",
           "file": "src/git.mjs",
-          "find": "git([...NO_HOOKS, 'worktree', 'add', '--detach', dest, ref], repo)",
-          "replace": "git(['worktree', 'add', '--detach', dest, ref], repo)",
+          "find": "spawnSync('git', [...NO_HOOKS, ...args]",
+          "replace": "spawnSync('git', [...args]",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -9467,6 +9467,1462 @@
       ]
     },
     {
+      "id": "TG-TYPECHECK-IS-THE-PROJECTS-OWN-AND-NEVER-SKIPPED",
+      "statement": "--typecheck runs the project's own type checker; it checks the unmodified tree first and refuses the run with a precondition error, never a skipped or optimistic check, when there is no tsconfig, no resolvable typescript, an unreadable configuration, a program with no project file or a tree that is not clean; a checker that dies without a diagnostic or runs out of budget is never clean.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-resolve.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The unmodified tree is not required to be clean, so a fault is judged against a tree that already fails.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "    if (verdict.status !== 'clean') {",
+          "replace": "    if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A project with no tsconfig.json and no command is not refused.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "      if (!existsSync(join(projectDir, 'tsconfig.json'))) {",
+          "replace": "      if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A checker that dies without a diagnostic is read as a clean check.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/typecheck.mjs",
+          "find": "      throw new Error(`type check exited ${ran.code ?? ran.signal} without a diagnostic: ${clip(ran.output.trim().split('\\n').pop(), projectDir)}`);",
+          "replace": "      return { status: 'clean' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A type check that ran out of budget is read as clean.",
+          "faultClass": "return-altered",
+          "file": "src/probe/typecheck.mjs",
+          "find": "      if (ran.timedOut) return { status: 'timeout' };",
+          "replace": "      if (ran.timedOut) return { status: 'clean' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A program with no project file is accepted, so the check judges nothing and says so by saying clean.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "      if (program.size === 0) {",
+          "replace": "      if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-CUSTOM-COMMAND-IS-AN-ARGV",
+      "statement": "A custom --typecheck command is split into an argv and never run through a shell, and two different commands are two different instruments.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-custom.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A custom command is run through a shell.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "{ cwd, stdio: ['ignore', 'pipe', 'pipe'], detached:",
+          "replace": "{ cwd, shell: true, stdio: ['ignore', 'pipe', 'pipe'], detached:",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Two different custom commands hash to the same identity.",
+          "faultClass": "return-altered",
+          "file": "src/probe/typecheck.mjs",
+          "find": "      identity = { kind: 'custom', argv: words };",
+          "replace": "      identity = { kind: 'custom' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-JUDGES-ONLY-WHAT-THE-CHECKER-CHECKS",
+      "statement": "A target the type checker does not read (a .py file, a .js file the project does not check with allowJs and checkJs, a .ts file the tsconfig does not include, any non-TypeScript file under a custom command) is recorded not-applicable and probed as before, never reported clean and never skipped silently.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-applicable.test.mjs",
+        "test/typecheck-probe-scope.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every file is judged, Python included.",
+          "faultClass": "return-altered",
+          "file": "src/probe/typecheck.mjs",
+          "find": "        return judged && (custom || program.has(file.split(sep).join('/')));",
+          "replace": "        return true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-applicable.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "JavaScript is judged when the project only sets one of allowJs and checkJs.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "config.compilerOptions?.allowJs === true && config.compilerOptions?.checkJs === true",
+          "replace": "config.compilerOptions?.allowJs === true || config.compilerOptions?.checkJs === true",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-applicable.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "A TypeScript file outside the program is reported clean although tsc never read it.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "        return judged && (custom || program.has(file.split(sep).join('/')));",
+          "replace": "        return judged;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-applicable.test.mjs"
+          ]
+        },
+        {
+          "id": "F4",
+          "description": "A file the checker does not judge is type checked anyway and reported clean.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "  if (!typechecker.applicable(fault.file)) return { status: 'not-applicable' };\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe-scope.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-STATE-NEVER-LEAKS-BETWEEN-FAULTS",
+      "statement": "One fault's type-check state never reaches the next: the incremental build-info is snapshotted after the baseline check and restored after every fault, and the replacement is restored before any test runs.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-incremental.test.mjs",
+        "test/typecheck-probe.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The build-info is not restored after a fault's check, so the next fault starts from the last fault's state.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/typecheck.mjs",
+          "find": "        } finally {\n          restore();\n        }\n      },",
+          "replace": "        } finally {\n        }\n      },",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-incremental.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "The baseline build-info is never snapshotted, so every restore throws the incremental state away.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/typecheck.mjs",
+          "find": "    if (existsSync(info)) copyFileSync(info, snapshot);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-incremental.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "The replacement stays applied after its type check, so the next fault is judged on top of it.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "    mutation.restore();\n    if (mutation.restoreSkipped) detail.restoreSkipped = mutation.restoreSkipped;\n  }\n}\n\n/**\n * The part of probing a fault",
+          "replace": "    if (mutation.restoreSkipped) detail.restoreSkipped = mutation.restoreSkipped;\n  }\n}\n\n/**\n * The part of probing a fault",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-DECIDES-A-FAULT-BEFORE-ANY-TEST",
+      "statement": "Under --typecheck a replacement that parses but does not type-check is fault-invalid (replacement-does-not-typecheck) with the first diagnostic in detail.message and zero test runs; nocover and an unlocated anchor still come first; a fault that type-checks is probed exactly as before.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-pure.test.mjs",
+        "test/typecheck-probe.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Diagnostics are ignored by classify, so a refused replacement is probed as a real fault.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/classify.mjs",
+          "find": "  if (typecheck?.status === 'diagnostics') return { verdict: 'fault-invalid', reason: 'replacement-does-not-typecheck' };\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-pure.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "A type check that timed out is reported as a survivor.",
+          "faultClass": "return-altered",
+          "file": "src/probe/classify.mjs",
+          "find": "return { verdict: 'timeout', reason: 'typecheck-timed-out' };",
+          "replace": "return { verdict: 'survived' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-pure.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "A refused replacement still spends its baseline and probe runs.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "const refusedByTypecheck = (typecheck) => typecheck?.status === 'diagnostics' || typecheck?.status === 'timeout';",
+          "replace": "const refusedByTypecheck = (typecheck) => false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe.test.mjs"
+          ]
+        },
+        {
+          "id": "F4",
+          "description": "The first diagnostic is not recorded.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "      if (typecheck.message) detail.message = typecheck.message;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-TIMEOUT-AND-FLAG",
+      "statement": "A type check over budget spends no test run, and the probe command passes --typecheck on and exits 2 without evidence when the unmodified tree already fails it.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-probe-preconditions.test.mjs",
+        "test/typecheck-cli.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A type check that timed out still spends the baseline and probe runs.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "const refusedByTypecheck = (typecheck) => typecheck?.status === 'diagnostics' || typecheck?.status === 'timeout';",
+          "replace": "const refusedByTypecheck = (typecheck) => typecheck?.status === 'diagnostics';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe-preconditions.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "The probe command does not pass --typecheck on.",
+          "faultClass": "argument-swapped",
+          "file": "src/commands/probe.mjs",
+          "find": "    typecheck: values.typecheck,\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-cli.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-IS-PART-OF-THE-REUSE-KEY",
+      "statement": "A record measured without the type check is not reusable by a run with it, nor the reverse, nor across another command or checker version.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-pure.test.mjs",
+        "test/typecheck-reuse-key.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Reuse ignores the type check entirely.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "    && previous.run.instrument?.digest === instrument.digest\n    && sameTypecheck(previous.run.typecheck, typecheck);",
+          "replace": "    && previous.run.instrument?.digest === instrument.digest;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-pure.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "A different checker version is the same instrument.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "  return recorded.commandHash === current.commandHash && recorded.version === current.version;",
+          "replace": "  return recorded.commandHash === current.commandHash;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-pure.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "The run's type check is not passed to the reuse decision.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/probe.mjs",
+          "find": "runner: recordedRunner, instrument, typecheck: typechecker?.spec, faultWorkers })",
+          "replace": "runner: recordedRunner, instrument, faultWorkers })",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-reuse-key.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-IS-RECORDED-AND-RECHECKED-ON-REUSE",
+      "statement": "Evidence names the checker that judged it (run.typecheck), and because type validity belongs to the whole program a clean verdict is only carried forward if the fault still type-checks now.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-probe.test.mjs",
+        "test/typecheck-reuse-program.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The evidence does not name the checker that judged it.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/probe.mjs",
+          "find": "      ...(typechecker ? { typecheck: typechecker.spec } : {}),\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "A clean verdict is carried forward without checking that the fault still type-checks.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "  if (reusable && typechecker && defenders.length > 0 && targetExists",
+          "replace": "  if (false && reusable && typechecker && defenders.length > 0 && targetExists",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-reuse-program.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-ANCHOR-CHECK-TYPE-CHECKS-REPLACEMENTS",
+      "statement": "claims --check-anchors --typecheck type checks every replacement that still parses against the working tree in a scratch worktree, reports a refused one as fault-invalid with the first diagnostic, and says not-applicable for a file the checker does not read.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-anchors.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A refused replacement is reported with its diagnostic but stays ok.",
+          "faultClass": "condition-forced",
+          "file": "src/claims/anchors.mjs",
+          "find": "status === 'diagnostics' ? { status: 'fault-invalid' } : status === 'timeout' ? { status: 'timeout' } : {}",
+          "replace": "status === 'timeout' ? { status: 'timeout' } : {}",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The check judges the last commit instead of the working tree.",
+          "faultClass": "argument-swapped",
+          "file": "src/claims/anchors.mjs",
+          "find": "ref: isDirty(root) ? snapshotWorkingTree(root) : 'HEAD'",
+          "replace": "ref: 'HEAD'",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A file the checker does not judge is type checked anyway.",
+          "faultClass": "condition-forced",
+          "file": "src/claims/anchors.mjs",
+          "find": "      if (!checker.applicable(fault.file)) { out.push({ ...result, typecheck: { status: 'not-applicable' } }); continue; }\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-ANCHOR-CHECK-TYPECHECK-FLAG",
+      "statement": "The claims command passes --typecheck on, prints each replacement's first diagnostic, exits 2 for a tree that already fails the check, and refuses the flag without --check-anchors.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-anchors-cli.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The claims command does not pass --typecheck on.",
+          "faultClass": "argument-swapped",
+          "file": "src/commands/claims.mjs",
+          "find": "typecheck: values.typecheck, budgetMs: Number(values.budget)",
+          "replace": "budgetMs: Number(values.budget)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The first diagnostic is not printed.",
+          "faultClass": "statement-deleted",
+          "file": "src/claims/anchors.mjs",
+          "find": "tc.status === 'timeout' ? '; type check timed out' : `; type check: ${tc.message}`",
+          "replace": "tc.status === 'timeout' ? '; type check timed out' : ''",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-EVIDENCE-CONFORMS-TO-THE-SPEC",
+      "statement": "Evidence that records a type check conforms only when it is consistent: detail.typecheck needs run.typecheck, diagnostics mean fault-invalid with its reason, a first diagnostic and no test run, a timeout means a timeout verdict, and the reasons belong to their statuses.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "spec/conformance/schemas.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A type-check result without a declared checker conforms.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (tc !== undefined && !doc.run.typecheck)",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A refused fault that carries test runs conforms.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "(tc === 'diagnostics' || tc === 'timeout') && (baselineRuns.length > 0 || probeRuns.length > 0)",
+          "replace": "(tc === 'diagnostics' || tc === 'timeout') && false",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Diagnostics on a fault that is not fault-invalid conform.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (tc === 'diagnostics' && (r.verdict !== 'fault-invalid' || r.detail.reason !== 'replacement-does-not-typecheck'))",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A type-check timeout with another verdict conforms.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (tc === 'timeout' && (r.verdict !== 'timeout' || r.detail.reason !== 'typecheck-timed-out'))",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "Diagnostics without the first diagnostic conform.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (tc === 'diagnostics' && !r.detail.message)",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-STUB-PROJECT-KEEPS-ITS-CHECKER-HONEST",
+      "statement": "The stub-typescript projects the type-check tests use diagnose a replacement they should refuse, list the program they should read and crash when told to, so those tests exercise a refusal and not an empty check.",
+      "source": {
+        "kind": "manual",
+        "ref": "test/helpers/typecheck-project.mjs"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-probe.test.mjs",
+        "test/typecheck-resolve.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The stub checker stops diagnosing the BAD replacement.",
+          "faultClass": "condition-forced",
+          "file": "test/helpers/typecheck-project.mjs",
+          "find": "else if (source.includes('BAD')) {",
+          "replace": "else if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "The stub lists no project file in its program.",
+          "faultClass": "return-altered",
+          "file": "test/helpers/typecheck-project.mjs",
+          "find": "process.stdout.write([here + 'src/a.ts'].concat(",
+          "replace": "process.stdout.write([].concat(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "The stub never crashes, so a dying checker is never exercised.",
+          "faultClass": "condition-forced",
+          "file": "test/helpers/typecheck-project.mjs",
+          "find": "if (mode === 'crash') {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-resolve.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-PUBLISHES-THE-SERIAL-RECORDS",
+      "statement": "Under --fault-workers, records and onProgress follow claim/fault order whatever order the trees finish in, and a timeout or inconsistent probe measured beside other faults is measured again alone and reported from that serial measurement.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A verdict only contention produced is reported as measured.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "        if (contended && needsSerialRemeasure(record)) remeasure.push({ index, state });",
+          "replace": "        if (false) remeasure.push({ index, state });",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Fan-out records are published in completion order, bypassing the ordered emitter.",
+          "faultClass": "call-removed",
+          "file": "src/probe/probe.mjs",
+          "find": "        else emitter.settle(index, record);",
+          "replace": "        else { records.push(record); onProgress(record); }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-MATCHES-THE-KNOWN-ANSWERS",
+      "statement": "The native known-answer fixture probed with --fault-workers 4 reproduces its oracle verdicts in claim/fault order, and marks exactly its contended timeout and inconsistent probe as re-measured serially.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers-known-answer.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The fan-out believes it is uncontended and never re-measures.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/probe.mjs",
+          "find": "      const contended = slots.length > 1;",
+          "replace": "      const contended = false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A serial re-measure is not recorded on the record it replaced.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "        record.detail.remeasuredSerially = true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-RE-MEASURES-ONLY-WHAT-CONTENTION-MADE",
+      "statement": "Only a freshly measured timeout or flaky-defender/inconsistent-probe is re-measured serially; a red baseline (measured alone before the fan-out) and a reused record are not.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A contended timeout is reported without a serial re-measure.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  if (record.verdict === 'timeout') return true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Every flaky-defender, including a red baseline, is re-measured.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  return record.verdict === 'flaky-defender' && record.detail?.reason === 'inconsistent-probe';",
+          "replace": "  return record.verdict === 'flaky-defender';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-IS-DETERMINISTIC",
+      "statement": "The fan-out publishes results strictly in index order, dispatches nothing after a failure while letting in-flight faults finish, and rethrows the lowest-index failure, never the first to arrive.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Results are emitted before their predecessors settle.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/fan-out.mjs",
+          "find": "      while (cursor < count && settled[cursor]) emit(values[cursor], cursor++);",
+          "replace": "      while (cursor < count) emit(values[cursor], cursor++);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The first failure to arrive is thrown instead of the lowest index.",
+          "faultClass": "return-altered",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  if (failures.length) throw failures.sort((a, b) => a.index - b.index)[0].error;",
+          "replace": "  if (failures.length) throw failures[0].error;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "New faults are dispatched after a failure.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/fan-out.mjs",
+          "find": "    while (failures.length === 0 && next < items.length) {",
+          "replace": "    while (next < items.length) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-CHARGES-OVERLAPPING-RUNNER-TIME-ONCE",
+      "statement": "Runner time is wall-clock time with at least one runner executing: the sum of serial invocations, the union of overlapping ones, so elapsedMs = runnerMs + overheadMs holds with no negative overhead.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every start resets the interval, losing the earlier overlapping run.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/fan-out.mjs",
+          "find": "      if (active++ === 0) since = now();",
+          "replace": "      active++; since = now();",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Every stop charges the whole interval, double-counting overlap.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/fan-out.mjs",
+          "find": "      if (--active === 0) total += now() - since;",
+          "replace": "      --active; total += now() - since;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAULT-WORKERS-BIND-REUSE",
+      "statement": "A measurement taken under a fault fan-out never stands in for a serial one, nor for a different fan-out; a serial measurement may stand in for any.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Reuse ignores the fault fan-out entirely.",
+          "faultClass": "return-altered",
+          "file": "src/probe/probe.mjs",
+          "find": "  return previous === current || previous === 1;",
+          "replace": "  return true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The worker policy no longer consults the fan-out.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "  if (!sameFaultWorkers(previousRun?.faultWorkers, faultWorkers)) return false;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-NEEDS-SCRATCH-TREES",
+      "statement": "A fault fan-out is refused in place, at the API and the CLI, and evidence that records one in place, or a serial re-measure without one, does not conform.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "probe accepts a fan-out in the user tree.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "  if (mode === 'in-place' && faultWorkers > 1) throw new PreconditionError('--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place');\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The CLI passes an in-place fan-out through.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/probe.mjs",
+          "find": "  if (faultWorkers > 1 && values['in-place']) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The validator admits an in-place fan-out.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "    if (doc.run.faultWorkers > 1 && doc.run.mode === 'in-place') errors.push(",
+          "replace": "    if (false) errors.push(",
+          "defendedBy": [
+            "spec/conformance/fault-workers.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The validator admits a serial re-measure with no fan-out.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (r.detail.remeasuredSerially && !(doc.run.faultWorkers > 1)) {",
+          "replace": "      if (false) {",
+          "defendedBy": [
+            "spec/conformance/fault-workers.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-WORKTREE-ALLOCATION-IS-LOCKED",
+      "statement": "Scratch-worktree allocation and removal hold one lock in the git common directory; a live owner is waited on (then refused, never bypassed) and only a provably dead owner on this host is broken.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/worktree-lock.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The lock file is opened without exclusive create, so two processes both hold it.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/worktree-lock.mjs",
+          "find": "      fd = openSync(path, 'wx');",
+          "replace": "      fd = openSync(path, 'w');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Every lock is treated as stale and broken.",
+          "faultClass": "return-altered",
+          "file": "src/probe/worktree-lock.mjs",
+          "find": "  return !alive(owner.pid);",
+          "replace": "  return true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "createScratch adds its worktree without the lock.",
+          "faultClass": "call-removed",
+          "file": "src/probe/worktree.mjs",
+          "find": "  withWorktreeLock(lockDir, () => addWorktree(repoRoot, dest, sha));",
+          "replace": "  addWorktree(repoRoot, dest, sha);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SCRATCH-GIT-IGNORES-THE-CALLERS-GIT-ENVIRONMENT",
+      "statement": "Every git call that creates, removes or prunes a scratch tree runs with inherited GIT_* variables stripped, terminal prompts disabled, and hooks and fsmonitor off.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/worktree-lock.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Inherited GIT_* variables reach the scratch git call.",
+          "faultClass": "guard-removed",
+          "file": "src/git.mjs",
+          "find": "  const clean = Object.fromEntries(Object.entries(env).filter(([key]) => !/^GIT_/i.test(key)));",
+          "replace": "  const clean = { ...env };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "fsmonitor is left on for scratch trees.",
+          "faultClass": "element-removed",
+          "file": "src/git.mjs",
+          "find": "export const NO_HOOKS = Object.freeze(['-c', `core.hooksPath=${devNull}`, '-c', 'core.fsmonitor=false']);",
+          "replace": "export const NO_HOOKS = Object.freeze(['-c', `core.hooksPath=${devNull}`]);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Terminal prompts and git optional locks stay enabled.",
+          "faultClass": "field-dropped",
+          "file": "src/git.mjs",
+          "find": "  return { ...clean, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' };",
+          "replace": "  return clean;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-LEAVES-NO-SCRATCH-TREE",
+      "statement": "Every scratch tree a fan-out creates is removed when the probe returns, and an interrupted probe (SIGINT, exit 130) removes them too.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers-lifecycle.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The fan-out trees are not removed when the probe returns.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "    for (const scratch of extraTrees.reverse()) scratch.cleanup();\n",
+          "replace": "",
+          "defendedBy": [
+            "test/probe-fault-workers-budget.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A scratch tree is not registered for removal on cancellation.",
+          "faultClass": "call-removed",
+          "file": "src/probe/worktree.mjs",
+          "find": "  const unregister = registerCleanup(remove);",
+          "replace": "  const unregister = registerCleanup(() => {});",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAULT-WORKERS-REACH-THE-CLI",
+      "statement": "probe --fault-workers <n> is parsed, validated and passed to the probe, and the run records it.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers-lifecycle.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The CLI does not accept the option.",
+          "faultClass": "element-removed",
+          "file": "src/cli.mjs",
+          "find": "        'fault-workers': { type: 'string' },\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The CLI drops the requested fan-out.",
+          "faultClass": "literal-changed",
+          "file": "src/commands/probe.mjs",
+          "find": "    faultWorkers,\n    commandBudget,",
+          "replace": "    faultWorkers: 1,\n    commandBudget,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A malformed count is accepted.",
+          "faultClass": "return-altered",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : null;",
+          "replace": "  return parsed;",
+          "defendedBy": [
+            "test/fan-out.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-NAMES-ITS-OWN-LOAD",
+      "statement": "Contention advice names --fault-workers when the probe fans out, and the probe warns when its own fan-out alone oversubscribes the available CPUs.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An oversubscribing fan-out is never warned about.",
+          "faultClass": "return-altered",
+          "file": "src/probe/contention.mjs",
+          "find": "  if (!(cpus >= 1) || load <= cpus) return undefined;",
+          "replace": "  return undefined;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Contention advice ignores the fan-out.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/contention.mjs",
+          "find": "  const fanOut = faultWorkers > 1",
+          "replace": "  const fanOut = false",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-PROJECT-REALLY-CONTENDS",
+      "statement": "The fan-out acceptance project keeps its oracle observable: its SLOW defender times out only while another faulted suite is running, so the serial re-measure path is exercised rather than assumed.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The SLOW defender never hangs, so contention is never produced.",
+          "faultClass": "condition-forced",
+          "file": "test/helpers/fan-out-project.mjs",
+          "find": "      if (readdirSync(markers).length > 0) { writeFileSync('.slow-hung', ''); await new Promise((resolve) => setTimeout(resolve, 60_000)); }",
+          "replace": "      if (false) { writeFileSync('.slow-hung', ''); await new Promise((resolve) => setTimeout(resolve, 60_000)); }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Faulted suites leave no marker, so the SLOW defender cannot see them.",
+          "faultClass": "statement-deleted",
+          "file": "test/helpers/fan-out-project.mjs",
+          "find": "  writeFileSync(mine, '');\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-REMEASURES-IN-A-FRESH-TREE",
+      "statement": "A serial re-measure runs in a fresh scratch tree, never in a tree a contended run may have left state in, and the fan-out releases its own trees first so no more than n exist at once.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The re-measure inherits the first tree and its stale state.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/probe.mjs",
+          "find": "          record = await measureOne(state, treeContext(fresh));",
+          "replace": "          record = await measureOne(state, primary);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The fan-out trees are kept through the re-measure.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "      while (extraTrees.length) extraTrees.pop().cleanup();\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-TYPECHECKS-WHILE-PLANNING",
+      "statement": "Under --typecheck a fan-out reports the serial records: every fault is type-checked while it is planned, one at a time on the first tree, before any tree is handed a fault, so no incremental build-info is shared between trees.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers-typecheck.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Faults are planned without the type checker.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/probe.mjs",
+          "find": "        const planned = await planFault({ ...common, typechecker, typecheckBudget:",
+          "replace": "        const planned = await planFault({ ...common, typechecker: undefined, typecheckBudget:",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The verdict ignores the type check that refused the fault.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/probe.mjs",
+          "find": "confirmRuns, subjectReached, typecheck });",
+          "replace": "confirmRuns, subjectReached });",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-SCRATCH-DIR-IS-CHECKED-BEFORE-ANY-WRITE",
       "statement": "A scratch directory that does not exist, is not a directory or cannot be written is a precondition error that names the cause and writes nothing, and the --scratch-dir flag wins over TESTGUARD_SCRATCH_DIR.",
       "source": {
@@ -9597,6 +11053,21 @@
           "file": "src/probe/worktree.mjs",
           "find": "scratchBase = scratchRoot(), nodeModules }",
           "replace": "scratchBase = process.env.TMPDIR ?? '/tmp', nodeModules }",
+          "defendedBy": [
+            "test/scratch-dir.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The worktree allocation lock goes to the OS temp directory.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/worktree-lock.mjs",
+          "find": "worktreeLockDir(gitCommonDir, base = scratchRoot())",
+          "replace": "worktreeLockDir(gitCommonDir, base = tmpdir())",
           "defendedBy": [
             "test/scratch-dir.test.mjs"
           ],

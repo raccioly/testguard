@@ -96,6 +96,11 @@
           "description": "True when the defenders were run one test file at a time. Recorded because a serial run is slower and its durations are not comparable with a parallel one.",
           "type": "boolean"
         },
+        "faultWorkers": {
+          "description": "How many faults were probed at once, each in its own scratch worktree (`probe --fault-workers`). Absent means one: the faults were probed one at a time, which is the only value a serial run records. Baselines are measured once per defender set before the fan-out, one at a time; a `timeout` or `inconsistent-probe` measured under the fan-out is re-measured serially before it is reported (`detail.remeasuredSerially`). A fan-out measurement never stands in for a serial one in verdict reuse; a serial measurement may stand in for a fan-out.",
+          "type": "integer",
+          "minimum": 2
+        },
         "contention": {
           "description": "Other test runners that were already running when this probe started. Best effort, never a verdict: it exists so a reader of a TIMEOUT or FLAKY-DEFENDER can tell the machine was loaded.",
           "type": "object",
@@ -183,6 +188,16 @@
           "properties": {
             "toolVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
             "digest": { "$ref": "urn:claimspec:v1:common#/$defs/sha256" }
+          },
+          "additionalProperties": false
+        },
+        "typecheck": {
+          "description": "The type check that judged every fault before any test ran (`probe --typecheck`): a hash of the command's identity (the flags of the project's own `tsc`, or the argv of a custom command) and the checker's version. Absent when the run did not type check. It is an input to reuse: a record measured without it is not reusable by a run with it, and the reverse.",
+          "type": "object",
+          "required": ["commandHash", "version"],
+          "properties": {
+            "commandHash": { "$ref": "urn:claimspec:v1:common#/$defs/sha256" },
+            "version": { "type": "string", "minLength": 1, "maxLength": 64 }
           },
           "additionalProperties": false
         },
@@ -447,9 +462,13 @@
           "required": [],
           "properties": {
             "reason": {
-              "description": "Machine-readable qualifier, e.g. `anchor-missing`, `anchor-ambiguous`, `defenders-not-green`, `replacement-does-not-compile`.",
+              "description": "Machine-readable qualifier, e.g. `anchor-missing`, `anchor-ambiguous`, `defenders-not-green`, `replacement-does-not-compile`, `replacement-does-not-typecheck`, `typecheck-timed-out`.",
               "type": "string",
               "maxLength": 256
+            },
+            "typecheck": {
+              "description": "How the type check judged this fault (present only when the run declares `run.typecheck`): `clean` (the replacement still type-checks), `diagnostics` (it does not: `fault-invalid`, `message` is the first diagnostic, no test ran), `timeout` (the check exceeded its budget: `timeout`), `not-applicable` (the checker does not judge this file, e.g. a `.py` file or a `.js` file the project does not check).",
+              "enum": ["clean", "diagnostics", "timeout", "not-applicable"]
             },
             "baselineRuns": {
               "description": "Defenders run on unmodified source, N times. Anything short of N/N pass is `flaky-defender`.",
@@ -559,6 +578,10 @@
               "description": "Human-readable detail for a reason that carries one \u2014 today `probe-error`, whose first line names what threw. Never parsed; a reader should not have to reproduce the run to learn what happened.",
               "type": "string",
               "maxLength": 1024
+            },
+            "remeasuredSerially": {
+              "description": "This record was first measured under a fault fan-out (`run.faultWorkers` above one) and came out `timeout` or `flaky-defender`/`inconsistent-probe` — verdicts a loaded machine can manufacture, since per-run budgets do not scale with the fan-out. It was therefore measured again, with no other fault in flight, and that serial measurement is what this record reports, whatever its verdict.",
+              "const": true
             },
             "restoreSkipped": {
               "description": "The fault was applied but the restore found nothing to put back: the target file no longer existed. In worktree mode that is a disturbed run rather than a failed one \u2014 the mutation only ever existed inside a scratch worktree, and something outside the process deleted it \u2014 but the verdicts in that run were measured against a tree that was being removed underneath them, and a reader has to be able to see that. In `--in-place` mode it never appears: there a missing target is the user's own file gone, and the restore throws.",

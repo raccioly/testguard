@@ -12,6 +12,7 @@ import { childScope, resolveScratchDir, scratchConfigured, scratchRoot, withScra
 import { linkNodeModules, nearestNodeModulesWritable, writable } from '../src/probe/node-modules-link.mjs';
 import { createScratch, PreconditionError, writeBoundary } from '../src/probe/worktree.mjs';
 import { snapshotWorkingTree } from '../src/git.mjs';
+import { worktreeLockDir } from '../src/probe/worktree-lock.mjs';
 import { parseCommandTemplate, resetRunnerCache, runProcess } from '../src/probe/runners/shared.mjs';
 import { configLoaderArgs } from '../src/probe/runners/vitest.mjs';
 import { FIXTURE_GIT } from './helpers/git.mjs';
@@ -92,6 +93,13 @@ describe('what lives under the scratch directory', () => {
       chmodSync(base, 0o555);
       expect(() => withScratchBase(base, () => snapshotWorkingTree(repoDir))).toThrow();
     }
+  });
+
+  it('the worktree allocation lock lives under it, not in the OS temp directory', () => {
+    const base = dir();
+    const lockDir = withScratchBase(base, () => worktreeLockDir('/some/repo/.git'));
+    expect(lockDir.startsWith(join(base, 'testguard-locks'))).toBe(true);
+    expect(existsSync(lockDir)).toBe(true);
   });
 
   it('the runner report file and the child\'s temp directory live under it, and the temp directory is gone after the run', async () => {

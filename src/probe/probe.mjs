@@ -8,7 +8,8 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { repoRoot as gitRoot, headSha, isDirty, snapshotWorkingTree } from '../git.mjs';
 import { discoverDefendersDetailed } from './discover.mjs';
 import { classifyDefenders } from './mocks.mjs';
-import { detectContention, contentionWarning } from './contention.mjs';
+import { detectContention, contentionWarning, fanOutWarning } from './contention.mjs';
+import { availableParallelism } from 'node:os';
 import { withScratchBase } from '../scratch-dir.mjs';
 import { createScratch, inPlace, PreconditionError, writeBoundary } from './worktree.mjs';
 import { applyContent, applyFault, locate } from './inject.mjs';
@@ -25,6 +26,8 @@ import { recordedOriginSummary } from '../../spec/lib/origins.mjs';
 import { persistenceSignalsFor } from '../supply/persistence.mjs';
 import { collectOwnedManifests, hashNativeTestUniverse, hashCustomCommandUniverse } from './universe.mjs';
 import { createDependencyHasher, instrumentOf } from './dependencies.mjs';
+import { createTypechecker, sameTypecheck } from './typecheck.mjs';
+import { createBusyClock, needsSerialRemeasure, orderedEmitter, parseFaultWorkers, runPool, singleFlight } from './fan-out.mjs';
 
 
 /** Is `child` the same file as `root`, or under it? Both must already be real paths. */
@@ -59,8 +62,20 @@ export function selectClaims(claims, only) {
   return only.map((id) => byId.get(id));
 }
 
+/**
+ * May a measurement taken with `previous` fault workers stand in for one with
+ * `current`? A serial measurement (one fault at a time, nothing contending)
+ * may stand in for any fan-out; a fan-out never stands in for a serial run,
+ * nor for a different fan-out, because its contention was different (#237).
+ * Evidence written before the field existed was serial.
+ */
+export function sameFaultWorkers(previous = 1, current = 1) {
+  return previous === current || previous === 1;
+}
+
 /** Reuse cannot stand in for a measurement under a different worker policy. */
-export function sameWorkerPolicy(previousRun, { workers = 1, serial = workers === 1, runnerCommand } = {}) {
+export function sameWorkerPolicy(previousRun, { workers = 1, serial = workers === 1, runnerCommand, faultWorkers = 1 } = {}) {
+  if (!sameFaultWorkers(previousRun?.faultWorkers, faultWorkers)) return false;
   if (runnerCommand) return previousRun?.workers === undefined && !previousRun?.serial;
   return previousRun?.workers === (serial ? 1 : workers) && Boolean(previousRun?.serial) === serial;
 }
@@ -91,16 +106,19 @@ export function sameRunner(previousRun, current) {
  * same N, the same worker policy, the same runner — and the same instrument:
  * the TestGuard version that decided the verdicts and the resolver/runner
  * configuration digest. Evidence from another version is readable, never
- * reusable: a newer tool may decide verdicts by different rules.
+ * reusable: a newer tool may decide verdicts by different rules. The type
+ * check is part of the instrument: a verdict measured without it cannot vouch
+ * for a run that has it (a fault it would have refused), nor the reverse.
  */
-export function reusableRun(previous, { confirmRuns, workers, serial, runnerCommand, runner, instrument }) {
+export function reusableRun(previous, { confirmRuns, workers, serial, runnerCommand, runner, instrument, typecheck, faultWorkers = 1 }) {
   return Boolean(previous)
     && previous.run.confirmRuns === confirmRuns
-    && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand })
+    && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand, faultWorkers })
     && sameRunner(previous.run, runner)
     && previous.tool?.version === instrument.toolVersion
     && previous.run.instrument?.toolVersion === instrument.toolVersion
-    && previous.run.instrument?.digest === instrument.digest;
+    && previous.run.instrument?.digest === instrument.digest
+    && sameTypecheck(previous.run.typecheck, typecheck);
 }
 
 /**
@@ -128,6 +146,7 @@ async function probeIn({
   ignoreDirty = false,
   workers = 1,
   serial = workers === 1,
+  faultWorkers = 1,
   onWarn = () => {},
   budgetMs = 120_000,
   commandBudget,
@@ -143,18 +162,26 @@ async function probeIn({
   toolVersion = '0.0.0',
   previous,
   onProgress = () => {},
+  typecheck,
 }) {
   if (!Number.isSafeInteger(workers) || workers < 1) throw new PreconditionError('workers must be a positive safe integer');
+  if (parseFaultWorkers(faultWorkers) !== faultWorkers) throw new PreconditionError('fault workers must be a positive safe integer');
+  // One mutable tree cannot hold two faults at once; the fan-out needs one
+  // scratch worktree per fault in flight.
+  if (mode === 'in-place' && faultWorkers > 1) throw new PreconditionError('--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place');
   resetInterpreterCache(); // Cache only within this measurement, never across commands.
   const measuredStart = performance.now();
   const startedAt = new Date().toISOString();
   const measurements = { elapsedMs: 0, runnerMs: 0, overheadMs: 0, runnerInvocations: 0, reuseBaselineRuns: 0 };
+  // Runner time is wall-clock time with at least one runner executing: the
+  // sum of the invocations when serial, their union under a fan-out.
+  const runnerClock = createBusyClock(() => performance.now());
   const timedRun = async (runner, opts) => {
     assertNotCancelled();
-    const start = performance.now();
+    runnerClock.start();
     measurements.runnerInvocations++;
     try { return await runner.run(opts); }
-    finally { measurements.runnerMs += performance.now() - start; }
+    finally { runnerClock.stop(); }
   };
   commandBudget?.assertOpen();
   // realpath: git reports the repository root by its real path (/private/var
@@ -258,16 +285,20 @@ async function probeIn({
   // Contention: name it before the first run, and record it, so a later
   // reader of a TIMEOUT or FLAKY-DEFENDER knows the machine was loaded.
   const contention = detectContention();
-  if (contention.detected) onWarn(contentionWarning(contention, { serial, workers, custom: Boolean(runnerCommand) }));
+  if (contention.detected) onWarn(contentionWarning(contention, { serial, workers, custom: Boolean(runnerCommand), faultWorkers }));
+  const selfLoad = fanOutWarning({ faultWorkers, workers, serial: serial || Boolean(runnerCommand), cpus: availableParallelism() });
+  if (selfLoad) onWarn(selfLoad);
 
   const iso = mode === 'worktree' ? createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules }) : inPlace({ repoRoot: root, projectDir });
   const isoReal = realpathSync(iso.projectDir);
+  const extraTrees = []; // the fan-out's scratch trees beyond the first
   const records = [];
   let runnerVersion;
   let runnerSource;
   let recordedRunner;
   let primaryManifest;
   let instrument;
+  let typechecker;
   let runner = RUNNERS[runnerName === 'auto' ? 'vitest' : runnerName];
   // A runner with more than one engine (Python: pytest or unittest) is recorded
   // by the engine that actually ran, never by the module's name. TestGuard does
@@ -308,10 +339,15 @@ async function probeIn({
         }));
       } catch (error) { throw new PreconditionError(`test discovery failed: ${error.message}`); }
     }
+    // Single-flight: two trees reaching a not-yet-checked owning runner at the
+    // same moment share one check.
+    const ownedChecking = new Map();
     const ensureOwned = async (r, file) => {
       if (!ownedChecked.has(r)) {
-        ownedChecked.set(r, await r.check({ projectDir: iso.projectDir, sourceDir: projectDir, python, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, budgetFor: () => commandBudget?.runBudget(budgetMs) ?? budgetMs }));
-        commandBudget?.assertOpen();
+        await singleFlight(ownedChecking, r, async () => {
+          ownedChecked.set(r, await r.check({ projectDir: iso.projectDir, sourceDir: projectDir, python, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, budgetFor: () => commandBudget?.runBudget(budgetMs) ?? budgetMs }));
+          commandBudget?.assertOpen();
+        });
       }
       const c = ownedChecked.get(r);
       if (!c.ok) throw new PreconditionError(`${file} is a ${r.name} test (${r.name === 'python' ? 'it is a .py file' : `it lives under ${r.name}'s testDir`}) but ${r.name} is not resolvable for the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${c.message}).`);
@@ -348,12 +384,19 @@ async function probeIn({
     const dependencyHasher = createDependencyHasher(iso.projectDir, { cache: iso.mode === 'worktree' });
     // The negative control is charged per (target file, defender set): two
     // claims over the same file with the same defenders ask the same question.
+    // Promises, so two trees asking at once share one run.
     const controlCache = new Map();
-    // The runner that will LOAD the subject, which is not always the project
-    // runner — a `.py` source file is Python's whatever the project runs.
-    const fatalEditFor = (file) => runnerFor(iso.projectDir, file, runner).fatalEdit?.();
     instrument = instrumentOf(iso.projectDir, toolVersion);
-    const prior = reusableRun(previous, { confirmRuns, workers, serial, runnerCommand, runner: recordedRunner, instrument })
+    // The type check's baseline comes before any fault: a tree that already
+    // fails it cannot be used to judge a fault. Throws a precondition error.
+    // Every fault's type check then runs while it is planned, on this first
+    // tree and one at a time, so its incremental build-info is never shared
+    // between trees and a fan-out type-checks exactly as a serial run does.
+    if (typecheck !== undefined) {
+      typechecker = await createTypechecker({ projectDir: iso.projectDir, command: typecheck, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, scratchBase });
+      commandBudget?.assertOpen();
+    }
+    const prior = reusableRun(previous, { confirmRuns, workers, serial, runnerCommand, runner: recordedRunner, instrument, typecheck: typechecker?.spec, faultWorkers })
       ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
       : new Map();
     const partitionConfigured = (files) => {
@@ -370,9 +413,9 @@ async function probeIn({
     };
     // `targets` are the fault's files, passed so a runner that can tell which
     // file the interpreter actually loaded (Python) reports it back.
-    const runDefenders = async (files, targets = []) => {
+    const runDefenders = async (files, targets = [], treeDir = iso.projectDir) => {
       if (commandTemplate) {
-        const result = await timedRun(runner, { projectDir: iso.projectDir, sourceDir: projectDir, python, files, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, commandTemplate, serial, workers, targets });
+        const result = await timedRun(runner, { projectDir: treeDir, sourceDir: projectDir, python, files, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, commandTemplate, serial, workers, targets });
         commandBudget?.assertOpen();
         return result;
       }
@@ -381,11 +424,39 @@ async function probeIn({
       for (const [r, group] of groups) {
         commandBudget?.assertOpen();
         if (r !== runner) await ensureOwned(r, group[0]);
-        parts.push(await timedRun(r, { projectDir: iso.projectDir, sourceDir: projectDir, python, files: group, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, serial, workers, targets }));
+        parts.push(await timedRun(r, { projectDir: treeDir, sourceDir: projectDir, python, files: group, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, serial, workers, targets }));
         commandBudget?.assertOpen();
       }
       return mergeRuns(parts);
     };
+    /**
+     * Everything that differs between scratch trees: where the defenders run,
+     * which file the interpreter must have loaded, and how a runner-reported
+     * path maps back to the repository. One per tree; a fault only ever uses
+     * the tree it was handed.
+     */
+    const treeContext = (scratch) => {
+      const real = scratch === iso ? isoReal : realpathSync(scratch.projectDir);
+      return {
+        iso: scratch,
+        isoReal: real,
+        runDefenders: (files, targets = []) => runDefenders(files, targets, scratch.projectDir),
+        // The runner that will LOAD the subject, which is not always the project
+        // runner — a `.py` source file is Python's whatever the project runs.
+        fatalEditFor: (file) => runnerFor(scratch.projectDir, file, runner).fatalEdit?.(),
+        // A path from the runner is absolute inside the SCRATCH worktree, or
+        // project-relative. Either way history is read from the real repository,
+        // so both must land on a repo-root-relative path. The runner reports
+        // realpaths (/private/var on macOS) while the worktree path may not be
+        // one — realpath both sides or every comparison silently misses.
+        toRepoPath: (p) => relative(root, join(projectDir, isAbsolute(p) ? relative(real, realpathSync(p)) : p)),
+      };
+    };
+    const primary = treeContext(iso);
+    // Baselines are measured one at a time in the first tree before any fan-out
+    // and then frozen: a worker that found one missing would be a planning bug,
+    // and running it beside other suites would be a contended baseline.
+    let baselinesFrozen = false;
     /**
      * The defenders' runs on unmodified source, shared by every fault with the
      * same defender set and topped up on demand: reuse asks for one run, a
@@ -400,6 +471,9 @@ async function probeIn({
       if (!baselineCache.has(key)) baselineCache.set(key, { runs: [], loadMessage: undefined, flakeFinished: false });
       const entry = baselineCache.get(key);
       const stopped = () => entry.runs.length > 0 && entry.runs[entry.runs.length - 1].outcome !== 'pass';
+      const needed = (entry.runs.length < want && !stopped())
+        || (want === confirmRuns && !entry.flakeFinished && entry.runs.length < confirmRuns && entry.runs[entry.runs.length - 1].outcome === 'fail');
+      if (baselinesFrozen && needed) throw new Error('internal: a baseline was requested after the fan-out started');
       while (entry.runs.length < want && !stopped()) {
         stage(reuse ? 'reuse-baseline' : 'baseline', entry.runs.length + 1, want);
         const res = await runDefenders(defenders);
@@ -423,58 +497,142 @@ async function probeIn({
       return Object.fromEntries([...groups].map(([r, group]) => [labelOf(r), group]));
     };
 
-    for (const claim of scopedClaims) {
-      commandBudget?.assertOpen();
-      for (const fault of claim.faults) {
-        commandBudget?.assertOpen();
-        const { requested } = defenderSelection(claim, fault);
-        const declared = requested.length ? resolveDefenders(iso.projectDir, requested) : null;
-        if (declared && !commandTemplate) {
-          const excluded = declared.filter((file) => !ownerByFile.has(file));
-          for (const file of excluded) {
-            const expectedOwner = owned.find((candidate) => candidate.owns?.(iso.projectDir, file));
-            const check = expectedOwner && ownedChecked.get(expectedOwner);
-            if (expectedOwner && check && !check.ok) {
-              throw new PreconditionError(`${file} is a ${expectedOwner.name} test (${expectedOwner.name === 'python' ? 'it is a .py file' : `it lives under ${expectedOwner.name}'s testDir`}) but ${expectedOwner.name} is not resolvable for the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${check.message}).`);
-            }
+    const faults = scopedClaims.flatMap((claim) => claim.faults.map((fault, i) => ({ claim, fault, firstOfClaim: i === 0 })));
+    // Records reach the caller in claim/fault order whatever order the trees
+    // finish in, so `onProgress` and the evidence are deterministic.
+    const emitter = orderedEmitter(faults.length, (record) => {
+      records.push(record);
+      onProgress(record);
+    });
+    /**
+     * A fault that threw. A precondition failure is a statement about the
+     * whole run — the interpreter is loading a different copy of the source,
+     * the runner is not resolvable — and continuing would produce verdicts
+     * that are all false. Everything else is this one fault's problem.
+     */
+    const failed = (common, err, tree, discoveryHashes) => {
+      if (err instanceof PreconditionError) throw err;
+      const error = err;
+      const record = errorRecord({ ...common, error, inputs: safeInputs(tree.iso.projectDir, common.fault, common.defenders, { testUniverseHash, discoveryHashes }) });
+      onWarn(`${common.claim.id}/${common.fault.id}: ${record.detail.message} — reported as unverifiable so the rest of the run still produces evidence.`);
+      return record;
+    };
+    /**
+     * Everything about a fault that is decided on unmodified source, in the
+     * first tree: its defenders, every input hash, the anchor, verdict reuse
+     * and the shared baseline. Returns a finished record, or the state the
+     * measurement needs. A fault that never mutates (no defenders, a bad
+     * anchor, a baseline that is not green N/N) finishes here.
+     */
+    const planOne = async ({ claim, fault }) => {
+      const { requested } = defenderSelection(claim, fault);
+      const declared = requested.length ? resolveDefenders(iso.projectDir, requested) : null;
+      if (declared && !commandTemplate) {
+        const excluded = declared.filter((file) => !ownerByFile.has(file));
+        for (const file of excluded) {
+          const expectedOwner = owned.find((candidate) => candidate.owns?.(iso.projectDir, file));
+          const check = expectedOwner && ownedChecked.get(expectedOwner);
+          if (expectedOwner && check && !check.ok) {
+            throw new PreconditionError(`${file} is a ${expectedOwner.name} test (${expectedOwner.name === 'python' ? 'it is a .py file' : `it lives under ${expectedOwner.name}'s testDir`}) but ${expectedOwner.name} is not resolvable for the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${check.message}).`);
           }
-          if (excluded.length) throw new PreconditionError(`${claim.id}/${fault.id}: defendedBy resolves to ${excluded.join(', ')}, but the configured runners do not collect ${excluded.length === 1 ? 'that file' : 'those files'}`);
         }
-        // Mock-awareness: a discovered file that mocks the target is not a
-        // defender; a declared one that mocks it stays (the author named it)
-        // but is listed, because a declared defender that mocks the subject
-        // is a broken evidence chain the author should see.
-        const mockInfo = declared ? classifyDefenders(iso.projectDir, fault.file, declared) : discoverDefendersDetailed(iso.projectDir, fault.file, allTests);
-        const defenders = declared ?? mockInfo.canDetect;
-        const discoveryHashes = declared ? {} : hashDiscoveryDependencies(iso.projectDir, mockInfo.dependencies, iso.mode === 'worktree' ? discoveryHashCache : new Map());
-        const stage = (name, i, n) => onStage({ claimId: claim.id, faultId: fault.id, stage: name, i, n });
-        const common = { claim, fault, defenders, discovered: declared === null, byRunner: byRunner(defenders), mocking: mockInfo.mocking, signals: mockInfo.signals };
+        if (excluded.length) throw new PreconditionError(`${claim.id}/${fault.id}: defendedBy resolves to ${excluded.join(', ')}, but the configured runners do not collect ${excluded.length === 1 ? 'that file' : 'those files'}`);
+      }
+      // Mock-awareness: a discovered file that mocks the target is not a
+      // defender; a declared one that mocks it stays (the author named it)
+      // but is listed, because a declared defender that mocks the subject
+      // is a broken evidence chain the author should see.
+      const mockInfo = declared ? classifyDefenders(iso.projectDir, fault.file, declared) : discoverDefendersDetailed(iso.projectDir, fault.file, allTests);
+      const defenders = declared ?? mockInfo.canDetect;
+      const discoveryHashes = declared ? {} : hashDiscoveryDependencies(iso.projectDir, mockInfo.dependencies, iso.mode === 'worktree' ? discoveryHashCache : new Map());
+      const stage = (name, i, n) => onStage({ claimId: claim.id, faultId: fault.id, stage: name, i, n });
+      const common = { claim, fault, defenders, discovered: declared === null, byRunner: byRunner(defenders), mocking: mockInfo.mocking, signals: mockInfo.signals };
+      try {
+        if (!declared && mockInfo.indeterminate.length > 0) {
+          return { record: discoveryIndeterminateRecord({ ...common, inputs: safeInputs(iso.projectDir, fault, defenders, { testUniverseHash, discoveryHashes }), indeterminate: mockInfo.indeterminate }) };
+        }
+        const planned = await planFault({ ...common, typechecker, typecheckBudget: () => commandBudget?.runBudget(budgetMs) ?? budgetMs, allTests, iso, onWarn, confirmRuns, escalate, controlCache, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, testUniverseHash, discoveryHashes, ensureBaseline, dependencyHasher,
+          historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root });
+        if (planned.record) return planned;
+        return { state: { ...planned.state, common } };
+      } catch (err) {
+        return { record: failed(common, err, primary, discoveryHashes) };
+      }
+    };
+    /** Apply, probe, control, escalate and restore one fault in `tree`. */
+    const measureOne = async (state, tree) => {
+      try {
+        return await measureFault(state, tree);
+      } catch (err) {
+        return failed(state.common, err, tree, state.discoveryHashes);
+      }
+    };
+
+    if (faultWorkers === 1) {
+      // Exactly the serial loop: plan and measure each fault before the next.
+      for (const [index, item] of faults.entries()) {
+        if (item.firstOfClaim) commandBudget?.assertOpen();
+        commandBudget?.assertOpen();
+        const planned = await planOne(item);
+        emitter.settle(index, planned.record ?? await measureOne(planned.state, primary));
+      }
+    } else {
+      // Plan every fault first, in order, on the clean first tree: input
+      // hashes and anchors are read before any fault is applied anywhere, and
+      // each defender set's baseline is measured once, alone, in exactly the
+      // order a serial run would ask for it.
+      const pending = [];
+      for (const [index, item] of faults.entries()) {
+        if (item.firstOfClaim) commandBudget?.assertOpen();
+        commandBudget?.assertOpen();
+        const planned = await planOne(item);
+        if (planned.record) emitter.settle(index, planned.record);
+        else if (!planned.state.mutate) emitter.settle(index, await measureOne(planned.state, primary));
+        else pending.push({ index, state: planned.state });
+      }
+      baselinesFrozen = true;
+      // One tree per fault in flight, never more trees than faults to probe.
+      const slots = [primary];
+      for (let i = 1; i < Math.min(faultWorkers, pending.length); i++) {
+        commandBudget?.assertOpen();
+        const scratch = createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules });
+        extraTrees.push(scratch);
+        slots.push(treeContext(scratch));
+      }
+      const contended = slots.length > 1;
+      const remeasure = [];
+      await runPool(pending, slots, async ({ index, state }, tree) => {
+        const record = await measureOne(state, tree);
+        // Held back (and everything after it, by the ordered emitter) until
+        // it has been measured again with nothing else running.
+        if (contended && needsSerialRemeasure(record)) remeasure.push({ index, state });
+        else emitter.settle(index, record);
+      }, { beforeEach: () => commandBudget?.assertOpen() });
+      // The fan-out is over: its trees go now, so no more than n ever exist.
+      while (extraTrees.length) extraTrees.pop().cleanup();
+      // Each re-measure gets a fresh tree: the contended run may have left
+      // state behind in its tree (a counter, a cache, a half-written file from
+      // a killed process), and the serial answer must not inherit it.
+      for (const { index, state } of remeasure.sort((a, b) => a.index - b.index)) {
+        commandBudget?.assertOpen();
+        const fresh = createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules });
+        extraTrees.push(fresh);
         let record;
         try {
-          if (!declared && mockInfo.indeterminate.length > 0) {
-            record = discoveryIndeterminateRecord({ ...common, inputs: safeInputs(iso.projectDir, fault, defenders, { testUniverseHash, discoveryHashes }), indeterminate: mockInfo.indeterminate });
-          } else record = await probeOne({ ...common, allTests, iso, isoReal, onWarn, confirmRuns, escalate, controlCache, fatalEditFor, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, testUniverseHash, discoveryHashes, ensureBaseline, dependencyHasher,
-            historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root,
-            // A path from the runner is absolute inside the SCRATCH worktree, or
-            // project-relative. Either way history is read from the real repository,
-            // so both must land on a repo-root-relative path. The runner reports
-            // realpaths (/private/var on macOS) while the worktree path may not be
-            // one — realpath both sides or every comparison silently misses.
-            toRepoPath: (p) => relative(root, join(projectDir, isAbsolute(p) ? relative(isoReal, realpathSync(p)) : p)) });
-        } catch (err) {
-          // A precondition failure is a statement about the whole run — the
-          // interpreter is loading a different copy of the source, the runner
-          // is not resolvable — and continuing would produce verdicts that are
-          // all false. Everything else is this one fault's problem.
-          if (err instanceof PreconditionError) throw err;
-          record = errorRecord({ ...common, error: err, inputs: safeInputs(iso.projectDir, fault, defenders, { testUniverseHash, discoveryHashes }) });
-          onWarn(`${claim.id}/${fault.id}: ${record.detail.message} — reported as unverifiable so the rest of the run still produces evidence.`);
+          record = await measureOne(state, treeContext(fresh));
+        } finally {
+          extraTrees.splice(extraTrees.indexOf(fresh), 1);
+          fresh.cleanup();
         }
-        records.push(record);
-        onProgress(record);
+        record.detail.remeasuredSerially = true;
+        emitter.settle(index, record);
       }
     }
   } finally {
+    // Every tree, even when a worker failed: the pool has already let every
+    // in-flight fault restore before rethrowing.
+    for (const scratch of extraTrees.reverse()) scratch.cleanup();
+    typechecker?.cleanup();
     iso.cleanup();
   }
 
@@ -482,6 +640,7 @@ async function probeIn({
 
   assertNotCancelled();
   const dirty = isDirty(root);
+  measurements.runnerMs = runnerClock.totalMs;
   measurements.elapsedMs = performance.now() - measuredStart;
   measurements.overheadMs = measurements.elapsedMs - measurements.runnerMs;
   return {
@@ -496,12 +655,15 @@ async function probeIn({
       // every resolved runner, as the schema documents, not only the builtin.
       runner: recordedRunner,
       instrument,
+      ...(typechecker ? { typecheck: typechecker.spec } : {}),
       reuse: reuseSummary(records),
       ...(runnersUsed.size > 1 ? { runners: [...runnersUsed].map(([n, v]) => ({ name: n, ...(v ? { version: v } : {}) })) } : {}),
       confirmRuns,
       measurements,
       ...(!runnerCommand ? { workers: serial ? 1 : workers } : {}),
       ...(serial && !runnerCommand ? { serial: true } : {}),
+      // Recorded only for a fan-out, so a serial run's evidence is unchanged.
+      ...(faultWorkers > 1 ? { faultWorkers } : {}),
       ...(contention.detected ? { contention } : {}),
       ...(confirmRuns < 3 ? { provisional: true } : {}),
       // The isolation that was actually created, not the mode that was asked
@@ -604,29 +766,53 @@ function hashDiscoveryDependencies(projectDir, dependencies = [], cache = new Ma
  * both gate.
  */
 async function negativeControl({ file, defenders, iso, runDefenders, fatalEditFor, cache, stage }) {
-  const key = `${file}\n${defenders.join('\n')}`;
-  if (cache.has(key)) return cache.get(key);
-  const content = fatalEditFor(file);
-  // A runner that cannot say what "this cannot compile" looks like for its
-  // language does not get to guess. No control, no signal, verdict unchanged.
-  if (content == null) {
-    cache.set(key, undefined);
-    return undefined;
-  }
-  const control = applyContent(iso.projectDir, file, content, { inPlace: iso.mode === 'in-place' });
-  let run;
-  try {
-    stage('negative-control', 1, 1);
-    ({ run } = await runDefenders(defenders, [file]));
-  } finally {
-    control.restore();
-  }
-  const reached = run.outcome !== 'pass';
-  cache.set(key, reached);
-  return reached;
+  return singleFlight(cache, `${file}\n${defenders.join('\n')}`, async () => {
+    const content = fatalEditFor(file);
+    // A runner that cannot say what "this cannot compile" looks like for its
+    // language does not get to guess. No control, no signal, verdict unchanged.
+    if (content == null) return undefined;
+    const control = applyContent(iso.projectDir, file, content, { inPlace: iso.mode === 'in-place' });
+    let run;
+    try {
+      stage('negative-control', 1, 1);
+      ({ run } = await runDefenders(defenders, [file]));
+    } finally {
+      control.restore();
+    }
+    const reached = run.outcome !== 'pass';
+    return reached;
+  });
 }
 
-async function probeOne({ claim, fault, defenders, discovered, allTests, iso, isoReal, onWarn = () => {}, confirmRuns, escalate, ensureBaseline, dependencyHasher, controlCache, fatalEditFor, runDefenders, stage, prior, priorRunId, byRunner, mocking = [], signals = [], historyRef, historyDir, toRepoPath, testUniverseHash, discoveryHashes = {} }) {
+/** The type check refused the replacement (or could not finish): no test runs. */
+const refusedByTypecheck = (typecheck) => typecheck?.status === 'diagnostics' || typecheck?.status === 'timeout';
+
+/**
+ * Apply the fault, type check, restore: before any test run. Not applicable
+ * (a file the checker does not judge) is recorded, never skipped silently, and
+ * never an obstacle. A checker that itself failed throws, which the caller
+ * reports as unverifiable rather than as a verdict about the fault.
+ */
+async function typecheckFault({ typechecker, iso, fault, budgetMs, stage, detail }) {
+  if (!typechecker.applicable(fault.file)) return { status: 'not-applicable' };
+  const mutation = applyFault(iso.projectDir, fault, { inPlace: iso.mode === 'in-place' });
+  try {
+    stage('typecheck', 1, 1);
+    return await typechecker.check({ budgetMs });
+  } finally {
+    mutation.restore();
+    if (mutation.restoreSkipped) detail.restoreSkipped = mutation.restoreSkipped;
+  }
+}
+
+/**
+ * The part of probing a fault that reads only unmodified source: input hashes,
+ * verdict reuse, the anchor and the shared baseline. Returns `{ record }` for
+ * a reused verdict, otherwise `{ state }` for `measureFault`. `state.mutate`
+ * says whether the fault will be applied at all.
+ */
+async function planFault(args) {
+  const { typechecker, typecheckBudget, claim, fault, defenders, iso, confirmRuns, ensureBaseline, dependencyHasher, stage, prior, priorRunId, testUniverseHash, discoveryHashes = {} } = args;
   const targetPath = join(iso.projectDir, fault.file);
   const targetExists = existsSync(targetPath);
   const inputs = {
@@ -648,22 +834,40 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
   // live unmodified run of the defender set licenses the carry-forward. It is
   // the first run of the shared baseline, so a fault that is probed after all
   // pays nothing twice. Not green: the fault is probed in full.
-  if (isReusable(prior, { claim, inputs, ...defenderSelection(claim, fault), resolved: defenders, contentHash: subject.contentHash })) {
-    const live = defenders.length ? await ensureBaseline(defenders, 1, stage, { reuse: true }) : null;
+  // Whether a replacement type-checks is a property of the WHOLE program, which
+  // no per-fault hash sees: a file added elsewhere can make yesterday's clean
+  // fault invalid. So under --typecheck the fault is checked again before any
+  // record is carried forward (one warm check, no test run), and reuse needs the
+  // same answer. The answer is kept for the measurement below if reuse fails.
+  let typecheck; // the type check's outcome for this fault, when one was asked for
+  const detail = { baselineRuns: [], probeRuns: [] };
+  const reusable = isReusable(prior, { claim, inputs, ...defenderSelection(claim, fault), resolved: defenders, contentHash: subject.contentHash });
+  if (reusable && typechecker && defenders.length > 0 && targetExists && locate(readFileSync(targetPath, 'utf8'), fault).status === 'ok') {
+    typecheck = await typecheckFault({ typechecker, iso, fault, budgetMs: typecheckBudget(), stage, detail });
+  }
+  const typecheckAgrees = !typechecker || typecheck === undefined || typecheck.status === prior?.detail?.typecheck;
+  if (reusable && typecheckAgrees) {
+    // A fault the type check refused ran no test, so there is no test run to confirm.
+    const refused = typecheck?.status === 'diagnostics';
+    const live = defenders.length && !refused ? await ensureBaseline(defenders, 1, stage, { reuse: true }) : null;
     if (!live || live.runs.every((run) => run.outcome === 'pass')) {
-      return { ...prior, defenders: { ...prior.defenders, ...defenderSelection(claim, fault) }, reusedFrom: prior.reusedFrom ?? priorRunId };
+      return { record: { ...prior, defenders: { ...prior.defenders, ...defenderSelection(claim, fault) }, reusedFrom: prior.reusedFrom ?? priorRunId } };
     }
   }
 
-  const detail = { baselineRuns: [], probeRuns: [] };
-  const rawProbeRuns = []; // spec testRun + the runner's timeout count, which classify needs
   let anchor = null;
-  let subjectReached; // the negative control's answer; undefined until it is worth asking
 
   if (defenders.length > 0) {
     anchor = targetExists ? locate(readFileSync(targetPath, 'utf8'), fault) : { status: 'file-missing', hits: 0, expected: fault.expectHits ?? 1 };
 
-    if (anchor.status === 'ok') {
+    // The type check comes first and spends no test run: a replacement the
+    // project's own compiler refuses is a bad fault whatever the defenders do.
+    if (anchor.status === 'ok' && typechecker) {
+      typecheck ??= await typecheckFault({ typechecker, iso, fault, budgetMs: typecheckBudget(), stage, detail });
+      detail.typecheck = typecheck.status;
+      if (typecheck.message) detail.message = typecheck.message;
+    }
+    if (anchor.status === 'ok' && !refusedByTypecheck(typecheck)) {
       // The decision stops at the first non-green run — nothing about this
       // fault can be trusted after it. But "failed once in three" and "fails
       // every time" are different problems for whoever has to fix the
@@ -682,67 +886,91 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
         // about the fault; the claim cannot be probed until they do.
         anchor = { status: 'defenders-failed-to-load', hits: anchor.hits, expected: anchor.expected, message: baseline.loadMessage };
       }
-
-      if (detail.baselineRuns.every((r) => r.outcome === 'pass') && detail.baselineRuns.length === confirmRuns) {
-        const mutation = applyFault(iso.projectDir, fault, { inPlace: iso.mode === 'in-place' });
-        try {
-          const probeRuns = rawProbeRuns;
-          for (let i = 0; i < confirmRuns; i++) {
-            stage('probe', i + 1, confirmRuns);
-            const { run, timeouts, loadMessage, failedTests, provenance } = await runDefenders(defenders, [fault.file]);
-            probeRuns.push({ ...run, timeouts, loadMessage, failedTests });
-            // Only when the suite actually loaded. A run that failed to load
-            // explains an absent import by itself — saying the defenders never
-            // reached the file would be true and useless, and it would put the
-            // signal on every fault whose replacement does not parse.
-            if (i === 0 && run.outcome !== 'error') checkProvenance({ claim, fault, provenance, isoReal, detail, onWarn });
-            if (shouldStopEarly(probeRuns)) break;
-          }
-          detail.probeRuns = probeRuns.map(({ timeouts, loadMessage, failedTests, ...run }) => run);
-          const provisional = classify({ defenders, anchor, baselineRuns: detail.baselineRuns, probeRuns, confirmRuns });
-          // `provisional` is deliberately computed BEFORE the control: the control is what turns a survivor into an unverifiable, so asking it first would be circular.
-
-          // Charge the negative control only where a false answer is expensive:
-          // on a survivor. A kill already proves the defenders reached the code,
-          // and paying for it on every fault would be waste.
-          if (provisional.verdict === 'survived') {
-            subjectReached = await negativeControl({ file: fault.file, defenders, iso, runDefenders, fatalEditFor, cache: controlCache, stage });
-            if (subjectReached !== undefined) detail.negativeControl = subjectReached ? 'reached' : 'not-reached';
-            if (subjectReached === false) {
-              onWarn(`${claim.id}/${fault.id}: the defenders stayed green with ${fault.file} replaced by something that cannot compile, so they never execute it. Every verdict about this file would be about their reach, not their assertions — reported as unverifiable rather than as a survivor.`);
-            }
-          }
-
-          // Escalation: does anything *undeclared* catch it? A single run cannot
-          // say — a flaky test elsewhere in the suite would take the credit — so
-          // a test is an undeclared killer only if it fails in all N runs.
-          // Skipped when the subject is not executed at all: nothing the wider
-          // suite does could be evidence about a file nobody loads.
-          const broader = allTests.filter((t) => !defenders.includes(t));
-          if (provisional.verdict === 'survived' && subjectReached !== false && escalate && broader.length > 0) {
-            // The rule lives in attribution.mjs as a pure fold; this loop only
-            // decides when to stop asking the runner.
-            let state = escalationStart();
-            for (let i = 0; i < confirmRuns; i++) {
-              stage('escalation', i + 1, confirmRuns);
-              state = foldEscalationRun(state, await runDefenders(allTests));
-              if (state.stoppedEarly) break;
-            }
-            Object.assign(detail, escalationResult(state, confirmRuns));
-          }
-        } finally {
-          mutation.restore();
-          // The restore found nothing to put back. In worktree mode that is a
-          // disturbed run, not a failed one (see applyFault) — but a reader
-          // has to be able to tell, because it means something outside this
-          // process was deleting the tree the verdicts came from.
-          if (mutation.restoreSkipped) detail.restoreSkipped = mutation.restoreSkipped;
-        }
-      }
     }
   }
+  // A refused type check never ran a baseline, so the length check already
+  // keeps it from mutating; stated anyway, because that is the rule.
+  const mutate = anchor?.status === 'ok' && !refusedByTypecheck(typecheck) && detail.baselineRuns.every((r) => r.outcome === 'pass') && detail.baselineRuns.length === confirmRuns;
+  return { state: { ...args, targetExists, inputs, subject, detail, anchor, mutate, typecheck } };
+}
 
-  const { verdict, reason, killKind } = classify({ defenders, anchor, baselineRuns: detail.baselineRuns, probeRuns: rawProbeRuns, confirmRuns, subjectReached });
+/**
+ * Apply the fault in `tree`, run the defenders N times, ask the negative
+ * control and the wider suite when the fault survives, restore, classify.
+ * Reads nothing it did not get from `planFault` except what it measures, so
+ * it can run in any scratch tree, and again for a serial re-measure.
+ */
+async function measureFault(state, tree) {
+  const { claim, fault, defenders, allTests, onWarn = () => {}, confirmRuns, escalate, controlCache, stage } = state;
+  const detail = { ...state.detail, baselineRuns: [...state.detail.baselineRuns], probeRuns: [] };
+  const rawProbeRuns = []; // spec testRun + the runner's timeout count, which classify needs
+  let subjectReached; // the negative control's answer; undefined until it is worth asking
+
+  if (state.mutate) {
+    const { iso, isoReal, runDefenders, fatalEditFor } = tree;
+    const mutation = applyFault(iso.projectDir, fault, { inPlace: iso.mode === 'in-place' });
+    try {
+      const probeRuns = rawProbeRuns;
+      for (let i = 0; i < confirmRuns; i++) {
+        stage('probe', i + 1, confirmRuns);
+        const { run, timeouts, loadMessage, failedTests, provenance } = await runDefenders(defenders, [fault.file]);
+        probeRuns.push({ ...run, timeouts, loadMessage, failedTests });
+        // Only when the suite actually loaded. A run that failed to load
+        // explains an absent import by itself — saying the defenders never
+        // reached the file would be true and useless, and it would put the
+        // signal on every fault whose replacement does not parse.
+        if (i === 0 && run.outcome !== 'error') checkProvenance({ claim, fault, provenance, isoReal, detail, onWarn });
+        if (shouldStopEarly(probeRuns)) break;
+      }
+      detail.probeRuns = probeRuns.map(({ timeouts, loadMessage, failedTests, ...run }) => run);
+      const provisional = classify({ defenders, anchor: state.anchor, baselineRuns: detail.baselineRuns, probeRuns, confirmRuns });
+      // `provisional` is deliberately computed BEFORE the control: the control is what turns a survivor into an unverifiable, so asking it first would be circular.
+
+      // Charge the negative control only where a false answer is expensive:
+      // on a survivor. A kill already proves the defenders reached the code,
+      // and paying for it on every fault would be waste.
+      if (provisional.verdict === 'survived') {
+        subjectReached = await negativeControl({ file: fault.file, defenders, iso, runDefenders, fatalEditFor, cache: controlCache, stage });
+        if (subjectReached !== undefined) detail.negativeControl = subjectReached ? 'reached' : 'not-reached';
+        if (subjectReached === false) {
+          onWarn(`${claim.id}/${fault.id}: the defenders stayed green with ${fault.file} replaced by something that cannot compile, so they never execute it. Every verdict about this file would be about their reach, not their assertions — reported as unverifiable rather than as a survivor.`);
+        }
+      }
+
+      // Escalation: does anything *undeclared* catch it? A single run cannot
+      // say — a flaky test elsewhere in the suite would take the credit — so
+      // a test is an undeclared killer only if it fails in all N runs.
+      // Skipped when the subject is not executed at all: nothing the wider
+      // suite does could be evidence about a file nobody loads.
+      const broader = allTests.filter((t) => !defenders.includes(t));
+      if (provisional.verdict === 'survived' && subjectReached !== false && escalate && broader.length > 0) {
+        // The rule lives in attribution.mjs as a pure fold; this loop only
+        // decides when to stop asking the runner.
+        let fold = escalationStart();
+        for (let i = 0; i < confirmRuns; i++) {
+          stage('escalation', i + 1, confirmRuns);
+          fold = foldEscalationRun(fold, await runDefenders(allTests));
+          if (fold.stoppedEarly) break;
+        }
+        Object.assign(detail, escalationResult(fold, confirmRuns));
+      }
+    } finally {
+      mutation.restore();
+      // The restore found nothing to put back. In worktree mode that is a
+      // disturbed run, not a failed one (see applyFault) — but a reader
+      // has to be able to tell, because it means something outside this
+      // process was deleting the tree the verdicts came from.
+      if (mutation.restoreSkipped) detail.restoreSkipped = mutation.restoreSkipped;
+    }
+  }
+  return finalizeFault(state, tree, { detail, rawProbeRuns, subjectReached });
+}
+
+/** The verdict and everything attached to it, once the runs are in. */
+function finalizeFault(state, tree, { detail, rawProbeRuns, subjectReached }) {
+  const { claim, fault, defenders, discovered, confirmRuns, byRunner, mocking = [], signals = [], historyRef, historyDir, anchor, targetExists, inputs, subject, typecheck } = state;
+  const { iso, toRepoPath } = tree;
+  const { verdict, reason, killKind } = classify({ defenders, anchor, baselineRuns: detail.baselineRuns, probeRuns: rawProbeRuns, confirmRuns, subjectReached, typecheck });
   if (reason && !detail.reason) detail.reason = reason;
   if (killKind) detail.killKind = killKind;
   const killKindReason = killKindReasonOf(rawProbeRuns, killKind);

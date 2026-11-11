@@ -11,6 +11,13 @@
     },
     {
       "kind": "path",
+      "pattern": "test/probe.typecheck.test.mjs",
+      "reason": "Real-compiler acceptance for --typecheck on fixtures/known-answer-typescript (hand-verified expected.json): about a minute of nested probes with a real tsc and vitest. Mandatory in npm test and CI, where the fixture's dependencies are installed and a missing install fails loudly. The behavior is claimed by the fast defenders test/typecheck-*.test.mjs files (a stub typescript), named in TG-TYPECHECK-*; naming this file as a self-probe defender would pay for real nested probes on every fault.",
+      "by": "claude",
+      "at": "2026-11-11T00:00:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/assertion-policy.cli.test.mjs",
       "reason": "Real-CLI acceptance for --require-assertion-kill: it probes a generated project several times (probe, --json, admit, --runner-cmd, legacy reuse), about a minute in total. Mandatory in npm test and CI. The claim TG-KILL-KIND-IS-RECORDED-FROM-ERROR-IDENTITY is defended by the fast pure tests in test/kill-kind.test.mjs; naming this file as a self-probe defender cost 2900 seconds of the gate's budget.",
       "by": "claude",

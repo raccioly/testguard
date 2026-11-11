@@ -114,9 +114,9 @@ that and verify it.
 
 | Path | Written by | Why |
 |---|---|---|
-| the scratch directory (`--scratch-dir`, `TESTGUARD_SCRATCH_DIR`, else the OS temp directory) | `probe`, `sweep`, `replay`, `admit` | scratch worktrees, the temporary git index, runner report and sidecar reporter files, one private temp and data directory per runner process, each removed when its run ends |
+| the scratch directory (`--scratch-dir`, `TESTGUARD_SCRATCH_DIR`, else the OS temp directory) | `probe`, `sweep`, `replay`, `admit` | scratch worktrees, the temporary git index, runner report and sidecar reporter files, one private temp and data directory per runner process, each removed when its run ends; and `testguard-locks/`, the worktree-allocation lock directory (kept, empty between runs) |
 | the evidence path (`--out`, else `<dir>/.testguard/`; `replay` also writes its calibration beside its report) | every command that writes evidence | the result of the run |
-| the repository's `.git` | `probe`, `sweep`, `replay`, `admit` | `worktrees/` metadata for each scratch worktree (removed with it), `testguard-worktrees.lock` while one is added or removed, and loose objects when `--include-dirty` snapshots an unstaged tree |
+| the repository's `.git` | `probe`, `sweep`, `replay`, `admit` | `worktrees/` metadata for each scratch worktree (removed with it), and loose objects when `--include-dirty` snapshots an unstaged tree |
 | the working tree and `.testguard/` | `scaffold --into`, `claims --annotate --apply`, `init`, `baseline`, `--in-place` | commands whose job is to write the project; `probe --in-place` edits the fault target and restores it |
 
 `--scratch-dir` must name a directory that exists and can be written; otherwise

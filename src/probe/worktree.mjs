@@ -1,7 +1,8 @@
 import { registerCleanup } from './runners/lifecycle.mjs';
 import { existsSync, mkdtempSync, readdirSync, mkdirSync, statSync, realpathSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
-import { addWorktree, removeWorktree, headSha } from '../git.mjs';
+import { addWorktree, removeWorktree, headSha, gitCommonDir } from '../git.mjs';
+import { withWorktreeLock, worktreeLockDir } from './worktree-lock.mjs';
 import { PreconditionError } from './precondition-error.mjs';
 import { linkNodeModules, writable } from './node-modules-link.mjs';
 import { scratchConfigured, scratchRoot } from '../scratch-dir.mjs';
@@ -55,9 +56,14 @@ export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase 
   if (!sha) {
     throw new PreconditionError(ref === 'HEAD' ? 'repository has no commits; commit first, or run with --in-place' : `ref ${ref} does not resolve to a commit`);
   }
+  // Allocation and removal both rewrite the repository's shared worktree
+  // registry; a concurrent probe on the same repository waits its turn (#237).
+  // The lock is keyed by the repository and kept out of it.
+  const lockDir = worktreeLockDir(gitCommonDir(repoRoot));
   const dest = mkdtempSync(join(scratchBase, 'testguard-'));
-  const unregister = registerCleanup(() => removeWorktree(repoRoot, dest));
-  addWorktree(repoRoot, dest, sha);
+  const remove = () => withWorktreeLock(lockDir, () => removeWorktree(repoRoot, dest));
+  const unregister = registerCleanup(remove);
+  withWorktreeLock(lockDir, () => addWorktree(repoRoot, dest, sha));
   const links = findNodeModules(repoRoot);
   if (nodeModules) {
     // Explicit override: link it where the probed project expects it.
@@ -75,7 +81,7 @@ export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase 
     sha,
     root: dest,
     projectDir: join(dest, relative(repoRoot, projectDir)),
-    cleanup: () => { removeWorktree(repoRoot, dest); unregister(); },
+    cleanup: () => { remove(); unregister(); },
   };
 }
 
