@@ -1,0 +1,399 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.1.0"
+  },
+  "run": {
+    "id": "run-20261110-120000",
+    "startedAt": "2026-11-10T12:00:00Z",
+    "finishedAt": "2026-11-10T12:00:30Z",
+    "repo": {
+      "head": "deadbeefcafe",
+      "dirty": false
+    },
+    "runner": {
+      "name": "vitest",
+      "version": "5.0.5",
+      "source": "project"
+    },
+    "typecheck": {
+      "commandHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "version": "5.9.3"
+    },
+    "confirmRuns": 3,
+    "mode": "worktree",
+    "serial": true,
+    "workers": 1
+  },
+  "records": [
+    {
+      "fingerprint": "e5aaa05c86be043c28365c1319033147ffda965dce25ff648926ec3ed9f821d7",
+      "claim": {
+        "id": "PRICE-001",
+        "statement": "A discounted price is a number.",
+        "severity": "high",
+        "source": {
+          "kind": "spec",
+          "ref": "docs/spec.md#pricing"
+        },
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-11-10T02:00:00Z"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "Returns a string from a function declared to return a number.",
+        "file": "src/price.ts",
+        "faultClass": "return-altered",
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-11-10T02:00:00Z"
+        },
+        "contentHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "verdict": "fault-invalid",
+      "detail": {
+        "baselineRuns": [],
+        "probeRuns": [],
+        "reason": "replacement-does-not-typecheck",
+        "typecheck": "diagnostics"
+      },
+      "defenders": {
+        "requested": [
+          "test/price.test.ts"
+        ],
+        "resolved": [
+          "test/price.test.ts"
+        ],
+        "nocover": false,
+        "selectionSource": "claim"
+      },
+      "inputs": {
+        "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "defenderHashes": {
+          "test/price.test.ts": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      }
+    },
+    {
+      "fingerprint": "ef67056363c9dd093bec539746c916d6a52cd0fe5d9e2aa71d860f6b7e8ab23e",
+      "claim": {
+        "id": "PRICE-002",
+        "statement": "A label shows two decimals.",
+        "severity": "high",
+        "source": {
+          "kind": "spec",
+          "ref": "docs/spec.md#pricing"
+        },
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-11-10T02:00:00Z"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "Three decimals instead of two.",
+        "file": "src/price.ts",
+        "faultClass": "return-altered",
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-11-10T02:00:00Z"
+        },
+        "contentHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "verdict": "survived",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 120
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 120
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 120
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 120
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 120
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 120
+          }
+        ],
+        "typecheck": "clean"
+      },
+      "defenders": {
+        "requested": [
+          "test/price.test.ts"
+        ],
+        "resolved": [
+          "test/price.test.ts"
+        ],
+        "nocover": false,
+        "selectionSource": "claim"
+      },
+      "inputs": {
+        "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "defenderHashes": {
+          "test/price.test.ts": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      }
+    },
+    {
+      "fingerprint": "a43abb636cb59c15e05ecd0dee5ec48063579bed8bda2735e3e5f55d6421b436",
+      "claim": {
+        "id": "LEGACY-001",
+        "statement": "double doubles its argument.",
+        "severity": "high",
+        "source": {
+          "kind": "spec",
+          "ref": "docs/spec.md#pricing"
+        },
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-11-10T02:00:00Z"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "Triples instead of doubles.",
+        "file": "src/legacy.js",
+        "faultClass": "return-altered",
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-11-10T02:00:00Z"
+        },
+        "contentHash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "verdict": "survived",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 120
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 120
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 120
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 120
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 120
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 120
+          }
+        ],
+        "typecheck": "not-applicable"
+      },
+      "defenders": {
+        "requested": [
+          "test/legacy.test.ts"
+        ],
+        "resolved": [
+          "test/legacy.test.ts"
+        ],
+        "nocover": false,
+        "selectionSource": "claim"
+      },
+      "inputs": {
+        "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "defenderHashes": {
+          "test/legacy.test.ts": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      }
+    },
+    {
+      "fingerprint": "a3f282d147224aa568c8fff57ca2d10ddb4bdc56146693732626a574b8d13fa6",
+      "claim": {
+        "id": "PRICE-003",
+        "statement": "A total is computed within the budget.",
+        "severity": "high",
+        "source": {
+          "kind": "spec",
+          "ref": "docs/spec.md#pricing"
+        },
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-11-10T02:00:00Z"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "Loops forever.",
+        "file": "src/total.ts",
+        "faultClass": "return-altered",
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-11-10T02:00:00Z"
+        },
+        "contentHash": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "verdict": "timeout",
+      "detail": {
+        "baselineRuns": [],
+        "probeRuns": [],
+        "reason": "typecheck-timed-out",
+        "typecheck": "timeout"
+      },
+      "defenders": {
+        "requested": [
+          "test/total.test.ts"
+        ],
+        "resolved": [
+          "test/total.test.ts"
+        ],
+        "nocover": false,
+        "selectionSource": "claim"
+      },
+      "inputs": {
+        "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "defenderHashes": {
+          "test/total.test.ts": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      }
+    }
+  ],
+  "origins": {
+    "basis": "recorded",
+    "claims": {
+      "total": 4,
+      "byKind": {
+        "spec": 4,
+        "adr": 0,
+        "annotation": 0,
+        "comment": 0,
+        "manual": 0,
+        "doc": 0,
+        "bug": 0,
+        "incident": 0,
+        "review": 0,
+        "inferred": 0
+      },
+      "mixed": 0
+    },
+    "records": {
+      "total": 4,
+      "byKind": {
+        "spec": 4,
+        "adr": 0,
+        "annotation": 0,
+        "comment": 0,
+        "manual": 0,
+        "doc": 0,
+        "bug": 0,
+        "incident": 0,
+        "review": 0,
+        "inferred": 0
+      }
+    }
+  }
+}

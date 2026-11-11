@@ -33,6 +33,11 @@ jobs:
       - name: Install
         run: npm ci
 
+      # The TypeScript fixture carries its own typescript and vitest (never the
+      # tool's dependencies). The suites that use it fail loudly without this.
+      - name: Install the TypeScript fixture
+        run: npm ci --prefix fixtures/known-answer-typescript
+
       # ── Syntax-check EVERY source, not just what the entry point eagerly
       #    imports; a lazily loaded module's parse error would otherwise slip. ──
       - name: Syntax-check all sources
@@ -55,7 +60,9 @@ jobs:
       - name: Run tests (with runtime budget)
         shell: bash
         env:
-          TEST_BUDGET_MS: 240000
+          # 240000 -> 300000 (#236): the type-check suites add about 70 s of deliberate
+          # real-compiler and nested-probe coverage (main measures 140-200 s; this PR 253-260 s).
+          TEST_BUDGET_MS: 300000
         run: |
           START=$(date +%s%3N)
           npm test
@@ -423,7 +430,9 @@ jobs:
         with:
           node-version: 22
       - name: Install
-        run: npm ci
+        run: |
+          npm ci
+          npm ci --prefix fixtures/known-answer-typescript
       - name: Manufacture a hostile global git config
         shell: bash
         run: |

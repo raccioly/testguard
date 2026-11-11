@@ -296,6 +296,15 @@ const semantic = {
       if (r.verdict === 'nocover' && !r.defenders.nocover) {
         errors.push({ path: `${p}/defenders/nocover`, message: 'nocover verdict requires defenders.nocover = true' });
       }
+      // GATE-SEMANTICS rule 16: the type check decides before any test runs.
+      const tc = r.detail.typecheck;
+      if (tc !== undefined && !doc.run.typecheck) errors.push({ path: `${p}/detail/typecheck`, message: 'detail.typecheck requires a run that declares run.typecheck' });
+      if (tc === 'diagnostics' && (r.verdict !== 'fault-invalid' || r.detail.reason !== 'replacement-does-not-typecheck')) errors.push({ path: `${p}/detail/typecheck`, message: 'a type check that found diagnostics yields fault-invalid with reason replacement-does-not-typecheck' });
+      if (tc === 'timeout' && (r.verdict !== 'timeout' || r.detail.reason !== 'typecheck-timed-out')) errors.push({ path: `${p}/detail/typecheck`, message: 'a type check that timed out yields timeout with reason typecheck-timed-out' });
+      if ((tc === 'diagnostics' || tc === 'timeout') && (baselineRuns.length > 0 || probeRuns.length > 0)) errors.push({ path: `${p}/detail`, message: `a fault the type check refused spent no test run, but this record carries ${baselineRuns.length} baseline and ${probeRuns.length} probe runs` });
+      if (tc === 'diagnostics' && !r.detail.message) errors.push({ path: `${p}/detail/message`, message: 'a type check that found diagnostics names the first one in detail.message' });
+      if (r.detail.reason === 'replacement-does-not-typecheck' && tc !== 'diagnostics') errors.push({ path: `${p}/detail/reason`, message: 'replacement-does-not-typecheck is the type check\'s reason; detail.typecheck must be diagnostics' });
+      if (r.detail.reason === 'typecheck-timed-out' && tc !== 'timeout') errors.push({ path: `${p}/detail/reason`, message: 'typecheck-timed-out is the type check\'s reason; detail.typecheck must be timeout' });
       if (r.detail.flakeRate) {
         const { runs, failures } = r.detail.flakeRate;
         if (failures > runs) errors.push({ path: `${p}/detail/flakeRate`, message: `flakeRate failures (${failures}) exceed runs (${runs})` });

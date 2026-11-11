@@ -65,7 +65,7 @@ export function terminateProcessTree(child) {
  * quotes; `{files}` expands to the test files (one argv entry each) and
  * `{out}` to the JSON report path. Everything else is passed through.
  */
-export function parseCommandTemplate(template) {
+export function splitCommandWords(template, flag = '--runner-cmd') {
   const words = [];
   let cur = '';
   let quote = null;
@@ -86,12 +86,16 @@ export function parseCommandTemplate(template) {
     }
   }
   if (has || cur) words.push(cur);
-  if (quote) throw new RangeError('unterminated quote in --runner-cmd');
+  if (quote) throw new RangeError(`unterminated quote in ${flag}`);
+  return words;
+}
+
+export function parseCommandTemplate(template) {
+  const words = splitCommandWords(template);
   if (!words.includes('{files}') || !words.some((w) => w.includes('{out}'))) throw new RangeError('--runner-cmd must contain {files} (as its own word) and {out}');
   return words;
 }
 
-/** `{files}` must be a word of its own (one argv entry per file); `{out}` may be embedded, e.g. `--outputFile={out}`. */
 export const expandCommand = (words, files, outFile) => words.flatMap((w) => (w === '{files}' ? files : [w.replaceAll('{out}', outFile)]));
 
 const resolvedRunners = new Map(); // `${projectDir}\0${pkg}` → { argv, version, source }

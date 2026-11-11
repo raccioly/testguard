@@ -24,6 +24,7 @@ import { recordedOriginSummary } from '../../spec/lib/origins.mjs';
 import { persistenceSignalsFor } from '../supply/persistence.mjs';
 import { collectOwnedManifests, hashNativeTestUniverse, hashCustomCommandUniverse } from './universe.mjs';
 import { createDependencyHasher, instrumentOf } from './dependencies.mjs';
+import { createTypechecker, sameTypecheck } from './typecheck.mjs';
 
 
 /** Is `child` the same file as `root`, or under it? Both must already be real paths. */
@@ -90,16 +91,19 @@ export function sameRunner(previousRun, current) {
  * same N, the same worker policy, the same runner — and the same instrument:
  * the TestGuard version that decided the verdicts and the resolver/runner
  * configuration digest. Evidence from another version is readable, never
- * reusable: a newer tool may decide verdicts by different rules.
+ * reusable: a newer tool may decide verdicts by different rules. The type
+ * check is part of the instrument: a verdict measured without it cannot vouch
+ * for a run that has it (a fault it would have refused), nor the reverse.
  */
-export function reusableRun(previous, { confirmRuns, workers, serial, runnerCommand, runner, instrument }) {
+export function reusableRun(previous, { confirmRuns, workers, serial, runnerCommand, runner, instrument, typecheck }) {
   return Boolean(previous)
     && previous.run.confirmRuns === confirmRuns
     && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand })
     && sameRunner(previous.run, runner)
     && previous.tool?.version === instrument.toolVersion
     && previous.run.instrument?.toolVersion === instrument.toolVersion
-    && previous.run.instrument?.digest === instrument.digest;
+    && previous.run.instrument?.digest === instrument.digest
+    && sameTypecheck(previous.run.typecheck, typecheck);
 }
 
 /**
@@ -140,6 +144,7 @@ export async function probe({
   toolVersion = '0.0.0',
   previous,
   onProgress = () => {},
+  typecheck,
 }) {
   if (!Number.isSafeInteger(workers) || workers < 1) throw new PreconditionError('workers must be a positive safe integer');
   resetInterpreterCache(); // Cache only within this measurement, never across commands.
@@ -264,6 +269,7 @@ export async function probe({
   let recordedRunner;
   let primaryManifest;
   let instrument;
+  let typechecker;
   let runner = RUNNERS[runnerName === 'auto' ? 'vitest' : runnerName];
   // A runner with more than one engine (Python: pytest or unittest) is recorded
   // by the engine that actually ran, never by the module's name. TestGuard does
@@ -349,7 +355,13 @@ export async function probe({
     // runner — a `.py` source file is Python's whatever the project runs.
     const fatalEditFor = (file) => runnerFor(iso.projectDir, file, runner).fatalEdit?.();
     instrument = instrumentOf(iso.projectDir, toolVersion);
-    const prior = reusableRun(previous, { confirmRuns, workers, serial, runnerCommand, runner: recordedRunner, instrument })
+    // The type check's baseline comes before any fault: a tree that already
+    // fails it cannot be used to judge a fault. Throws a precondition error.
+    if (typecheck !== undefined) {
+      typechecker = await createTypechecker({ projectDir: iso.projectDir, command: typecheck, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, scratchBase });
+      commandBudget?.assertOpen();
+    }
+    const prior = reusableRun(previous, { confirmRuns, workers, serial, runnerCommand, runner: recordedRunner, instrument, typecheck: typechecker?.spec })
       ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
       : new Map();
     const partitionConfigured = (files) => {
@@ -449,7 +461,7 @@ export async function probe({
         try {
           if (!declared && mockInfo.indeterminate.length > 0) {
             record = discoveryIndeterminateRecord({ ...common, inputs: safeInputs(iso.projectDir, fault, defenders, { testUniverseHash, discoveryHashes }), indeterminate: mockInfo.indeterminate });
-          } else record = await probeOne({ ...common, allTests, iso, isoReal, onWarn, confirmRuns, escalate, controlCache, fatalEditFor, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, testUniverseHash, discoveryHashes, ensureBaseline, dependencyHasher,
+          } else record = await probeOne({ ...common, typechecker, typecheckBudget: () => commandBudget?.runBudget(budgetMs) ?? budgetMs, allTests, iso, isoReal, onWarn, confirmRuns, escalate, controlCache, fatalEditFor, runDefenders, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, testUniverseHash, discoveryHashes, ensureBaseline, dependencyHasher,
             historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root,
             // A path from the runner is absolute inside the SCRATCH worktree, or
             // project-relative. Either way history is read from the real repository,
@@ -471,6 +483,7 @@ export async function probe({
       }
     }
   } finally {
+    typechecker?.cleanup();
     iso.cleanup();
   }
 
@@ -492,6 +505,7 @@ export async function probe({
       // every resolved runner, as the schema documents, not only the builtin.
       runner: recordedRunner,
       instrument,
+      ...(typechecker ? { typecheck: typechecker.spec } : {}),
       reuse: reuseSummary(records),
       ...(runnersUsed.size > 1 ? { runners: [...runnersUsed].map(([n, v]) => ({ name: n, ...(v ? { version: v } : {}) })) } : {}),
       confirmRuns,
@@ -621,7 +635,25 @@ async function negativeControl({ file, defenders, iso, runDefenders, fatalEditFo
   return reached;
 }
 
-async function probeOne({ claim, fault, defenders, discovered, allTests, iso, isoReal, onWarn = () => {}, confirmRuns, escalate, ensureBaseline, dependencyHasher, controlCache, fatalEditFor, runDefenders, stage, prior, priorRunId, byRunner, mocking = [], signals = [], historyRef, historyDir, toRepoPath, testUniverseHash, discoveryHashes = {} }) {
+/**
+ * Apply the fault, type check, restore: before any test run. Not applicable
+ * (a file the checker does not judge) is recorded, never skipped silently, and
+ * never an obstacle. A checker that itself failed throws, which the caller
+ * reports as unverifiable rather than as a verdict about the fault.
+ */
+async function typecheckFault({ typechecker, iso, fault, budgetMs, stage, detail }) {
+  if (!typechecker.applicable(fault.file)) return { status: 'not-applicable' };
+  const mutation = applyFault(iso.projectDir, fault, { inPlace: iso.mode === 'in-place' });
+  try {
+    stage('typecheck', 1, 1);
+    return await typechecker.check({ budgetMs });
+  } finally {
+    mutation.restore();
+    if (mutation.restoreSkipped) detail.restoreSkipped = mutation.restoreSkipped;
+  }
+}
+
+async function probeOne({ typechecker, typecheckBudget, claim, fault, defenders, discovered, allTests, iso, isoReal, onWarn = () => {}, confirmRuns, escalate, ensureBaseline, dependencyHasher, controlCache, fatalEditFor, runDefenders, stage, prior, priorRunId, byRunner, mocking = [], signals = [], historyRef, historyDir, toRepoPath, testUniverseHash, discoveryHashes = {} }) {
   const targetPath = join(iso.projectDir, fault.file);
   const targetExists = existsSync(targetPath);
   const inputs = {
@@ -643,14 +675,27 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
   // live unmodified run of the defender set licenses the carry-forward. It is
   // the first run of the shared baseline, so a fault that is probed after all
   // pays nothing twice. Not green: the fault is probed in full.
-  if (isReusable(prior, { claim, inputs, ...defenderSelection(claim, fault), resolved: defenders, contentHash: subject.contentHash })) {
-    const live = defenders.length ? await ensureBaseline(defenders, 1, stage, { reuse: true }) : null;
+  // Whether a replacement type-checks is a property of the WHOLE program, which
+  // no per-fault hash sees: a file added elsewhere can make yesterday's clean
+  // fault invalid. So under --typecheck the fault is checked again before any
+  // record is carried forward (one warm check, no test run), and reuse needs the
+  // same answer. The answer is kept for the measurement below if reuse fails.
+  let typecheck; // the type check's outcome for this fault, when one was asked for
+  const detail = { baselineRuns: [], probeRuns: [] };
+  const reusable = isReusable(prior, { claim, inputs, ...defenderSelection(claim, fault), resolved: defenders, contentHash: subject.contentHash });
+  if (reusable && typechecker && defenders.length > 0 && targetExists && locate(readFileSync(targetPath, 'utf8'), fault).status === 'ok') {
+    typecheck = await typecheckFault({ typechecker, iso, fault, budgetMs: typecheckBudget(), stage, detail });
+  }
+  const typecheckAgrees = !typechecker || typecheck === undefined || typecheck.status === prior?.detail?.typecheck;
+  if (reusable && typecheckAgrees) {
+    // A fault the type check refused ran no test, so there is no test run to confirm.
+    const refused = typecheck?.status === 'diagnostics';
+    const live = defenders.length && !refused ? await ensureBaseline(defenders, 1, stage, { reuse: true }) : null;
     if (!live || live.runs.every((run) => run.outcome === 'pass')) {
       return { ...prior, defenders: { ...prior.defenders, ...defenderSelection(claim, fault) }, reusedFrom: prior.reusedFrom ?? priorRunId };
     }
   }
 
-  const detail = { baselineRuns: [], probeRuns: [] };
   const rawProbeRuns = []; // spec testRun + the runner's timeout count, which classify needs
   let anchor = null;
   let subjectReached; // the negative control's answer; undefined until it is worth asking
@@ -658,7 +703,16 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
   if (defenders.length > 0) {
     anchor = targetExists ? locate(readFileSync(targetPath, 'utf8'), fault) : { status: 'file-missing', hits: 0, expected: fault.expectHits ?? 1 };
 
-    if (anchor.status === 'ok') {
+    // The type check comes first and spends no test run: a replacement the
+    // project's own compiler refuses is a bad fault whatever the defenders do.
+    if (anchor.status === 'ok' && typechecker) {
+      typecheck ??= await typecheckFault({ typechecker, iso, fault, budgetMs: typecheckBudget(), stage, detail });
+      detail.typecheck = typecheck.status;
+      if (typecheck.message) detail.message = typecheck.message;
+    }
+    const typecheckRefused = typecheck?.status === 'diagnostics' || typecheck?.status === 'timeout';
+
+    if (anchor.status === 'ok' && !typecheckRefused) {
       // The decision stops at the first non-green run — nothing about this
       // fault can be trusted after it. But "failed once in three" and "fails
       // every time" are different problems for whoever has to fix the
@@ -737,7 +791,7 @@ async function probeOne({ claim, fault, defenders, discovered, allTests, iso, is
     }
   }
 
-  const { verdict, reason, killKind } = classify({ defenders, anchor, baselineRuns: detail.baselineRuns, probeRuns: rawProbeRuns, confirmRuns, subjectReached });
+  const { verdict, reason, killKind } = classify({ defenders, anchor, baselineRuns: detail.baselineRuns, probeRuns: rawProbeRuns, confirmRuns, subjectReached, typecheck });
   if (reason && !detail.reason) detail.reason = reason;
   if (killKind) detail.killKind = killKind;
   const killKindReason = killKindReasonOf(rawProbeRuns, killKind);
