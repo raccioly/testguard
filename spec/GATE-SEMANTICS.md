@@ -156,7 +156,7 @@ The verdict set is closed. Only one value is a pass.
 | `nocover` | No defending test exists: the declared globs resolve to nothing, or no test imports the subject. Worse than `survived` — nothing was even tried. | **yes** |
 | `unverifiable` | The claim could not be probed: the fault's anchor is missing or ambiguous, configured or symbol-level defender discovery was indeterminate (`defender-discovery-indeterminate`), its defenders failed to load (`defenders-failed-to-load`), probing it threw (`probe-error`), or the defenders do not execute the subject at all (`subject-not-executed`). Carries a `reason`. A loud, gating verdict — a claim that cannot be probed is not "skipped", it is undefended until someone fixes the fault or the defenders. Never confused with `flaky-defender`, which requires tests that *ran*. | **yes** |
 | `timeout` | Probe run exceeded its budget. Not counted as a kill; the pessimistic reading is the safe one because flakiness biases the metric optimistically. | **yes** |
-| `fault-invalid` | The replacement does not load or compile. A bad fault, not a detection. | **yes** |
+| `fault-invalid` | The replacement does not load or compile (`replacement-does-not-compile`, `suite-failed-to-load`), or — under `--typecheck` — parses but does not type-check (`replacement-does-not-typecheck`, rule 16). A bad fault, not a detection. | **yes** |
 | `flaky-defender` | Defenders were not green N/N on unmodified source (`defenders-not-green`), or the N probe runs disagreed with each other (`inconsistent-probe`). Either way no verdict about the fault can be trusted; fix the defenders first. | **yes** |
 
 Rules that follow from the table:
@@ -550,6 +550,56 @@ Rules that follow from the table:
    hard-coded its assumptions as requirements.
    The verdict set stays closed and shared. What each method may legitimately
    report is part of defining it.
+
+16. **A replacement the compiler refuses is not a fault.** Under
+   `--typecheck[=<cmd>]` the project's own type checker judges every fault
+   before any test runs: the fault is applied, the checker runs, the fault is
+   restored. Diagnostics that the unmodified tree did not have make the verdict
+   `fault-invalid`, `detail.reason` `replacement-does-not-typecheck`,
+   `detail.typecheck` `diagnostics` and `detail.message` the first diagnostic;
+   `baselineRuns` and `probeRuns` are empty, because no test run was spent. A
+   check that exceeds its budget is `timeout` (`typecheck-timed-out`, never a
+   pass). The type check precedes rule 1's baseline because it is a property of
+   the fault, not of the defenders; `nocover` and an anchor that does not hit
+   still come first, since there is no fault to check.
+   **The unmodified tree is checked first** and must be clean. A tree that
+   already fails cannot be used to judge a fault, so the run is a precondition
+   failure (exit `2`) that names the first diagnostic and writes no evidence.
+   So is a checker that cannot run: no `tsconfig.json` and no command, a
+   `typescript` that cannot be resolved from the project, a `tsc` that cannot
+   read the configuration. A check that was asked for and cannot be made is
+   never a skipped check. A checker that dies mid-run without a diagnostic is
+   `unverifiable` (`probe-error`) for that fault, never `clean`.
+   The checker is the project's own `tsc --noEmit -p tsconfig.json`, never a
+   bundled compiler, or a custom command that is an argv and never a shell
+   string. The default runs `--incremental`; its build-info file lives under
+   the scratch area, is snapshotted after the baseline check, and is restored
+   before and after every fault, so one fault's diagnostics never reach the
+   next. A target the checker does not read (a `.py` file, a `.js` file the
+   project does not check with `allowJs` and `checkJs`, a `.ts` file the
+   tsconfig's program does not contain, any custom command's non-TypeScript
+   target) is recorded `detail.typecheck: "not-applicable"` and probed as
+   before: `clean` is never said about a file the checker did not read. (A
+   custom command cannot say what it reads, so for it only the extension
+   decides.) A program with no project file is a precondition failure for the
+   default command: nothing could be judged. A checked fault that stays valid
+   is `clean`.
+   **The checker is an instrument.** Evidence records
+   `run.typecheck: { commandHash, version }`: a hash of the command's identity
+   (its flags, or the custom argv) and the checker's version. It is part of the
+   reuse key (rule 8's instrument): a record measured without the type check is
+   not reusable by a run with it, and the reverse; so is one measured with a
+   different command or checker version. A record carrying `detail.typecheck`
+   requires a run that declares `run.typecheck`.
+   **Type validity belongs to the whole program**, which no per-fault hash sees
+   (a file added elsewhere can make a clean fault invalid). So when a run that
+   type checks would carry a record forward, it first type checks that fault
+   again — one check, no test run — and carries the record forward only if
+   `detail.typecheck` comes out the same; a `diagnostics` record is carried
+   forward without any test run, since none produced it. A custom command's
+   `version` is best-effort (the command's own `--version` plus the project's
+   `typescript` when it resolves); `--no-reuse` covers a checker that changes
+   under neither.
 
 ## Per-run and whole-command budgets are different
 

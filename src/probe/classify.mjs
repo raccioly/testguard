@@ -13,10 +13,18 @@ import { isKillRun, killKindOf } from './kill-kind.mjs';
  * point only: a would-be `survived`. It is never asked about a kill — a kill
  * already proves the defenders reached the code — and `undefined` (the control
  * was not run) never changes a verdict.
+ *
+ * `typecheck` is the type check's outcome for this fault, when one was asked
+ * for and applied: it is passed in, never run here. A replacement the
+ * project's own compiler refuses is `fault-invalid` — a property of the fault,
+ * decided before any test ran, so it ranks above the defenders' baseline.
+ * `{ status: 'clean' | 'not-applicable' }` and `undefined` change nothing.
  */
-export function classify({ defenders, anchor, baselineRuns, probeRuns, confirmRuns, subjectReached }) {
+export function classify({ defenders, anchor, baselineRuns, probeRuns, confirmRuns, subjectReached, typecheck }) {
   if (defenders.length === 0) return { verdict: 'nocover' };
   if (anchor && anchor.status !== 'ok') return { verdict: 'unverifiable', reason: anchor.status };
+  if (typecheck?.status === 'diagnostics') return { verdict: 'fault-invalid', reason: 'replacement-does-not-typecheck' };
+  if (typecheck?.status === 'timeout') return { verdict: 'timeout', reason: 'typecheck-timed-out' };
   if (baselineRuns.length === 0 || baselineRuns.some((r) => r.outcome !== 'pass')) {
     return { verdict: 'flaky-defender', reason: 'defenders-not-green' };
   }

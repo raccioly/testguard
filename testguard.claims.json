@@ -9465,6 +9465,748 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-TYPECHECK-IS-THE-PROJECTS-OWN-AND-NEVER-SKIPPED",
+      "statement": "--typecheck runs the project's own type checker; it checks the unmodified tree first and refuses the run with a precondition error, never a skipped or optimistic check, when there is no tsconfig, no resolvable typescript, an unreadable configuration, a program with no project file or a tree that is not clean; a checker that dies without a diagnostic or runs out of budget is never clean.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-resolve.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The unmodified tree is not required to be clean, so a fault is judged against a tree that already fails.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "    if (verdict.status !== 'clean') {",
+          "replace": "    if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A project with no tsconfig.json and no command is not refused.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "      if (!existsSync(join(projectDir, 'tsconfig.json'))) {",
+          "replace": "      if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A checker that dies without a diagnostic is read as a clean check.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/typecheck.mjs",
+          "find": "      throw new Error(`type check exited ${ran.code ?? ran.signal} without a diagnostic: ${clip(ran.output.trim().split('\\n').pop(), projectDir)}`);",
+          "replace": "      return { status: 'clean' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A type check that ran out of budget is read as clean.",
+          "faultClass": "return-altered",
+          "file": "src/probe/typecheck.mjs",
+          "find": "      if (ran.timedOut) return { status: 'timeout' };",
+          "replace": "      if (ran.timedOut) return { status: 'clean' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A program with no project file is accepted, so the check judges nothing and says so by saying clean.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "      if (program.size === 0) {",
+          "replace": "      if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-CUSTOM-COMMAND-IS-AN-ARGV",
+      "statement": "A custom --typecheck command is split into an argv and never run through a shell, and two different commands are two different instruments.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-custom.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A custom command is run through a shell.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "{ cwd, stdio: ['ignore', 'pipe', 'pipe'], detached:",
+          "replace": "{ cwd, shell: true, stdio: ['ignore', 'pipe', 'pipe'], detached:",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Two different custom commands hash to the same identity.",
+          "faultClass": "return-altered",
+          "file": "src/probe/typecheck.mjs",
+          "find": "      identity = { kind: 'custom', argv: words };",
+          "replace": "      identity = { kind: 'custom' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-JUDGES-ONLY-WHAT-THE-CHECKER-CHECKS",
+      "statement": "A target the type checker does not read (a .py file, a .js file the project does not check with allowJs and checkJs, a .ts file the tsconfig does not include, any non-TypeScript file under a custom command) is recorded not-applicable and probed as before, never reported clean and never skipped silently.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-applicable.test.mjs",
+        "test/typecheck-probe-scope.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every file is judged, Python included.",
+          "faultClass": "return-altered",
+          "file": "src/probe/typecheck.mjs",
+          "find": "        return judged && (custom || program.has(file.split(sep).join('/')));",
+          "replace": "        return true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-applicable.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "JavaScript is judged when the project only sets one of allowJs and checkJs.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "config.compilerOptions?.allowJs === true && config.compilerOptions?.checkJs === true",
+          "replace": "config.compilerOptions?.allowJs === true || config.compilerOptions?.checkJs === true",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-applicable.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "A TypeScript file outside the program is reported clean although tsc never read it.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "        return judged && (custom || program.has(file.split(sep).join('/')));",
+          "replace": "        return judged;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-applicable.test.mjs"
+          ]
+        },
+        {
+          "id": "F4",
+          "description": "A file the checker does not judge is type checked anyway and reported clean.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "  if (!typechecker.applicable(fault.file)) return { status: 'not-applicable' };\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe-scope.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-STATE-NEVER-LEAKS-BETWEEN-FAULTS",
+      "statement": "One fault's type-check state never reaches the next: the incremental build-info is snapshotted after the baseline check and restored after every fault, and the replacement is restored before any test runs.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-incremental.test.mjs",
+        "test/typecheck-probe.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The build-info is not restored after a fault's check, so the next fault starts from the last fault's state.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/typecheck.mjs",
+          "find": "        } finally {\n          restore();\n        }\n      },",
+          "replace": "        } finally {\n        }\n      },",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-incremental.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "The baseline build-info is never snapshotted, so every restore throws the incremental state away.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/typecheck.mjs",
+          "find": "    if (existsSync(info)) copyFileSync(info, snapshot);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-incremental.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "The replacement stays applied after its type check, so the next fault is judged on top of it.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "    mutation.restore();\n    if (mutation.restoreSkipped) detail.restoreSkipped = mutation.restoreSkipped;\n  }\n}\n\nasync function probeOne(",
+          "replace": "    if (mutation.restoreSkipped) detail.restoreSkipped = mutation.restoreSkipped;\n  }\n}\n\nasync function probeOne(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-DECIDES-A-FAULT-BEFORE-ANY-TEST",
+      "statement": "Under --typecheck a replacement that parses but does not type-check is fault-invalid (replacement-does-not-typecheck) with the first diagnostic in detail.message and zero test runs; nocover and an unlocated anchor still come first; a fault that type-checks is probed exactly as before.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-pure.test.mjs",
+        "test/typecheck-probe.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Diagnostics are ignored by classify, so a refused replacement is probed as a real fault.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/classify.mjs",
+          "find": "  if (typecheck?.status === 'diagnostics') return { verdict: 'fault-invalid', reason: 'replacement-does-not-typecheck' };\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-pure.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "A type check that timed out is reported as a survivor.",
+          "faultClass": "return-altered",
+          "file": "src/probe/classify.mjs",
+          "find": "return { verdict: 'timeout', reason: 'typecheck-timed-out' };",
+          "replace": "return { verdict: 'survived' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-pure.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "A refused replacement still spends its baseline and probe runs.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "    const typecheckRefused = typecheck?.status === 'diagnostics' || typecheck?.status === 'timeout';",
+          "replace": "    const typecheckRefused = false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe.test.mjs"
+          ]
+        },
+        {
+          "id": "F4",
+          "description": "The first diagnostic is not recorded.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "      if (typecheck.message) detail.message = typecheck.message;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-TIMEOUT-AND-FLAG",
+      "statement": "A type check over budget spends no test run, and the probe command passes --typecheck on and exits 2 without evidence when the unmodified tree already fails it.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-probe-preconditions.test.mjs",
+        "test/typecheck-cli.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A type check that timed out still spends the baseline and probe runs.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "    const typecheckRefused = typecheck?.status === 'diagnostics' || typecheck?.status === 'timeout';",
+          "replace": "    const typecheckRefused = typecheck?.status === 'diagnostics';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe-preconditions.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "The probe command does not pass --typecheck on.",
+          "faultClass": "argument-swapped",
+          "file": "src/commands/probe.mjs",
+          "find": "    typecheck: values.typecheck,\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-cli.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-IS-PART-OF-THE-REUSE-KEY",
+      "statement": "A record measured without the type check is not reusable by a run with it, nor the reverse, nor across another command or checker version.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-pure.test.mjs",
+        "test/typecheck-reuse-key.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Reuse ignores the type check entirely.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "    && previous.run.instrument?.digest === instrument.digest\n    && sameTypecheck(previous.run.typecheck, typecheck);",
+          "replace": "    && previous.run.instrument?.digest === instrument.digest;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-pure.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "A different checker version is the same instrument.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "  return recorded.commandHash === current.commandHash && recorded.version === current.version;",
+          "replace": "  return recorded.commandHash === current.commandHash;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-pure.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "The run's type check is not passed to the reuse decision.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/probe.mjs",
+          "find": "runner: recordedRunner, instrument, typecheck: typechecker?.spec })",
+          "replace": "runner: recordedRunner, instrument })",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-reuse-key.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-IS-RECORDED-AND-RECHECKED-ON-REUSE",
+      "statement": "Evidence names the checker that judged it (run.typecheck), and because type validity belongs to the whole program a clean verdict is only carried forward if the fault still type-checks now.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-probe.test.mjs",
+        "test/typecheck-reuse-program.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The evidence does not name the checker that judged it.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/probe.mjs",
+          "find": "      ...(typechecker ? { typecheck: typechecker.spec } : {}),\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "A clean verdict is carried forward without checking that the fault still type-checks.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "  if (reusable && typechecker && defenders.length > 0 && targetExists",
+          "replace": "  if (false && reusable && typechecker && defenders.length > 0 && targetExists",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-reuse-program.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-ANCHOR-CHECK-TYPE-CHECKS-REPLACEMENTS",
+      "statement": "claims --check-anchors --typecheck type checks every replacement that still parses against the working tree in a scratch worktree, reports a refused one as fault-invalid with the first diagnostic, and says not-applicable for a file the checker does not read.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-anchors.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A refused replacement is reported with its diagnostic but stays ok.",
+          "faultClass": "condition-forced",
+          "file": "src/claims/anchors.mjs",
+          "find": "status === 'diagnostics' ? { status: 'fault-invalid' } : status === 'timeout' ? { status: 'timeout' } : {}",
+          "replace": "status === 'timeout' ? { status: 'timeout' } : {}",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The check judges the last commit instead of the working tree.",
+          "faultClass": "argument-swapped",
+          "file": "src/claims/anchors.mjs",
+          "find": "ref: isDirty(root) ? snapshotWorkingTree(root) : 'HEAD'",
+          "replace": "ref: 'HEAD'",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A file the checker does not judge is type checked anyway.",
+          "faultClass": "condition-forced",
+          "file": "src/claims/anchors.mjs",
+          "find": "      if (!checker.applicable(fault.file)) { out.push({ ...result, typecheck: { status: 'not-applicable' } }); continue; }\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-ANCHOR-CHECK-TYPECHECK-FLAG",
+      "statement": "The claims command passes --typecheck on, prints each replacement's first diagnostic, exits 2 for a tree that already fails the check, and refuses the flag without --check-anchors.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-anchors-cli.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The claims command does not pass --typecheck on.",
+          "faultClass": "argument-swapped",
+          "file": "src/commands/claims.mjs",
+          "find": "typecheck: values.typecheck, budgetMs: Number(values.budget)",
+          "replace": "budgetMs: Number(values.budget)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The first diagnostic is not printed.",
+          "faultClass": "statement-deleted",
+          "file": "src/claims/anchors.mjs",
+          "find": "tc.status === 'timeout' ? '; type check timed out' : `; type check: ${tc.message}`",
+          "replace": "tc.status === 'timeout' ? '; type check timed out' : ''",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-EVIDENCE-CONFORMS-TO-THE-SPEC",
+      "statement": "Evidence that records a type check conforms only when it is consistent: detail.typecheck needs run.typecheck, diagnostics mean fault-invalid with its reason, a first diagnostic and no test run, a timeout means a timeout verdict, and the reasons belong to their statuses.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "spec/conformance/schemas.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A type-check result without a declared checker conforms.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (tc !== undefined && !doc.run.typecheck)",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A refused fault that carries test runs conforms.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "(tc === 'diagnostics' || tc === 'timeout') && (baselineRuns.length > 0 || probeRuns.length > 0)",
+          "replace": "(tc === 'diagnostics' || tc === 'timeout') && false",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Diagnostics on a fault that is not fault-invalid conform.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (tc === 'diagnostics' && (r.verdict !== 'fault-invalid' || r.detail.reason !== 'replacement-does-not-typecheck'))",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A type-check timeout with another verdict conforms.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (tc === 'timeout' && (r.verdict !== 'timeout' || r.detail.reason !== 'typecheck-timed-out'))",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "Diagnostics without the first diagnostic conform.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (tc === 'diagnostics' && !r.detail.message)",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-STUB-PROJECT-KEEPS-ITS-CHECKER-HONEST",
+      "statement": "The stub-typescript projects the type-check tests use diagnose a replacement they should refuse, list the program they should read and crash when told to, so those tests exercise a refusal and not an empty check.",
+      "source": {
+        "kind": "manual",
+        "ref": "test/helpers/typecheck-project.mjs"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-probe.test.mjs",
+        "test/typecheck-resolve.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The stub checker stops diagnosing the BAD replacement.",
+          "faultClass": "condition-forced",
+          "file": "test/helpers/typecheck-project.mjs",
+          "find": "else if (source.includes('BAD')) {",
+          "replace": "else if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "The stub lists no project file in its program.",
+          "faultClass": "return-altered",
+          "file": "test/helpers/typecheck-project.mjs",
+          "find": "process.stdout.write([here + 'src/a.ts'].concat(",
+          "replace": "process.stdout.write([].concat(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-probe.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "The stub never crashes, so a dying checker is never exercised.",
+          "faultClass": "condition-forced",
+          "file": "test/helpers/typecheck-project.mjs",
+          "find": "if (mode === 'crash') {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-resolve.test.mjs"
+          ]
+        }
+      ]
     }
   ]
 }

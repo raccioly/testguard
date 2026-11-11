@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "TS-DISCOUNT",
+      "statement": "A discount takes the given percentage off the price.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "test/price.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "file": "src/price.ts",
+          "find": "(100 - percent)",
+          "replace": "(100 + percent)",
+          "description": "The discount is added to the price instead of taken off.",
+          "faultClass": "literal-changed",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TS-LABEL",
+      "statement": "A label shows the amount with two decimals.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "test/price.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "file": "src/price.ts",
+          "find": ".toFixed(2)",
+          "replace": ".toFixed(3)",
+          "description": "Three decimals instead of two; the only label test checks the dollar sign.",
+          "faultClass": "literal-changed",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TS-STRING",
+      "statement": "A discounted price is a number.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "test/price.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "file": "src/price.ts",
+          "find": "return Math.round((cents * (100 - percent)) / 100);",
+          "replace": "return String(Math.round((cents * (100 - percent)) / 100));",
+          "description": "Returns a string from a function declared to return a number: parses, does not type-check.",
+          "faultClass": "return-altered",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TS-SIGNATURE",
+      "statement": "A receipt line is labeled from a single amount.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "test/receipt.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "file": "src/price.ts",
+          "find": "export function label(cents: number): string {",
+          "replace": "export function label(cents: number, unit: string): string {",
+          "description": "A new required parameter: the target still type-checks, its caller in another file does not.",
+          "faultClass": "argument-swapped",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TS-TOTAL",
+      "statement": "A total adds the tax to the subtotal.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "test/receipt.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "file": "src/receipt.ts",
+          "find": "return subtotal + tax;",
+          "replace": "return subtotal - tax;",
+          "description": "Tax is subtracted: type-checks, and runs after two faults that did not.",
+          "faultClass": "literal-changed",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TS-LEGACY",
+      "statement": "double doubles its argument.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "test/legacy.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "file": "src/legacy.js",
+          "find": "return n * 2;",
+          "replace": "return n * 3;",
+          "description": "A JavaScript file outside the type-checked program: the check does not apply.",
+          "faultClass": "literal-changed",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TS-BANNER",
+      "statement": "A banner frames the name between equals signs.",
+      "source": {
+        "kind": "spec",
+        "ref": "README.md#claims"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "human",
+        "by": "fixture author"
+      },
+      "defendedBy": [
+        "test/banner.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "file": "tools/banner.ts",
+          "find": "`== ${name} ==`",
+          "replace": "`-- ${name} --`",
+          "description": "A TypeScript file outside the tsconfig include: tsc never reads it, so the check does not apply.",
+          "faultClass": "literal-changed",
+          "producedBy": {
+            "producer": "human",
+            "by": "fixture author"
+          }
+        }
+      ]
+    }
+  ]
+}
