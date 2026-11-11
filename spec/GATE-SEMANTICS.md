@@ -1105,6 +1105,19 @@ the requested and actually probed claim ids and counts. Commands whose
 `--claim` is singular (`scaffold` and `admit`) reject repeated or comma-separated
 values instead of silently choosing one.
 
+A scoped run (`--claim` or `--changed`) that measured claims carries two
+answers. The document's `state` and `next` describe the whole claims file, as
+they do for `status`: an invalid anchor on a claim the invocation did not select
+is true of the file and stays visible there. `run.scope.state` and
+`run.scope.next` describe the selection alone: the same state machine over only
+the probed claims, their anchors and their evidence, with everything that
+belongs to the rest of the file (`unclaimed-changes`, `no-claims`, the claimed
+surface, the origin policy) left out. Either both are present or neither. The
+validator refuses a scoped `next` whose `target` is a claim the invocation did
+not probe, a scoped state of `unclaimed-changes` or `no-claims`, and a scoped
+state on an invocation that measured nothing. Human output leads with the scoped
+line and names the whole-file line only when it differs.
+
 ## Probing a change
 
 `probe --changed <ref>` measures only the claims a change can have affected.

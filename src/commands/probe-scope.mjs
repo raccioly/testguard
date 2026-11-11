@@ -1,5 +1,6 @@
 import { resolveProbeScope } from '../probe/scope.mjs';
 import { selectClaims } from '../probe/probe.mjs';
+import { computeStatus } from '../status/status.mjs';
 
 /**
  * The `--changed` half of `probe`: turn a reference into the claims to probe,
@@ -51,3 +52,21 @@ export function renderNoSelection(selection, { failOnEmpty }) {
 
 /** The changed source files no claim covers; absence from the results says nothing about them. */
 export const renderUnmatched = (changed) => changed.unmatchedFiles.length === 0 ? [] : [`${changed.unmatchedFiles.length} changed source file${changed.unmatchedFiles.length === 1 ? ' is' : 's are'} ${changed.note}: ${changed.unmatchedFiles.slice(0, 10).join(', ')}${changed.unmatchedFiles.length > 10 ? ', …' : ''}`];
+
+/**
+ * What the selection alone says: the status machine run over the probed claims
+ * only, reduced to the two fields a caller acts on. `computeStatus` without
+ * `only` stays the answer for the whole file.
+ */
+export function scopedView({ probedClaims, ...statusInput }) {
+  const { state, next } = computeStatus({ ...statusInput, only: probedClaims });
+  return { state, next };
+}
+
+/** The human lines for a scoped run: the selection first, then what the rest of the file says. */
+export function renderScopedView(scope, view, whole) {
+  const n = scope.probedCount;
+  const lines = [`scope:    ${view.state} over ${n} selected claim${n === 1 ? '' : 's'}; next: [${view.next.action}] ${view.next.command}`, `why:      ${view.next.why}`];
+  if (whole.state !== view.state || whole.next.why !== view.next.why) lines.push(`rest of the file: ${whole.state}; next: [${whole.next.action}] ${whole.next.command} (${whole.next.why})`);
+  return lines;
+}

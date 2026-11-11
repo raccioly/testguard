@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.1.0"
+  },
+  "generatedAt": "2026-09-17T02:00:00Z",
+  "state": "invalid-anchors",
+  "next": {
+    "action": "repair-fault",
+    "command": "testguard claims --check-anchors",
+    "why": "1 fault anchor no longer locates exactly. Repair REDACT-009/F1 in testguard.claims.json without changing what the fault means, then re-probe.",
+    "target": {
+      "claimId": "REDACT-009",
+      "subjectId": "F1",
+      "file": "src/unselected.mjs"
+    }
+  },
+  "provisional": false,
+  "run": {
+    "id": "run-20260917T020000",
+    "evidence": ".testguard/evidence-partial.json",
+    "provisional": false,
+    "records": 7,
+    "newSinceBaseline": 1,
+    "exitCode": 1,
+    "claims": [
+      {
+        "id": "REDACT-001",
+        "result": "unproven",
+        "faults": {
+          "total": 3,
+          "killed": 2,
+          "survived": 1,
+          "nocover": 0,
+          "unverifiable": 0,
+          "faultInvalid": 0,
+          "timeout": 0,
+          "flakyDefender": 0
+        },
+        "reasons": [
+          {
+            "faultId": "F3",
+            "verdict": "survived"
+          }
+        ]
+      },
+      {
+        "id": "REDACT-002",
+        "result": "proven",
+        "faults": {
+          "total": 2,
+          "killed": 2,
+          "survived": 0,
+          "nocover": 0,
+          "unverifiable": 0,
+          "faultInvalid": 0,
+          "timeout": 0,
+          "flakyDefender": 0
+        },
+        "reasons": []
+      },
+      {
+        "id": "REDACT-003",
+        "result": "could-not-verify",
+        "faults": {
+          "total": 2,
+          "killed": 1,
+          "survived": 0,
+          "nocover": 0,
+          "unverifiable": 0,
+          "faultInvalid": 0,
+          "timeout": 1,
+          "flakyDefender": 0
+        },
+        "reasons": [
+          {
+            "faultId": "F2",
+            "verdict": "timeout",
+            "reason": "defender-timeout"
+          }
+        ]
+      }
+    ],
+    "scope": {
+      "probedClaims": [
+        "REDACT-001",
+        "REDACT-002",
+        "REDACT-003"
+      ],
+      "probedCount": 3,
+      "selectedCount": 3,
+      "changed": {
+        "ref": "origin/main",
+        "outcome": "determined",
+        "base": "0123456789abcdef0123456789abcdef01234567",
+        "head": "fedcba9876543210fedcba9876543210fedcba98",
+        "includeDirty": false,
+        "files": [
+          "src/redact.mjs",
+          "src/session.mjs",
+          "test/redact.test.mjs"
+        ],
+        "matchedClaims": [
+          "REDACT-001",
+          "REDACT-002",
+          "REDACT-003"
+        ],
+        "unmatchedFiles": [
+          "src/session.mjs"
+        ],
+        "note": "not covered by any claim; absence from the results is not a pass"
+      },
+      "state": "unproven"
+    }
+  },
+  "surface": {
+    "sourceModules": 3,
+    "claimedModules": 2,
+    "unclaimedModules": 1,
+    "history": {
+      "available": true,
+      "maxCommits": 200,
+      "commitsRead": 40
+    },
+    "highChurn": {
+      "modules": 3,
+      "claimed": 2
+    },
+    "rankedUnclaimed": [
+      {
+        "file": "src/session.mjs",
+        "changes": 8,
+        "riskSignals": [
+          "security"
+        ]
+      }
+    ]
+  },
+  "counts": {
+    "claims": 2,
+    "faults": 6,
+    "byVerdict": {
+      "killed": 1,
+      "survived": 1,
+      "unverifiable": 1,
+      "nocover": 1,
+      "flaky-defender": 2
+    },
+    "new": 1,
+    "baselined": 4
+  },
+  "stale": [],
+  "invalidFaults": [
+    {
+      "claimId": "REDACT-009",
+      "subjectId": "F1",
+      "file": "src/unselected.mjs",
+      "reason": "anchor-missing",
+      "hits": 0,
+      "expected": 1
+    }
+  ],
+  "changedFaults": [
+    {
+      "claimId": "REDACT-002",
+      "subjectId": "F1",
+      "previousVerdict": "unverifiable",
+      "file": "src/redact.mjs"
+    }
+  ],
+  "findings": [
+    {
+      "fingerprint": "01876384493be6809da455cb1a1c4bc92e7564e9898506d790b9589200502163",
+      "claimId": "REDACT-001",
+      "subjectId": "F1",
+      "verdict": "survived",
+      "severity": "critical",
+      "file": "src/redact.mjs",
+      "rank": 9.5,
+      "isNew": true
+    }
+  ],
+  "paths": {
+    "claims": "testguard.claims.json",
+    "evidence": ".testguard/evidence.json",
+    "baseline": ".testguard/baseline.json"
+  }
+}

@@ -154,7 +154,7 @@ faults and probe the selected draft before promoting it to canonical claims.
 
 ## Proving one change
 
-`testguard probe --changed <base> --json` probes only the claims the change since `<base>` can have affected, and `run.claims[]` answers per claim id: `proven`, `unproven` (a fault survived or had no defender) or `could-not-verify` (the measurement did not happen: fix the claim or the flake, do not write a test for it). Read `run.scope` first:
+`testguard probe --changed <base> --json` probes only the claims the change since `<base>` can have affected, and `run.claims[]` answers per claim id: `proven`, `unproven` (a fault survived or had no defender) or `could-not-verify` (the measurement did not happen: fix the claim or the flake, do not write a test for it). Read `run.scope` first. With `--claim` or `--changed`, the top-level `state` and `next` describe the whole claims file (another claim's broken anchor shows there); `run.scope.state` and `run.scope.next` describe only the claims you selected, so act on those to finish your selection:
 
 - `selectedCount: 0` is **not** a pass. It means no claim was in the change's way; `run.scope.changed.unmatchedFiles` lists the changed source files no claim covers. Add `--fail-on-empty-selection` to make an empty selection exit 2.
 - `run.scope.changed.outcome: "undetermined"` (exit 2) means git could not say what changed. Nothing was probed; fix the base ref or fetch history, then rerun. Never treat it as "no change".

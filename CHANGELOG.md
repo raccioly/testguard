@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `--claim` or `--changed` run no longer tells you to repair a claim you did
+  not select.** The status header is about the whole claims file and stays so;
+  `run.scope.state` and `run.scope.next` are new and describe the selection
+  alone, and the human output leads with a `scope:` line, then a `rest of the
+  file:` line when the whole file says something different. Spec change:
+  `status.schema.json`, `GATE-SEMANTICS.md`, the validator, a conformance
+  example and three invalid ones.
+
 ## [0.22.1] - 2026-11-11
 
 Automated weekly release — everything merged since `v0.22.0`.
