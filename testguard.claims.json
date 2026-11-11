@@ -9081,7 +9081,7 @@
           "description": "A scratch directory that cannot be written is accepted.",
           "faultClass": "call-removed",
           "file": "src/scratch-dir.mjs",
-          "find": "    rmSync(mkdtempSync(join(real, '.testguard-writable-')), { recursive: true, force: true });\n",
+          "find": "    rmSync(mkdtempSync(join(real, 'testguard-writable-')), { recursive: true, force: true });\n",
           "replace": "",
           "defendedBy": [
             "test/scratch-dir.test.mjs"

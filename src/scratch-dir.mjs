@@ -67,7 +67,7 @@ export function resolveScratchDir(flag, env = process.env) {
     if (!statSync(path).isDirectory()) throw new Error('not a directory');
     real = realpathSync(path);
     // Creating and removing a directory is the real test of "writable": an access(2) check answers yes for root on a path that then fails.
-    rmSync(mkdtempSync(join(real, '.testguard-writable-')), { recursive: true, force: true });
+    rmSync(mkdtempSync(join(real, 'testguard-writable-')), { recursive: true, force: true });
   } catch (error) {
     throw new PreconditionError(`scratch directory ${path} is not usable: ${error.code === 'ENOENT' ? 'it does not exist' : error.message}. Create a writable directory and pass it as --scratch-dir (or TESTGUARD_SCRATCH_DIR).`);
   }
