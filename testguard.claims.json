@@ -9139,8 +9139,8 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/probe-scope.test.mjs",
-        "test/probe-scope-git.test.mjs"
+        "test/probe-scope-git.test.mjs",
+        "test/probe-scope-cli.test.mjs"
       ],
       "faults": [
         {
@@ -9196,7 +9196,7 @@
           "find": "return { outcome: 'undetermined', exitCode: 2,",
           "replace": "return { outcome: 'undetermined', exitCode: 0,",
           "defendedBy": [
-            "test/probe-scope.test.mjs"
+            "test/probe-scope-cli.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",
@@ -9393,7 +9393,8 @@
       },
       "defendedBy": [
         "test/probe-scope.test.mjs",
-        "test/probe-scope-git.test.mjs"
+        "test/probe-scope-git.test.mjs",
+        "test/probe-scope-cli.test.mjs"
       ],
       "faults": [
         {
