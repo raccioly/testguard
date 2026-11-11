@@ -17,6 +17,6 @@ export default defineConfig({
     // tool's own tests, never collected directly. Agent-managed worktrees are
     // separate checkouts too: collecting them makes this tree's result depend
     // on unrelated, potentially unfinished work.
-    exclude: [...configDefaults.exclude, 'fixtures/**', '.claude/**'],
+    exclude: [...configDefaults.exclude, 'fixtures/**', 'corpus/**', '.claude/**'],
   },
 });
