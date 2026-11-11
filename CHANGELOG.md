@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   eligibility, `--typecheck`) is still decided first, in order, on the first
   tree.
 
+## [0.22.0] - 2026-11-11
+
+Automated weekly release — everything merged since `v0.21.0`.
+
+### Changed
+
+- feat(probe): --partial-on-budget writes what was proven and marks the rest not reached (#235) (#248)
+- feat(probe): a declared write boundary: --scratch-dir, node_modules never written through (#239) (#244)
+- feat(probe): --fault-workers probes several faults at once, each in its own scratch worktree (#237) (#245)
+- feat(probe): --typecheck — a replacement that does not type-check is fault-invalid (#236) (#247)
+- feat(probe): probe a change — --changed selection, run.claims[], external claims, claim-thin (#234) (#242)
+- chore(homebrew): sha256 for v0.21.0 (#246)
+
+
 ### Changed
 
 - **`probe --changed <ref>` now selects claims (#234).** It used to run every claim and only add
