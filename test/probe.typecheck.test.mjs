@@ -134,10 +134,10 @@ describe('the command line', () => {
     const project = typescriptProject();
     try {
       const bin = join(ROOT, 'cli', 'testguard.mjs');
-      const bare = spawnSync(process.execPath, [bin, 'probe', project.dir, '--typecheck', '--quiet', '--no-escalate', '--claim', 'TS-STRING,TS-SIGNATURE'], { encoding: 'utf8' });
+      const bare = spawnSync(process.execPath, [bin, 'probe', project.dir, '--typecheck', '--quiet', '--no-escalate', '--claim', 'TS-STRING'], { encoding: 'utf8' });
       expect(bare.status).toBe(1); // fault-invalid gates (GATE-SEMANTICS): a bad fault is a claim not yet proven
       const evidence = readJson(join(project.dir, '.testguard', 'evidence-partial.json'));
-      expect(evidence.records.map((r) => r.verdict)).toEqual(['fault-invalid', 'fault-invalid']);
+      expect(evidence.records.map((r) => r.verdict)).toEqual(['fault-invalid']); // TS-SIGNATURE's refusal is asserted above, through the API
       const tsc = join(TS_FIXTURE, 'node_modules', 'typescript', 'bin', 'tsc');
       const custom = spawnSync(process.execPath, [bin, 'probe', project.dir, `--typecheck=${process.execPath} ${tsc} --noEmit -p tsconfig.json`, '--quiet', '--no-escalate', '--no-reuse', '--claim', 'TS-STRING'], { encoding: 'utf8' });
       expect(custom.status).toBe(1);
