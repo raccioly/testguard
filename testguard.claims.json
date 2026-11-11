@@ -4465,7 +4465,8 @@
         "by": "maintainer"
       },
       "defendedBy": [
-        "test/runner-python.test.mjs"
+        "test/runner-python.test.mjs",
+        "test/probe-python-claims.test.mjs"
       ],
       "faults": [
         {
@@ -4568,7 +4569,8 @@
         "by": "maintainer"
       },
       "defendedBy": [
-        "test/pyimports.test.mjs"
+        "test/pyimports.test.mjs",
+        "test/probe-python-claims.test.mjs"
       ],
       "faults": [
         {
