@@ -187,6 +187,27 @@
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/claimResult" }
         },
+        "budget": {
+          "description": "Copied from the evidence's run.budget when probe ran with --partial-on-budget: the command budget, whether it ran out, and how many faults were reached.",
+          "type": "object",
+          "required": ["limitMs", "exhausted", "reached", "notReached"],
+          "properties": {
+            "limitMs": { "type": "integer", "minimum": 1 },
+            "exhausted": { "type": "boolean" },
+            "reached": { "type": "integer", "minimum": 0 },
+            "notReached": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "failureKind": {
+          "description": "Present only on a run whose command budget ran out (--partial-on-budget). `unproven+incomplete`: the measured part already holds a finding that gates, so the exit code is 1 and `unprovenAtLeast` is its count, a floor (faults not reached are not counted). `policy+incomplete`: the measured part failed a policy (exit 1) without a new gating verdict. `incomplete`: nothing gating so far, exit 2. Never an exit 0.",
+          "enum": ["unproven+incomplete", "policy+incomplete", "incomplete"]
+        },
+        "unprovenAtLeast": {
+          "description": "With failureKind `unproven+incomplete`: how many measured faults gate (not baselined, at or above the severity floor). A floor, never a total.",
+          "type": "integer",
+          "minimum": 1
+        },
         "scope": {
           "description": "What this invocation selected. `requestedClaims`/`requestedCount` come from --claim; `selectedCount` and `changed` from --changed. Every probed claim was selected.",
           "type": "object",

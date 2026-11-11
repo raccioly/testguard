@@ -11,6 +11,8 @@ import { classifyDefenders } from './mocks.mjs';
 import { detectContention, contentionWarning, fanOutWarning } from './contention.mjs';
 import { availableParallelism } from 'node:os';
 import { createScratch, inPlace, PreconditionError } from './worktree.mjs';
+import { BudgetExhaustedError } from '../command-budget.mjs';
+import { completeRecords, budgetSummary, notReachedRecord, isNotReached } from './partial-budget.mjs';
 import { applyContent, applyFault, locate } from './inject.mjs';
 import { resolveDefenders, parseCommandTemplate } from './runners/shared.mjs';
 import { selectRunner, discoverRunnerManifest, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns, runnerLabel, runnerFor } from './runners/index.mjs';
@@ -129,7 +131,73 @@ export function reuseSummary(records) {
  * Probe every fault of every claim. Returns a spec-conformant evidence
  * document; writing it is the caller's job.
  */
-export async function probe({
+export async function probe(options) {
+  const { partialOnBudget = false, commandBudget } = options;
+  const ctx = { settled: new Map(), records: [], measurements: { elapsedMs: 0, runnerMs: 0, overheadMs: 0, runnerInvocations: 0, reuseBaselineRuns: 0 }, measuredStart: performance.now(), startedAt: new Date().toISOString(), runnerClock: createBusyClock(() => performance.now()) };
+  if (!partialOnBudget) return measureProbe(options, ctx);
+  if (!commandBudget) throw new PreconditionError('--partial-on-budget needs a command budget: pass --command-budget <ms>');
+  let document;
+  try {
+    document = await measureProbe(options, ctx);
+  } catch (error) {
+    // By identity: only the budget's own expiry becomes a document. Every other
+    // failure — including a precondition that merely coincides with the
+    // deadline — is raised exactly as it is without the flag. measureProbe has
+    // already restored and removed every tree.
+    if (!(error instanceof BudgetExhaustedError)) throw error;
+    return partialDocument(options, ctx);
+  }
+  // Every fault was reached; the deadline bounds measuring, so a complete
+  // result stands even if the clock ran out while writing it.
+  document.run.budget = budgetSummary(commandBudget.limitMs, document.records);
+  return document;
+}
+
+/**
+ * The document of a run whose command budget expired: every fault that was
+ * fully measured keeps its record, every other fault is `not-reached`. Built
+ * only after the scratch trees are gone, from what `measureProbe` published.
+ */
+function partialDocument(options, ctx) {
+  const { claims, only, ref = 'HEAD', confirmRuns = 3, workers = 1, serial = workers === 1, faultWorkers = 1, runnerCommand, onProgress = () => {}, commandBudget, toolVersion = '0.0.0' } = options;
+  const projectDir = realpathSync(resolve(options.projectDir));
+  const faults = selectClaims(claims.claims, only).flatMap((claim) => claim.faults.map((fault) => ({ claim, fault })));
+  const records = completeRecords(faults, ctx.settled, ({ claim, fault }) => notReachedRecord({ claim, fault, inputs: safeInputs(projectDir, fault, []), limitMs: commandBudget.limitMs }));
+  // Whatever the ordered emitter had not published yet reaches the caller now, in order.
+  for (const record of records.slice(ctx.records.length)) onProgress(record);
+  const head = ctx.head ?? headSha(gitRoot(projectDir), ref);
+  const { measurements, runnerClock } = ctx;
+  measurements.runnerMs = runnerClock.totalMs;
+  measurements.elapsedMs = performance.now() - ctx.measuredStart;
+  measurements.overheadMs = measurements.elapsedMs - measurements.runnerMs;
+  return {
+    schemaVersion: 1,
+    tool: { name: 'testguard', version: toolVersion },
+    run: {
+      id: `run-${ctx.startedAt.replace(/[-:.]/g, '').slice(0, 15)}`,
+      startedAt: ctx.startedAt,
+      finishedAt: new Date().toISOString(),
+      repo: { head, dirty: isDirty(gitRoot(projectDir)), ...(ctx.snapshot ? { snapshot: ctx.snapshot } : {}), ...(ctx.ignoredDirty?.length ? { ignoredDirty: ctx.ignoredDirty } : {}) },
+      ...(ctx.recordedRunner ? { runner: ctx.recordedRunner } : {}),
+      ...(ctx.instrument ? { instrument: ctx.instrument } : {}),
+      reuse: reuseSummary(records),
+      ...(ctx.runnersUsed?.size > 1 ? { runners: [...ctx.runnersUsed].map(([n, v]) => ({ name: n, ...(v ? { version: v } : {}) })) } : {}),
+      confirmRuns,
+      measurements,
+      ...(!runnerCommand ? { workers: serial ? 1 : workers } : {}),
+      ...(serial && !runnerCommand ? { serial: true } : {}),
+      ...(faultWorkers > 1 ? { faultWorkers } : {}),
+      ...(ctx.contention?.detected ? { contention: ctx.contention } : {}),
+      ...(confirmRuns < 3 ? { provisional: true } : {}),
+      mode: ctx.mode ?? options.mode ?? 'worktree',
+      budget: budgetSummary(commandBudget.limitMs, records),
+    },
+    records,
+    origins: recordedOriginSummary(records),
+  };
+}
+
+async function measureProbe({
   projectDir,
   claims,
   confirmRuns = 3,
@@ -155,19 +223,16 @@ export async function probe({
   toolVersion = '0.0.0',
   previous,
   onProgress = () => {},
-}) {
+}, ctx) {
   if (!Number.isSafeInteger(workers) || workers < 1) throw new PreconditionError('workers must be a positive safe integer');
   if (parseFaultWorkers(faultWorkers) !== faultWorkers) throw new PreconditionError('fault workers must be a positive safe integer');
   // One mutable tree cannot hold two faults at once; the fan-out needs one
   // scratch worktree per fault in flight.
   if (mode === 'in-place' && faultWorkers > 1) throw new PreconditionError('--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place');
   resetInterpreterCache(); // Cache only within this measurement, never across commands.
-  const measuredStart = performance.now();
-  const startedAt = new Date().toISOString();
-  const measurements = { elapsedMs: 0, runnerMs: 0, overheadMs: 0, runnerInvocations: 0, reuseBaselineRuns: 0 };
+  const { measuredStart, startedAt, measurements, runnerClock } = ctx;
   // Runner time is wall-clock time with at least one runner executing: the
   // sum of the invocations when serial, their union under a fan-out.
-  const runnerClock = createBusyClock(() => performance.now());
   const timedRun = async (runner, opts) => {
     assertNotCancelled();
     runnerClock.start();
@@ -182,6 +247,7 @@ export async function probe({
   const root = gitRoot(projectDir);
   if (mode === 'in-place' && ref !== 'HEAD') throw new PreconditionError('--ref needs a scratch worktree; drop --in-place');
   const head = headSha(root, ref);
+  ctx.head = head;
   if (!head) throw new PreconditionError(ref === 'HEAD' ? 'repository has no commits; every verdict is tied to a commit' : `ref ${ref} does not resolve to a commit`);
 
   const scopedClaims = selectClaims(claims.claims, only);
@@ -203,7 +269,7 @@ export async function probe({
   let ignoredDirty = [];
   if (mode === 'worktree') {
     if (includeDirty) {
-      if (isDirty(root)) snapshot = snapshotWorkingTree(root);
+      if (isDirty(root)) { snapshot = snapshotWorkingTree(root); ctx.snapshot = snapshot; }
     } else {
       const watched = new Set(targets);
       const records = gitRaw(['status', '--porcelain=v1', '-z'], root).split('\0');
@@ -237,6 +303,7 @@ export async function probe({
           try {
             manifests.set(candidate, await discoverRunnerManifest(candidate, check, projectDir, budgetFor()));
           } catch (error) {
+            if (error instanceof BudgetExhaustedError) throw error;
             throw new PreconditionError(`cannot verify dirty defender/config inputs because ${candidate.name} discovery failed (${error.message})`);
           }
         }
@@ -269,6 +336,7 @@ export async function probe({
       }
       if (dirty.length) {
         ignoredDirty = dirty.sort();
+        ctx.ignoredDirty = ignoredDirty;
         onWarn(`${dirty.length} defender/target file${dirty.length === 1 ? ' has' : 's have'} uncommitted changes (${dirty.join(', ')}); probing ${ref === 'HEAD' ? `HEAD (${head.slice(0, 7)})` : `${ref} (${head.slice(0, 7)})`} as committed — the working-tree versions are NOT what is being probed. Recorded in the evidence as repo.ignoredDirty.`);
       }
     }
@@ -276,14 +344,16 @@ export async function probe({
   // Contention: name it before the first run, and record it, so a later
   // reader of a TIMEOUT or FLAKY-DEFENDER knows the machine was loaded.
   const contention = detectContention();
+  ctx.contention = contention;
   if (contention.detected) onWarn(contentionWarning(contention, { serial, workers, custom: Boolean(runnerCommand), faultWorkers }));
   const selfLoad = fanOutWarning({ faultWorkers, workers, serial: serial || Boolean(runnerCommand), cpus: availableParallelism() });
   if (selfLoad) onWarn(selfLoad);
 
   const iso = mode === 'worktree' ? createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules }) : inPlace({ repoRoot: root, projectDir });
+  ctx.mode = iso.mode;
   const isoReal = realpathSync(iso.projectDir);
   const extraTrees = []; // the fan-out's scratch trees beyond the first
-  const records = [];
+  const records = ctx.records;
   let runnerVersion;
   let runnerSource;
   let recordedRunner;
@@ -296,6 +366,7 @@ export async function probe({
   const engines = new Map();
   const labelOf = (r) => runnerLabel(r, engines);
   const runnersUsed = new Map(); // every runner that ran defenders, beyond the project runner
+  ctx.runnersUsed = runnersUsed;
   try {
     const commandTemplate = runnerCommand ? parseCommandTemplate(runnerCommand) : undefined;
     if (!commandTemplate) {
@@ -313,6 +384,7 @@ export async function probe({
       if (sel.engine) engines.set(sel.runner, sel.engine);
     }
     recordedRunner = runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), runnerSource);
+    ctx.recordedRunner = recordedRunner;
     runnersUsed.set(recordedRunner.name, recordedRunner.version);
     // Files an owning runner (Playwright) claims run under it, whatever the
     // project runner is; it must resolve before the first such defender runs.
@@ -327,7 +399,10 @@ export async function probe({
           budgetFor: () => commandBudget?.runBudget(budgetMs) ?? budgetMs,
           assertOpen: () => commandBudget?.assertOpen(),
         }));
-      } catch (error) { throw new PreconditionError(`test discovery failed: ${error.message}`); }
+      } catch (error) {
+        if (error instanceof BudgetExhaustedError) throw error;
+        throw new PreconditionError(`test discovery failed: ${error.message}`);
+      }
     }
     // Single-flight: two trees reaching a not-yet-checked owning runner at the
     // same moment share one check.
@@ -377,6 +452,7 @@ export async function probe({
     // Promises, so two trees asking at once share one run.
     const controlCache = new Map();
     instrument = instrumentOf(iso.projectDir, toolVersion);
+    ctx.instrument = instrument;
     const prior = reusableRun(previous, { confirmRuns, workers, serial, runnerCommand, runner: recordedRunner, instrument, faultWorkers })
       ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
       : new Map();
@@ -396,8 +472,10 @@ export async function probe({
     // file the interpreter actually loaded (Python) reports it back.
     const runDefenders = async (files, targets = [], treeDir = iso.projectDir) => {
       if (commandTemplate) {
-        const result = await timedRun(runner, { projectDir: treeDir, sourceDir: projectDir, python, files, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, commandTemplate, serial, workers, targets });
+        const granted = commandBudget?.runBudget(budgetMs) ?? budgetMs;
+        const result = await timedRun(runner, { projectDir: treeDir, sourceDir: projectDir, python, files, budgetMs: granted, commandTemplate, serial, workers, targets });
         commandBudget?.assertOpen();
+        commandBudget?.assertNotCut(granted, budgetMs, result.timeouts);
         return result;
       }
       const groups = partitionConfigured(files);
@@ -405,8 +483,11 @@ export async function probe({
       for (const [r, group] of groups) {
         commandBudget?.assertOpen();
         if (r !== runner) await ensureOwned(r, group[0]);
-        parts.push(await timedRun(r, { projectDir: treeDir, sourceDir: projectDir, python, files: group, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, serial, workers, targets }));
+        const granted = commandBudget?.runBudget(budgetMs) ?? budgetMs;
+        const part = await timedRun(r, { projectDir: treeDir, sourceDir: projectDir, python, files: group, budgetMs: granted, serial, workers, targets });
+        parts.push(part);
         commandBudget?.assertOpen();
+        commandBudget?.assertNotCut(granted, budgetMs, part.timeouts);
       }
       return mergeRuns(parts);
     };
@@ -485,6 +566,13 @@ export async function probe({
       records.push(record);
       onProgress(record);
     });
+    // Every finished record is also kept by index: when the command budget
+    // runs out, a record that finished but is still held back behind an
+    // unfinished predecessor is a full measurement and survives.
+    const settle = (index, record) => {
+      ctx.settled.set(index, record);
+      emitter.settle(index, record);
+    };
     /**
      * A fault that threw. A precondition failure is a statement about the
      * whole run — the interpreter is loading a different copy of the source,
@@ -555,7 +643,7 @@ export async function probe({
         if (item.firstOfClaim) commandBudget?.assertOpen();
         commandBudget?.assertOpen();
         const planned = await planOne(item);
-        emitter.settle(index, planned.record ?? await measureOne(planned.state, primary));
+        settle(index, planned.record ?? await measureOne(planned.state, primary));
       }
     } else {
       // Plan every fault first, in order, on the clean first tree: input
@@ -567,8 +655,8 @@ export async function probe({
         if (item.firstOfClaim) commandBudget?.assertOpen();
         commandBudget?.assertOpen();
         const planned = await planOne(item);
-        if (planned.record) emitter.settle(index, planned.record);
-        else if (!planned.state.mutate) emitter.settle(index, await measureOne(planned.state, primary));
+        if (planned.record) settle(index, planned.record);
+        else if (!planned.state.mutate) settle(index, await measureOne(planned.state, primary));
         else pending.push({ index, state: planned.state });
       }
       baselinesFrozen = true;
@@ -587,7 +675,7 @@ export async function probe({
         // Held back (and everything after it, by the ordered emitter) until
         // it has been measured again with nothing else running.
         if (contended && needsSerialRemeasure(record)) remeasure.push({ index, state });
-        else emitter.settle(index, record);
+        else settle(index, record);
       }, { beforeEach: () => commandBudget?.assertOpen() });
       // The fan-out is over: its trees go now, so no more than n ever exist.
       while (extraTrees.length) extraTrees.pop().cleanup();
@@ -606,7 +694,7 @@ export async function probe({
           fresh.cleanup();
         }
         record.detail.remeasuredSerially = true;
-        emitter.settle(index, record);
+        settle(index, record);
       }
     }
   } finally {

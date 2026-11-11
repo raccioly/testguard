@@ -1,0 +1,255 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.21.0"
+  },
+  "generatedAt": "2026-11-11T03:00:06.000Z",
+  "state": "evidence-stale",
+  "next": {
+    "action": "probe",
+    "command": "testguard probe --include-dirty",
+    "why": "6 inputs changed since the evidence was taken: defender selection for C3/F1 changed since it was probed; test/c3.test.mjs now defends C3/F1 but was not probed; C3/F1 predates dependency hashing and cannot be reused; …."
+  },
+  "provisional": false,
+  "counts": {
+    "claims": 4,
+    "faults": 4,
+    "byVerdict": {
+      "survived": 1,
+      "killed": 1,
+      "unverifiable": 2
+    },
+    "killedCoAuthored": 1,
+    "killedExceptionOnly": 0,
+    "new": 3,
+    "baselined": 0
+  },
+  "stale": [
+    "defender selection for C3/F1 changed since it was probed",
+    "test/c3.test.mjs now defends C3/F1 but was not probed",
+    "C3/F1 predates dependency hashing and cannot be reused",
+    "defender selection for C4/F1 changed since it was probed",
+    "test/c4.test.mjs now defends C4/F1 but was not probed",
+    "C4/F1 predates dependency hashing and cannot be reused"
+  ],
+  "invalidFaults": [],
+  "changedFaults": [],
+  "findings": [
+    {
+      "fingerprint": "dbd56f767d06bb225000d92b5469323b066735f476d9a7927176286cdda30f14",
+      "claimId": "C1",
+      "subjectId": "F1",
+      "verdict": "survived",
+      "severity": "high",
+      "file": "src/c1.mjs",
+      "rank": 3.6,
+      "isNew": true
+    },
+    {
+      "fingerprint": "2272fa06352208619942ce05f71bfc5029503f1a4c7f364845fad0baf23e8856",
+      "claimId": "C3",
+      "subjectId": "F1",
+      "verdict": "unverifiable",
+      "reason": "not-reached-within-budget",
+      "severity": "high",
+      "file": "src/c3.mjs",
+      "isNew": true
+    },
+    {
+      "fingerprint": "5487e182540b15fd66f77500fed5d4f9cee1094ee40e3dc64a6a00e9136a222f",
+      "claimId": "C4",
+      "subjectId": "F1",
+      "verdict": "unverifiable",
+      "reason": "not-reached-within-budget",
+      "severity": "high",
+      "file": "src/c4.mjs",
+      "isNew": true
+    }
+  ],
+  "notes": [
+    "ANNOTATION ADVISORY: 4 declared claim IDs lack a scanned source link. Discoverability and annotation reconciliation are reduced; exact fault anchors remain checked.",
+    "Missing source annotation: C1",
+    "Missing source annotation: C2",
+    "Missing source annotation: C3",
+    "Missing source annotation: C4",
+    "Optional read-only preview in the selected project: testguard claims --annotate. Placement is not verification or authenticated intent; review before explicitly applying."
+  ],
+  "paths": {
+    "claims": "testguard.claims.json",
+    "evidence": ".testguard/evidence-partial.json"
+  },
+  "origins": {
+    "basis": "declared",
+    "claims": {
+      "total": 4,
+      "byKind": {
+        "spec": 0,
+        "adr": 0,
+        "annotation": 0,
+        "comment": 0,
+        "manual": 4,
+        "doc": 0,
+        "bug": 0,
+        "incident": 0,
+        "review": 0,
+        "inferred": 0
+      },
+      "mixed": 0
+    }
+  },
+  "thinClaims": [
+    {
+      "claimId": "C1",
+      "signal": "claim-thin",
+      "reason": "fewer-than-two-faults",
+      "faults": 1,
+      "faultClasses": [
+        "return-altered"
+      ]
+    },
+    {
+      "claimId": "C2",
+      "signal": "claim-thin",
+      "reason": "fewer-than-two-faults",
+      "faults": 1,
+      "faultClasses": [
+        "return-altered"
+      ]
+    },
+    {
+      "claimId": "C3",
+      "signal": "claim-thin",
+      "reason": "fewer-than-two-faults",
+      "faults": 1,
+      "faultClasses": [
+        "return-altered"
+      ]
+    },
+    {
+      "claimId": "C4",
+      "signal": "claim-thin",
+      "reason": "fewer-than-two-faults",
+      "faults": 1,
+      "faultClasses": [
+        "return-altered"
+      ]
+    }
+  ],
+  "surface": {
+    "sourceModules": 4,
+    "claimedModules": 4,
+    "unclaimedModules": 0,
+    "history": {
+      "available": true,
+      "maxCommits": 200,
+      "commitsRead": 1
+    },
+    "highChurn": {
+      "modules": 4,
+      "claimed": 4
+    },
+    "rankedUnclaimed": []
+  },
+  "evidenceSource": "provided",
+  "evidenceHead": "69806b50ef481c22636247767e111e452cb11de1",
+  "head": "69806b50ef481c22636247767e111e452cb11de1",
+  "run": {
+    "id": "run-20261111T030000",
+    "evidence": ".testguard/evidence-partial.json",
+    "provisional": false,
+    "records": 4,
+    "newSinceBaseline": 1,
+    "exitCode": 1,
+    "reuse": {
+      "reused": 0,
+      "measured": 4
+    },
+    "budget": {
+      "limitMs": 60000,
+      "exhausted": true,
+      "reached": 2,
+      "notReached": 2
+    },
+    "failureKind": "incomplete",
+    "claims": [
+      {
+        "id": "C1",
+        "result": "unproven",
+        "faults": {
+          "total": 1,
+          "killed": 0,
+          "survived": 1,
+          "nocover": 0,
+          "unverifiable": 0,
+          "faultInvalid": 0,
+          "timeout": 0,
+          "flakyDefender": 0
+        },
+        "reasons": [
+          {
+            "faultId": "F1",
+            "verdict": "survived"
+          }
+        ]
+      },
+      {
+        "id": "C2",
+        "result": "proven",
+        "faults": {
+          "total": 1,
+          "killed": 1,
+          "survived": 0,
+          "nocover": 0,
+          "unverifiable": 0,
+          "faultInvalid": 0,
+          "timeout": 0,
+          "flakyDefender": 0
+        },
+        "reasons": []
+      },
+      {
+        "id": "C3",
+        "result": "could-not-verify",
+        "faults": {
+          "total": 1,
+          "killed": 0,
+          "survived": 0,
+          "nocover": 0,
+          "unverifiable": 1,
+          "faultInvalid": 0,
+          "timeout": 0,
+          "flakyDefender": 0
+        },
+        "reasons": [
+          {
+            "faultId": "F1",
+            "verdict": "unverifiable",
+            "reason": "not-reached-within-budget"
+          }
+        ]
+      },
+      {
+        "id": "C4",
+        "result": "could-not-verify",
+        "faults": {
+          "total": 1,
+          "killed": 0,
+          "survived": 0,
+          "nocover": 0,
+          "unverifiable": 1,
+          "faultInvalid": 0,
+          "timeout": 0,
+          "flakyDefender": 0
+        },
+        "reasons": [
+          {
+            "faultId": "F1",
+            "verdict": "unverifiable",
+            "reason": "not-reached-within-budget"
+          }
+        ]
+      }
+    ]
+  }
+}

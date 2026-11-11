@@ -101,6 +101,18 @@
           "type": "integer",
           "minimum": 2
         },
+        "budget": {
+          "description": "Present only when `probe --partial-on-budget` ran under a command budget (`--command-budget`). `limitMs` is that budget. `exhausted` is true exactly when the budget ran out before every fault was fully measured, in which case every fault that was in flight or not started is an `unverifiable` record with reason `not-reached-within-budget` (no runs, never reusable, never part of a baseline) and every other record is a complete measurement. `reached` and `notReached` count the records in each state and always sum to the record count; a validator derives both from the records and rejects a document that disagrees. An exhausted document is written to `--out` or `.testguard/evidence-partial.json`, never the canonical evidence file.",
+          "type": "object",
+          "required": ["limitMs", "exhausted", "reached", "notReached"],
+          "properties": {
+            "limitMs": { "type": "integer", "minimum": 1 },
+            "exhausted": { "type": "boolean" },
+            "reached": { "type": "integer", "minimum": 0 },
+            "notReached": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
         "contention": {
           "description": "Other test runners that were already running when this probe started. Best effort, never a verdict: it exists so a reader of a TIMEOUT or FLAKY-DEFENDER can tell the machine was loaded.",
           "type": "object",
@@ -433,7 +445,7 @@
           "required": [],
           "properties": {
             "reason": {
-              "description": "Machine-readable qualifier, e.g. `anchor-missing`, `anchor-ambiguous`, `defenders-not-green`, `replacement-does-not-compile`.",
+              "description": "Machine-readable qualifier, e.g. `anchor-missing`, `anchor-ambiguous`, `defenders-not-green`, `replacement-does-not-compile`, `not-reached-within-budget` (the command budget ran out before this fault was fully measured; `unverifiable`, no runs, never reusable).",
               "type": "string",
               "maxLength": 256
             },

@@ -45,6 +45,11 @@ export async function baselineCommand({ projectDir, values, version }, io) {
     io.err(`error: ${evPath} is provisional (confirmRuns ${evidence.run.confirmRuns} < 3); a baseline must be frozen from confirmed evidence. Re-run probe with --confirm 3, or pass --allow-provisional if you accept unconfirmed findings as the frozen contract.`);
     return 2;
   }
+  // A document whose command budget ran out holds faults nobody measured; freezing it would make "not reached" the accepted contract.
+  if (evidence.run.budget?.exhausted) {
+    io.err(`error: ${evPath} is incomplete (the command budget of ${evidence.run.budget.limitMs}ms ran out; ${evidence.run.budget.notReached} fault${evidence.run.budget.notReached === 1 ? '' : 's'} not reached). A baseline is never frozen from it. Re-run probe with a larger --command-budget.`);
+    return 2;
+  }
   const outPath = values.out ? resolve(values.out) : baselinePath(projectDir);
   if (values.restamp) {
     if (!existsSync(outPath)) {
