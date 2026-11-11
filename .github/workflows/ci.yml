@@ -381,6 +381,8 @@ jobs:
         run: |
           npm ci
           npm ci --prefix fixtures/known-answer-playwright
+      - name: Write boundary — every runner, read-only and writable node_modules
+        run: TESTGUARD_WRITE_BOUNDARY_FULL=1 npx vitest run test/write-boundary.acceptance.test.mjs
       - name: Playwright adapter units + mixed-defender acceptance
         run: npx vitest run test/runner-playwright.test.mjs test/probe.playwright.test.mjs
       - name: probe the playwright fixture through the bin (mixed defenders, auto runner)

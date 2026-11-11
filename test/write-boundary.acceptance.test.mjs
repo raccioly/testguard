@@ -28,12 +28,18 @@ const HAS_PYTHON = spawnSync(PYTHON, ['-c', 'import sys']).status === 0;
 const PW_FIXTURE = join(ROOT, 'fixtures', 'known-answer-playwright');
 const HAS_PLAYWRIGHT = existsSync(join(PW_FIXTURE, 'node_modules', '@playwright', 'test')) && existsSync(join(PW_FIXTURE, 'node_modules', 'vitest'));
 
-const FIXTURES = [
+// The full matrix (every runner, a read-only and a writable install, a dirty tree) takes minutes, and `npm test` has a
+// runtime budget. `npm test` runs the vitest fixture once, over a dirty tree and a read-only install, which exercises
+// the scratch tree, discovery in the caller's tree and the listing. CI runs the whole matrix in the playwright job,
+// which has every runner installed: TESTGUARD_WRITE_BOUNDARY_FULL=1.
+const FULL = process.env.TESTGUARD_WRITE_BOUNDARY_FULL === '1';
+const ALL_FIXTURES = [
   { name: 'vitest', dir: 'known-answer', runner: 'vitest', nm: join(ROOT, 'node_modules'), dirty: true, writableRun: true },
   { name: 'jest', dir: 'known-answer-jest', runner: 'jest', nm: join(ROOT, 'node_modules') },
   { name: 'python (unittest)', dir: 'known-answer-python', runner: 'unittest', skip: !HAS_PYTHON },
   { name: 'playwright + vitest', dir: 'known-answer-playwright', runner: 'auto', nm: join(PW_FIXTURE, 'node_modules'), skip: !HAS_PLAYWRIGHT },
 ];
+const FIXTURES = FULL ? ALL_FIXTURES : ALL_FIXTURES.slice(0, 1).map((f) => ({ ...f, lean: true, writableRun: false }));
 
 const git = (cwd, ...args) => {
   const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'gc.auto=0', '-c', 'maintenance.auto=false', '-c', 'user.email=f@example.invalid', '-c', 'user.name=f', ...args], { cwd, encoding: 'utf8' });
@@ -92,9 +98,10 @@ describe.each(FIXTURES)('write boundary: $name', (fixture) => {
     const nmRwBefore = nmRw ? listing(nmRw) : undefined;
     if (nmRo) chmodTree(nmRo, 'ro');
     try {
-      ro = boundaryRun(fixture, expected, nmRo);
+      ro = boundaryRun(fixture, expected, nmRo, { dirty: Boolean(fixture.lean) });
+      if (fixture.lean) roDirty = ro;
       if (!fixture.nm || fixture.writableRun) rw = boundaryRun(fixture, expected, nmRw);
-      if (nmRo && fixture.dirty) roDirty = boundaryRun(fixture, expected, nmRo, { dirty: true });
+      if (nmRo && fixture.dirty && !fixture.lean) roDirty = boundaryRun(fixture, expected, nmRo, { dirty: true });
       if (rw) rw.nmChanges = nmRw ? changes(nmRwBefore, listing(nmRw)) : undefined;
     } finally {
       if (nmRo) chmodTree(nmRo, 'rw'); // so cleanup can never fail on a read-only tree
