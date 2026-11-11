@@ -89,7 +89,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
       - run: npm ci
@@ -186,7 +186,7 @@ jobs:
       # NO registry-url on purpose: with it, setup-node writes an _authToken
       # line that expands to an EMPTY token when NODE_AUTH_TOKEN is unset, and
       # npm then sends that instead of attempting OIDC.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
       - run: npm install -g npm@11
@@ -216,7 +216,7 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
       - name: Sync version into pyproject.toml
@@ -228,7 +228,7 @@ jobs:
       - run: python -m build
       - name: Assert OIDC token is available
         run: '[ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] || { echo "::error::no OIDC token endpoint"; exit 1; }'
-      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
 
   homebrew-sha:
     # The formula's sha256 is set from the PUBLISHED tarball — what Homebrew
@@ -269,7 +269,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
       - name: Set sha256, publish the live tap, and land the source formula PR
