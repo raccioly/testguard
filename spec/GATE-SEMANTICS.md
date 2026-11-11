@@ -1296,8 +1296,9 @@ run exactly: the same invocations in the same order, and evidence without
 
 1. **Plan, then measure.** Every fault is first planned in claim/fault order
    on the first scratch tree with no fault applied anywhere: defender
-   resolution and discovery, every input hash, the anchor, verdict reuse, and
-   the defender set's shared baseline (topped up in the order a serial run
+   resolution and discovery, every input hash, the anchor, verdict reuse, the
+   `--typecheck` check (so its incremental build-info lives in one tree only),
+   and the defender set's shared baseline (topped up in the order a serial run
    would ask for it, so `runnerInvocations` and `reuseBaselineRuns` match). A
    fault that never mutates (reused, no defenders, a bad anchor, a baseline
    that is not green N/N) is finished there. Baselines are therefore measured
