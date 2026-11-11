@@ -14,6 +14,11 @@ import { FIXTURE_GIT } from './helpers/git.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'fixtures', 'known-answer-python');
 const expected = JSON.parse(readFileSync(join(FIXTURE, 'expected.json'), 'utf8'));
+// The fixture's REDACT-004 defender never returns, so its run ends at this wall-clock budget: that wait is most of
+// this file's time. A healthy unittest or pytest run of the fixture takes a fraction of a second, so 8 s is far
+// above any baseline and a timeout can only be the hang. expected.json's own budgetMs (20 s) stays the oracle's
+// figure for the CI step that drives the fixture through the bin.
+const BUDGET_MS = Math.min(expected.budgetMs, 8_000);
 
 // The interpreter TestGuard will resolve, so capability detection and the run
 // cannot disagree. CI points TESTGUARD_PYTHON at a bare venv to prove the
@@ -55,7 +60,7 @@ describe.skipIf(!HAS_PYTHON)('probe reproduces the known-answer fixture with the
   beforeAll(async () => {
     resetInterpreterCache();
     scratch = plant();
-    evidence = await probe({ projectDir: scratch, claims: loadClaims(join(scratch, 'testguard.claims.json')), confirmRuns: expected.confirmRuns, mode: 'worktree', runnerName: 'unittest', escalate: false, budgetMs: expected.budgetMs, toolVersion: 'test' });
+    evidence = await probe({ projectDir: scratch, claims: loadClaims(join(scratch, 'testguard.claims.json')), confirmRuns: expected.confirmRuns, mode: 'worktree', runnerName: 'unittest', escalate: false, budgetMs: BUDGET_MS, toolVersion: 'test' });
   }, 600_000);
 
   afterAll(() => { if (scratch) rmSync(scratch, { recursive: true, force: true }); resetInterpreterCache(); });
@@ -125,7 +130,7 @@ describe.skipIf(!HAS_PYTEST)('the same oracle under pytest', () => {
   beforeAll(async () => {
     resetInterpreterCache();
     scratch = plant();
-    evidence = await probe({ projectDir: scratch, claims: loadClaims(join(scratch, 'testguard.claims.json')), confirmRuns: expected.confirmRuns, mode: 'worktree', runnerName: 'pytest', escalate: false, budgetMs: expected.budgetMs, toolVersion: 'test' });
+    evidence = await probe({ projectDir: scratch, claims: loadClaims(join(scratch, 'testguard.claims.json')), confirmRuns: expected.confirmRuns, mode: 'worktree', runnerName: 'pytest', escalate: false, budgetMs: BUDGET_MS, toolVersion: 'test' });
   }, 600_000);
 
   afterAll(() => { if (scratch) rmSync(scratch, { recursive: true, force: true }); resetInterpreterCache(); });
@@ -192,16 +197,12 @@ describe.skipIf(!HAS_PYTHON)('a fault the interpreter never loads is refused, no
   afterAll(() => { resetInterpreterCache(); });
 
   it('refuses the run and names the file that was loaded instead', async () => {
-    await expect(probe({
-      projectDir: scratch, claims: loadClaims(join(scratch, 'testguard.claims.json')),
-      confirmRuns: 1, mode: 'worktree', runnerName: 'unittest', escalate: false, budgetMs: 30_000, toolVersion: 'test',
-    })).rejects.toThrow(PreconditionError);
-
-    // …and the reason is actionable, not just a refusal.
+    // One run, two assertions: the refusal is a PreconditionError, and its reason is actionable, not just a refusal.
     const failure = await probe({
       projectDir: scratch, claims: loadClaims(join(scratch, 'testguard.claims.json')),
       confirmRuns: 1, mode: 'worktree', runnerName: 'unittest', escalate: false, budgetMs: 30_000, toolVersion: 'test',
-    }).catch((e) => e);
+    }).then(() => undefined, (e) => e);
+    expect(failure).toBeInstanceOf(PreconditionError);
     expect(failure.message).toContain(join(outside, 'demo', 'guard.py'));
     expect(failure.message).toMatch(/every claim would be reported as SURVIVED/);
   }, 300_000);
