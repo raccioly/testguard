@@ -9478,7 +9478,7 @@
           "find": "e instanceof ClaimsError || e instanceof PreconditionError || e instanceof GitError",
           "replace": "e instanceof ClaimsError || e instanceof GitError",
           "defendedBy": [
-            "test/scratch-dir.test.mjs"
+            "test/scratch-dir.cli.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",
@@ -9593,7 +9593,7 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/scratch-dir.test.mjs"
+        "test/no-network-guard.test.mjs"
       ],
       "faults": [
         {
@@ -9604,7 +9604,7 @@
           "find": "  if (log) appendFileSync(log, `${process.pid} ${kind} ${detail}\\n`);\n",
           "replace": "",
           "defendedBy": [
-            "test/scratch-dir.test.mjs"
+            "test/no-network-guard.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",
@@ -9619,7 +9619,7 @@
           "find": "if (!local) refuse('listen',",
           "replace": "if (false) refuse('listen',",
           "defendedBy": [
-            "test/scratch-dir.test.mjs"
+            "test/no-network-guard.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",
@@ -9634,7 +9634,7 @@
           "find": "if (!local) refuse('connect',",
           "replace": "if (true) refuse('connect',",
           "defendedBy": [
-            "test/scratch-dir.test.mjs"
+            "test/no-network-guard.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",
