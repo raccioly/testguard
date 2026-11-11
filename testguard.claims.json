@@ -9061,8 +9061,8 @@
       ]
     },
     {
-      "id": "TG-PROBE-CHANGED-SELECTS-WHAT-A-CHANGE-REACHES",
-      "statement": "probe --changed selects a claim when a changed path (a rename counting through its old and its new path) is a fault target, a defender or anything in their import closure, selects a claim whose closure cannot be followed only when something changed, and leaves a requested claim out when the change did not reach it.",
+      "id": "TG-PROBE-CHANGED-SELECTS-THROUGH-RENAMES-AND-CLOSURES",
+      "statement": "probe --changed selects a claim when a changed path, a rename counting through its old and its new path, is a fault target, a defender or anything in their import closure.",
       "source": {
         "kind": "spec",
         "ref": "spec/GATE-SEMANTICS.md"
@@ -9099,7 +9099,25 @@
             "producer": "agent",
             "by": "claude"
           }
-        },
+        }
+      ]
+    },
+    {
+      "id": "TG-PROBE-CHANGED-SELECTION-IS-CONSERVATIVE-AND-INTERSECTS",
+      "statement": "probe --changed selects a claim whose closure cannot be followed only when something changed, and leaves a requested claim out when the change did not reach it.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-scope.test.mjs"
+      ],
+      "faults": [
         {
           "id": "F3",
           "description": "An unfollowable closure selects the claim even when nothing changed.",
@@ -9127,8 +9145,8 @@
       ]
     },
     {
-      "id": "TG-PROBE-CHANGED-NEVER-READS-A-GIT-FAILURE-AS-NO-CHANGE",
-      "statement": "A git failure on the probe --changed path is reported as an undetermined change, classified as an unresolved ref, a missing merge base, a timeout or a git failure, exits 2 and probes nothing; it never reads as an empty change.",
+      "id": "TG-PROBE-CHANGED-CLASSIFIES-A-GIT-FAILURE",
+      "statement": "A git call that times out on the probe --changed path is a timeout and one whose ref does not resolve is an unresolved ref, never a generic failure or an empty change.",
       "source": {
         "kind": "spec",
         "ref": "spec/GATE-SEMANTICS.md"
@@ -9172,7 +9190,26 @@
             "producer": "agent",
             "by": "claude"
           }
-        },
+        }
+      ]
+    },
+    {
+      "id": "TG-PROBE-CHANGED-NEVER-READS-A-GIT-FAILURE-AS-NO-CHANGE",
+      "statement": "A failed merge-base on the probe --changed path is reported as a missing merge base, and an undetermined change exits 2 and probes nothing; it never reads as an empty change.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-scope-git.test.mjs",
+        "test/probe-scope-cli.test.mjs"
+      ],
+      "faults": [
         {
           "id": "F3",
           "description": "The merge-base site failing is reported as an unresolved ref, hiding the shallow-clone remedy.",
