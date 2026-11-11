@@ -96,6 +96,11 @@ probe
   --serial             one worker, even when --workers is higher (vitest --no-file-parallelism, jest --runInBand,
                        playwright --workers=1; pytest never loads xdist either way). The default --workers 1 is already
                        serial, so it only changes a run that raised --workers; probe warns and records contention either way
+  --fault-workers <n>  (probe) faults probed at once, each in its own scratch worktree (default: 1, one at a time).
+                       Baselines are still measured once per defender set, alone, before the fan-out; a TIMEOUT or
+                       inconsistent probe measured under it is re-measured serially before it is reported. Records keep
+                       claim/fault order. Not with --in-place. Tests that bind a fixed port or share an external
+                       resource can collide across trees: that is the project's call, keep the default for them
   --in-place           mutate the working tree instead of a scratch worktree
   --no-escalate        do not re-run survivors against the whole suite
   --no-reuse           re-probe claims whose inputs have not changed
@@ -228,6 +233,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         ref: { type: 'string' },
         'ignore-dirty': { type: 'boolean', default: false },
         workers: { type: 'string', default: '1' },
+        'fault-workers': { type: 'string' },
         serial: { type: 'boolean', default: false },
         claim: { type: 'string', multiple: true },
         'require-origin': { type: 'string', multiple: true },

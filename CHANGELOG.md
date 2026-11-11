@@ -16,6 +16,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`probe --fault-workers <n>` probes several faults at once (#237).** Each
+  fault in flight gets its own scratch worktree; the default 1 is the serial
+  run exactly. Baselines are still measured once per defender set, alone,
+  before the fan-out, and records keep claim/fault order. A `timeout` or
+  `inconsistent-probe` measured beside other faults is measured again alone, in a fresh scratch tree,
+  before it is reported (`detail.remeasuredSerially: true`). The evidence
+  records `run.faultWorkers`; fan-out evidence is never reused by a serial
+  probe. Refused with `--in-place`. `run.measurements.runnerMs` now charges
+  overlapping runner invocations once (their union), which equals the old sum
+  for a serial run.
+- Scratch-worktree creation and removal take a lock keyed by the git common
+  directory and kept outside the repository (stale when its owner pid is gone), so two probes of one repository
+  cannot allocate or prune each other's trees. Git calls on scratch trees drop
+  inherited `GIT_*` variables (a probe run from a git hook no longer reads the
+  hook's `GIT_INDEX_FILE`) and disable prompts and fsmonitor.
 - `probe --typecheck[=<cmd>]` and `claims --check-anchors --typecheck` (#236): a replacement that parses but does not type-check is `fault-invalid` (`replacement-does-not-typecheck`, first diagnostic in `detail.message`) before any test runs, so it spends zero test runs. The checker is the project's own `tsc --noEmit -p tsconfig.json --incremental` (never a bundled compiler; no new dependency) or a custom argv command. The unmodified tree is checked first: not clean is exit 2 naming the first diagnostic, and no evidence is written; a missing tsconfig, an unresolvable `typescript`, an unreadable configuration or a program with no project file is exit 2, never a skipped check; a file the checker never reads (`.py`, a `.js` the project does not check, a `.ts` outside the tsconfig) is `not-applicable`, never `clean`. One incremental build-info file per worktree is snapshotted after the baseline and restored around every fault, so one fault's diagnostics never reach the next. Evidence gains `run.typecheck: { commandHash, version }` (part of the reuse key; a reused record is re-checked once, with no test run, because type validity belongs to the whole program) and `detail.typecheck` (`clean`, `diagnostics`, `timeout`, `not-applicable`); a type check over budget is `timeout` (`typecheck-timed-out`). GATE-SEMANTICS rule 16, schema, validator and conformance cases ship with it, and `fixtures/known-answer-typescript` has hand-verified expectations.
 
 - **Probe a change (#234).** `probe --changed <ref>` probes only the claims a
