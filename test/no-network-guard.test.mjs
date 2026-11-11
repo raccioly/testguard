@@ -25,8 +25,9 @@ describe('the network guard the acceptance tests rely on', () => {
         try { attempt(); tried.push('allowed'); } catch (error) { tried.push('refused'); }
       }
       try { net.connect({ path: '/nonexistent-tg.sock' }).on('error', () => {}); tried.push('local-allowed'); } catch { tried.push('local-refused'); }
-      console.log(tried.join(','));`;
-    const r = spawnSync(process.execPath, ['-e', script], { encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: `--import=${NETWORK_GUARD}`, TESTGUARD_NETWORK_LOG: log } });
+      console.log(tried.join(','));
+      process.exit(0); // a fault that lets a listen or lookup through must not keep this child alive`;
+    const r = spawnSync(process.execPath, ['-e', script], { encoding: 'utf8', timeout: 20_000, env: { ...process.env, NODE_OPTIONS: `--import=${NETWORK_GUARD}`, TESTGUARD_NETWORK_LOG: log } });
     expect(r.stdout.trim()).toBe('refused,refused,refused,local-allowed');
     expect(readFileSync(log, 'utf8').trim().split('\n').map((l) => l.split(' ')[1])).toEqual(['connect', 'listen', 'dns-lookup']);
   });

@@ -51,6 +51,7 @@ describe('which directory is the scratch directory', () => {
     expect(readdirSync(parent)).toEqual([]);
     writeFileSync(join(parent, 'file'), 'x');
     expect(() => resolveScratchDir(join(parent, 'file'), {})).toThrow(/not a directory/);
+    expect(() => resolveScratchDir('', {})).toThrow(/must name a directory/); // never read as the current directory
     expect(() => resolveScratchDir('  ', {})).toThrow(PreconditionError);
   });
 

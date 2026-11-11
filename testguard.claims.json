@@ -9093,11 +9093,11 @@
         },
         {
           "id": "F2",
-          "description": "A path that is a file is accepted as a scratch directory.",
+          "description": "An empty scratch directory name is read as the current directory.",
           "faultClass": "condition-forced",
           "file": "src/scratch-dir.mjs",
-          "find": "if (!statSync(path).isDirectory()) throw new Error('not a directory');",
-          "replace": "if (false) throw new Error('not a directory');",
+          "find": "if (named.trim() === '') throw",
+          "replace": "if (false) throw",
           "defendedBy": [
             "test/scratch-dir.test.mjs"
           ],
