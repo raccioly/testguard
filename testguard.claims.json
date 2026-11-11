@@ -8347,7 +8347,8 @@
         "at": "2026-11-11T00:00:00Z"
       },
       "defendedBy": [
-        "test/cost-normalize.test.mjs"
+        "test/cost-normalize.test.mjs",
+        "test/cost-drift.test.mjs"
       ],
       "faults": [
         {
@@ -8381,8 +8382,8 @@
           "description": "The speed factor uses only the before-probe median, so a runner that changed speed during the probe is not averaged.",
           "faultClass": "variable-swap",
           "file": "src/probe/cost.mjs",
-          "find": "const speedFactor = (beforeMs + afterMs) / 2 / baselineMs;",
-          "replace": "const speedFactor = beforeMs / baselineMs;",
+          "find": "const meanFactor = (beforeMs + afterMs) / 2 / baselineMs;",
+          "replace": "const meanFactor = beforeMs / baselineMs;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -8401,6 +8402,18 @@
             "by": "maintainer",
             "at": "2026-11-11T00:00:00Z"
           }
+        },
+        {
+          "id": "F5",
+          "description": "A run whose reference speed drifted mid-probe is read at the mean again, so a runner that slowed down is credited for speed it did not have throughout and growth hides behind it (170 ms then 320 ms: 4588 normalized seconds read as 3184).",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "const speedFactor = drifted ? Math.min(beforeMs, afterMs) / baselineMs : meanFactor;",
+          "replace": "const speedFactor = meanFactor;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
         }
       ]
     },
@@ -8418,7 +8431,8 @@
         "at": "2026-11-11T00:00:00Z"
       },
       "defendedBy": [
-        "test/cost-normalize.test.mjs"
+        "test/cost-normalize.test.mjs",
+        "test/cost-runner-class.test.mjs"
       ],
       "faults": [
         {
@@ -8465,7 +8479,7 @@
           "description": "Drift between the before and after batches is never reported, so a runner that moved during the probe looks steady.",
           "faultClass": "condition-forced",
           "file": "src/probe/cost.mjs",
-          "find": "drift > maxDrift ? ['drift'] : []",
+          "find": "drifted ? ['drift'] : []",
           "replace": "[]",
           "producedBy": {
             "producer": "human",
@@ -8484,6 +8498,30 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-11-11T00:00:00Z"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "A reference measured on another CPU count or platform than its baseline is normalized anyway, though the reference tracks probe speed only within one machine class.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/cost.mjs",
+          "find": "  if (mismatch.length > 0) return { status: 'runner-mismatch', beforeMs, afterMs, baselineMs, mismatch, runner };",
+          "replace": "  if (false) return { status: 'runner-mismatch', beforeMs, afterMs, baselineMs, mismatch, runner };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "Only the CPU count is compared, so a measurement from another platform with the same count passes as the baseline's class.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "measured.cpus !== base.cpus || measured.platform !== base.platform",
+          "replace": "measured.cpus !== base.cpus",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
           }
         }
       ]
@@ -12173,6 +12211,249 @@
           "file": "src/probe/probe.mjs",
           "find": "        if (p.record) settle(index, p.record);\n",
           "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SCOPED-RUN-HAS-ITS-OWN-STATE",
+      "statement": "A --claim or --changed run reports the state and next action of the selected claims alone (run.scope.state, run.scope.next), while the status header stays the whole claims file's: a broken anchor on a claim the invocation did not select is never the selection's next action.",
+      "source": {
+        "kind": "manual",
+        "ref": "independent verification of 0.22.1, defect A"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/status-scoped.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The status machine ignores the selection, so another claim's invalid anchor becomes the selection's state.",
+          "faultClass": "condition-forced",
+          "file": "src/status/status.mjs",
+          "find": "const claims = only ? { ...whole, claims: whole.claims.filter((c) => only.includes(c.id)) } : whole;",
+          "replace": "const claims = whole;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The validator accepts a scoped next action that names a claim the invocation did not probe.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/run-result.mjs",
+          "find": "if (target && !scope.probedClaims.includes(target.claimId))",
+          "replace": "if (false)",
+          "defendedBy": [
+            "spec/conformance/schemas.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The probe's JSON run carries the scope without its own state and next.",
+          "faultClass": "field-dropped",
+          "file": "src/commands/probe.mjs",
+          "find": "...(scope ? { scope: { ...scope, state: view.state, next: view.next } } : {})",
+          "replace": "...(scope ? { scope } : {})",
+          "defendedBy": [
+            "test/probe-scope-state.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The human output never names the rest of the file, so a selection that is clean hides a broken file.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/probe-scope.mjs",
+          "find": "if (whole.state !== view.state || whole.next.why !== view.next.why)",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-JSON-REFUSALS-ARE-ONE-DOCUMENT",
+      "statement": "Under --json every exit 2 and exit 3 writes exactly one error document (kind, message, exitCode) to stdout and keeps the human message on stderr; a refusal that already wrote its own document is not given a second, and every PreconditionError carries a kind from a closed set.",
+      "source": {
+        "kind": "manual",
+        "ref": "independent verification of 0.22.1, defect B"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/precondition-kinds.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A refusal under --json writes nothing to stdout.",
+          "faultClass": "condition-forced",
+          "file": "src/cli.mjs",
+          "find": "if (seen.json && (code === 2 || code === 3) && !wrote) {",
+          "replace": "if (false) {",
+          "defendedBy": [
+            "test/json-errors.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A refusal writes an error document after a command already wrote its own, so stdout holds two JSON values.",
+          "faultClass": "guard-removed",
+          "file": "src/cli.mjs",
+          "find": "if (seen.json && (code === 2 || code === 3) && !wrote) {",
+          "replace": "if (seen.json && (code === 2 || code === 3)) {",
+          "defendedBy": [
+            "test/json-errors.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The document reports exit 2 for a usage error.",
+          "faultClass": "return-altered",
+          "file": "src/probe/precondition-error.mjs",
+          "find": "const exitCode = error?.exitCode ?? WIRE_EXIT[kind] ?? 2;",
+          "replace": "const exitCode = 2;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A PreconditionError can be constructed without a known kind.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/precondition-error.mjs",
+          "find": "    if (!PRECONDITION_KINDS.includes(kind)) throw new TypeError(`PreconditionError needs a kind from PRECONDITION_KINDS (got ${JSON.stringify(kind)}): ${message}`);\n",
+          "replace": "    ",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A throw site is added without a kind.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/worktree.mjs",
+          "find": "'repository has no commits; commit first, or run with --in-place', 'no-commits'",
+          "replace": "'repository has no commits; commit first, or run with --in-place'",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-INTERRUPTED-RUN-EXITS-WITH-ITS-SIGNALS-CODE",
+      "statement": "A run interrupted by a signal exits 128 plus the signal number (SIGINT 130, SIGTERM 143), says once on stderr which signal interrupted it, and has removed its scratch trees by then.",
+      "source": {
+        "kind": "manual",
+        "ref": "independent verification of 0.22.1, defect C"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/lifecycle-exit-codes.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every signal exits 130, so SIGTERM reads as SIGINT.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/lifecycle.mjs",
+          "find": "export const exitCodeFor = (signal) => 128 + constants.signals[signal];",
+          "replace": "export const exitCodeFor = (signal) => 130;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An interrupted run says nothing about why it stopped.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/lifecycle.mjs",
+          "find": "      process.stderr.write(clean ? `interrupted by ${signal}; scratch trees removed\\n` : `interrupted by ${signal}; scratch cleanup did not finish (see above)\\n`);\n",
+          "replace": "",
+          "defendedBy": [
+            "test/probe-signals.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-USAGE-IS-EXIT-3-WHATEVER-THE-TREE-HOLDS",
+      "statement": "A flag combination that is wrong whatever the repository holds (--include-dirty with --in-place or --ref, --ref with --in-place) exits 3, the usage code, before the claims file or the repository is read; only a condition that depends on the tree is exit 2.",
+      "source": {
+        "kind": "manual",
+        "ref": "independent verification of 0.22.1, defect D"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-flag-usage.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "--include-dirty with --in-place exits 2, as a precondition.",
+          "faultClass": "literal-changed",
+          "file": "src/commands/probe.mjs",
+          "find": "    io.err('--include-dirty applies to worktree mode; drop --in-place');\n    return 3;",
+          "replace": "    io.err('--include-dirty applies to worktree mode; drop --in-place');\n    return 2;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The library reports --include-dirty with --in-place as a precondition error.",
+          "faultClass": "return-altered",
+          "file": "src/probe/probe.mjs",
+          "find": "throw new UsageError('--include-dirty applies to worktree mode; drop --in-place');",
+          "replace": "throw new PreconditionError('--include-dirty applies to worktree mode; drop --in-place', 'dirty-tree');",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

@@ -9,6 +9,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { main } from '../src/cli.mjs';
+import { probe } from '../src/probe/probe.mjs';
+import { UsageError } from '../src/probe/precondition-error.mjs';
 import { project } from './helpers/scope-project.mjs';
 
 const roots = [];
@@ -59,6 +61,15 @@ describe('flag combinations that are wrong whatever the repository holds are usa
     expect(r.err).toMatch(/--include-dirty/);
     expect(r.err).toMatch(/--in-place/);
   });
+});
+
+describe('the library refuses the same combinations as usage, before touching the repository', () => {
+  const nowhere = { projectDir: '/nonexistent/testguard-flag-usage', claims: { claims: [] } };
+  for (const options of [{ mode: 'in-place', includeDirty: true }, { includeDirty: true, ref: 'main' }, { mode: 'in-place', ref: 'main' }]) {
+    it(JSON.stringify(options), async () => {
+      await expect(probe({ ...nowhere, ...options })).rejects.toThrow(UsageError);
+    });
+  }
 });
 
 describe('conditions that depend on the tree stay preconditions (exit 2)', () => {
