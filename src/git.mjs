@@ -13,9 +13,12 @@ export class GitError extends Error {
   }
 }
 
-export function gitRaw(args, cwd, env) {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: 30_000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', ...env } });
-  if (r.status !== 0) throw new GitError(`git ${args.join(' ')}: ${(r.stderr || r.stdout).trim()}`);
+export function gitRaw(args, cwd, env, { timeoutMs = 30_000 } = {}) {
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', ...env } });
+  if (r.status !== 0) {
+    const timedOut = r.error?.code === 'ETIMEDOUT';
+    throw new GitError(`git ${args.join(' ')}: ${timedOut ? `timed out after ${timeoutMs} ms` : (r.stderr || r.stdout || r.error?.message || '').trim()}`, { timedOut });
+  }
   return r.stdout;
 }
 

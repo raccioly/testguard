@@ -50,7 +50,7 @@ const git = (cwd, ...args) => {
  * Probe one fixture inside a sandbox and report what moved outside the boundary.
  * `nodeModules` is a private copy (or undefined for Python): read-only or writable.
  */
-function boundaryRun(fixture, expected, nodeModules, { dirty = false } = {}) {
+function boundaryRun(fixture, expected, nodeModules, { dirty = false, changed = false } = {}) {
   const sandbox = mkdtempSync(join(tmpdir(), 'tg-boundary-'));
   const project = join(sandbox, 'project');
   const scratch = makeDir(join(sandbox, 'scratch'));
@@ -60,6 +60,9 @@ function boundaryRun(fixture, expected, nodeModules, { dirty = false } = {}) {
   makeDir(dirname(out));
   cpSync(join(ROOT, 'fixtures', fixture.dir), project, { recursive: true, filter: (src) => !/node_modules|__pycache__|\.flake-counter|\.testguard|\.pytest_cache|test-results/.test(src) });
   git(project, 'init', '-q'); git(project, 'add', '-A'); git(project, 'commit', '-q', '-m', 'fixture');
+  // `--changed HEAD~1` selects the claims a commit touched: the selection reads the diff and the status through git, and
+  // must stay inside the boundary too. The second commit edits a fault target, so some claims are selected.
+  if (changed) { writeFileSync(join(project, 'src', 'redact.mjs'), `${readFileSync(join(project, 'src', 'redact.mjs'), 'utf8')}// touched\n`); git(project, 'add', '-A'); git(project, 'commit', '-q', '-m', 'touch'); }
   // A dirty tree makes probe run test discovery in the caller's own tree, where node_modules is the project's own
   // (a symlink to the read-only copy here, as an installed-beforehand container has it) and cannot be swapped for a scratch one.
   if (dirty) { writeFileSync(join(project, 'notes.txt'), 'untracked\n'); symlinkSync(nodeModules, join(project, 'node_modules'), 'dir'); }
@@ -68,7 +71,7 @@ function boundaryRun(fixture, expected, nodeModules, { dirty = false } = {}) {
   const userDataDir = (rel) => process.platform !== 'linux' && (rel === 'home/Library' || rel.startsWith('home/Library/') || rel.startsWith('home/AppData'));
   const outside = (rel) => userDataDir(rel) || rel === join('project', '.git', 'worktrees') || rel.startsWith(join('project', '.git', 'worktrees') + '/') || rel === 'scratch' || rel.startsWith('scratch/') || rel === join('out', 'evidence.json');
   const before = listing(sandbox, outside);
-  const args = [CLI, 'probe', project, '--scratch-dir', scratch, '--out', out, '--runner', fixture.runner, '--confirm', String(expected.confirmRuns), '--budget', String(expected.budgetMs ?? 60_000), '--no-escalate', '--quiet', ...(nodeModules && !dirty ? ['--node-modules', nodeModules] : [])];
+  const args = [CLI, 'probe', project, '--scratch-dir', scratch, '--out', out, '--runner', fixture.runner, '--confirm', String(expected.confirmRuns), '--budget', String(expected.budgetMs ?? 60_000), '--no-escalate', '--quiet', ...(changed ? ['--changed', 'HEAD~1'] : []), ...(nodeModules && !dirty ? ['--node-modules', nodeModules] : [])];
   const networkLog = join(sandbox, '..', `${basename(sandbox)}.net.log`);
   writeFileSync(networkLog, '');
   // The guard rides NODE_OPTIONS into TestGuard and every Node runner it starts: a socket or a name lookup lands in the log and is refused.
@@ -85,7 +88,7 @@ const verdicts = (evidence) => Object.fromEntries(evidence.records.map((r) => [`
 describe.each(FIXTURES)('write boundary: $name', (fixture) => {
   const expected = JSON.parse(readFileSync(join(ROOT, 'fixtures', fixture.dir, 'expected.json'), 'utf8'));
   const oracle = Object.fromEntries(Object.entries(expected.expected).map(([k, v]) => [k, v.verdict]));
-  let nmRo; let nmRw; let ro; let rw; let roDirty; const sandboxes = [];
+  let nmRo; let nmRw; let ro; let rw; let roDirty; let roChanged; const sandboxes = [];
 
   beforeAll(() => {
     if (fixture.skip) return;
@@ -101,11 +104,12 @@ describe.each(FIXTURES)('write boundary: $name', (fixture) => {
       ro = boundaryRun(fixture, expected, nmRo, { dirty: Boolean(fixture.lean) });
       if (fixture.lean) roDirty = ro;
       if (!fixture.nm || fixture.writableRun) rw = boundaryRun(fixture, expected, nmRw);
+      if (nmRo && fixture.dirty) roChanged = boundaryRun(fixture, expected, nmRo, { dirty: true, changed: true });
       if (nmRo && fixture.dirty && !fixture.lean) roDirty = boundaryRun(fixture, expected, nmRo, { dirty: true });
       if (rw) rw.nmChanges = nmRw ? changes(nmRwBefore, listing(nmRw)) : undefined;
     } finally {
       if (nmRo) chmodTree(nmRo, 'rw'); // so cleanup can never fail on a read-only tree
-      for (const r of [ro, rw, roDirty]) if (r) sandboxes.push(r.sandbox);
+      for (const r of [ro, rw, roDirty, roChanged]) if (r) sandboxes.push(r.sandbox);
     }
   }, 1_800_000);
 
@@ -122,6 +126,16 @@ describe.each(FIXTURES)('write boundary: $name', (fixture) => {
     expect(verdicts(roDirty.evidence)).toEqual(oracle);
     expect(roDirty.before.size).toBeGreaterThan(20);
     expect(changes(roDirty.before, roDirty.after)).toEqual({ created: [], removed: [], modified: [] });
+  });
+
+  it.skipIf(fixture.skip || !fixture.dirty)('probe --changed reads the diff and writes nothing outside the boundary, over a read-only node_modules', () => {
+    expect(roChanged.evidence, roChanged.stderr).toBeDefined();
+    expect(roChanged.evidence.records.length).toBeGreaterThan(0);
+    for (const r of roChanged.evidence.records) expect(r.verdict).toBe(oracle[`${r.claim.id}/${r.subject.id}`]);
+    expect(roChanged.before.size).toBeGreaterThan(20);
+    expect(changes(roChanged.before, roChanged.after)).toEqual({ created: [], removed: [], modified: [] });
+    expect(roChanged.network).toBe('');
+    expect(roChanged.scratchLeft).toEqual([]);
   });
 
   it.skipIf(fixture.skip)('creates and modifies nothing outside the scratch dir, --out and .git/worktrees', () => {
