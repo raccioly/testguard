@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ClaimsError } from './claims/load.mjs';
 import { PreconditionError } from './probe/worktree.mjs';
+import { resolveScratchDir, withScratchBase } from './scratch-dir.mjs';
 import { RUNNER_NAMES } from './probe/runners/index.mjs';
 import { GitError } from './git.mjs';
 import { SpecDocError } from './evidence/writer.mjs';
@@ -21,6 +22,7 @@ import { admitCommand } from './commands/admit.mjs';
 import { sweepCommand } from './commands/sweep.mjs';
 import { concernsCommand } from './commands/concerns.mjs';
 import { originPolicyRequest } from './probe/origin-policy.mjs';
+import { assertionPolicyRequest } from './probe/assertion-policy.mjs';
 import { draftAppendRequest, intentInputRequest } from './scaffold/request.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
@@ -43,19 +45,36 @@ export const USAGE = `testguard ${VERSION} — proves a test suite defends the c
   testguard admit <test> --claim <ID>   the two-gate rule as one verb: is this test green on HEAD and does it fail on every fault of the claim?
 
 probe
-  --claims <path>      claims file             (default: <dir>/testguard.claims.json)
+  --claims <path>      claims file             (default: <dir>/testguard.claims.json). May live outside the project
+                       (probe, claims, admit, status): fault files and defendedBy stay project-relative; evidence records
+                       run.claimsSource {external, sha256}, never the path
   --confirm <n>        runs per verdict        (default: 3)
   --budget <ms>        wall clock per run      (default: 120000)
   --command-budget <ms> cooperative measurement deadline for probe, sweep, replay, or admit. Caps async children; expiry exits 2 and writes no partial result
+  --partial-on-budget (probe) with --command-budget: when the budget runs out, stop starting work, restore every tree, and write
+                       the document anyway. Faults fully measured keep their record; the ones in flight and not started
+                       are unverifiable with reason not-reached-within-budget (they gate, and are never reused).
+                       Written to --out or <dir>/.testguard/evidence-partial.json, never the canonical file or a baseline.
+                       Exit 1 when the measured part already holds a gating finding (--json: run.failureKind
+                       unproven+incomplete, the count a floor), otherwise 2. Not with --require-origin
   --out <path>         evidence file           (default: <dir>/.testguard/evidence.json)
   --baseline <path>    baseline to gate against (default: <dir>/.testguard/baseline.json if present)
   --severity <level>   gate only at or above   (default: low)
   --require-origin <kinds> complete confirmed probe only; repeatable comma-separated declared source kinds.
                        No kind authenticates independence. Policy failures ignore baseline debt and severity floors.
+  --require-assertion-kill  fail (exit 1) when any kill was made only by an uncaught exception, never by an assertion.
+                       The verdict stays killed; the policy names the faults. Also valid on admit.
   --ref <commit>       probe this commit in the scratch worktree (default: HEAD). An explicit --ref is honoured even when
                        defender/target files are dirty: a warning names them, the evidence records them (repo.ignoredDirty)
   --ignore-dirty       probe HEAD as committed although defender/target files are dirty (same warning and record)
   --claim <ID,ID>      probe only these claims; repeatable, order-preserving, and writes .testguard/evidence-partial.json
+  --changed <ref>      probe only the claims the change since merge-base(<ref>, HEAD) can have affected: a fault's target, its defenders
+                       or anything they import differs (a rename counts through its old and new path). Intersects with --claim and
+                       writes .testguard/evidence-partial.json. A change git cannot measure (ref missing, no merge base, git failed
+                       or timed out) exits 2 and probes nothing; it is never read as an empty change. Refused with --ref and
+                       --in-place (exit 3). --json: run.scope.changed
+  --fail-on-empty-selection  with --changed: a change that selects no claim exits 2 instead of 0 (either way it says so and
+                       lists the changed source files no claim covers: absence from the results is not a pass)
   --include-dirty      probe the working tree (a snapshot commit) instead of HEAD; uncommitted tests count
                        (without it, a dirty defender/target with the implicit HEAD is refused: the silent-mismatch trap)
   --verbose            also print each killed fault (default: only unproven ones, plus a count)
@@ -71,6 +90,16 @@ probe
                        unittest pin that choice and fail rather than fall back. The engine that ran is what the evidence records.)
   --runner-cmd "<cmd>" custom runner; must contain {files} and {out}, e.g. "pnpm vitest run {files} --reporter=json --outputFile={out}"
   --node-modules <dir> node_modules to link into the scratch worktree (or TESTGUARD_NODE_MODULES)
+  --scratch-dir <dir>  every scratch worktree, temporary git index, runner report and runner cache goes under this existing,
+                       writable directory (or TESTGUARD_SCRATCH_DIR); default: the OS temp directory. Missing or unwritable
+                       refuses the run (exit 2). Also written: --out, and git's worktree metadata under .git. The tests under
+                       probe run project code: this bounds where TestGuard writes, it is not a sandbox
+  --typecheck[=<cmd>]  type check every fault before any test runs: a replacement that parses but does not type-check is
+                       fault-invalid (replacement-does-not-typecheck) and costs no test run. Default command: the project's own
+                       tsc --noEmit -p tsconfig.json --incremental (never a bundled compiler; a project without a tsconfig
+                       or a resolvable typescript needs <cmd>). <cmd> is an argv, never run through a shell. The unmodified
+                       tree is checked first: not clean is a precondition error (exit 2) naming the first diagnostic.
+                       Non-TypeScript targets are recorded detail.typecheck: not-applicable
   --python <path>      Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH.
                        Default: $VIRTUAL_ENV, then the project's .venv, venv, .env, then python3, then python on PATH.
                        Resolved against your working tree, never the scratch worktree.
@@ -78,12 +107,18 @@ probe
   --serial             one worker, even when --workers is higher (vitest --no-file-parallelism, jest --runInBand,
                        playwright --workers=1; pytest never loads xdist either way). The default --workers 1 is already
                        serial, so it only changes a run that raised --workers; probe warns and records contention either way
+  --fault-workers <n>  (probe) faults probed at once, each in its own scratch worktree (default: 1, one at a time).
+                       Baselines are measured once per defender set, different sets side by side; a baseline, a TIMEOUT
+                       or an inconsistent probe that is not green beside others is re-measured alone first. Records keep
+                       claim/fault order. Not with --in-place. Tests that bind a fixed port or share an external
+                       resource can collide across trees: that is the project's call, keep the default for them
   --in-place           mutate the working tree instead of a scratch worktree
   --no-escalate        do not re-run survivors against the whole suite
   --no-reuse           re-probe claims whose inputs have not changed
   --allow-empty        adoption only: skip a valid empty claims file; writes no evidence; run gate separately
   --quiet              suppress the per-fault stream and ranked block; print only the summary and evidence path
-  --json               the status document plus this run's result (records, newSinceBaseline, exitCode)
+  --json               the status document plus this run's result (records, newSinceBaseline, exitCode, scope, claims[]:
+                       {id, result: proven|unproven|could-not-verify, faults: {counts}, reasons[]} keyed by claim id)
 
 scaffold   --claim <ID> (put every proposal under this claim; copies it if it exists)  --out <path>  --json
            --from-document <local-text-path> OR --from-fix <full-commit-ID> inspects read-only authoring inputs;
@@ -99,7 +134,7 @@ sweep      --changed <ref> (required unless --save-paths; CI bases and a safe lo
                              denominator: "120 writes across 38 files, swept 12". A clean sweep over an unstated
                              denominator is a sample of unknown size, not a guarantee that saving works
            --include-dirty  --exclude <glob>  --confirm <n>  --budget <ms>  --command-budget <ms>  --workers <n>  --serial  --max <n>  --out <path>  --json
-           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>   runner selection, as for probe
+           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>  --scratch-dir <dir>   runner selection and write boundary, as for probe
            --python <path>   Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH
            the cold start: no claim and no concern needed. Everything it proposes is a DRAFT — it never writes testguard.claims.json,
            and its evidence never replaces .testguard/evidence.json. exit 1 on a fault that survived, or a file no test imports
@@ -118,12 +153,12 @@ replay     --workers <n> (default 1)  --serial  --budget <ms> (per run)
            --command-budget <ms> cooperative measurement deadline; expiry writes neither replay nor calibration, so an unmeasured suffix cannot look clean
            --out <path>       replay document (default: <dir>/.testguard/replay.json); the calibration goes beside it
            --calibration-out <path>  write the calibration document here instead of beside the replay document
-           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>   runner selection, as for probe
+           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>  --scratch-dir <dir>   runner selection and write boundary, as for probe
            --python <path>   Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH
            reports, never gates: a bug that escaped is history, not a regression in this change
-admit      --workers <n> (default 1)  --serial  --budget <ms>  --command-budget <ms>
+admit      --workers <n> (default 1)  --serial  --budget <ms>  --command-budget <ms>  --require-assertion-kill
            --claim <ID> (required)  --fault <FID> (one fault only)  --confirm <n>  --json
-           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>   runner selection, as for probe
+           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>  --scratch-dir <dir>   runner selection and write boundary, as for probe
            --python <path>   Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH
            ADMITTED (exit 0) only when every fault of the claim is killed N/N by defenders that are green N/N; anything else is NOT ADMITTED (exit 1) and names the first blocking fault
            the test must be a declared or discovered defender of the claim (exit 3 otherwise); evidence goes to .testguard/evidence-partial.json
@@ -134,6 +169,7 @@ gate       --changed <ref>   measure the change since merge-base(ref, HEAD); aut
            --ignore <path>   ignore file (default: <dir>/testguard.ignore.json; kind=path entries excuse files, with a reason)
            exit 0 every changed source file is claimed or excused · 1 unclaimed file · 2 cannot evaluate · 3 no reference
 claims     --check-anchors   locate every fault without running tests; JS/MJS and Python replacements are syntax-checked in memory
+           --typecheck[=<cmd>] with --check-anchors: also type check each TypeScript replacement, as for probe (a scratch worktree of the working tree)
            --annotate       read-only file-header preview (JS/TS/Python); --claim <ID,ID> selects claims
            --apply          explicit annotation writes, only with --annotate; retains private recovery on partial failure
            authoring is not verification; each invocation recomputes its plan. Results are stdout-only, never --out
@@ -157,6 +193,9 @@ brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; 
 
 exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift, or unclaimed changes) · 2 precondition failed · 3 usage
 `;
+
+/** The commands that run a project's tests, and so create scratch worktrees and runner files. */
+const SCRATCH_COMMANDS = new Set(['probe', 'sweep', 'replay', 'admit']);
 
 const COMMANDS = { mcp: mcpCommand, replay: replayCommand, probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand, admit: admitCommand, sweep: sweepCommand, concerns: concernsCommand };
 
@@ -187,7 +226,8 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
   let parsed;
   try {
     parsed = parseArgs({
-      args: argv,
+      // `--typecheck` alone means the project's own tsc; `--typecheck=<cmd>` names one.
+      args: argv.map((arg) => (arg === '--typecheck' ? '--typecheck=' : arg)),
       allowPositionals: true,
       tokens: true,
       options: {
@@ -198,6 +238,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         confirm: { type: 'string', default: '3' },
         budget: { type: 'string', default: '120000' },
         'command-budget': { type: 'string' },
+        'partial-on-budget': { type: 'boolean', default: false },
         out: { type: 'string' },
         evidence: { type: 'string' },
         baseline: { type: 'string' },
@@ -207,12 +248,15 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         ref: { type: 'string' },
         'ignore-dirty': { type: 'boolean', default: false },
         workers: { type: 'string', default: '1' },
+        'fault-workers': { type: 'string' },
         serial: { type: 'boolean', default: false },
         claim: { type: 'string', multiple: true },
         'require-origin': { type: 'string', multiple: true },
+        'require-assertion-kill': { type: 'boolean', default: false },
         fault: { type: 'string' },
         'include-dirty': { type: 'boolean', default: false },
         changed: { type: 'string' },
+        'fail-on-empty-selection': { type: 'boolean', default: false },
         since: { type: 'string' },
         exclude: { type: 'string', multiple: true },
         cap: { type: 'string' },
@@ -230,9 +274,11 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         here: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'runner-cmd': { type: 'string' },
+        typecheck: { type: 'string' },
         python: { type: 'string' },
         runner: { type: 'string', default: 'auto' },
         'node-modules': { type: 'string' },
+        'scratch-dir': { type: 'string' },
         'in-place': { type: 'boolean', default: false },
         'no-escalate': { type: 'boolean', default: false },
         'no-reuse': { type: 'boolean', default: false },
@@ -287,11 +333,23 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
     io.err('--calibration-out is only valid on replay');
     return 3;
   }
+  if (values['partial-on-budget'] && command !== 'probe') {
+    io.err('--partial-on-budget is only valid on probe: sweep, replay and admit still refuse to publish when the command budget runs out');
+    return 3;
+  }
+  if (values['scratch-dir'] !== undefined && !SCRATCH_COMMANDS.has(command)) {
+    io.err('--scratch-dir is only valid on probe, sweep, replay and admit: the commands that run tests');
+    return 3;
+  }
+  if (values.typecheck !== undefined && !(command === 'probe' || (command === 'claims' && values['check-anchors']))) {
+    io.err('--typecheck is only valid on probe and on claims --check-anchors');
+    return 3;
+  }
   if ((values.annotate || values.apply) && command !== 'claims') {
     io.err('--annotate and --apply are only valid on claims');
     return 3;
   }
-  try { originPolicyRequest(values, command); }
+  try { originPolicyRequest(values, command); assertionPolicyRequest(values, command); }
   catch (e) { io.err(e.message); return 3; }
   const suppliedOptions = parsed.tokens.filter((token) => token.kind === 'option').map((token) => token.name);
   try { intentInputRequest({ command, values, suppliedOptions, files: positionals.slice(1) }); }
@@ -308,7 +366,9 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
   }
   try {
     const projectDir = command === 'scaffold' || command === 'admit' ? resolve('.') : resolve(dirArg ?? '.');
-    return await handler({ projectDir, file: dirArg, files: positionals.slice(1), values, suppliedOptions, version: VERSION }, io);
+    // Checked before the handler writes anything: a scratch directory that cannot be used refuses the run.
+    const scratchBase = SCRATCH_COMMANDS.has(command) ? resolveScratchDir(values['scratch-dir']) : undefined;
+    return await withScratchBase(scratchBase, () => handler({ projectDir, file: dirArg, files: positionals.slice(1), values, suppliedOptions, version: VERSION }, io));
   } catch (e) {
     if (e instanceof ClaimsError || e instanceof PreconditionError || e instanceof GitError || e instanceof SpecDocError) {
       io.err(`error: ${e.message}`);

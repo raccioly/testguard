@@ -17,6 +17,7 @@ import { fingerprint } from '../spec/lib/fingerprint.mjs';
 import { defenderSelection } from '../src/probe/attribution.mjs';
 import { resolveDefenders } from '../src/probe/runners/shared.mjs';
 import { discoverDefenders } from '../src/probe/discover.mjs';
+import { createDependencyHasher } from '../src/probe/dependencies.mjs';
 import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'known-answer');
@@ -63,7 +64,7 @@ function project() {
         verdict,
         detail: { ...(verdict === 'nocover' ? {} : verdict === 'unverifiable' ? { reason: 'anchor-missing' } : {}), baselineRuns: runs.length ? [pass, pass, pass] : [], probeRuns: runs },
         defenders: { ...selection, resolved: verdict === 'nocover' ? [] : resolved, ...(defenders.length ? {} : { discovered: true }), nocover: verdict === 'nocover' },
-        inputs: { targetHash: hashFile(join(dir, f.file)), defenderHashes: Object.fromEntries((verdict === 'nocover' ? [] : resolved).map((d) => [d, hashFile(join(dir, d))])) },
+        inputs: { targetHash: hashFile(join(dir, f.file)), defenderHashes: Object.fromEntries((verdict === 'nocover' ? [] : resolved).map((d) => [d, hashFile(join(dir, d))])), ...createDependencyHasher(dir).inputsFor([f.file, ...(verdict === 'nocover' ? [] : resolved)]) },
         rank: { score: c.severity === 'critical' ? 8 : 4 },
       };
     })),

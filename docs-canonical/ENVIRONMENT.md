@@ -28,6 +28,7 @@ None are required. All are optional overrides.
 | Variable | Read by | Effect |
 |---|---|---|
 | `TESTGUARD_NODE_MODULES` | `probe` | `node_modules` to link into the scratch worktree; same as `--node-modules` |
+| `TESTGUARD_SCRATCH_DIR` | `probe`, `sweep`, `replay`, `admit` | Existing, writable directory for every scratch worktree, temporary git index, runner report and runner temp directory; same as `--scratch-dir`, which wins. Missing or unwritable exits 2 before anything is written. Default: the OS temp directory |
 | `TESTGUARD_CHANGED_REF` | `gate`, `status --changed` | The reference a change is measured against; overrides CI and local Git detection |
 | `GITHUB_BASE_REF` | `gate` | GitHub Actions pull requests: the base branch |
 | `CI_MERGE_REQUEST_DIFF_BASE_SHA` | `gate` | GitLab merge request pipelines: exact diff base, needs no fetch |

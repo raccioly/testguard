@@ -1,5 +1,5 @@
 import { gate } from '../baseline/baseline.mjs';
-import { coAuthorshipWarning, summarize, formatVerdict, renderOrigins, renderOriginPolicy } from '../render.mjs';
+import { coAuthorshipWarning, exceptionOnlyWarning, summarize, formatVerdict, renderOrigins, renderOriginPolicy } from '../render.mjs';
 import { recordedOriginSummary } from '../../spec/lib/origins.mjs';
 
 export const HEADING = '## TEST BLINDSPOT CONTEXT';
@@ -94,10 +94,12 @@ export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Dat
   const origins = recordedOriginSummary(evidence.records);
   const kills = evidence.records.filter((r) => r.verdict === 'killed');
   const coAuthored = kills.filter((r) => r.detail.independence?.class === 'co-authored').length;
+  const exceptionOnly = kills.filter((r) => r.detail.killKind === 'exception-only').length;
+  if (exceptionOnly) summary.killedExceptionOnly = exceptionOnly;
   const unclaimed = changes?.uncovered?.length ? { ref: changes.ref, files: changes.uncovered } : undefined;
   const doc = { schemaVersion: 1, tool: evidence.tool, generatedAt, head: evidence.run.repo.head, heading: HEADING, summary, origins, ...(next ? { next: { action: next.action, command: next.command, why: next.why } } : {}), ...(unclaimed ? { unclaimed } : {}), items, text: '' };
   if (evidence.originPolicy) doc.originPolicy = structuredClone(evidence.originPolicy);
-  doc.text = renderBriefText({ ...doc, provisional: Boolean(evidence.run.provisional), install }, { hasBaseline: Boolean(baseline), total: evidence.records.length, independence: kills.length ? { coAuthored, kills: kills.length } : undefined });
+  doc.text = renderBriefText({ ...doc, provisional: Boolean(evidence.run.provisional), install }, { hasBaseline: Boolean(baseline), total: evidence.records.length, independence: kills.length ? { coAuthored, kills: kills.length, exceptionOnly } : undefined });
   return doc;
 }
 
@@ -122,6 +124,8 @@ export function renderBriefText(brief, { hasBaseline, total, independence }) {
   // L3: a kill written in the same change as the code it guards is not
   // independent evidence. One line, no per-item noise.
   if (independence?.coAuthored) lines.push('', coAuthorshipWarning(independence.coAuthored, independence.kills));
+  // A crash is not a check: a kill with no assertion in any run proves reach, not behavior.
+  if (independence?.exceptionOnly) lines.push('', exceptionOnlyWarning(independence.exceptionOnly, independence.kills));
   if (brief.next) lines.push('', `NEXT [${brief.next.action}]: ${brief.next.command}`, `  why: ${brief.next.why}`);
   if (brief.items.length === 0) {
     lines.push('', unproven === 0 ? 'Every probed claim is defended. Keep it that way: new claims need a fault and a test that fails on it.' : `${unproven} unproven faults remain; no items shown at the current cap. See the full evidence file.`);

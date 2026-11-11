@@ -93,6 +93,7 @@ jobs:
         with:
           node-version: 24
       - run: npm ci
+      - run: npm ci --prefix fixtures/known-answer-typescript
       - run: npm test
       - name: Install smoke — the tarball must run with production deps only
         run: npm run test:install

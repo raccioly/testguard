@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
+import { loadClaims, defaultClaimsPath, claimsSourceOf } from '../claims/load.mjs';
 import { probe } from '../probe/probe.mjs';
 import { writeSpecDoc, readSpecDoc } from '../evidence/writer.mjs';
 import { gate } from '../baseline/baseline.mjs';
@@ -12,9 +12,14 @@ import { progressMode, stageReporter, clearStageLine, recordEvent, isProgressMod
 import { validate } from '../../spec/lib/validate.mjs';
 import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
 import { originPolicyRequest, evaluateOriginPolicy } from '../probe/origin-policy.mjs';
+import { assertionPolicyRequest, evaluateAssertionPolicy, renderAssertionPolicy, isWeakKill } from '../probe/assertion-policy.mjs';
 import { readNativeTestUniverse } from '../probe/universe.mjs';
 import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
 import { runnerOptions } from './runner-options.mjs';
+import { parseFaultWorkers } from '../probe/fan-out.mjs';
+import { selectByChange, measuredScope, renderNoSelection, renderUnmatched } from './probe-scope.mjs';
+import { claimResults } from '../probe/claim-results.mjs';
+import { partialExit, partialEvidencePath, isNotReached } from '../probe/partial-budget.mjs';
 export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
@@ -38,15 +43,32 @@ export function partialScope(only, records) {
   };
 }
 
-export async function probeCommand({ projectDir, values, version }, io) {
+/**
+ * `deps` is a test seam, never a CLI surface: `budgetOptions` reaches the
+ * command budget (an injected clock makes expiry deterministic) and `onStage`
+ * sees every stage the probe starts.
+ */
+export async function probeCommand({ projectDir, values, version }, io, deps = {}) {
   let eligibleKinds;
   try { eligibleKinds = originPolicyRequest(values); }
+  catch (e) { io.err(e.message); return 3; }
+  let requireAssertionKill;
+  try { requireAssertionKill = assertionPolicyRequest(values, 'probe'); }
   catch (e) { io.err(e.message); return 3; }
   const confirmRuns = Number(values.confirm);
   const budgetMs = Number(values.budget);
   const workers = Number(values.workers ?? 1);
   if (!Number.isSafeInteger(workers) || workers < 1) {
     io.err('--workers must be a positive safe integer');
+    return 3;
+  }
+  const faultWorkers = parseFaultWorkers(values['fault-workers']);
+  if (faultWorkers === null) {
+    io.err('--fault-workers must be a positive safe integer');
+    return 3;
+  }
+  if (faultWorkers > 1 && values['in-place']) {
+    io.err('--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place');
     return 3;
   }
   const commandBudgetMs = parseCommandBudget(values['command-budget']);
@@ -58,12 +80,21 @@ export async function probeCommand({ projectDir, values, version }, io) {
     io.err('--command-budget must be at least 1000 milliseconds');
     return 3;
   }
+  const partialOnBudget = values['partial-on-budget'] === true;
+  if (partialOnBudget && commandBudgetMs === undefined) {
+    io.err('--partial-on-budget needs --command-budget <ms>: without a command budget there is nothing to run out');
+    return 3;
+  }
+  if (partialOnBudget && values['require-origin'] !== undefined) {
+    io.err('--partial-on-budget cannot be combined with --require-origin: the origin policy needs complete evidence and runs test discovery of its own, which is new work after the budget has run out');
+    return 3;
+  }
   const runner = runnerOptions(values);
   if (runner.error) {
     io.err(runner.error);
     return 3;
   }
-  const commandBudget = createCommandBudget(commandBudgetMs);
+  let commandBudget = createCommandBudget(commandBudgetMs, deps.budgetOptions);
   if (values.progress && !isProgressMode(values.progress)) {
     io.err(`--progress must be one of auto, tty, plain, ndjson, none (got ${values.progress})`);
     return 3;
@@ -72,7 +103,8 @@ export async function probeCommand({ projectDir, values, version }, io) {
   const progress = progressMode({ explicit: values.progress, isTTY: process.stderr.isTTY, quiet: values.quiet, json: values.json });
   const progressTo = progressStream(process);
   const stageOut = stageReporter(progress, (s) => progressTo.write(s));
-  const claims = loadClaims(values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir));
+  const claimsPath = values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir);
+  const claims = loadClaims(claimsPath);
   if (claims.claims.length === 0) {
     if (values['allow-empty'] && values.claim === undefined) {
       io.err('claims file declares no claims; verification skipped (--allow-empty); run gate to check changed-file coverage');
@@ -90,15 +122,45 @@ export async function probeCommand({ projectDir, values, version }, io) {
     io.err('claims file declares no claims; nothing to verify');
     return 2;
   }
-  const only = claimSelection(values.claim);
-  if (only?.length === 0) {
+  const requested = claimSelection(values.claim);
+  if (requested?.length === 0) {
     io.err('--claim must name at least one claim id');
     return 3;
   }
-  // A --claim run is partial evidence; keep it away from the canonical file unless --out says otherwise.
+  if (values['fail-on-empty-selection'] && values.changed === undefined) {
+    io.err('--fail-on-empty-selection needs --changed <ref>: only a change-based selection can come up empty');
+    return 3;
+  }
+  if (values.changed !== undefined && (values.ref !== undefined || values['in-place'])) {
+    io.err('--changed selects against the tree being probed, so it cannot be combined with --ref or --in-place');
+    return 3;
+  }
+  let only = requested;
+  let changedScope;
+  if (values.changed !== undefined) {
+    const selection = selectByChange({ projectDir, claims, ref: values.changed, includeDirty: values['include-dirty'], only: requested, failOnEmpty: values['fail-on-empty-selection'] });
+    if (selection.outcome !== 'selected') {
+      for (const line of renderNoSelection(selection, { failOnEmpty: values['fail-on-empty-selection'] })) (selection.outcome === 'undetermined' || values.json ? io.err : io.out)(line);
+      if (values.json) {
+        // No probe ran: the status of the project as it is, plus the scope that explains why. An undetermined change never names a ref the status could not resolve.
+        const status = withChangedRef(selection.outcome === 'undetermined' ? null : resolveChangedRef({ explicit: values.changed, projectDir }), (changedRef) => computeStatus({
+          projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'],
+          paths: { claims: claimsPath, evidence: evidencePath(projectDir), provisional: provisionalEvidencePath(projectDir), baseline: values.baseline ? resolve(values.baseline) : baselinePath(projectDir) },
+        }), io.err);
+        const doc = { ...status, run: { exitCode: selection.exitCode, scope: selection.scope } };
+        const result = validate('status', doc);
+        if (!result.ok) throw new Error(`probe JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
+        io.out(JSON.stringify(doc, null, 2));
+      }
+      return selection.exitCode;
+    }
+    only = selection.only;
+    changedScope = selection.changed;
+  }
+  // A --claim or --changed run is partial evidence; keep it away from the canonical file unless --out says otherwise.
   const provisional = confirmRuns < 3;
   // Provisional and partial runs never overwrite the canonical evidence: only confirmed, complete runs may feed a baseline.
-  const outPath = values.out ? resolve(values.out) : only ? join(projectDir, '.testguard', 'evidence-partial.json') : provisional ? provisionalEvidencePath(projectDir) : evidencePath(projectDir);
+  let outPath = values.out ? resolve(values.out) : only ? join(projectDir, '.testguard', 'evidence-partial.json') : provisional ? provisionalEvidencePath(projectDir) : evidencePath(projectDir);
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
   const discoveryNoted = new Set();
   const previous = !values['no-reuse'] && existsSync(outPath) ? readSpecDoc('evidence', outPath) : undefined;
@@ -113,7 +175,9 @@ export async function probeCommand({ projectDir, values, version }, io) {
     budgetMs,
     workers,
     serial: values.serial || workers === 1,
+    faultWorkers,
     commandBudget,
+    partialOnBudget,
     mode: values['in-place'] ? 'in-place' : 'worktree',
     ref: values.ref ?? 'HEAD',
     refExplicit: values.ref !== undefined,
@@ -123,11 +187,12 @@ export async function probeCommand({ projectDir, values, version }, io) {
     runnerName: values.runner,
     nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
     python: runner.python,
+    typecheck: values.typecheck,
     only,
     escalate: !values['no-escalate'],
     toolVersion: version,
     includeDirty: values['include-dirty'],
-    onStage: stageOut,
+    onStage: (event) => { stageOut?.(event); deps.onStage?.(event); },
     onProgress: (r) => {
       // ndjson streams verdicts as they land; a watcher sees them without
       // waiting for the document at the end.
@@ -137,9 +202,20 @@ export async function probeCommand({ projectDir, values, version }, io) {
       // The discovery note is a property of the claim, not of each fault: say it once.
       const firstOfClaim = !discoveryNoted.has(r.claim.id);
       if (r.defenders.discovered) discoveryNoted.add(r.claim.id);
-      if (values.verbose || r.verdict !== 'killed') io.out(renderRecord(r, { provisional, showDiscovered: firstOfClaim }) + (r.reusedFrom ? '  (reused)' : ''));
+      // A kill is normally a count. Under the policy, the ones it will fail on are named as they land.
+      if (values.verbose || r.verdict !== 'killed' || (requireAssertionKill && isWeakKill(r))) io.out(renderRecord(r, { provisional, showDiscovered: firstOfClaim }) + (r.reusedFrom ? '  (reused)' : ''));
     },
   });
+  // Every fault was either measured or reported as not reached, so what is
+  // left (policy evaluation, one write) is no new measurement: the deadline
+  // has done its job and a document that exists is never thrown away.
+  const exhausted = evidence.run.budget?.exhausted === true;
+  if (partialOnBudget) commandBudget = undefined;
+  if (exhausted) {
+    const canonical = evidencePath(projectDir);
+    if (values.out && resolve(values.out) === canonical) io.err(`warning: the command budget ran out, so the document is incomplete and was written to ${partialEvidencePath(projectDir)} instead of the canonical ${canonical}`);
+    outPath = values.out && resolve(values.out) !== canonical ? resolve(values.out) : partialEvidencePath(projectDir);
+  }
   commandBudget?.assertOpen();
   if (eligibleKinds) {
     let universe;
@@ -161,13 +237,20 @@ export async function probeCommand({ projectDir, values, version }, io) {
     const fresh = originPolicyInputsFresh({ projectDir, claims: currentClaims, evidence, universe });
     evidence.originPolicy = evaluateOriginPolicy({ claims: currentClaims, evidence, eligibleKinds, fresh });
   }
+  const claimsSource = claimsSourceOf(projectDir, claimsPath);
+  if (claimsSource) evidence.run.claimsSource = claimsSource;
+  if (requireAssertionKill) evidence.assertionPolicy = evaluateAssertionPolicy(evidence.records);
   commandBudget?.assertOpen();
   writeSpecDoc('evidence', outPath, evidence);
 
-  const g = gate(evidence.records, baseline, { severityFloor: values.severity });
+  // The gate reads what was measured: a not-reached record always gates, and
+  // counting it would hide how many findings the measured part really holds.
+  const g = gate(exhausted ? evidence.records.filter((r) => !isNotReached(r)) : evidence.records, baseline, { severityFloor: values.severity });
   const policy = evidence.originPolicy;
-  const exitCode = policy?.state === 'unavailable' ? 2 : policy?.state === 'failed' || g.new.length > 0 ? 1 : 0;
-  const scope = partialScope(only, evidence.records);
+  const weak = evidence.assertionPolicy;
+  const incomplete = exhausted ? partialExit({ newGating: g.new.length, policyFailed: weak?.state === 'failed' }) : undefined;
+  const exitCode = incomplete ? incomplete.exitCode : policy?.state === 'unavailable' ? 2 : policy?.state === 'failed' || weak?.state === 'failed' || g.new.length > 0 ? 1 : 0;
+  const scope = measuredScope({ requested, changed: changedScope, records: evidence.records });
   if (values.json) {
     const status = withChangedRef(resolveChangedRef({ explicit: values.changed, projectDir }), (changedRef) => computeStatus({
       projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'], evidence: outPath,
@@ -177,7 +260,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
         baseline: values.baseline ? resolve(values.baseline) : baselinePath(projectDir),
       },
     }), io.err);
-    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode, ...(policy ? { originPolicy: policy } : {}), ...(scope ? { scope } : {}) }, ...(values.cost ? { cost: costReport(evidence.records, { run: evidence.run }) } : {}) };
+    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode, ...(evidence.run.reuse ? { reuse: evidence.run.reuse } : {}), ...(policy ? { originPolicy: policy } : {}), ...(weak ? { assertionPolicy: weak } : {}), ...(scope ? { scope } : {}), ...(evidence.run.budget ? { budget: evidence.run.budget } : {}), ...(incomplete ? { failureKind: incomplete.failureKind, ...(incomplete.unprovenAtLeast !== undefined ? { unprovenAtLeast: incomplete.unprovenAtLeast } : {}) } : {}), claims: claimResults(evidence.records) }, ...(values.cost ? { cost: costReport(evidence.records, { run: evidence.run }) } : {}) };
     const result = validate('status', doc);
     if (!result.ok) throw new Error(`probe JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
     io.out(JSON.stringify(doc, null, 2));
@@ -185,7 +268,7 @@ export async function probeCommand({ projectDir, values, version }, io) {
   }
   if (!values.quiet && baseline) {
     io.out('');
-    const tag = (r) => (g.new.includes(r) ? '[NEW]      ' : g.baselined.includes(r) ? '[baseline] ' : '[below floor] ');
+    const tag = (r) => (isNotReached(r) ? '[not reached] ' : g.new.includes(r) ? '[NEW]      ' : g.baselined.includes(r) ? '[baseline] ' : '[below floor] ');
     for (const r of sortForReport(evidence.records).filter((x) => x.verdict !== 'killed')) io.out('  ' + tag(r) + renderRecord(r, { provisional }));
   }
   io.out('');
@@ -195,14 +278,21 @@ export async function probeCommand({ projectDir, values, version }, io) {
   }
   io.out(renderSummary(evidence.records, evidence.run));
   // Its own line: the summary ends with the origins line, which is not a sentence to append to.
+  if (exhausted) {
+    const b = evidence.run.budget;
+    io.out(`command budget of ${b.limitMs}ms exhausted: ${b.reached} of ${b.reached + b.notReached} faults reached, ${b.notReached} not reached (unverifiable, ${'not-reached-within-budget'}; they gate, so the unmeasured part cannot look clean).`);
+    if (incomplete.unprovenAtLeast !== undefined) io.out(`at least ${incomplete.unprovenAtLeast} unproven in the measured part (a floor: the faults not reached are not counted).`);
+  }
   io.out(baseline ? `${g.new.length} new since baseline, ${g.baselined.length} baselined.` : 'No baseline.');
   if (policy) io.out(renderOriginPolicy(policy, { basis: 'current' }));
+  if (weak) io.out(renderAssertionPolicy(weak));
   if (values.cost) {
     io.out('');
     io.out(renderCost(costReport(evidence.records, { run: evidence.run })));
     io.out('');
   }
-  io.out(`evidence: ${outPath}${scope ? ` (partial: ${scope.requestedCount} claim${scope.requestedCount === 1 ? '' : 's'} requested, ${scope.probedCount} probed: --claim ${scope.requestedClaims.join(',')}; not the canonical evidence file)` : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);
+  if (changedScope) for (const line of renderUnmatched(changedScope)) io.out(line);
+  io.out(`evidence: ${outPath}${scope ? ` (partial: ${[scope.requestedClaims ? `${scope.requestedCount} claim${scope.requestedCount === 1 ? '' : 's'} requested` : null, scope.changed ? `${scope.selectedCount} selected by --changed ${scope.changed.ref}` : null, `${scope.probedCount} probed`].filter(Boolean).join(', ')}${scope.requestedClaims ? `: --claim ${scope.requestedClaims.join(',')}` : ''}; not the canonical evidence file)` : exhausted ? ' (incomplete: command budget exhausted; not the canonical evidence file)' : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
   return exitCode;
 }

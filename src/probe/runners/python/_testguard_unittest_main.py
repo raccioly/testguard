@@ -95,6 +95,7 @@ class Result(unittest.TestResult):
                 "phase": "call",
                 "exceptionType": None,
                 "message": None,
+                "failureKind": None,
             }
         return self.records[key]
 
@@ -102,6 +103,10 @@ class Result(unittest.TestResult):
         record = self._record(test)
         record["outcome"] = outcome
         record["exceptionType"] = err[0].__name__ if err and err[0] else None
+        # By type: `addFailure` is unittest's own "an assertion rejected it"
+        # channel, and an AssertionError subclass that reached `addError`
+        # (a subtest, say) is still one.
+        record["failureKind"] = tg.merge_kind(record.get("failureKind"), tg.kind_of(err[0] if err else None))
         record["message"] = tg.clip("".join(traceback.format_exception(*err))) if err else None
 
     def startTest(self, test):

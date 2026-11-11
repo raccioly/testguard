@@ -1,4 +1,8 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { scratchRoot } from '../../scratch-dir.mjs';
+import { randomBytes } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { runProcess, listTestFiles, firstInformativeLine, runnerArgv } from './shared.mjs';
@@ -17,7 +21,8 @@ import { globToRegExp } from '../../util/glob.mjs';
  * spec's testRun as follows, and the mapping is the point of the adapter:
  *
  *   expected            → passed
- *   unexpected/failed   → failed, counts toward assertionFailures (can kill)
+ *   unexpected/failed   → failed, counts toward assertionFailures or
+ *                         exceptionFailures (either can kill; see kinds-reporter.cjs)
  *   unexpected/timedOut → failed, counts toward timeouts (never a kill)
  *   flaky               → failed on an attempt and passed on retry: the run
  *                         is NOT green. Counted as failed with neither an
@@ -149,14 +154,21 @@ export async function discoverTests({ projectDir, version, timeoutMs, maxOutputB
  * Playwright's JSON report → the spec's testRun. Pure; exported for the
  * sample-driven tests. `durationMs` is the wall clock measured by the runner.
  */
-export function parseReport(report, durationMs) {
+export function parseReport(report, durationMs, kinds) {
+  const entries = Array.isArray(kinds?.tests) ? kinds.tests : [];
+  const kindOf = (file, spec, t) => {
+    const hit = entries.filter((e) => e.title === spec.title && e.line === spec.line && e.column === spec.column
+      && (e.project ?? '') === (t.projectName ?? '') && typeof e.file === 'string' && file && (e.file === file || e.file.endsWith(`/${String(file).replace(/\\/g, '/')}`)));
+    if (hit.length === 0) return 'unreported';
+    return hit.every((e) => e.kind === 'assertion') ? 'assertion' : 'exception';
+  };
   const tests = [];
   const walk = (suite) => {
     for (const spec of suite.specs ?? []) {
       for (const t of spec.tests ?? []) {
         const results = t.results ?? [];
         const last = results[results.length - 1];
-        tests.push({ id: `${suite.file ?? spec.file ?? ''}::${spec.title}`, status: t.status, finalResult: last?.status, error: results.find((r) => r.error)?.error?.message });
+        tests.push({ id: `${suite.file ?? spec.file ?? ''}::${spec.title}`, kind: kindOf(spec.file ?? suite.file, spec, t), status: t.status, finalResult: last?.status, error: results.find((r) => r.error)?.error?.message });
       }
     }
     for (const s of suite.suites ?? []) walk(s);
@@ -167,7 +179,11 @@ export function parseReport(report, durationMs) {
   const unexpected = tests.filter((t) => t.status === 'unexpected');
   const flaky = tests.filter((t) => t.status === 'flaky').length;
   const timeouts = unexpected.filter((t) => t.finalResult === 'timedOut' || t.finalResult === 'interrupted').length;
-  const assertionFailures = unexpected.length - timeouts;
+  // A failed test is exactly one of: a timeout, an assertion, an exception.
+  const settled = unexpected.filter((t) => !(t.finalResult === 'timedOut' || t.finalResult === 'interrupted'));
+  const assertionFailures = settled.filter((t) => t.kind === 'assertion').length;
+  const exceptionFailures = settled.length - assertionFailures;
+  const kindNotReported = settled.filter((t) => t.kind === 'unreported').length;
   const failedTests = [...unexpected, ...tests.filter((t) => t.status === 'flaky')].map((t) => t.id);
   const total = tests.length;
   const summary = { total, passed: expected, failed: unexpected.length + flaky };
@@ -180,13 +196,22 @@ export function parseReport(report, durationMs) {
   const loadMessage = outcome === 'error'
     ? (globalErrors.length ? firstInformativeLine(globalErrors.map((e) => e.message ?? '').join('\n')) : 'playwright found no tests')
     : undefined;
-  return { run: { outcome, tests: summary, assertionFailures, durationMs }, timeouts, loadMessage, failedTests, flaky };
+  return { run: { outcome, tests: summary, assertionFailures, exceptionFailures, ...(kindNotReported ? { kindNotReported } : {}), durationMs }, timeouts, loadMessage, failedTests, flaky };
 }
 
-export const run = (opts) => {
-  const env = { PLAYWRIGHT_JSON_OUTPUT_FILE: '{out}', PLAYWRIGHT_JSON_OUTPUT_NAME: '{out}' };
-  return runProcess({ ...opts, env, parse: parseReport, argv: (files) => argvFor(opts.projectDir, files, opts) });
-};
+/** The injected reporter that records each failed test's structured error identity; see its header. */
+export const KINDS_REPORTER = join(dirname(fileURLToPath(import.meta.url)), 'playwright', 'kinds-reporter.cjs');
+
+export async function run(opts) {
+  const sidecar = join(scratchRoot(), `testguard-playwright-kinds-${randomBytes(6).toString('hex')}.json`);
+  const env = { PLAYWRIGHT_JSON_OUTPUT_FILE: '{out}', PLAYWRIGHT_JSON_OUTPUT_NAME: '{out}', TESTGUARD_PLAYWRIGHT_KINDS: sidecar };
+  const readKinds = () => {
+    try { return existsSync(sidecar) ? JSON.parse(readFileSync(sidecar, 'utf8')) : undefined; } catch { return undefined; }
+  };
+  try {
+    return await runProcess({ ...opts, env, parse: (report, durationMs) => parseReport(report, durationMs, readKinds()), argv: (files) => argvFor(opts.projectDir, files, opts) });
+  } finally { rmSync(sidecar, { force: true }); }
+}
 
 /**
  * The negative control's edit: content this runner's loader cannot possibly
@@ -199,4 +224,4 @@ export const fatalEdit = () => '/* testguard negative control: this file must no
 
 /** Run the project-pinned CLI directly, avoiding an npm subprocess per confirmation. */
 export const argvFor = (projectDir, files, { serial = false, workers = 1 } = {}) =>
-  [...runnerArgv(projectDir, '@playwright/test', 'playwright'), 'test', '--reporter=json', `--workers=${serial ? 1 : workers}`, ...files];
+  [...runnerArgv(projectDir, '@playwright/test', 'playwright'), 'test', `--reporter=${KINDS_REPORTER.includes(',') ? 'json' : `json,${KINDS_REPORTER}`}`, `--workers=${serial ? 1 : workers}`, ...files];

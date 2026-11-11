@@ -5,6 +5,7 @@ import { validate, methodOf } from '../../spec/lib/validate.mjs';
 import { sha256 } from '../util/hash.mjs';
 import { defenderSelection, isReusable, subjectOf } from './attribution.mjs';
 import { discoverDefendersDetailed } from './discover.mjs';
+import { createDependencyHasher } from './dependencies.mjs';
 import { resolveDefenders } from './runners/shared.mjs';
 import { hashNativeTestUniverse } from './universe.mjs';
 
@@ -51,6 +52,10 @@ export function originPolicyInputsFresh({ projectDir, claims, evidence, universe
     }
     if (!expected.size || evidence.records.length !== expected.size) return false;
     const seen = new Set();
+    // The same dependency inputs, and through `isReusable` the same
+    // comparison, that verdict reuse applies: an indeterminate or changed
+    // import closure is not fresh.
+    const dependencyHasher = createDependencyHasher(projectDir);
     for (const record of evidence.records) {
       const key = JSON.stringify([record.claim.id, record.subject.id]);
       const current = expected.get(key);
@@ -70,6 +75,7 @@ export function originPolicyInputsFresh({ projectDir, claims, evidence, universe
         defenderHashes: hashes(resolved),
         testUniverseHash,
         discoveryHashes: hashes(discovery?.dependencies ?? []),
+        ...dependencyHasher.inputsFor([fault.file, ...resolved]),
       };
       if (!isReusable(record, { claim, requested, resolved, selectionSource, contentHash: subject.contentHash, inputs })) return false;
     }

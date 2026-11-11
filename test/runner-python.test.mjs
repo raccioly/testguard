@@ -19,8 +19,9 @@ describe('the Python report maps onto the spec testRun', () => {
     expect(run.outcome).toBe('fail');
     // 7 tests; passed = 1; failed counts the three `failed` plus the xpass.
     expect(run.tests).toEqual({ total: 7, passed: 1, failed: 4 });
-    // AssertionError and TypeError both kill; the pytest-timeout failure does not.
-    expect(run.assertionFailures).toBe(2);
+    // AssertionError and TypeError both kill, as different kinds; the pytest-timeout failure is neither.
+    expect(run.assertionFailures).toBe(1);
+    expect(run.exceptionFailures).toBe(1);
     expect(timeouts).toBe(1);
     expect(failedTests).toContain('tests/test_redact.py::test_xpass');
     expect(failedTests).toHaveLength(4);
@@ -242,5 +243,16 @@ describe('mergeRuns keeps provenance across runners', () => {
     const part = (extra) => ({ run: { outcome: 'pass', tests: { total: 1, passed: 1, failed: 0 }, assertionFailures: 0, durationMs: 1 }, timeouts: 0, failedTests: [], ...extra });
     const merged = mergeRuns([part({ provenance: {} }), part({ provenance: { 'a.py': '/iso/a.py' } })]);
     expect(merged.provenance).toEqual({ 'a.py': '/iso/a.py' });
+  });
+});
+
+describe('the Python failureKind decides assertion or exception, never the message', () => {
+  const failed = (id, extra) => ({ id, outcome: 'failed', message: 'AssertionError: looks like one', ...extra });
+  const run = (tests) => parseReport({ testguard: 1, collectionErrors: [], tests: [{ id: 'a::ok', outcome: 'passed' }, ...tests] }, 1).run;
+  it('counts failureKind assertion as an assertion and exception as an exception', () => {
+    expect(run([failed('a::x', { failureKind: 'assertion' }), failed('a::y', { failureKind: 'exception' })])).toMatchObject({ assertionFailures: 1, exceptionFailures: 1 });
+  });
+  it('a missing or unknown failureKind is an exception, even when the text says AssertionError', () => {
+    expect(run([failed('a::x'), failed('a::y', { failureKind: null }), failed('a::z', { failureKind: 'maybe' })])).toMatchObject({ assertionFailures: 0, exceptionFailures: 3 });
   });
 });

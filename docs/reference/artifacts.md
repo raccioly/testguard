@@ -58,7 +58,7 @@ it ignores `.testguard/` as a whole, `init` leaves it alone and warns that
 |---|---|---|---|
 | `evidence.json` | `probe` (complete run, `--confirm` 3 or more) | [`evidence`](../../spec/schemas/evidence.schema.json) | ignore |
 | `evidence-provisional.json` | `probe --confirm` below 3 | [`evidence`](../../spec/schemas/evidence.schema.json) | ignore |
-| `evidence-partial.json` | `probe --claim`, `admit` | [`evidence`](../../spec/schemas/evidence.schema.json) | ignore |
+| `evidence-partial.json` | `probe --claim`, `probe --changed`, `admit`, and an exhausted `probe --partial-on-budget` | [`evidence`](../../spec/schemas/evidence.schema.json) | ignore |
 | `baseline.json` | `baseline` | [`baseline`](../../spec/schemas/baseline.schema.json) | **commit** |
 | `brief.json` | `brief` (not with `--text` or `--markdown`) | [`brief`](../../spec/schemas/brief.schema.json) | ignore |
 | `gate.json` | `gate` | [`gate`](../../spec/schemas/gate.schema.json) | ignore |
@@ -85,13 +85,54 @@ complete, confirmed run writes it, which is why a provisional or partial run
 goes to its own file and can never be frozen into a baseline by accident.
 
 The next `probe` reads its own output file to reuse verdicts whose recorded
-inputs have not changed (`--no-reuse` turns that off).
+inputs have not changed (`--no-reuse` turns that off). Those inputs include
+`inputs.dependencyHashes`, the hashes of everything the target and its
+defenders import plus the root lockfiles and runner config, and
+`inputs.dependencyClosure`: `complete`, or `indeterminate` with the reasons in
+`inputs.dependencyIssues` when an import could not be followed. An
+indeterminate record, or one written before these fields existed, is never
+reused. Before any record is reused its defender set runs once, unmodified;
+`run.measurements.reuseBaselineRuns` counts those runs. `run.instrument` names
+the TestGuard version and a digest of the resolver and runner configuration;
+evidence from another version or digest is never reused. `run.reuse` counts the
+records carried forward and the records measured. With `probe --typecheck`,
+`run.typecheck` names the checker (`commandHash` of the command's identity, and
+its `version`) and each record says how its fault was judged in
+`detail.typecheck`: `clean`, `diagnostics`, `timeout` or `not-applicable`. The
+type check is part of the reuse key: a record measured without it is never
+reused by a run with it, nor the reverse. Reuse trusts this file: if
+the people a gate judges can write it, run that gate with `--no-reuse`.
+
+The file is written atomically (a temporary file, then a rename), so an
+interrupted run never leaves a truncated document behind.
+
+**For tools that read this file.** `inputs.targetHash` and
+`inputs.defenderHashes` are unchanged; `inputs.dependencyHashes` was added beside
+them. A consumer judging whether a record is still fresh must compare all three
+against the current tree: the first two alone miss a changed helper that the
+target or a defender imports.
+
+### External claims files
+
+When `--claims` names a file outside the project, every evidence document it
+produces carries `run.claimsSource: { external: true, sha256 }` and nothing
+else about the file: no path. `status` reports the same `claimsSource` and
+omits `paths.claims`. Records stay self-describing (claim id, statement,
+severity and source are embedded in each), so a consumer without the claims
+file can read results per claim id; it cannot check `claim-changed` against the
+file. The project's own claims file has no `claimsSource`.
 
 ### evidence-provisional.json and evidence-partial.json
 
 `probe --confirm 1` or `2` writes the provisional file; `baseline` refuses it
-unless you pass `--allow-provisional`. `probe --claim <ID>` and `admit` write
+unless you pass `--allow-provisional`. `probe --claim <ID>`, `probe --changed <ref>` and `admit` write
 the partial file. Neither ever replaces `evidence.json`.
+
+A `probe --partial-on-budget` whose command budget ran out also writes the partial
+file (or `--out`), never the canonical one. It records `run.budget`
+(`{limitMs, exhausted, reached, notReached}`), and every fault the budget did not reach is an
+`unverifiable` record with reason `not-reached-within-budget`. `baseline` refuses such a document, and
+a later probe never reuses one of those records.
 
 ### baseline.json
 

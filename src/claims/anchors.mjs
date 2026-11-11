@@ -1,9 +1,13 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { dirname, extname, join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { locate, mutate } from '../probe/inject.mjs';
 import { resolveInterpreter } from '../probe/runners/python.mjs';
+import { repoRoot, isDirty, snapshotWorkingTree } from '../git.mjs';
+import { createScratch } from '../probe/worktree.mjs';
+import { applyFault } from '../probe/inject.mjs';
+import { createTypechecker } from '../probe/typecheck.mjs';
 
 const JS_EXTENSIONS = new Set(['.js', '.mjs', '.cjs']);
 
@@ -160,8 +164,14 @@ function packageType(projectDir, file, cache) {
  * Anchor every fault, then ask the language parser whether the in-memory
  * replacement still compiles. Unsupported languages (and Python when no
  * interpreter resolves) are intentionally left anchor-only.
+ *
+ * With `typecheck` (`''` for the project's own tsc, or a command) every
+ * replacement that still parses is also type checked, the way `probe
+ * --typecheck` would: in a scratch worktree of the working tree, after a
+ * baseline check of the unmodified tree. A replacement the checker refuses is
+ * `fault-invalid`; a file it does not judge is reported `not-applicable`.
  */
-export async function checkAnchors(projectDir, claims, { python } = {}) {
+export async function checkAnchors(projectDir, claims, { python, typecheck, budgetMs = 120_000, nodeModules, scratchBase } = {}) {
   const started = performance.now();
   const work = inspectLocations(projectDir, claims);
   const candidates = work.filter((x) => x.result.status === 'ok' && x.source !== undefined && isInjection(x.fault));
@@ -195,13 +205,44 @@ export async function checkAnchors(projectDir, claims, { python } = {}) {
   javascript.forEach(({ candidate }, index) => parsedByFault.set(keyOf(candidate.claim.id, candidate.fault.id), { language: 'javascript', ...javascriptResults[index] }));
   pythonSources.forEach(({ candidate }, index) => parsedByFault.set(keyOf(candidate.claim.id, candidate.fault.id), { language: 'python', ...pythonResults[index] }));
 
-  const results = work.map(({ claim, fault, result }) => {
+  let results = work.map(({ claim, fault, result }) => {
     const parsed = parsedByFault.get(keyOf(claim.id, fault.id));
     if (!parsed) return result;
     if (parsed.status === 'invalid') return { ...result, status: 'fault-invalid', syntax: parsed };
     return { ...result, syntax: parsed };
   });
+  if (typecheck !== undefined) {
+    results = await typecheckResults(projectDir, work, results, { typecheck, budgetMs, nodeModules, scratchBase });
+  }
   return summarize(results, performance.now() - started);
+}
+
+/** Type check every still-valid injection fault in a scratch copy of the working tree. */
+async function typecheckResults(projectDir, work, results, { typecheck, budgetMs, nodeModules, scratchBase }) {
+  // git reports the repository root by its real path (/private/var on macOS);
+  // the scratch tree's project directory is computed relative to it.
+  projectDir = realpathSync(resolve(projectDir));
+  const root = repoRoot(projectDir);
+  const iso = createScratch({ repoRoot: root, projectDir, ref: isDirty(root) ? snapshotWorkingTree(root) : 'HEAD', scratchBase, nodeModules });
+  let checker;
+  try {
+    checker = await createTypechecker({ projectDir: iso.projectDir, command: typecheck, budgetMs, scratchBase });
+    const out = [];
+    for (const [index, result] of results.entries()) {
+      const { fault } = work[index];
+      if (result.status !== 'ok' || !isInjection(fault)) { out.push(result); continue; }
+      if (!checker.applicable(fault.file)) { out.push({ ...result, typecheck: { status: 'not-applicable' } }); continue; }
+      const mutation = applyFault(iso.projectDir, fault);
+      let outcome;
+      try { outcome = await checker.check({ budgetMs }); } finally { mutation.restore(); }
+      const { status, message } = outcome;
+      out.push({ ...result, ...(status === 'diagnostics' ? { status: 'fault-invalid' } : status === 'timeout' ? { status: 'timeout' } : {}), typecheck: { status, ...(message ? { message } : {}) } });
+    }
+    return out;
+  } finally {
+    checker?.cleanup();
+    iso.cleanup();
+  }
 }
 
 export function renderAnchorChecks(report) {
@@ -211,7 +252,9 @@ export function renderAnchorChecks(report) {
     const syntax = result.syntax?.status === 'ok'
       ? `; ${result.syntax.language} syntax ok`
       : result.syntax?.message ? `; ${result.syntax.language}: ${result.syntax.message}` : '';
-    return `${label} ${result.claimId}/${result.faultId}  ${result.file} — ${hits}${syntax}`;
+    const tc = result.typecheck;
+    const typed = !tc ? '' : tc.status === 'clean' ? '; type check ok' : tc.status === 'not-applicable' ? '; type check not applicable' : tc.status === 'timeout' ? '; type check timed out' : `; type check: ${tc.message}`;
+    return `${label} ${result.claimId}/${result.faultId}  ${result.file} — ${hits}${syntax}${typed}`;
   });
   lines.push(`anchor preflight: ${report.checked} faults checked, ${report.ok} ok, ${report.invalid} invalid in ${report.durationMs}ms`);
   return lines.join('\n');

@@ -59,10 +59,12 @@ const corpus = rows.map(([name, changes, expected]) => [name, { ...healthy, ...c
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const toolSources = Object.fromEntries(['node-test.mjs', 'node/runner.mjs', 'node/entry.mjs', 'node/report.mjs', 'shared.mjs', 'discovery.mjs', 'lifecycle.mjs', 'vitest.mjs'].map((file) => [file, sha256(readFileSync(join(ROOT, 'src/probe/runners', file)))]));
 const vitestVersion = JSON.parse(readFileSync(join(ROOT, 'node_modules/vitest/package.json'), 'utf8')).version;
+// The base commit predates `exceptionFailures`; a kill there was counted wholly in `assertionFailures`. Compare the sum.
+const comparable = ({ durationMs, exceptionFailures, kindNotReported, ...run }) => ({ ...run, assertionFailures: run.assertionFailures + (exceptionFailures ?? 0) });
 const proofProjection = (evidence) => evidence.records.map((r) => ({
   id: `${r.claim.id}/${r.subject.id}`, verdict: r.verdict, reason: r.detail.reason ?? null,
-  baseline: r.detail.baselineRuns.map(({ durationMs, ...run }) => run),
-  probe: r.detail.probeRuns.map(({ durationMs, ...run }) => run),
+  baseline: r.detail.baselineRuns.map(comparable),
+  probe: r.detail.probeRuns.map(comparable),
 }));
 const results = [];
 async function measure(engine, label) {
@@ -96,7 +98,7 @@ for(const [name,input,expected] of ${JSON.stringify(corpus)}) it(name,()=>{try{$
       assert.equal(r.verdict, 'killed', `${r.claim.id} must be caught by both frameworks`);
       assert.equal(r.detail.baselineRuns.length, 3); assert.equal(r.detail.probeRuns.length, 3);
       for (const run of r.detail.baselineRuns) { assert.equal(run.outcome, 'pass'); assert.equal(run.tests.total, corpus.length); }
-      for (const run of r.detail.probeRuns) { assert.equal(run.outcome, 'fail'); assert(run.assertionFailures > 0); assert.equal(run.tests.total, corpus.length); }
+      for (const run of r.detail.probeRuns) { assert.equal(run.outcome, 'fail'); assert(run.assertionFailures + (run.exceptionFailures ?? 0) > 0); assert.equal(run.tests.total, corpus.length); }
     }
     const workers = readFileSync(receipts, 'utf8').trim().split('\n').map(JSON.parse).filter((r) => !r.collect);
     assert.equal(workers.length, 15, 'three shared baseline runs plus four faults times three confirmations');

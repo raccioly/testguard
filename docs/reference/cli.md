@@ -141,9 +141,10 @@ signals such as `MOCKED-NEVER-ASSERTED`. It never runs a test.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--claims <path>` | `<dir>/testguard.claims.json` | The claims file to read. |
+| `--claims <path>` | `<dir>/testguard.claims.json` | The claims file to read. May live outside the project: see [external claims files](../../spec/GATE-SEMANTICS.md#external-claims-files). |
 | `--check-anchors` | off | Locate every exact anchor and syntax-check each JavaScript and Python replacement in memory. No tests, no worktree, no file changes. |
 | `--python <path>` | resolved as for [probe](#probe) | The interpreter `--check-anchors` uses to parse Python replacements. |
+| `--typecheck[=<cmd>]` | off | With `--check-anchors`: also type check each replacement that still parses, as [probe](#probe) does, in a scratch worktree of the working tree (the project is never touched). A replacement the checker refuses is `FAULT-INVALID` with the first diagnostic; a file the checker does not judge says `type check not applicable`. A working tree that already fails the check is exit `2`. Refused (exit `3`) without `--check-anchors`. |
 | `--since <ref>` | none | Report every claim and fault that existed at `<ref>` and does not now (`removed-claim`, `removed-fault`; a rename with the same statement is `renamed-claim` and does not fail). |
 | `--ignore <path>` | `<dir>/testguard.ignore.json` | With `--since`: the ignore file whose `claim` and `fault` entries excuse a removal. |
 | `--cost` | off | What the last probe spent, per claim, per fault and per defender file, read back from recorded run durations. Re-measures nothing. |
@@ -163,7 +164,7 @@ options that cannot combine with authoring (`--apply` without `--annotate`, or
 `--annotate` with anything but `--claims`, `--claim`, `--apply`, `--json`).
 
 **`--json` schema:** none published for the inspection document
-(`{path, claims, annotations, drift, annotationAdvisory, narrowedDefenders?, anchorChecks?, removed?, cost?}`);
+(`{path | claimsSource, claims, thinClaims, annotations, drift, annotationAdvisory, narrowedDefenders?, anchorChecks?, removed?, cost?}`; `claimsSource` replaces `path` for an external claims file; `thinClaims` is the advisory `claim-thin` list);
 [`annotations.schema.json`](../../spec/schemas/annotations.schema.json) with
 `--annotate`.
 
@@ -183,14 +184,17 @@ spec before it is written.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--claims <path>` | `<dir>/testguard.claims.json` | Claims file. |
+| `--claims <path>` | `<dir>/testguard.claims.json` | Claims file. May live outside the project (also for `claims`, `admit`, `status`): fault `file` and `defendedBy` stay project-relative, the evidence records `run.claimsSource: {external, sha256}` and never the path, and nothing is written beside the file. |
 | `--confirm <n>` | `3` | Runs per verdict. Below 3 the run is **provisional**: verdicts print with `?` and the evidence goes to `evidence-provisional.json`. |
 | `--budget <ms>` | `120000` | Wall clock for each runner invocation. At least `1000`. |
-| `--command-budget <ms>` | none | Cooperative deadline for the whole probe. Caps asynchronous children; expiry exits `2` and writes no partial result. At least `1000`. |
+| `--command-budget <ms>` | none | Cooperative deadline for the whole probe. Caps asynchronous children; expiry exits `2` and writes no partial result unless `--partial-on-budget` is given. At least `1000`. |
+| `--partial-on-budget` | off | Needs `--command-budget` (exit `3` without it; also refused with `--require-origin`). When the budget runs out, stop starting work, restore every tree, and write the document anyway: faults fully measured keep their record, and the ones in flight or not started become `unverifiable` with reason `not-reached-within-budget` (they gate and are never reused). Written to `--out` or `.testguard/evidence-partial.json`, never the canonical file or a baseline. `run.budget` is `{limitMs, exhausted, reached, notReached}`. Exit `1` when the measured part already holds a gating finding (`--json`: `run.failureKind` `unproven+incomplete`, `run.unprovenAtLeast` a floor), otherwise `2` (`incomplete`). Claims are probed in `--claim` order, so the caller decides what the budget buys first. `probe` only. |
 | `--out <path>` | see below | Evidence file. |
 | `--baseline <path>` | `<dir>/.testguard/baseline.json` if present | Baseline to gate against. |
 | `--severity <level>` | `low` | Gate only findings whose claim severity is at or above this level. Findings below are still reported and written. |
 | `--claim <ID,ID>` | every claim | Probe only these claims. Repeatable, order-preserving, duplicates collapsed. Writes `evidence-partial.json`. |
+| `--changed <ref>` | none | Probe only the claims the change since `merge-base(<ref>, HEAD)` can have affected: a fault's target, a defender, or anything they import differs (a rename counts through its old and new path; `--include-dirty` reads the working tree). Intersects with `--claim`. Writes `evidence-partial.json`. A change git cannot measure (`ref-unresolved`, `no-merge-base`, `git-timeout`, `git-failed`) exits `2` and probes nothing; it is never read as an empty change. Refused with `--ref` and `--in-place` (exit `3`). See [probing a change](../../spec/GATE-SEMANTICS.md#probing-a-change). |
+| `--fail-on-empty-selection` | off | With `--changed`: a change that selects no claim exits `2` instead of `0`. Either way the run says so, probes nothing, writes no evidence and lists the changed source files no claim covers. Refused without `--changed` (exit `3`). |
 | `--include-dirty` | off | Probe the working tree (snapshotted into a throwaway commit) instead of HEAD, so uncommitted tests count. |
 | `--ref <commit>` | `HEAD` | Probe this commit in the scratch worktree. Honoured even when defender or target files are dirty: a warning names them and the evidence records them as `repo.ignoredDirty`. |
 | `--ignore-dirty` | off | Probe HEAD as committed although defender or target files are dirty (same warning and record). Without this, `--include-dirty` or an explicit `--ref`, a dirty defender or target is refused. |
@@ -198,12 +202,16 @@ spec before it is written.
 | `--runner <name>` | `auto` | Test runner. See the table below. |
 | `--runner-cmd "<cmd>"` | none | A custom runner command; must contain `{files}` and `{out}`, e.g. `"pnpm vitest run {files} --reporter=json --outputFile={out}"`. |
 | `--node-modules <dir>` | `TESTGUARD_NODE_MODULES` | `node_modules` to link into the scratch worktree when it cannot see yours. |
+| `--scratch-dir <dir>` | `TESTGUARD_SCRATCH_DIR`, else the OS temp directory | An existing, writable directory for every scratch worktree, temporary git index, runner report and runner temp directory. Missing or unwritable exits 2 before anything is written. It bounds where TestGuard writes; it does not sandbox the tests. See [where TestGuard writes](configuration.md#where-testguard-writes). |
+| `--typecheck[=<cmd>]` | off | Type check every fault before any test runs. Bare, the checker is the project's own `tsc --noEmit -p tsconfig.json --incremental`, resolved from the project or the linked `node_modules`, never a bundled compiler; a project with no `tsconfig.json`, or whose `typescript` does not resolve, needs `=<cmd>` (exit `2` otherwise, never a skipped check). `<cmd>` is split into an argv like `--runner-cmd` and never run through a shell; exit `0` means clean, anything else is diagnostics, and its first line that says `error` is the message. The unmodified tree is checked first: not clean is exit `2` naming the first diagnostic, and no evidence is written. A fault whose replacement does not type-check is `fault-invalid` / `replacement-does-not-typecheck` with zero test runs; a check over `--budget` is `timeout`. The program is the tsconfig's own, listed by `tsc --listFilesOnly`: a tsconfig whose program holds no project file (solution-style, references only) is exit `2`. Targets the checker does not read (`.py`; `.js` unless the tsconfig sets `allowJs` and `checkJs`; a `.ts` file the tsconfig does not include; with `<cmd>`, every non-TypeScript file, since a command cannot say what it reads) are recorded `detail.typecheck: "not-applicable"` and probed as before. Recorded as `run.typecheck` and part of the reuse key; because type validity belongs to the whole program, a reused record is re-checked once (no test run) and carried forward only if the answer is unchanged. A custom command's `version` is best-effort (its own `--version` plus the project's `typescript` when it resolves); use `--no-reuse` if the checker can change without either changing. |
 | `--python <path>` | `TESTGUARD_PYTHON`, then `$VIRTUAL_ENV`, then `.venv`, `venv`, `.env` in the project, then `python3`, `python` on `PATH` | Interpreter for `.py` defenders, resolved against your working tree. A bare name is looked up on `PATH`. An explicit interpreter is the only one tried: it is never replaced by another. |
 | `--workers <n>` | `1` | Maximum built-in runner workers. Python stays serial. |
 | `--serial` | off | One worker, even when `--workers` is higher (vitest `--no-file-parallelism`, jest `--runInBand`, playwright `--workers=1`). With the default `--workers 1` it changes nothing. pytest always runs with `-p no:xdist`, with or without it. |
+| `--fault-workers <n>` | `1` | Probe up to n faults at once, each in its own scratch worktree. Baselines are still measured once per defender set, before any fault is applied; different defender sets run side by side, and one that is not green beside another is re-measured alone (`detail.baselineRemeasuredSerially`). Records keep claim/fault order; a `timeout` or inconsistent probe measured beside other faults is re-measured alone before it is reported (`detail.remeasuredSerially`). Recorded as `run.faultWorkers`; not with `--in-place`. See [performance](../guides/performance.md#probe-several-faults-at-once). |
 | `--no-escalate` | off | Do not re-run survivors against the whole suite. Escalation runs the whole suite up to N times per survivor. |
 | `--no-reuse` | off | Re-probe claims whose recorded inputs have not changed. |
 | `--allow-empty` | off | Adoption only: a valid claims file with zero claims exits `0` instead of `2`, writes no evidence, and says verification was skipped. Has no effect with `--claim`. |
+| `--require-assertion-kill` | off | Fail (exit 1) when any kill was made only by an uncaught exception and never by an assertion, or comes from evidence that records no kind. The verdict stays `killed`; the policy names the faults and is stored as `assertionPolicy`. Also valid on `admit`, where it refuses a test whose kills are all exception-only. A kill whose runner reported no error identity fails with `reason: "kind-not-reported-by-runner"`, per kill, in the text line and in `--json`: only a runner that reports identity can satisfy this policy. The built-in runners do. A custom `--runner-cmd` can if it writes a jest-shaped report (`testResults[].assertionResults[]`) with `failureDetails` per failed test: `matcherResult`, or `name: "AssertionError"`, or `code: "ERR_ASSERTION"`, or an `operator`. Without `failureDetails` every failure is an exception and the policy cannot pass. |
 | `--require-origin <kinds>` | none | Require every claim's declared source kind to be in this set (repeatable, comma-separated). Needs a complete confirmed run: refused with `--claim`, `--allow-empty`, `--ref`, `--ignore-dirty` or `--confirm` below 3. Labels do not authenticate independence. |
 | `--progress <mode>` | `auto` | `auto`, `tty`, `plain`, `ndjson` or `none`. Always on stderr. `--quiet` and `--json` imply `none` unless this is given explicitly. |
 | `--verbose` | off | Also print every killed fault. |
@@ -216,7 +224,7 @@ Where the evidence goes, unless `--out` says otherwise:
 | Run | File |
 |---|---|
 | Complete, `--confirm` 3 or more | `.testguard/evidence.json` |
-| `--claim` selection | `.testguard/evidence-partial.json` |
+| `--claim` or `--changed` selection | `.testguard/evidence-partial.json` |
 | `--confirm` below 3 | `.testguard/evidence-provisional.json` |
 
 Partial and provisional runs never overwrite the canonical evidence: only a
@@ -237,17 +245,21 @@ Detection, limits and per-runner behaviour are in
 [languages and runners](languages-and-runners.md).
 
 **Exit:** `0` no new gating finding at or above the severity floor; `1` at
-least one new finding, or a failed `--require-origin` policy (which baseline
-debt and severity floors cannot hide); `2` precondition (an empty claims file
+least one new finding, a failed `--require-origin` policy, or a failed
+`--require-assertion-kill` policy (which baseline debt and severity floors
+cannot hide); `2` precondition (an empty claims file
 without `--allow-empty`, a runner that does not resolve, a dirty defender or
-target with the implicit HEAD, an exhausted command budget, an unavailable
-origin policy); `3` usage (`--confirm` not a positive integer, `--budget` or
-`--command-budget` below 1000, `--workers` not a positive integer, an unknown
-`--progress` mode, an empty `--claim`).
+target with the implicit HEAD, an exhausted command budget (without `--partial-on-budget`), an unavailable
+origin policy, a `--changed` change git could not measure, an empty `--changed` selection under `--fail-on-empty-selection`); `3` usage (`--confirm` not a positive integer, `--budget` or
+`--command-budget` below 1000, `--workers` or `--fault-workers` not a positive
+integer, `--fault-workers` above 1 with `--in-place`, an unknown
+`--progress` mode, an empty `--claim`, `--fail-on-empty-selection` without `--changed`, `--partial-on-budget` without `--command-budget` or with `--require-origin`).
+
+With `--partial-on-budget` an exhausted command budget writes a document instead of refusing: exit `1` when the measured part already holds a gating finding, otherwise `2` (see the flag above). It is never `0`.
 
 **`--json` schema:** [`status.schema.json`](../../spec/schemas/status.schema.json),
-with `run` = `{id, evidence, provisional, records, newSinceBaseline, exitCode, originPolicy?, scope?}`
-and `cost` when `--cost` is given. The evidence file itself conforms to
+with `run` = `{id, evidence, provisional, records, newSinceBaseline, exitCode, claims, originPolicy?, scope?, budget?, failureKind?, unprovenAtLeast?}`
+and `cost` when `--cost` is given. `budget` = `{limitMs, exhausted, reached, notReached}` is present with `--partial-on-budget`; `failureKind` (`unproven+incomplete`, `policy+incomplete` or `incomplete`) and `unprovenAtLeast` (a floor) only when the budget ran out. `run.claims[]` is `{id, result: "proven" | "unproven" | "could-not-verify", faults: {total, killed, survived, nocover, unverifiable, faultInvalid, timeout, flakyDefender}, reasons: [{faultId, verdict, reason?}]}` per claim measured, keyed by claim id ([per-claim results](../../spec/GATE-SEMANTICS.md#per-claim-results)). With `--changed`, `run.scope` adds `selectedCount` and `changed` = `{ref, outcome: "determined" | "undetermined", base, head, includeDirty, files, matchedClaims, unmatchedFiles, note}` (or `{ref, outcome: "undetermined", reason: {kind, message}}`); when the selection is empty or undetermined no probe ran and `run` is only `{exitCode, scope}`. The evidence file itself conforms to
 [`evidence.schema.json`](../../spec/schemas/evidence.schema.json).
 
 ## baseline

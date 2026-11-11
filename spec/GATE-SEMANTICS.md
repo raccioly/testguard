@@ -151,12 +151,12 @@ The verdict set is closed. Only one value is a pass.
 
 | Verdict | Meaning | Gates by default |
 |---|---|---|
-| `killed` | Fault applied; every one of N probe runs failed with a genuine assertion failure, on a defender set that was green N/N unmodified. | no |
+| `killed` | Fault applied; every one of N probe runs failed in a test body (by assertion or by an exception the fault provoked; rule 3), on a defender set that was green N/N unmodified. Carries `detail.killKind`. | no |
 | `survived` | Fault applied; every one of N probe runs passed. The claim is **unproven**. | **yes** |
 | `nocover` | No defending test exists: the declared globs resolve to nothing, or no test imports the subject. Worse than `survived` — nothing was even tried. | **yes** |
 | `unverifiable` | The claim could not be probed: the fault's anchor is missing or ambiguous, configured or symbol-level defender discovery was indeterminate (`defender-discovery-indeterminate`), its defenders failed to load (`defenders-failed-to-load`), probing it threw (`probe-error`), or the defenders do not execute the subject at all (`subject-not-executed`). Carries a `reason`. A loud, gating verdict — a claim that cannot be probed is not "skipped", it is undefended until someone fixes the fault or the defenders. Never confused with `flaky-defender`, which requires tests that *ran*. | **yes** |
 | `timeout` | Probe run exceeded its budget. Not counted as a kill; the pessimistic reading is the safe one because flakiness biases the metric optimistically. | **yes** |
-| `fault-invalid` | The replacement does not load or compile. A bad fault, not a detection. | **yes** |
+| `fault-invalid` | The replacement does not load or compile (`replacement-does-not-compile`, `suite-failed-to-load`), or — under `--typecheck` — parses but does not type-check (`replacement-does-not-typecheck`, rule 16). A bad fault, not a detection. | **yes** |
 | `flaky-defender` | Defenders were not green N/N on unmodified source (`defenders-not-green`), or the N probe runs disagreed with each other (`inconsistent-probe`). Either way no verdict about the fault can be trusted; fix the defenders first. | **yes** |
 
 Rules that follow from the table:
@@ -169,10 +169,56 @@ Rules that follow from the table:
    rendering marks the verdicts as unconfirmed, and a provisional run is
    never frozen into a baseline. Provisional runs exist for the fix loop —
    a fast signal while writing a test — not for a gate.
-3. **Only a test body rejecting the behaviour kills.** A test that fails by
-   assertion — or by an exception the fault provoked inside it — counts. A
-   timeout does not, and a suite that fails to load does not: neither is
-   evidence that the suite defends the claim. Tools parse the runner's
+3. **Only a test body rejecting the behaviour kills, and a kill says how.** A
+   test that fails by assertion — or by an exception the fault provoked inside
+   it — counts. A timeout does not, and a suite that fails to load does not:
+   neither is evidence that the suite defends the claim.
+
+   *Two kinds of kill.* Every failed test is exactly one of: a timeout, an
+   **assertion** failure, or an **exception**. The runner reads which from the
+   error's structured identity — an `AssertionError` (by `name` or by
+   `code: ERR_ASSERTION`), a jest `matcherResult`, a framework's own failed
+   `expect` step, a Python `AssertionError` or pytest `fail`/`raises` outcome —
+   and never from message wording. An error whose shape the runner cannot read
+   is an exception: the pessimistic side. A test with several errors is an
+   assertion when any one of them is. The testRun records both counts,
+   `assertionFailures` and `exceptionFailures`; a run kills when their sum is
+   above zero, so the default verdicts are exactly what they were before the
+   split. A `killed` record then carries `detail.killKind`, derived from its N
+   probe runs: `assertion` (every run had at least one assertion failure),
+   `exception-only` (no run had one: the code threw and the suite went red,
+   which proves the suite **reaches** the code, not that it **checks** it), or
+   `mixed`. Evidence written before the split has neither field.
+
+   *The policy.* `probe --require-assertion-kill` (also on `admit`) fails
+   when any `killed` record is `exception-only` or carries no recorded kind:
+   exit 1, the verdict still `killed`, the policy result stored as
+   `assertionPolicy` and rendered beside the record. It adds no verdict and
+   never changes one. `mixed` passes. `status` and `brief` count exception-only
+   kills as a named weakness beside the co-authored count.
+
+   *Known limits, stated so they are not rediscovered.* A defender that
+   asserts only that the code does not throw (`expect(fn).not.toThrow()`,
+   `assert.doesNotThrow`) is an assertion, and a kill by it is an assertion
+   kill. An `AssertionError` raised by the code under test itself (an internal
+   `assert`) is indistinguishable from the test's own and reads as an
+   assertion, the optimistic side. jest keeps only a rewritten `message` for
+   a `node:assert` error, which is the same shape as a plain object thrown as
+   `{ message }`; such a lone `message` is an assertion only when the error
+   header (first line of the matching `failureMessages` entry, never a stack
+   frame or quoted text) names `AssertionError` or is jest's own assertion
+   header, `assert.<fn>(` or `expect(`; otherwise it is an exception. Playwright
+   exposes only the failed `expect` step and the error's class name to a
+   reporter; a failed `expect` step the test then swallowed, before failing
+   some other way, is misread as an assertion. A custom `--runner-cmd`
+   reports what its jest-compatible report carries; without `failureDetails`
+   every failure is an exception, and when that is the only reason (every
+   exception failure of every run was one the runner gave nothing to classify,
+   counted as `testRun.kindNotReported`) the record says so with
+   `detail.killKindReason: "kind-not-reported-by-runner"` and the policy
+   repeats it per kill: the kill is exception-only by default, not by
+   evidence that the suite is hollow. It still fails the policy.
+ Tools parse the runner's
    structured report, never its exit code, because the exit code cannot tell
    these apart. A runner's own retry mechanism does not change this: a test
    that failed and then passed on retry (Playwright's `flaky`) is a
@@ -183,8 +229,9 @@ Rules that follow from the table:
    assertion, stack frame, or source excerpt. Structured assertion identity
    does not hide a separate timeout in the same failed test.
    Python is read the same way: an `AssertionError` and any other
-   exception raised by the test body both count, because both are the suite
-   rejecting the behaviour; a collection error — a module that will not
+   exception raised by the test body both kill (as an assertion and as an
+   exception respectively), because both are the suite rejecting the
+   behaviour; a collection error — a module that will not
    import, which is what a replacement that does not parse looks like from
    Python — is a load failure and never a kill; and a test the suite expected
    to fail that passed (`xpass`) makes the run non-green without ever being an
@@ -240,6 +287,79 @@ Rules that follow from the table:
    does not change verdicts or baseline fingerprints, and a source label
    still does not authenticate independent intent.
 
+   **What the target and defenders import is an input to reuse.** A verdict
+   is about the code the defenders run, and most of that code is not the
+   target file or the test file. Evidence records
+   `inputs.dependencyHashes`: content hashes of the transitive project-file
+   import closure of the fault target and of every resolved defender, plus
+   the lockfiles, package manifests and runner/compiler configuration files
+   present at the project root. JavaScript and TypeScript follow every static
+   import, re-export, literal `import()`/`require()`, and module named to a
+   test framework's `mock`/`importActual`/`requireActual` family (with an
+   adjacent `__mocks__` file); an ambiguous resolution includes every
+   candidate. Python follows module names, including the packages a module's
+   import runs first and every `conftest.py` from the project root down to
+   each file. Reuse requires the recorded and current maps to be equal.
+   When any import cannot be followed — a dynamic import, `require`,
+   `import_module` or `__import__` whose argument is not one string literal; a
+   project-relative or aliased specifier that resolves to no file; a module
+   the lexer cannot read; a graph over the resolver limits — the record
+   carries `inputs.dependencyClosure: "indeterminate"` with the reasons in
+   `inputs.dependencyIssues`, and is never reused: it is probed again every
+   time. A record without `dependencyHashes` predates this rule; it stays
+   readable and is never reused. A record carrying `reusedFrom` and an
+   indeterminate closure does not conform.
+
+   **One live baseline licenses every carry-forward.** No hash sees the
+   environment: installed packages, the interpreter, a data file a test reads,
+   a bare specifier that resolves through a `node_modules` symlink to a
+   workspace package (outside the project closure), a setup or global-setup
+   file a runner configuration names by string rather than imports, a lockfile
+   above the project directory in a monorepo. So before a prior record
+   with a non-empty defender set is carried forward, that defender set runs
+   once on unmodified source. That run is the first run of rule 1's shared
+   baseline, so it costs one run per defender set per command, and a fault
+   probed after all pays nothing twice. Anything other than a green run
+   means no reuse: the fault is probed in full, and rule 1 decides the
+   verdict. The run is counted in `run.measurements.reuseBaselineRuns`.
+
+   `status` and the origin-policy freshness check compute the same closure
+   and apply the same comparison, so a changed import makes `status` stale
+   and makes origin-policy inputs unfresh. An indeterminate closure is never
+   fresh for the origin policy, which is then `unavailable`; `status` does
+   not call it stale on that ground alone, because re-probing cannot make it
+   determinate and an agent would loop. `--no-reuse` is unchanged.
+
+   **The instrument is part of the reuse key.** Evidence records
+   `run.instrument`: the TestGuard version that decided its verdicts (equal to
+   `tool.version`) and a digest of the configuration that shapes how
+   defenders are found and run and is not hashed per record — the resolver's
+   alias sources (tsconfig `paths` through `extends` and `references`,
+   vite/vitest `resolve.alias`, package.json `imports`) and the root runner
+   configuration and lockfiles. Evidence from another version or digest, or
+   with no `run.instrument`, is readable and never reusable: a newer tool may
+   decide verdicts by different rules. `status` applies the same rule and
+   reports it as one stale line for the whole document — another version, or
+   a changed configuration digest — so `status` never calls evidence fresh
+   that the next probe would re-measure in full.
+
+   **Reuse is a trust decision, and the evidence says how much of it there
+   was.** `run.reuse` counts the records carried forward (`reused`, each with
+   `reusedFrom`) and the records measured (`measured`); `probe --json` copies
+   it. Reuse trusts the previous evidence file: a hand-written record whose
+   hashes match is indistinguishable from a measured one. **A gate over
+   authors who can write the evidence file must run with `--no-reuse`.**
+
+   Evidence is written atomically — an exclusive temporary file in the same
+   directory, then a rename — so a run killed mid-write leaves the previous
+   document or the new one, never a truncated file a later probe reads as
+   prior evidence.
+
+   `inputs.targetHash` and `inputs.defenderHashes` keep their meaning;
+   `inputs.dependencyHashes` sits beside them. A consumer that judges
+   freshness must compare all three: the first two alone miss every change
+   to what the target and defenders import.
+
 9. **The fault must be the code that ran.** A green baseline proves the
    harness is not reporting everything as broken. It proves nothing about the
    opposite direction: a fault the interpreter never executes leaves the
@@ -277,7 +397,11 @@ Rules that follow from the table:
    an interpreter without the test requirements changes none of the hashed
    inputs, so fixing the environment would otherwise leave the failure
    reported as the current answer. Re-measuring it costs one baseline run per
-   defender set. The one exception is a **precondition** failure — the
+   defender set. A record whose verdict is `timeout` or `flaky-defender` is
+   never reused either: each says the defenders could not be measured on that
+   machine at that time (a loaded runner, a nondeterministic suite), and a
+   green live baseline today (rule 8) does not make yesterday's timeout
+   today's answer. The one exception is a **precondition** failure — the
    interpreter loading the source from outside the probed tree, a runner that
    does not resolve — which is a statement about every verdict in the run and
    still refuses it outright.
@@ -427,6 +551,56 @@ Rules that follow from the table:
    The verdict set stays closed and shared. What each method may legitimately
    report is part of defining it.
 
+16. **A replacement the compiler refuses is not a fault.** Under
+   `--typecheck[=<cmd>]` the project's own type checker judges every fault
+   before any test runs: the fault is applied, the checker runs, the fault is
+   restored. Diagnostics that the unmodified tree did not have make the verdict
+   `fault-invalid`, `detail.reason` `replacement-does-not-typecheck`,
+   `detail.typecheck` `diagnostics` and `detail.message` the first diagnostic;
+   `baselineRuns` and `probeRuns` are empty, because no test run was spent. A
+   check that exceeds its budget is `timeout` (`typecheck-timed-out`, never a
+   pass). The type check precedes rule 1's baseline because it is a property of
+   the fault, not of the defenders; `nocover` and an anchor that does not hit
+   still come first, since there is no fault to check.
+   **The unmodified tree is checked first** and must be clean. A tree that
+   already fails cannot be used to judge a fault, so the run is a precondition
+   failure (exit `2`) that names the first diagnostic and writes no evidence.
+   So is a checker that cannot run: no `tsconfig.json` and no command, a
+   `typescript` that cannot be resolved from the project, a `tsc` that cannot
+   read the configuration. A check that was asked for and cannot be made is
+   never a skipped check. A checker that dies mid-run without a diagnostic is
+   `unverifiable` (`probe-error`) for that fault, never `clean`.
+   The checker is the project's own `tsc --noEmit -p tsconfig.json`, never a
+   bundled compiler, or a custom command that is an argv and never a shell
+   string. The default runs `--incremental`; its build-info file lives under
+   the scratch area, is snapshotted after the baseline check, and is restored
+   before and after every fault, so one fault's diagnostics never reach the
+   next. A target the checker does not read (a `.py` file, a `.js` file the
+   project does not check with `allowJs` and `checkJs`, a `.ts` file the
+   tsconfig's program does not contain, any custom command's non-TypeScript
+   target) is recorded `detail.typecheck: "not-applicable"` and probed as
+   before: `clean` is never said about a file the checker did not read. (A
+   custom command cannot say what it reads, so for it only the extension
+   decides.) A program with no project file is a precondition failure for the
+   default command: nothing could be judged. A checked fault that stays valid
+   is `clean`.
+   **The checker is an instrument.** Evidence records
+   `run.typecheck: { commandHash, version }`: a hash of the command's identity
+   (its flags, or the custom argv) and the checker's version. It is part of the
+   reuse key (rule 8's instrument): a record measured without the type check is
+   not reusable by a run with it, and the reverse; so is one measured with a
+   different command or checker version. A record carrying `detail.typecheck`
+   requires a run that declares `run.typecheck`.
+   **Type validity belongs to the whole program**, which no per-fault hash sees
+   (a file added elsewhere can make a clean fault invalid). So when a run that
+   type checks would carry a record forward, it first type checks that fault
+   again — one check, no test run — and carries the record forward only if
+   `detail.typecheck` comes out the same; a `diagnostics` record is carried
+   forward without any test run, since none produced it. A custom command's
+   `version` is best-effort (the command's own `--version` plus the project's
+   `typescript` when it resolves); `--no-reuse` covers a checker that changes
+   under neither.
+
 ## Per-run and whole-command budgets are different
 
 `--budget` remains the wall-clock ceiling for one runner invocation. An
@@ -444,6 +618,59 @@ result document; any previous document remains untouched. Cleanup may finish
 after the deadline, but no record from the incomplete operation becomes
 evidence. This is deliberately stricter than a per-run timeout: publishing
 the completed prefix would let the unattempted suffix look clean.
+
+### Opt-in partial result: `probe --partial-on-budget`
+
+A caller with a fixed time box (an agent loop, a CI step) can opt into a
+partial result for `probe` only (`sweep`, `replay` and `admit` refuse the flag;
+it needs `--command-budget`, and it is refused with `--require-origin`, whose
+policy needs complete evidence). The default above is unchanged. With the flag,
+when the budget runs out the run stops starting work, restores and removes
+every scratch tree, and writes a document under one rule: nothing that was not
+fully measured is reported as measured.
+
+1. **Reached.** A fault whose measurement finished keeps its record, whatever
+   order a `--fault-workers` fan-out finished them in. "Reached" is decided per
+   record: under a fan-out a record that finished behind an unfinished
+   predecessor is kept.
+2. **Not reached.** Every other fault — the ones in flight, the ones never
+   started, and one waiting for its serial re-measure (a contended record is not
+   a measurement) — gets verdict `unverifiable` with `detail.reason`
+   `not-reached-within-budget`, no baseline or probe runs, no resolved
+   defenders and `defenders.nocover: false`. It gates, so the suffix cannot look
+   clean. It is never reusable (`isReusable` refuses the reason) and carries
+   no `reusedFrom`. Expiry before any fault is measured (during discovery,
+   planning or a baseline) writes a document with zero reached.
+3. **A run the budget itself cut short is the deadline.** A child killed at the
+   cap of the command's remaining time is not a `timeout` verdict about the
+   defenders even if the clock shows a sliver left; the run is over.
+4. **Order.** Faults are probed in the caller's order: `--claim` order, else the
+   claims file's order. The emitted order is always claim/fault order.
+5. **`run.budget`** is `{ limitMs, exhausted, reached, notReached }`, recorded
+   whenever the flag is given. `exhausted` is true exactly when a
+   `not-reached-within-budget` record exists; `reached + notReached` equals the
+   record count, and each count equals the records it names. The validator
+   re-derives all of it and rejects a document that disagrees, a not-reached
+   record outside `run.budget`, one that has runs or a verdict other than
+   `unverifiable`, and an origin policy on an exhausted run. A run that finished
+   every fault inside the budget is complete (`exhausted: false`) even if the
+   clock ran out while its result was being written: the deadline bounds
+   measuring.
+6. **Where it goes.** An exhausted document is written to `--out` or
+   `.testguard/evidence-partial.json`, never the canonical evidence file (an
+   `--out` that names the canonical file is redirected with a warning), and
+   `baseline` refuses it.
+7. **Exit code.** Never `0`. The gate reads the measured records only (a
+   not-reached record always gates and is not counted): when they already hold a
+   new gating verdict, or a failed policy, the exit code is `1` and `--json`
+   carries `run.failureKind` `unproven+incomplete` with `run.unprovenAtLeast`, the
+   count of those verdicts — a floor, since the faults not reached are not
+   counted — or `policy+incomplete` for a failed assertion policy alone.
+   Otherwise the exit code is `2` and `run.failureKind` is `incomplete`. `run.budget`
+   is copied into the `--json` run block.
+8. **Per-claim results.** `run.claims[]` reports a claim with a not-reached
+   fault as `could-not-verify` with the reason, unless another of its faults
+   survived, in which case it is `unproven` (the rule below is unchanged).
 
 Timeout cleanup is best effort, not portable process containment. TestGuard
 hard-kills the runner's original process group and every descendant still
@@ -812,6 +1039,42 @@ Exit codes: `0` every changed parent-owned source file is claimed or excused
 all-excluded or all-delegated change); `2` the change cannot be evaluated (unresolvable
 reference, invalid claims or ignore file, no repository); `3` no reference.
 
+## Write boundary
+
+TestGuard writes in a fixed, listed set of places, so a caller that confines it
+can provision exactly those. The set is: the **scratch directory**, the
+evidence path (`--out`, else `<dir>/.testguard/`), and git's own metadata under
+the repository's `.git` (`worktrees/` for each scratch worktree, plus loose
+objects when `--include-dirty` snapshots an unstaged tree). Nothing else.
+`--scratch-dir <path>`, or `TESTGUARD_SCRATCH_DIR`, names the scratch directory
+for `probe`, `sweep`, `replay` and `admit`; the flag wins. Every scratch
+worktree, temporary git index, runner report, sidecar reporter file and
+per-process runner temp directory lives under it, and the children are given
+a `TMPDIR` inside it. Unset, it is the operating system's temp directory, as
+before. A directory that does not exist or cannot be written is a precondition
+error (exit 2) reported before anything is written; it is never created.
+
+The scratch worktree gets its own `node_modules` directory whose entries link
+to the shared install, so a tool that writes `node_modules/.vite-temp`,
+`.vite` or `.cache` writes into the scratch tree and never into the install.
+Dot-entries that are not part of an install are not carried across. The
+per-run temp directory also sets `XDG_DATA_HOME` (vitest keeps an API token
+there on Linux). Runs against the caller's own tree (the dirty-tree test
+discovery, `--in-place`) cannot be redirected: discovery asks vitest 4 and
+later for `--configLoader runner` when the install is not writable, and
+`--in-place` is documented as writing the tree.
+
+`run.writeBoundary` records signals, never paths: `scratchDir` is `default` or
+`configured`; `nodeModulesWritable` is true when any linked install (or
+`--node-modules`) could be written as the run started, false when none could,
+and absent when none is linked. It does not enter reuse: it is a statement
+about where the run could write, and no verdict depends on it.
+
+What is not promised: the tests under probe run the project's own code with the
+caller's privileges. The boundary says where TestGuard and the built-in runners
+write; it is not a sandbox, and it cannot stop a test from writing elsewhere or
+opening a socket.
+
 ## Anchor preflight
 
 `claims --check-anchors` answers what is knowable before a runner starts. For
@@ -842,6 +1105,114 @@ the requested and actually probed claim ids and counts. Commands whose
 `--claim` is singular (`scaffold` and `admit`) reject repeated or comma-separated
 values instead of silently choosing one.
 
+## Probing a change
+
+`probe --changed <ref>` measures only the claims a change can have affected.
+The change is `merge-base(<ref>, HEAD)` against HEAD, or against the working
+tree with `--include-dirty` (tracked edits, staged or not, and untracked files).
+Paths are project-relative; a change outside the project directory is not this
+project's change. A deletion is a change. A rename or copy contributes its old
+path and its new path.
+
+A claim is **selected** when any of those paths is one of: a fault's target; a
+defender, whether the claim names it (`defendedBy`, literally or by glob) or
+discovery resolves it; or a file in the import closure of the target and the
+defenders (the same closure `inputs.dependencyHashes` records, manifests and
+runner configuration included). A closure that cannot be followed selects the
+claim whenever anything changed: not being able to tell is never read as
+"unaffected". `--claim` intersects: the selection is the requested ids that the
+change reached, in the order requested. An unknown `--claim` id is an error
+whatever the change is.
+
+Selection has three outcomes, reported in `run.scope.changed.outcome` and
+`run.scope.selectedCount`, and they are never confused:
+
+| Outcome | Meaning | `run` | Exit |
+|---|---|---|---|
+| `determined`, claims selected | those claims are probed | a measured run | the probe's own (0 or 1) |
+| `determined`, none selected | the change touches nothing any claim depends on | `exitCode` and `scope` only; `selectedCount: 0`; no evidence written | `0`, or `2` under `--fail-on-empty-selection` |
+| `undetermined` | the ref does not resolve (`ref-unresolved`), there is no merge base (`no-merge-base`), git did not finish (`git-timeout`) or git failed any other way (`git-failed`) | `exitCode` and `scope` only; no `selectedCount`; `reason` `{kind, message}` | `2` |
+
+An empty selection says so in a line of its own and is not a pass for the
+change: it says no claim was in its way. An undetermined change is not an empty
+one and never narrows a run: nothing is probed. Every git call on the selection
+path is a named site (`SCOPE_GIT_SITES` in `src/probe/scope.mjs`) and a failure
+at any of them is `undetermined`; the test suite fails every site in turn and
+pins the list, so a call added without a reviewer deciding what its failure
+means does not pass CI.
+
+`run.scope.changed` also carries `files` (every changed path), `matchedClaims`
+(the claims the change reached, before `--claim`) and `unmatchedFiles`: the
+changed source files no claim's target, defender or closure touches, with the
+note `not covered by any claim; absence from the results is not a pass`. This is
+the probe-side view of what `gate --changed` enforces; a clean result over a
+change whose files are listed there says nothing about those files.
+
+`--changed` measures the tree being probed (HEAD, or the working tree with
+`--include-dirty`), so it is refused with `--ref` and `--in-place` (exit `3`):
+the selection would describe another tree than the one measured.
+
+A `--changed` run is partial evidence: it writes `evidence-partial.json`, never
+the canonical file, and is never a baseline.
+
+## Per-claim results
+
+`probe --json` carries `run.claims[]`: one entry per claim the invocation
+measured, in the order probed, keyed by claim id (and, inside `reasons`, by
+fault id, never by position or line):
+
+```
+{ id, result: "proven" | "unproven" | "could-not-verify",
+  faults: { total, killed, survived, nocover, unverifiable, faultInvalid, timeout, flakyDefender },
+  reasons: [{ faultId, verdict, reason? }] }
+```
+
+`faults` counts verdicts and `total` is their sum. `result` is derived from the
+counts, in this order, rounding toward unproven:
+
+1. any `survived` or `nocover` fault → `unproven`, whatever happened to the others;
+2. otherwise at least one fault was measured and every one is `killed` → `proven`;
+3. anything else (`unverifiable`, `timeout`, `fault-invalid`, `flaky-defender`, or
+   no fault measured at all) → `could-not-verify`.
+
+`could-not-verify` is neither a pass nor a finding about the code: the
+measurement did not happen, so the remedy is to repair the claim or the suite's
+reliability, not to write a test for a fault nobody ran. `reasons` has exactly
+one entry for each fault that was not killed. The block ignores the baseline
+and the severity floor: it describes what this run measured, not what gates.
+The validator re-derives every `result` from its counts and rejects a block
+that disagrees, a `total` that is not the sum, a missing or duplicated reason,
+and a block that does not name exactly the probed claims.
+
+## External claims files
+
+`--claims <path>` may name a file outside the project under probe, for `probe`,
+`claims`, `admit` and `status`. Fault `file` and `defendedBy` stay
+project-relative: they name files of the project, wherever the claims live.
+`admit` takes the project to be the repository the test file lives in. A claims
+file inside the project is not external; the project's own claims need no
+mark. For an external file the evidence records `run.claimsSource: { external:
+true, sha256 }` (the hash of the file's bytes), never its path, and `status`
+reports `claimsSource` in place of `paths.claims`. Nothing is written beside the
+external file: evidence, partial evidence and baselines stay under the project's
+`.testguard/`.
+
+Every evidence record embeds the claim's id, statement, severity and source, so
+a consumer without the claims file can still read the results per claim id. It
+cannot check `claim-changed` (claim metadata against the file) and cannot tell
+whether the file it was measured against is the one a caller holds, except by
+comparing `sha256`.
+
+## Thin claims
+
+`claims` and `status` flag a claim with fewer than two faults (`fewer-than-two-faults`),
+or whose faults all share one `faultClass` (`single-fault-class`), as
+`claim-thin`. It is advisory: it never changes a state, an exit code or a
+verdict. A claim whose every fault is killed is proven against one way of being
+wrong, or one kind of wrong; the signal says how much that proves. `status`
+lists them in `thinClaims` (absent when none); `claims --json` always carries
+`thinClaims`.
+
 ## Severity floor
 
 `--severity <level>` gates only findings whose claim severity is at or above
@@ -854,7 +1225,7 @@ evidence; they simply do not turn CI red.
 |---|---|
 | `0` | No new gating findings at or above the severity floor. |
 | `1` | At least one new gating finding. |
-| `2` | Precondition failed: test runner not resolvable (e.g. no `node_modules` linked into the scratch worktree), working tree dirty for a fault target file, claims file invalid, no commits. Nothing was probed. |
+| `2` | Precondition failed (or, with `probe --partial-on-budget`, the command budget ran out and the measured part holds nothing that gates: `run.failureKind` `incomplete`; or, for `probe --changed`, the change could not be measured, or selected nothing under `--fail-on-empty-selection`): test runner not resolvable (e.g. no `node_modules` linked into the scratch worktree), working tree dirty for a fault target file, claims file invalid, no commits. Nothing was probed. |
 | `3` | Usage or configuration error. |
 
 A tool must never exit `0` because it had nothing to check. If the claims
@@ -949,7 +1320,8 @@ fresh time. Existing ordinary scaffold/append/probe behavior is unchanged.
 Built-in runners default to one worker. `--workers N` raises the worker ceiling
 for Vitest, Jest and Playwright; `--serial` overrides it to one. Python remains
 serial and disables pytest-xdist without installing or enabling any plugin.
-Faults and mixed-runner partitions remain sequential. This is a worker ceiling,
+Mixed-runner partitions remain sequential, and faults are probed one at a
+time unless `--fault-workers` fans them out (see [Fault fan-out](#fault-fan-out)). This is a worker ceiling,
 not OS CPU/memory containment; test-created threads, native libraries and custom
 `--runner-cmd` commands manage their own concurrency. Native discovery is bounded
 and uses one worker where applicable.
@@ -969,10 +1341,17 @@ cooperative around synchronous setup, and bounded OS cleanup can outlive it.
 Optional `run.measurements` records monotonic elapsed time, fresh runner execution
 time, invocation count and remaining setup/discovery/other overhead. Each real
 runner invocation is charged once, including negative controls and mixed-runner
-partitions; reused records and cached baselines create no invocation charge.
-`elapsedMs = runnerMs + overheadMs`. Optional `run.workers` records the built-in
+partitions. Reused records and cached baselines create no invocation charge;
+the one live baseline run that licenses reuse of a defender set (rule 8) is a
+real invocation, charged once and also counted in optional
+`reuseBaselineRuns`.
+`elapsedMs = runnerMs + overheadMs`. `runnerMs` is wall-clock time during
+which at least one fresh runner invocation was executing: the sum of the
+invocations when faults run one at a time, the union of their intervals under
+a fault fan-out, so overlap is charged once and `overheadMs` is never negative. Optional `run.workers` records the built-in
 worker ceiling and must be one for serial execution; custom commands omit it.
-Native evidence reuse requires the same recorded worker ceiling and serial policy.
+Native evidence reuse requires the same recorded worker ceiling and serial policy,
+and a compatible fault fan-out (see [Fault fan-out](#fault-fan-out)).
 Older native evidence with no worker ceiling is remeasured; native and opaque
 custom-command policies are not interchangeable.
 Every reuse also requires the same recorded `run.runner`: name (the engine that
@@ -994,3 +1373,85 @@ live per-run deadline as test execution.
 The regression suite caps outer concurrency at two workers in CI. Interactive
 runs reserve one available CPU and use at most two workers; a two-core machine
 therefore uses one. Nested built-in runners retain their one-worker default.
+
+## Fault fan-out
+
+`probe --fault-workers <n>` (default 1) probes up to n faults at once. Each
+fault in flight has its own scratch worktree at the probed commit; no two
+faults ever share a tree, so it is refused with `--in-place` (a usage error,
+exit 3, at the CLI; a precondition error through the API). n = 1 is the serial
+run exactly: the same invocations in the same order, and evidence without
+`run.faultWorkers`.
+
+1. **Plan, then measure.** Every fault is first planned in claim/fault order
+   on the first scratch tree with no fault applied anywhere: defender
+   resolution and discovery, every input hash, the anchor, reuse eligibility
+   and the `--typecheck` check (so its incremental build-info lives in one
+   tree only). None of this depends on a baseline.
+2. **Baselines.** Each defender set's baseline asks (one live run that
+   licenses reuse, then N runs unless reuse held) are replayed in the order a
+   serial run makes them, so `runnerInvocations` and `reuseBaselineRuns`
+   match. Different defender sets are independent and are measured side by
+   side, at most n at once, one set per scratch tree. A set measured while
+   another was in flight whose runs are anything but green N/N is not
+   believed: it is measured again with nothing else in flight, in a fresh
+   scratch tree, and the records that use it report those runs with
+   `detail.baselineRemeasuredSerially: true`. Baselines are then frozen. The
+   rest of planning (the reuse decision, the baseline a record reports) runs
+   in claim/fault order against them, and a fault that never mutates (reused,
+   no defenders, a bad anchor, a refused type check, a baseline that is not
+   green N/N) is finished there. A fault measured in another tree reads the
+   baselines, it never runs them.
+3. **Fan-out.** The remaining faults are handed, in order, to at most n trees.
+   A fault's probe runs, its negative control and its escalation all run in
+   the tree that holds it. A negative control shared by two faults (same
+   target, same defenders) is paid once, by whichever asks first.
+4. **Order.** Records and the per-record progress stream (`onProgress`,
+   `--progress ndjson` verdicts) follow claim/fault order whatever order the
+   trees finish in. Apart from timings (`durationMs`, `run.measurements`),
+   `run.faultWorkers`, `detail.remeasuredSerially` and
+   `detail.baselineRemeasuredSerially`, the evidence has the
+   content a serial run of the same commit would have. Per-stage progress lines
+   from different trees interleave.
+5. **Contention is not a verdict.** Per-run budgets (`--budget`) do not scale
+   with the fan-out. A record measured while another fault was in flight whose
+   verdict is `timeout`, or `flaky-defender` with reason `inconsistent-probe`,
+   is not reported from that measurement: after the fan-out it is measured
+   again with nothing else in flight, in a fresh scratch tree (the contended
+   run may have left state in its own), reusing its frozen baseline, and the
+   serial measurement is what the record reports, whatever its verdict, with
+   `detail.remeasuredSerially: true`. Records after it in order wait for it.
+   `defenders-not-green` is never re-measured as a fault: a contended
+   baseline was already re-measured alone (rule 2). Validators reject
+   `remeasuredSerially` and `baselineRemeasuredSerially` on a document without
+   `run.faultWorkers` above one, and `run.faultWorkers` together with
+   `mode: "in-place"`.
+6. **Reuse.** `run.faultWorkers` is recorded only above one. A measurement
+   under a fan-out never stands in for a serial run or for a different
+   fan-out; a serial measurement (no `run.faultWorkers`) may stand in for any.
+7. **Contention advice.** The contention warning names `--fault-workers` when
+   the probe fans out, and the probe warns before the first run when n times
+   the runner's worker count exceeds the CPUs available to the process.
+8. **Lifecycle.** `--command-budget` is one deadline for every tree and is
+   checked before each fault is dispatched. On a failure no further fault is
+   dispatched, every fault in flight finishes and restores, every tree is
+   removed, and the failure of the lowest fault index is raised (the one a
+   serial run would have met first). Cancellation stops every tree's runners
+   and removes every tree. Interrupted runs leave no scratch worktree.
+9. **Shared worktree registry.** Scratch-worktree allocation and removal (add,
+   remove, prune) hold one lock file, `testguard-worktrees.lock`, keyed by the
+   git common directory and kept under TestGuard's scratch root (never inside
+   the repository), so two probes of one repository, or of its linked
+   worktrees, sharing a scratch root cannot allocate or prune each other's trees. The lock is held
+   only around those synchronous git calls. A lock whose owner pid is no longer
+   running on the same host is stale and is taken over; a live owner is waited
+   on for at most two minutes, after which the command fails rather than
+   proceed unlocked. Every git call that creates, removes or prunes a scratch
+   tree runs with inherited `GIT_*` variables removed, `GIT_TERMINAL_PROMPT=0`,
+   `core.hooksPath` set to the null device and `core.fsmonitor=false`.
+10. **Isolation is per tree, not per machine.** Python, `--runner-cmd` and every
+   built-in runner are supported; each tree has its own files and its own
+   working directory. `node_modules` is linked into every tree as for one, so
+   the disk cost is one checkout per tree. Tests that bind a fixed port, share
+   an external database or write outside the project tree can collide across
+   trees; whether to fan out is the project's decision.
