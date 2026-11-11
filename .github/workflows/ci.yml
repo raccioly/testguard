@@ -60,7 +60,9 @@ jobs:
       - name: Run tests (with runtime budget)
         shell: bash
         env:
-          TEST_BUDGET_MS: 240000
+          # 240000 -> 300000 (#236): the type-check suites add about 70 s of deliberate
+          # real-compiler and nested-probe coverage (main measures 140-200 s; this PR 253-260 s).
+          TEST_BUDGET_MS: 300000
         run: |
           START=$(date +%s%3N)
           npm test
