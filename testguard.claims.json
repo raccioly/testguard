@@ -2361,7 +2361,7 @@
           "description": "Unclaimed changes never become the state; evidence states hide them.",
           "faultClass": "condition-forced",
           "file": "src/status/status.mjs",
-          "find": "if (changes && changes.uncovered.length > 0) {",
+          "find": "if (!only && changes && changes.uncovered.length > 0) {",
           "replace": "if (false) {",
           "producedBy": {
             "producer": "human",
@@ -7186,8 +7186,8 @@
           "description": "A defender absent from every frozen runner manifest is routed anyway.",
           "faultClass": "condition-forced",
           "file": "src/replay/replay.mjs",
-          "find": "    if (!owner) throw new PreconditionError(`${file} is not in any resolved runner's configured test universe`);",
-          "replace": "    if (false) throw new PreconditionError(`${file} is not in any resolved runner's configured test universe`);",
+          "find": "    if (!owner) throw new PreconditionError(`${file} is not in any resolved runner's configured test universe`, 'defender-outside-universe');",
+          "replace": "    if (false) throw new PreconditionError(`${file} is not in any resolved runner's configured test universe`, 'defender-outside-universe');",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -7834,7 +7834,7 @@
           "description": "An unparseable settings.json throws a plain Error again, which the CLI reports as a defect in testguard with a stack trace instead of a precondition naming the file.",
           "faultClass": "other",
           "file": "src/init/init.mjs",
-          "find": "    throw new PreconditionError(`${settingsPath} is not valid JSON (${e.message}); fix it before init can add the hook. Nothing was written.`);",
+          "find": "    throw new PreconditionError(`${settingsPath} is not valid JSON (${e.message}); fix it before init can add the hook. Nothing was written.`, 'init-settings');",
           "replace": "    throw new Error(`${settingsPath} is not valid JSON (${e.message}); fix it before init can add the hook. Nothing was written.`);",
           "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
         }
@@ -10706,7 +10706,7 @@
           "description": "probe accepts a fan-out in the user tree.",
           "faultClass": "statement-deleted",
           "file": "src/probe/probe.mjs",
-          "find": "  if (mode === 'in-place' && faultWorkers > 1) throw new PreconditionError('--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place');\n",
+          "find": "  if (mode === 'in-place' && faultWorkers > 1) throw new UsageError('--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place');\n",
           "replace": "",
           "producedBy": {
             "producer": "agent",
@@ -11580,8 +11580,8 @@
           "description": "A precondition error loses its message.",
           "faultClass": "other",
           "file": "src/probe/precondition-error.mjs",
-          "find": "export class PreconditionError extends Error {}",
-          "replace": "export class PreconditionError extends Object {}",
+          "find": "export class PreconditionError extends Error {",
+          "replace": "export class PreconditionError extends Object {",
           "defendedBy": [
             "test/scratch-dir.test.mjs"
           ],
@@ -11910,8 +11910,8 @@
           "description": "Budget expiry is no longer a precondition failure.",
           "faultClass": "other",
           "file": "src/command-budget.mjs",
-          "find": "export class BudgetExhaustedError extends PreconditionError {}",
-          "replace": "export class BudgetExhaustedError extends Error {}",
+          "find": "export class BudgetExhaustedError extends PreconditionError {",
+          "replace": "export class BudgetExhaustedError extends Error {",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

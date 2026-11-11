@@ -75,20 +75,20 @@ export async function admitCommand({ file, values, version }, io) {
     io.err('--confirm must be a positive integer and --budget at least 1000');
     return 3;
   }
-  if (!existsSync(resolve(file))) throw new PreconditionError(`no such file: ${file}`);
+  if (!existsSync(resolve(file))) throw new PreconditionError(`no such file: ${file}`, 'file-missing');
   // The repository root git reports is a real path; compare like with like.
   const testAbs = realpathSync(resolve(file));
   const projectDir = findProjectDir(testAbs, values.claims);
   const testRel = relative(projectDir, testAbs);
-  if (testRel.startsWith('..')) throw new PreconditionError(`${file} is outside the project directory ${projectDir}`);
+  if (testRel.startsWith('..')) throw new PreconditionError(`${file} is outside the project directory ${projectDir}`, 'path-outside-project');
 
   const claimsPath = values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir);
   const all = loadClaims(claimsPath);
   const claimsSource = claimsSourceOf(projectDir, claimsPath);
   const claim = all.claims.find((c) => c.id === claimId);
-  if (!claim) throw new PreconditionError(`--claim: unknown claim id ${claimId}`);
+  if (!claim) throw new PreconditionError(`--claim: unknown claim id ${claimId}`, 'claim-unknown');
   const faults = values.fault ? claim.faults.filter((f) => f.id === values.fault) : claim.faults;
-  if (faults.length === 0) throw new PreconditionError(`--fault: ${claimId} has no fault ${values.fault}`);
+  if (faults.length === 0) throw new PreconditionError(`--fault: ${claimId} has no fault ${values.fault}`, 'fault-unknown');
 
   // The named test must be a defender of the claim, declared or discovered;
   // otherwise `killed` below would be someone else's test doing the work.

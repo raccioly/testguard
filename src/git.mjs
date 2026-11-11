@@ -9,6 +9,7 @@ export class GitError extends Error {
   /** `timedOut`: git did not finish in time, which is not the same finding as git refusing. */
   constructor(message, { timedOut = false } = {}) {
     super(message);
+    this.kind = 'git';
     this.timedOut = timedOut;
   }
 }

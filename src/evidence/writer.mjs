@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
 import { validate } from '../../spec/lib/validate.mjs';
 
-export class SpecDocError extends Error {}
+export class SpecDocError extends Error { kind = 'spec-document'; }
 
 function describe(kind, path, result) {
   const lines = result.errors.map((e) => `  ${e.path}: ${e.message}`).join('\n');

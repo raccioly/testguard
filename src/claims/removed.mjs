@@ -27,7 +27,7 @@ export function claimsAt({ projectDir, ref, claimsPath }) {
   const p0 = resolve(claimsPath);
   const abs = existsSync(p0) ? realpathSync(p0) : join(realpathSync(dirname(p0)), basename(p0));
   const rel = relative(root, abs).split('\\').join('/');
-  if (rel.startsWith('..')) throw new PreconditionError(`the claims file ${claimsPath} is outside the repository at ${root}`);
+  if (rel.startsWith('..')) throw new PreconditionError(`the claims file ${claimsPath} is outside the repository at ${root}`, 'path-outside-project');
   let text;
   try {
     text = git(['show', `${ref}:${rel}`], root);
@@ -38,7 +38,7 @@ export function claimsAt({ projectDir, ref, claimsPath }) {
       try {
         git(['rev-parse', '--verify', `${ref}^{commit}`], root);
       } catch {
-        throw new PreconditionError(`cannot read ${ref}: no such commit`);
+        throw new PreconditionError(`cannot read ${ref}: no such commit`, 'ref-unresolved');
       }
       return null;
     }
@@ -47,7 +47,7 @@ export function claimsAt({ projectDir, ref, claimsPath }) {
   try {
     return JSON.parse(text);
   } catch (e) {
-    throw new PreconditionError(`the claims file at ${ref} is not valid JSON (${e.message})`);
+    throw new PreconditionError(`the claims file at ${ref} is not valid JSON (${e.message})`, 'claims-file-invalid');
   }
 }
 

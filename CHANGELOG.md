@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SIGTERM exits 143, not 130.** SIGINT stays 130 and SIGHUP is 129 (128 plus
+  the signal number). Each prints `interrupted by <signal>; scratch trees
+  removed` once on stderr, and the cleanup is the same.
+- **Incompatible flags are exit 3 whatever the repository holds.**
+  `probe --include-dirty --in-place` exited 2 (a precondition) while every other
+  pair exited 3, the documented usage code; it, `--include-dirty --ref` and
+  `--ref --in-place` are now refused before the claims file or the repository
+  is read. Conditions that depend on the tree (no commits, an unresolvable ref,
+  uncommitted fault targets) stay exit 2.
+- **`--json` is one shape on every refusal.** `probe --json --claims /missing`,
+  `--typecheck` on a tree that fails the check, a repository with no commits and
+  every other exit 2, and every exit 3, now write one `error` document
+  (`{schemaVersion, tool, error: {kind, message, exitCode}}`) to stdout; the
+  message stays on stderr. Before, most of them wrote nothing to stdout, while
+  an unresolvable `--changed` ref wrote a status document (it still does: read
+  `error` first). Every `PreconditionError` now carries a kind from a closed
+  set and the build rejects one without it. New schema `error.schema.json`.
 - **A `--claim` or `--changed` run no longer tells you to repair a claim you did
   not select.** The status header is about the whole claims file and stays so;
   `run.scope.state` and `run.scope.next` are new and describe the selection

@@ -94,7 +94,8 @@ describe('resolveChangedRef / withChangedRef', () => {
       const b = capture();
       expect(await main(['status', r.project, '--json', '--changed', 'origin/main'], b.io)).toBe(2);
       expect(b.lines.err.join('\n')).toMatch(/cannot resolve --changed origin\/main/);
-      expect(b.lines.out).toEqual([]);
+      // --json: one error document on stdout (the message above stays on stderr), never an empty stdout.
+      expect(JSON.parse(b.lines.out.join('\n')).error).toMatchObject({ kind: 'git', exitCode: 2 });
     } finally {
       for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
       Object.assign(process.env, saved);

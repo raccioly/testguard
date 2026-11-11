@@ -39,7 +39,13 @@ The exit code is the contract. Integrations read it; they never parse text.
 | `0` | Nothing new to prove. |
 | `1` | A finding: unproven claims, claim drift, unclaimed changes or invalid fault anchors. |
 | `2` | A precondition failed and nothing was measured: an invalid claims file, a runner that does not resolve, a reference that does not resolve, missing evidence, an exhausted `--command-budget`. |
-| `3` | Usage: a missing or malformed option, an unknown command or flag. |
+| `3` | Usage: a request that is wrong whatever the repository holds: a missing or malformed option, an unknown command or flag, flags that cannot be combined (for example `--in-place` with `--ref`, `--include-dirty` or `--fault-workers` above 1). |
+
+**Under `--json`, a refusal is one `error` document on stdout** (`{schemaVersion, tool, error: {kind, message, exitCode}}`,
+[`error.schema.json`](../../spec/schemas/error.schema.json)) and the human message stays on stderr, for every exit `2` and exit `3`:
+stdout is never empty on a refusal. `exitCode` is `3` exactly when `kind` is `usage`. Branch on `kind`: `usage`, `claims-file`, `git`, `spec-document`, `refused`, `internal`, or one of the precondition kinds (`no-commits`, `ref-unresolved`, `dirty-tree`, `runner-unresolvable`, `discovery-failed`, `typecheck-unavailable`, `typecheck-red-baseline`, `typecheck-timeout`, `budget-exhausted`, and the defender and scratch-directory kinds; the closed list is in the schema). An undetermined `probe --changed` keeps writing the status document it always did (`run.exitCode: 2`, `run.scope.changed.outcome: "undetermined"`), so read `error` first: when it is present nothing was measured.
+
+**Interruption.** A probe, sweep, replay or admit that receives a signal stops its test runners, removes its scratch worktrees and exits with the shell's code for that signal: `130` for SIGINT, `143` for SIGTERM, `129` for SIGHUP. It prints one line to stderr, `interrupted by <signal>; scratch trees removed` (or, when a cleanup step failed, `scratch cleanup did not finish (see above)`), and publishes no partial result.
 
 A command that crashes on a defect in TestGuard itself prints
 `error: this is a bug in testguard <version>, not a problem with your project.`

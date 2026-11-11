@@ -74,7 +74,9 @@ describe('read-only intent input CLI', () => {
   });
   it('refuses invalid document admission with exit 2, not successful stdout', async () => {
     fixture(); const result = await run(['scaffold', '--from-document', 'missing.md', '--json']);
-    expect(result.code).toBe(2); expect(result.out).toEqual([]); expect(result.err.join('\n')).toMatch(/intent input refused/);
+    expect(result.code).toBe(2); expect(result.err.join('\n')).toMatch(/intent input refused/);
+    // Under --json the refusal is one error document, not an empty stdout and not a success document.
+    expect(JSON.parse(result.out.join('\n')).error).toMatchObject({ kind: 'refused', exitCode: 2 });
   });
   it('re-admits direct handler input and preserves help', async () => {
     const root = fixture(), out = [], err = [];

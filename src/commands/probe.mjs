@@ -71,6 +71,27 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     io.err('--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place');
     return 3;
   }
+  // Flag combinations that are wrong whatever the repository holds, refused before the claims file or the repository is read.
+  if (values['in-place'] && values.ref !== undefined) {
+    io.err('--ref needs a scratch worktree; drop --in-place');
+    return 3;
+  }
+  if (values['include-dirty'] && values['in-place']) {
+    io.err('--include-dirty applies to worktree mode; drop --in-place');
+    return 3;
+  }
+  if (values['include-dirty'] && values.ref !== undefined) {
+    io.err('--include-dirty snapshots the working tree; it cannot be combined with --ref');
+    return 3;
+  }
+  if (values.changed !== undefined && (values.ref !== undefined || values['in-place'])) {
+    io.err('--changed selects against the tree being probed, so it cannot be combined with --ref or --in-place');
+    return 3;
+  }
+  if (values['fail-on-empty-selection'] && values.changed === undefined) {
+    io.err('--fail-on-empty-selection needs --changed <ref>: only a change-based selection can come up empty');
+    return 3;
+  }
   const commandBudgetMs = parseCommandBudget(values['command-budget']);
   if (!Number.isInteger(confirmRuns) || confirmRuns < 1 || !Number.isInteger(budgetMs) || budgetMs < 1000) {
     io.err('--confirm must be a positive integer and --budget at least 1000');
@@ -125,14 +146,6 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   const requested = claimSelection(values.claim);
   if (requested?.length === 0) {
     io.err('--claim must name at least one claim id');
-    return 3;
-  }
-  if (values['fail-on-empty-selection'] && values.changed === undefined) {
-    io.err('--fail-on-empty-selection needs --changed <ref>: only a change-based selection can come up empty');
-    return 3;
-  }
-  if (values.changed !== undefined && (values.ref !== undefined || values['in-place'])) {
-    io.err('--changed selects against the tree being probed, so it cannot be combined with --ref or --in-place');
     return 3;
   }
   let only = requested;

@@ -86,7 +86,7 @@ export async function createTypechecker({ projectDir, command = '', budgetMs = 1
   const custom = command.trim() !== '';
   let words;
   if (custom) {
-    try { words = splitCommandWords(command, '--typecheck'); } catch (error) { throw new PreconditionError(error.message); }
+    try { words = splitCommandWords(command, '--typecheck'); } catch (error) { throw new PreconditionError(error.message, 'typecheck-unavailable'); }
   }
   const dir = mkdtempSync(join(scratchBase ?? scratchRoot(), 'testguard-tc-'));
   const info = join(dir, 'build.tsbuildinfo');
@@ -102,7 +102,7 @@ export async function createTypechecker({ projectDir, command = '', budgetMs = 1
       argv = words;
       identity = { kind: 'custom', argv: words };
       const probe = await execute({ argv: [words[0], '--version'], cwd: projectDir, budgetMs: 15_000 });
-      if (probe.spawnError) throw new PreconditionError(`--typecheck: ${probe.spawnError}`);
+      if (probe.spawnError) throw new PreconditionError(`--typecheck: ${probe.spawnError}`, 'typecheck-unavailable');
       // Best-effort identification: the command's own --version, plus the
       // project's typescript when it resolves (what such a command usually runs).
       // A checker that changes behavior under neither is not detected; --no-reuse.
@@ -111,11 +111,11 @@ export async function createTypechecker({ projectDir, command = '', budgetMs = 1
       version = [own, ts ? `typescript@${ts}` : ''].filter(Boolean).join('; ').slice(0, 64) || 'unknown';
     } else {
       if (!existsSync(join(projectDir, 'tsconfig.json'))) {
-        throw new PreconditionError('--typecheck needs a tsconfig.json in the project, or a command: --typecheck="<cmd>"');
+        throw new PreconditionError('--typecheck needs a tsconfig.json in the project, or a command: --typecheck="<cmd>"', 'typecheck-unavailable');
       }
       const tsc = resolveRunner({ projectDir, pkg: 'typescript', bin: 'tsc' });
       if (!tsc) {
-        throw new PreconditionError('--typecheck: the project\'s own typescript cannot be resolved (npm i -D typescript, or --node-modules <dir>), or pass a command: --typecheck="<cmd>"');
+        throw new PreconditionError('--typecheck: the project\'s own typescript cannot be resolved (npm i -D typescript, or --node-modules <dir>), or pass a command: --typecheck="<cmd>"', 'typecheck-unavailable');
       }
       version = tsc.version;
       const flags = ['--noEmit', '-p', 'tsconfig.json', '--incremental', '--pretty', 'false'];
@@ -128,7 +128,7 @@ export async function createTypechecker({ projectDir, command = '', budgetMs = 1
       try { config = JSON.parse(shown.output); } catch { /* reported below */ }
       if (shown.timedOut || shown.spawnError || shown.code !== 0 || !config) {
         const cause = shown.timedOut ? `timed out after ${budgetMs}ms` : shown.spawnError ?? firstDiagnostic(shown.output) ?? firstLine(shown.output) ?? `exit ${shown.code}`;
-        throw new PreconditionError(`--typecheck: tsc cannot read tsconfig.json (${clip(cause, projectDir)})`);
+        throw new PreconditionError(`--typecheck: tsc cannot read tsconfig.json (${clip(cause, projectDir)})`, 'typecheck-unavailable');
       }
       checkJs = config.compilerOptions?.allowJs === true && config.compilerOptions?.checkJs === true;
       // Which project files does the program actually contain? A `.ts` file the
@@ -136,11 +136,11 @@ export async function createTypechecker({ projectDir, command = '', budgetMs = 1
       // be a statement about nothing.
       const listed = await execute({ argv: [...tsc.argv, '--listFilesOnly', '-p', 'tsconfig.json'], cwd: projectDir, budgetMs });
       if (listed.timedOut || listed.spawnError || listed.code !== 0) {
-        throw new PreconditionError(`--typecheck: tsc could not list the program's files (${clip(listed.spawnError ?? firstDiagnostic(listed.output) ?? firstLine(listed.output) ?? `exit ${listed.code}`, projectDir)})`);
+        throw new PreconditionError(`--typecheck: tsc could not list the program's files (${clip(listed.spawnError ?? firstDiagnostic(listed.output) ?? firstLine(listed.output) ?? `exit ${listed.code}`, projectDir)})`, 'typecheck-unavailable');
       }
       program = programFiles(listed.output, projectDir);
       if (program.size === 0) {
-        throw new PreconditionError('--typecheck: the tsconfig.json program contains no project file (a solution-style tsconfig with only references, or an include that matches nothing), so a type check could judge no fault. Point a tsconfig at the sources, or pass a command: --typecheck="<cmd>"');
+        throw new PreconditionError('--typecheck: the tsconfig.json program contains no project file (a solution-style tsconfig with only references, or an include that matches nothing), so a type check could judge no fault. Point a tsconfig at the sources, or pass a command: --typecheck="<cmd>"', 'typecheck-unavailable');
       }
     }
 
@@ -167,12 +167,12 @@ export async function createTypechecker({ projectDir, command = '', budgetMs = 1
     const stats = { baselineMs: 0, checks: 0, checkMs: 0 };
     const base = await execute({ argv, cwd: projectDir, budgetMs });
     stats.baselineMs = base.durationMs;
-    if (base.timedOut) throw new PreconditionError(`--typecheck: the type check of the unmodified tree exceeded ${budgetMs}ms; raise --budget`);
-    if (base.spawnError) throw new PreconditionError(`--typecheck: ${base.spawnError}`);
+    if (base.timedOut) throw new PreconditionError(`--typecheck: the type check of the unmodified tree exceeded ${budgetMs}ms; raise --budget`, 'typecheck-timeout');
+    if (base.spawnError) throw new PreconditionError(`--typecheck: ${base.spawnError}`, 'typecheck-unavailable');
     let verdict;
-    try { verdict = judge(base); } catch (error) { throw new PreconditionError(`--typecheck: ${error.message}`); }
+    try { verdict = judge(base); } catch (error) { throw new PreconditionError(`--typecheck: ${error.message}`, 'typecheck-red-baseline'); }
     if (verdict.status !== 'clean') {
-      throw new PreconditionError(`--typecheck: the unmodified tree does not type-check, so no fault can be judged against it. First diagnostic: ${verdict.message}`);
+      throw new PreconditionError(`--typecheck: the unmodified tree does not type-check, so no fault can be judged against it. First diagnostic: ${verdict.message}`, 'typecheck-red-baseline');
     }
     if (existsSync(info)) copyFileSync(info, snapshot);
 

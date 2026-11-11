@@ -12,6 +12,7 @@ import { detectContention, contentionWarning, fanOutWarning } from './contention
 import { availableParallelism } from 'node:os';
 import { withScratchBase } from '../scratch-dir.mjs';
 import { createScratch, inPlace, PreconditionError, writeBoundary } from './worktree.mjs';
+import { UsageError } from './precondition-error.mjs';
 import { BudgetExhaustedError } from '../command-budget.mjs';
 import { completeRecords, budgetSummary, notReachedRecord, isNotReached } from './partial-budget.mjs';
 import { applyContent, applyFault, locate } from './inject.mjs';
@@ -57,10 +58,10 @@ function readRunnerVersion(projectDir, name = 'vitest') {
 /** Validate and order a partial claim selection without losing caller order. */
 export function selectClaims(claims, only) {
   if (!only) return claims;
-  if (only.length === 0) throw new PreconditionError('--claim must name at least one claim id');
+  if (only.length === 0) throw new UsageError('--claim must name at least one claim id');
   const byId = new Map(claims.map((claim) => [claim.id, claim]));
   const unknown = only.filter((id) => !byId.has(id));
-  if (unknown.length) throw new PreconditionError(`--claim: unknown claim id(s) ${unknown.join(', ')}`);
+  if (unknown.length) throw new PreconditionError(`--claim: unknown claim id(s) ${unknown.join(', ')}`, 'claim-unknown');
   return only.map((id) => byId.get(id));
 }
 
@@ -142,7 +143,7 @@ async function probeBudgeted(options) {
   const { partialOnBudget = false, commandBudget } = options;
   const ctx = { settled: new Map(), records: [], measurements: { elapsedMs: 0, runnerMs: 0, overheadMs: 0, runnerInvocations: 0, reuseBaselineRuns: 0 }, measuredStart: performance.now(), startedAt: new Date().toISOString(), runnerClock: createBusyClock(() => performance.now()) };
   if (!partialOnBudget) return measureProbe(options, ctx);
-  if (!commandBudget) throw new PreconditionError('--partial-on-budget needs a command budget: pass --command-budget <ms>');
+  if (!commandBudget) throw new UsageError('--partial-on-budget needs a command budget: pass --command-budget <ms>');
   let document;
   try {
     document = await measureProbe(options, ctx);
@@ -232,11 +233,16 @@ async function measureProbe({
   onProgress = () => {},
   typecheck,
 }, ctx) {
-  if (!Number.isSafeInteger(workers) || workers < 1) throw new PreconditionError('workers must be a positive safe integer');
-  if (parseFaultWorkers(faultWorkers) !== faultWorkers) throw new PreconditionError('fault workers must be a positive safe integer');
+  if (!Number.isSafeInteger(workers) || workers < 1) throw new UsageError('workers must be a positive safe integer');
+  if (parseFaultWorkers(faultWorkers) !== faultWorkers) throw new UsageError('fault workers must be a positive safe integer');
   // One mutable tree cannot hold two faults at once; the fan-out needs one
   // scratch worktree per fault in flight.
-  if (mode === 'in-place' && faultWorkers > 1) throw new PreconditionError('--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place');
+  if (mode === 'in-place' && faultWorkers > 1) throw new UsageError('--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place');
+  // Combinations that are wrong whatever the repository holds are usage (exit 3) and are refused first, so a
+  // repository problem never hides the mistake in the request. What depends on the tree is a precondition (exit 2).
+  if (mode === 'in-place' && ref !== 'HEAD') throw new UsageError('--ref needs a scratch worktree; drop --in-place');
+  if (includeDirty && mode !== 'worktree') throw new UsageError('--include-dirty applies to worktree mode; drop --in-place');
+  if (includeDirty && ref !== 'HEAD') throw new UsageError('--include-dirty snapshots the working tree; it cannot be combined with --ref');
   resetInterpreterCache(); // Cache only within this measurement, never across commands.
   const { measuredStart, startedAt, measurements, runnerClock } = ctx;
   // Runner time is wall-clock time with at least one runner executing: the
@@ -254,18 +260,18 @@ async function measureProbe({
   projectDir = realpathSync(resolve(projectDir));
   const root = gitRoot(projectDir);
   const boundary = writeBoundary({ repoRoot: root, nodeModules }); // as the run starts, before anything is linked or written
-  if (mode === 'in-place' && ref !== 'HEAD') throw new PreconditionError('--ref needs a scratch worktree; drop --in-place');
   const head = headSha(root, ref);
   ctx.head = head;
-  if (!head) throw new PreconditionError(ref === 'HEAD' ? 'repository has no commits; every verdict is tied to a commit' : `ref ${ref} does not resolve to a commit`);
+  if (!head) {
+    if (ref === 'HEAD') throw new PreconditionError('repository has no commits; every verdict is tied to a commit', 'no-commits');
+    throw new PreconditionError(`ref ${ref} does not resolve to a commit`, 'ref-unresolved');
+  }
 
   const scopedClaims = selectClaims(claims.claims, only);
   const targets = [...new Set(scopedClaims.flatMap((c) => c.faults.map((f) => relative(root, join(projectDir, f.file)))))];
   if (mode === 'in-place' && isDirty(root, targets)) {
-    throw new PreconditionError(`uncommitted changes in fault target files (${targets.join(', ')}); commit or stash them, or drop --in-place. Only the files faults are applied to must be clean — test files may be dirty, which is what makes --in-place usable while writing tests.`);
+    throw new PreconditionError(`uncommitted changes in fault target files (${targets.join(', ')}); commit or stash them, or drop --in-place. Only the files faults are applied to must be clean — test files may be dirty, which is what makes --in-place usable while writing tests.`, 'dirty-tree');
   }
-  if (includeDirty && mode !== 'worktree') throw new PreconditionError('--include-dirty applies to worktree mode; drop --in-place');
-  if (includeDirty && ref !== 'HEAD') throw new PreconditionError('--include-dirty snapshots the working tree; it cannot be combined with --ref');
 
   // Worktree mode probes a commit, not the working tree. Uncommitted defender
   // or target edits would be silently absent — the same survivors, no hint why.
@@ -301,7 +307,7 @@ async function measureProbe({
         const budgetFor = () => commandBudget?.runBudget(budgetMs) ?? budgetMs;
         const selected = await selectRunner({ projectDir, sourceDir: projectDir, python, name: runnerName, budgetMs: budgetFor(), budgetFor });
         commandBudget?.assertOpen();
-        if (selected.error) throw new PreconditionError(`cannot verify dirty defender/config inputs because test discovery failed (${selected.error})`);
+        if (selected.error) throw new PreconditionError(`cannot verify dirty defender/config inputs because test discovery failed (${selected.error})`, 'discovery-failed');
         const manifests = new Map([[selected.runner, selected.manifest]]);
         const primaryIsPython = ['python', 'pytest', 'unittest'].includes(selected.runner.name);
         const owned = OWNED_RUNNERS.filter((candidate) => candidate !== selected.runner && !(candidate.name === 'python' && primaryIsPython));
@@ -313,7 +319,7 @@ async function measureProbe({
             manifests.set(candidate, await discoverRunnerManifest(candidate, check, projectDir, budgetFor()));
           } catch (error) {
             if (error instanceof BudgetExhaustedError) throw error;
-            throw new PreconditionError(`cannot verify dirty defender/config inputs because ${candidate.name} discovery failed (${error.message})`);
+            throw new PreconditionError(`cannot verify dirty defender/config inputs because ${candidate.name} discovery failed (${error.message})`, 'discovery-failed');
           }
         }
         configuredFiles = Object.freeze([...new Set([...manifests.values()].flatMap((manifest) => manifest.files))].sort());
@@ -341,7 +347,7 @@ async function measureProbe({
       ]) watched.add(relative(root, join(projectDir, config)));
       const dirty = dirtyPaths.filter((path) => watched.has(path));
       if (dirty.length && !refExplicit && !ignoreDirty) {
-        throw new PreconditionError(`${dirty.length} defender/target file${dirty.length === 1 ? ' has' : 's have'} uncommitted changes (${dirty.join(', ')}); worktree mode probes HEAD (${head.slice(0, 7)}), so those changes would be silently ignored. Commit them, run with --include-dirty to probe the working tree, use --in-place, or --ignore-dirty if you mean HEAD as committed.`);
+        throw new PreconditionError(`${dirty.length} defender/target file${dirty.length === 1 ? ' has' : 's have'} uncommitted changes (${dirty.join(', ')}); worktree mode probes HEAD (${head.slice(0, 7)}), so those changes would be silently ignored. Commit them, run with --include-dirty to probe the working tree, use --in-place, or --ignore-dirty if you mean HEAD as committed.`, 'dirty-tree');
       }
       if (dirty.length) {
         ignoredDirty = dirty.sort();
@@ -385,7 +391,7 @@ async function measureProbe({
       commandBudget?.assertOpen();
       if (sel.error) {
         throw new PreconditionError(`test runner is not resolvable in the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${sel.error}). ` +
-          (mode === 'worktree' ? 'If dependencies are missing, pass --node-modules <path>, or run with --in-place. Otherwise fix the discovery error above.' : 'If dependencies are missing, install them first. Otherwise fix the discovery error above.'));
+          (mode === 'worktree' ? 'If dependencies are missing, pass --node-modules <path>, or run with --in-place. Otherwise fix the discovery error above.' : 'If dependencies are missing, install them first. Otherwise fix the discovery error above.'), 'runner-unresolvable');
       }
       runner = sel.runner;
       runnerVersion = sel.version;
@@ -411,7 +417,7 @@ async function measureProbe({
         }));
       } catch (error) {
         if (error instanceof BudgetExhaustedError) throw error;
-        throw new PreconditionError(`test discovery failed: ${error.message}`);
+        throw new PreconditionError(`test discovery failed: ${error.message}`, 'discovery-failed');
       }
     }
     // Single-flight: two trees reaching a not-yet-checked owning runner at the
@@ -425,7 +431,7 @@ async function measureProbe({
         });
       }
       const c = ownedChecked.get(r);
-      if (!c.ok) throw new PreconditionError(`${file} is a ${r.name} test (${r.name === 'python' ? 'it is a .py file' : `it lives under ${r.name}'s testDir`}) but ${r.name} is not resolvable for the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${c.message}).`);
+      if (!c.ok) throw new PreconditionError(`${file} is a ${r.name} test (${r.name === 'python' ? 'it is a .py file' : `it lives under ${r.name}'s testDir`}) but ${r.name} is not resolvable for the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${c.message}).`, 'defender-misrouted');
       if (c.engine) engines.set(r, c.engine);
       runnersUsed.set(labelOf(r), c.version);
     };
@@ -437,7 +443,7 @@ async function measureProbe({
         for (const file of manifest.files) {
           const previousOwner = ownerByFile.get(file);
           if (previousOwner && previousOwner !== runner && previousOwner !== owner) {
-            throw new PreconditionError(`${file} was listed by both ${previousOwner.name} and ${owner.name}; TestGuard cannot choose which configured runner owns it.`);
+            throw new PreconditionError(`${file} was listed by both ${previousOwner.name} and ${owner.name}; TestGuard cannot choose which configured runner owns it.`, 'defender-ambiguous');
           }
           // A per-file runner that natively lists a file owns it over a broad
           // project runner that also collected it. Membership, never filename
@@ -480,7 +486,7 @@ async function measureProbe({
       const groups = new Map([[runner, []]]);
       for (const file of files) {
         const owner = ownerByFile.get(file);
-        if (!owner) throw new PreconditionError(`${file} is not in any resolved runner's configured test universe`);
+        if (!owner) throw new PreconditionError(`${file} is not in any resolved runner's configured test universe`, 'defender-outside-universe');
         if (!groups.has(owner)) groups.set(owner, []);
         groups.get(owner).push(file);
       }
@@ -624,10 +630,10 @@ async function measureProbe({
           const expectedOwner = owned.find((candidate) => candidate.owns?.(iso.projectDir, file));
           const check = expectedOwner && ownedChecked.get(expectedOwner);
           if (expectedOwner && check && !check.ok) {
-            throw new PreconditionError(`${file} is a ${expectedOwner.name} test (${expectedOwner.name === 'python' ? 'it is a .py file' : `it lives under ${expectedOwner.name}'s testDir`}) but ${expectedOwner.name} is not resolvable for the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${check.message}).`);
+            throw new PreconditionError(`${file} is a ${expectedOwner.name} test (${expectedOwner.name === 'python' ? 'it is a .py file' : `it lives under ${expectedOwner.name}'s testDir`}) but ${expectedOwner.name} is not resolvable for the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${check.message}).`, 'defender-misrouted');
           }
         }
-        if (excluded.length) throw new PreconditionError(`${claim.id}/${fault.id}: defendedBy resolves to ${excluded.join(', ')}, but the configured runners do not collect ${excluded.length === 1 ? 'that file' : 'those files'}`);
+        if (excluded.length) throw new PreconditionError(`${claim.id}/${fault.id}: defendedBy resolves to ${excluded.join(', ')}, but the configured runners do not collect ${excluded.length === 1 ? 'that file' : 'those files'}`, 'defender-excluded');
       }
       // Mock-awareness: a discovered file that mocks the target is not a
       // defender; a declared one that mocks it stays (the author named it)
@@ -1254,6 +1260,7 @@ export function checkProvenance({ claim, fault, provenance, isoReal, detail, onW
       'Python loaded a different copy of this module, so nothing TestGuard changes can ever run and every claim would be reported as SURVIVED however good the tests are. ' +
       'The usual cause is an install that registers an import hook ahead of sys.path — a strict editable install (`pip install -e . --config-settings editable_mode=strict`, and some build backends by default) — or a plain install that left a copy in site-packages. ' +
       'Either reinstall the project against the tree being probed, or run with --in-place so the tree the install points at is the tree that is faulted.',
+      'module-shadowed',
     );
   }
 }

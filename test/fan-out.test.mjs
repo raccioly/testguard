@@ -187,9 +187,10 @@ describe('contention advice accounts for the fan-out', () => {
 describe('preconditions', () => {
   it('probe refuses a fan-out in place and a count that is not a positive integer, before touching anything', async () => {
     const { probe } = await import('../src/probe/probe.mjs');
-    const { PreconditionError } = await import('../src/probe/worktree.mjs');
+    const { UsageError } = await import('../src/probe/precondition-error.mjs');
     const nowhere = { projectDir: '/nonexistent/testguard-fan-out', claims: { claims: [] } };
-    await expect(probe({ ...nowhere, mode: 'in-place', faultWorkers: 2 })).rejects.toThrow(PreconditionError);
+    // Wrong whatever the repository holds, so usage (exit 3), not a precondition.
+    await expect(probe({ ...nowhere, mode: 'in-place', faultWorkers: 2 })).rejects.toThrow(UsageError);
     await expect(probe({ ...nowhere, mode: 'in-place', faultWorkers: 2 })).rejects.toThrow(/drop --in-place/);
     await expect(probe({ ...nowhere, faultWorkers: 0 })).rejects.toThrow(/fault workers must be a positive safe integer/);
     await expect(probe({ ...nowhere, faultWorkers: 1.5 })).rejects.toThrow(/fault workers must be a positive safe integer/);

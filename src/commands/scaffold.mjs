@@ -67,9 +67,9 @@ export async function scaffoldCommand({ projectDir, file, files = file ? [file] 
     return 3;
   }
   const abs = resolve(file);
-  if (!existsSync(abs)) throw new PreconditionError(`no such file: ${file}`);
+  if (!existsSync(abs)) throw new PreconditionError(`no such file: ${file}`, 'file-missing');
   const rel = relative(projectDir, abs);
-  if (rel.startsWith('..')) throw new PreconditionError(`${file} is outside the project directory ${projectDir}`);
+  if (rel.startsWith('..')) throw new PreconditionError(`${file} is outside the project directory ${projectDir}`, 'path-outside-project');
 
   const claimsPath = values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir);
   const existingClaims = existsSync(claimsPath) ? loadClaims(claimsPath) : undefined;

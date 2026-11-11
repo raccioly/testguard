@@ -54,7 +54,8 @@ export function findNodeModules(root, depth = 3) {
 export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase = scratchRoot(), nodeModules }) {
   const sha = headSha(repoRoot, ref);
   if (!sha) {
-    throw new PreconditionError(ref === 'HEAD' ? 'repository has no commits; commit first, or run with --in-place' : `ref ${ref} does not resolve to a commit`);
+    if (ref === 'HEAD') throw new PreconditionError('repository has no commits; commit first, or run with --in-place', 'no-commits');
+    throw new PreconditionError(`ref ${ref} does not resolve to a commit`, 'ref-unresolved');
   }
   // Allocation and removal both rewrite the repository's shared worktree
   // registry; a concurrent probe on the same repository waits its turn (#237).

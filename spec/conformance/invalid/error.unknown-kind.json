@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.1.0"
+  },
+  "error": {
+    "kind": "something-new",
+    "message": "x",
+    "exitCode": 2
+  }
+}

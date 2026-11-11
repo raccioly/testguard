@@ -148,7 +148,7 @@ describe('one bad fault does not cost the evidence for the rest', () => {
     // try/catch this regression defends. Runner preflights happen earlier and
     // cannot prove that this catch preserves whole-run preconditions.
     boom.faultId = 'F1';
-    boom.error = new PreconditionError('simulated whole-run precondition');
+    boom.error = new PreconditionError('simulated whole-run precondition', 'discovery-failed');
     try {
       await expect(probe({ projectDir: dir, claims, mode: 'in-place', confirmRuns: 1, budgetMs: 30_000, escalate: false, toolVersion: 't' }))
         .rejects.toThrow(PreconditionError);
