@@ -1,8 +1,87 @@
 {
   "why": "Reviewed TestGuard defects the corpus exposes, each filed as an issue. An entry excuses exactly the observation it names, in any mode; a different observation is still a failure. A false kill (observed killed where the key says otherwise) can never be listed here: corpus/lib/checks.mjs refuses such an entry. Remove an entry in the pull request that fixes its issue.",
   "entries": [
-    { "subject": "node-test-floorplan", "fault": "LSHAPE-ESTIMATE-USES-CORE-AREA/F1", "expected": { "verdict": "killed" }, "observed": { "verdict": "unverifiable", "reason": "subject-not-executed" }, "issue": 263 },
-    { "subject": "node-test-floorplan", "fault": "LSHAPE-ESTIMATE-USES-CORE-AREA/F2", "expected": { "verdict": "killed" }, "observed": { "verdict": "unverifiable", "reason": "subject-not-executed" }, "issue": 263 },
-    { "subject": "js-jest-newsletter", "fault": "SCHEDULE-VALIDATION/F1", "expected": { "verdict": "unverifiable", "reason": "anchor-ambiguous" }, "observed": { "verdict": "nocover" }, "issue": 265 }
+    {
+      "subject": "node-test-floorplan",
+      "fault": "LSHAPE-ESTIMATE-USES-CORE-AREA/F1",
+      "expected": {
+        "verdict": "killed"
+      },
+      "observed": {
+        "verdict": "unverifiable",
+        "reason": "subject-not-executed"
+      },
+      "issue": 263
+    },
+    {
+      "subject": "node-test-floorplan",
+      "fault": "LSHAPE-ESTIMATE-USES-CORE-AREA/F2",
+      "expected": {
+        "verdict": "killed"
+      },
+      "observed": {
+        "verdict": "unverifiable",
+        "reason": "subject-not-executed"
+      },
+      "issue": 263
+    },
+    {
+      "subject": "js-jest-newsletter",
+      "fault": "SCHEDULE-VALIDATION/F1",
+      "expected": {
+        "verdict": "unverifiable",
+        "reason": "anchor-ambiguous"
+      },
+      "observed": {
+        "verdict": "nocover"
+      },
+      "issue": 265
+    },
+    {
+      "subject": "js-jest-newsletter",
+      "check": "selection:footer-source",
+      "expected": {
+        "selected": [
+          "FOOTER-BY-AUDIENCE"
+        ]
+      },
+      "observed": {
+        "selected": [
+          "COUNT-WORDS",
+          "ESCAPE-BY-DEFAULT",
+          "FOOTER-BY-AUDIENCE",
+          "MISSING-VALUE-HANDLING",
+          "READING-TIME-MINUTES",
+          "SCHEDULE-VALIDATION",
+          "SLUG-FORMAT",
+          "SLUG-LIMIT",
+          "UNCLOSED-PLACEHOLDER-ERROR"
+        ]
+      },
+      "issue": 266
+    },
+    {
+      "subject": "ts-vitest-stock",
+      "check": "selection:adjustments-test",
+      "expected": {
+        "selected": [
+          "RECEIVE-ADDS-STOCK",
+          "WRITEOFF-PROTECTS-RESERVED"
+        ]
+      },
+      "observed": {
+        "selected": [
+          "PRICING-BULK-DISCOUNT-AND-ROUNDING",
+          "RECEIVE-ADDS-STOCK",
+          "REPORT-TOTALS-SUMS",
+          "RESERVE-REJECTS-INVALID-INPUT",
+          "RESERVE-SUCCEEDS-WITHIN-AVAILABLE",
+          "STOCK-REPORT-STATUS-AND-RESERVED",
+          "SWEEP-EXPIRES-AT-EXPIRY-INSTANT",
+          "WRITEOFF-PROTECTS-RESERVED"
+        ]
+      },
+      "issue": 267
+    }
   ]
 }

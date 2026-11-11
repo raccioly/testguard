@@ -99,7 +99,7 @@ an ambiguous anchor.
 | `typecheck` | `--typecheck` (TypeScript subjects) | key with its type-check overrides, reference elsewhere |
 | `changed` | `--changed HEAD~1` over scripted commits, then an unresolvable reference | keyed selections, key and reference for what is selected, exit 2 for the bad reference |
 | `partial` | `--command-budget 1000 --partial-on-budget` | every fault named in order; budget exhausted and its counts agree; not-reached records empty; whatever was reached matches the key |
-| `scratch` | `--scratch-dir` with node_modules a read-only copy | key, reference; node_modules unchanged; scratch directory left empty |
+| `scratch` | `--scratch-dir` with node_modules a read-only copy (where the subject's own runner can run read-only; see `readOnlyNodeModules` in `subject.json`) | key, reference; node_modules unchanged; scratch directory left empty except the documented `testguard-locks/` |
 | `assertion-kill` | `--require-assertion-kill` | key, reference; the policy names exactly the keyed exception-only kills |
 | `reorder` | claims (and faults) in reverse order | key; same map; records follow the new order |
 | `noise` | an unrelated file added and an untouched file renamed | key, reference |
@@ -138,6 +138,8 @@ summary, with the base branch's numbers beside it when the base has one.
 |---|---|---|
 | #263 | `node-test-floorplan` | A fault in a workspace package, defended by a sibling package's test through the `node_modules` link, reads `unverifiable`/`subject-not-executed`: the scratch worktree's link resolves to the original checkout. Known failure for `LSHAPE-ESTIMATE-USES-CORE-AREA/F1`, `/F2`. |
 | #264 | `ts-vitest-stock` | A vitest alias written `fileURLToPath(new URL('./src', import.meta.url))` makes `probe` refuse the whole project (exit 2). The subject uses the equivalent `join()` form so it measures everything else. |
+| #266 | `js-jest-newsletter` | `module.exports = { X: call() }` in `src/errors.js` makes every closure indeterminate: nothing is reused and `--changed` selects every claim (a safe superset). Known failure for the `footer-source` selection. |
+| #267 | `ts-vitest-stock` | `export interface` marks a module `unsupported-syntax`, so every closure is indeterminate: nothing is reused and `--changed` selects every claim (a safe superset). Known failure for the `adjustments-test` selection. |
 | #265 | `js-jest-newsletter` | GATE-SEMANTICS does not order `nocover` against an invalid anchor; the tool says `nocover`, the key says `anchor-ambiguous`. Known failure for `SCHEDULE-VALIDATION/F1` until the spec settles it. |
 
 ## A project outside the repository

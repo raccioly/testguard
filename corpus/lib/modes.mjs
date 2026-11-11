@@ -88,7 +88,22 @@ export const RUN = {
     const unchanged = await p([]);
     runs.push(runSummary('unchanged', unchanged));
     const a = keyAndDiff(ctx, 'reuse', unchanged);
-    checks.push(check('unchanged-reuses-something', (unchanged.evidence?.run?.reuse?.reused ?? 0) > 0, unchanged.evidence?.run?.reuse));
+    // GATE-SEMANTICS rules 8 and 11, read without the tool: a record may be
+    // carried forward unless its verdict is timeout or flaky-defender, its
+    // reason is probe-error, defenders-failed-to-load or not-reached, or its
+    // import closure is not complete. With nothing changed, every record that
+    // may be carried forward must be, and nothing else may be.
+    const mayReuse = (r) => !['timeout', 'flaky-defender'].includes(r.verdict)
+      && !['probe-error', 'defenders-failed-to-load', 'not-reached-within-budget'].includes(r.detail?.reason)
+      && r.inputs?.dependencyClosure === 'complete';
+    const seedById = new Map((seed.evidence?.records ?? []).map((r) => [`${r.claim.id}/${r.subject.id}`, r]));
+    const wrongReuse = (unchanged.evidence?.records ?? []).flatMap((r) => {
+      const id = `${r.claim.id}/${r.subject.id}`;
+      const prior = seedById.get(id);
+      const want = Boolean(prior && mayReuse(prior));
+      return want === Boolean(r.reusedFrom) ? [] : [{ fault: id, reused: Boolean(r.reusedFrom), mayReuse: want, closure: prior?.inputs?.dependencyClosure ?? null }];
+    });
+    checks.push(check('unchanged-reuses-exactly-the-reusable', wrongReuse.length === 0 && (unchanged.evidence?.records ?? []).length > 0, wrongReuse.length ? wrongReuse : unchanged.evidence?.run?.reuse));
     const spec = ctx.subject.key.modes?.['reuse-edit'];
     let key = a.key;
     if (spec) {
@@ -143,7 +158,16 @@ export const RUN = {
       runs.push(runSummary(step.name, r));
       const selected = [...new Set((r.evidence?.records ?? []).map((x) => x.claim.id))].sort();
       const want = [...step.expectedClaims].sort();
-      checks.push(check(`selection:${step.name}`, JSON.stringify(selected) === JSON.stringify(want), { expected: want, selected }));
+      const exact = JSON.stringify(selected) === JSON.stringify(want);
+      const c = check(`selection:${step.name}`, exact, { expected: want, selected });
+      // A selection that misses a claim the change can affect is unsound and is
+      // never excused. A superset is safe but imprecise; it passes only when a
+      // reviewed known failure names this exact selection and its issue.
+      if (!exact && want.every((id) => selected.includes(id))) {
+        const k = ctx.known.find((x) => x.subject === ctx.subject.name && x.check === c.check && JSON.stringify([...x.observed.selected].sort()) === JSON.stringify(selected));
+        if (k) { c.ok = true; c.detail.knownIssue = k.issue; }
+      }
+      checks.push(c);
       const ids = ctx.subject.faultIds.filter((id) => want.includes(id.split('/')[0]));
       const k = keyAndDiff(ctx, 'changed', r, { ids });
       key = mergeKey(key, k.key);
@@ -193,13 +217,14 @@ export const RUN = {
     const root = mkdtempSync(join(ctx.work, 'scratch-mode-'));
     const scratchDir = join(root, 'scratch');
     mkdirSync(scratchDir);
-    const ro = ctx.subject.config.install === 'npm' ? readOnlyNodeModules(ctx.subject, root) : null;
+    const ro = ctx.subject.config.install === 'npm' && ctx.subject.config.readOnlyNodeModules?.applies !== false ? readOnlyNodeModules(ctx.subject, root) : null;
     const before = ro ? listing(ro) : null;
     try {
       const repo = prepareRepo(ctx.subject, { scratchRoot: ctx.work, nodeModules: ro ?? undefined });
       const r = await probe({ toolRoot: ctx.toolRoot, subject: ctx.subject, repo, outPath: out(repo, 'scratch'), args: ['--no-reuse', '--scratch-dir', scratchDir], python: ctx.python });
       const { key, diff } = keyAndDiff(ctx, 'scratch', r);
-      const left = readdirSync(scratchDir);
+      // testguard-locks/ is documented to stay (empty) between runs; anything else is left over.
+      const left = listing(scratchDir).split('\n').filter((l) => l && !l.startsWith(':') && !/^testguard-locks(\/[^:]*)?:d:/.test(l));
       const checks = [exitCheck(r), check('scratch-dir-left-empty', left.length === 0, left.length ? left : 'empty')];
       if (ro) checks.push(check('read-only-node_modules-unchanged', listing(ro) === before, ro));
       return result('scratch', ctx.subject, { runs: [runSummary('scratch', r)], key, diff, checks });

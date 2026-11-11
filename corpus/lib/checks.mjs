@@ -30,6 +30,7 @@ export function loadKnownFailures(path = join(CORPUS, 'known-failures.json')) {
   const doc = JSON.parse(readFileSync(path, 'utf8'));
   for (const k of doc.entries ?? []) {
     if (!Number.isInteger(k.issue) || k.issue < 1) throw new Error(`known-failures.json: ${k.subject} ${k.fault} names no issue number`);
+    if (k.check && !(k.check.startsWith('selection:') && Array.isArray(k.observed?.selected))) throw new Error(`known-failures.json: ${k.subject} ${k.check}: only a --changed selection (a safe superset) can be a known check failure`);
     if (k.observed?.verdict === 'killed' && k.expected?.verdict !== 'killed') throw new Error(`known-failures.json: ${k.subject} ${k.fault} would excuse a false kill; a critical failure is never known`);
   }
   return doc.entries ?? [];
@@ -38,7 +39,7 @@ export function loadKnownFailures(path = join(CORPUS, 'known-failures.json')) {
 const same = (a, b) => (a?.verdict ?? null) === (b?.verdict ?? null) && (a?.reason ?? null) === (b?.reason ?? null);
 
 function knownFor(known, subject, mode, id, observed) {
-  return known.find((k) => k.subject === subject && k.fault === id && (k.modes === undefined || k.modes.includes(mode))
+  return known.find((k) => !k.check && k.subject === subject && k.fault === id && (k.modes === undefined || k.modes.includes(mode))
     && k.observed?.verdict === observed?.verdict && (k.observed?.reason ?? null) === (observed?.reason ?? null)) ?? null;
 }
 

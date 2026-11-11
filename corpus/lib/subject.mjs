@@ -145,7 +145,8 @@ export function readOnlyNodeModules(subject, root) {
   const lock = (p) => {
     const st = lstatSync(p);
     if (st.isSymbolicLink()) return;
-    if (st.isDirectory()) { for (const e of readdirSync(p)) lock(join(p, e)); chmodSync(p, 0o555); } else chmodSync(p, 0o444);
+    // Remove the write bits only: native binaries (esbuild) must stay executable.
+    if (st.isDirectory()) { for (const e of readdirSync(p)) lock(join(p, e)); chmodSync(p, st.mode & 0o555); } else chmodSync(p, st.mode & 0o555);
   };
   lock(copy);
   return copy;
