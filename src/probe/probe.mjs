@@ -10,7 +10,8 @@ import { discoverDefendersDetailed } from './discover.mjs';
 import { classifyDefenders } from './mocks.mjs';
 import { detectContention, contentionWarning, fanOutWarning } from './contention.mjs';
 import { availableParallelism } from 'node:os';
-import { createScratch, inPlace, PreconditionError } from './worktree.mjs';
+import { withScratchBase } from '../scratch-dir.mjs';
+import { createScratch, inPlace, PreconditionError, writeBoundary } from './worktree.mjs';
 import { applyContent, applyFault, locate } from './inject.mjs';
 import { resolveDefenders, parseCommandTemplate } from './runners/shared.mjs';
 import { selectRunner, discoverRunnerManifest, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns, runnerLabel, runnerFor } from './runners/index.mjs';
@@ -133,7 +134,9 @@ export function reuseSummary(records) {
  * Probe every fault of every claim. Returns a spec-conformant evidence
  * document; writing it is the caller's job.
  */
-export async function probe({
+export const probe = (options) => withScratchBase(options.scratchBase, () => probeIn(options));
+
+async function probeIn({
   projectDir,
   claims,
   confirmRuns = 3,
@@ -185,6 +188,7 @@ export async function probe({
   // on macOS, not /var); every relative() below must start from the same place.
   projectDir = realpathSync(resolve(projectDir));
   const root = gitRoot(projectDir);
+  const boundary = writeBoundary({ repoRoot: root, nodeModules }); // as the run starts, before anything is linked or written
   if (mode === 'in-place' && ref !== 'HEAD') throw new PreconditionError('--ref needs a scratch worktree; drop --in-place');
   const head = headSha(root, ref);
   if (!head) throw new PreconditionError(ref === 'HEAD' ? 'repository has no commits; every verdict is tied to a commit' : `ref ${ref} does not resolve to a commit`);
@@ -761,6 +765,7 @@ export async function probe({
       // place would be a false statement about where the evidence came from,
       // and nothing downstream could detect it.
       mode: iso.mode,
+      writeBoundary: boundary,
     },
     records,
     origins: recordedOriginSummary(records),

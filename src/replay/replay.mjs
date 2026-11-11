@@ -3,6 +3,7 @@ import { existsSync, rmSync, realpathSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { git, GitError, NO_HOOKS, repoRoot, headSha } from '../git.mjs';
+import { withScratchBase } from '../scratch-dir.mjs';
 import { createScratch, PreconditionError } from '../probe/worktree.mjs';
 import { selectRunner, discoverRunnerManifest, RUNNERS, OWNED_RUNNERS, mergeRuns } from '../probe/runners/index.mjs';
 import { parseCommandTemplate } from '../probe/runners/shared.mjs';
@@ -80,7 +81,9 @@ export function dedupeByPatch({ dir, commits }) {
  *
  * Runs in a scratch worktree; the caller's tree is never touched.
  */
-export async function replay({
+export const replay = (options) => withScratchBase(options.scratchBase, () => replayIn(options));
+
+async function replayIn({
   projectDir,
   range,
   confirmRuns = 3,

@@ -1,7 +1,7 @@
 import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, readSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
-import { tmpdir } from 'node:os';
+import { scratchRoot } from '../../scratch-dir.mjs';
 import { fileURLToPath } from 'node:url';
 import { runProcess } from './shared.mjs';
 import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs, normalizeDiscoveredFiles, readBoundedJsonFile, runDiscoveryProcess } from './discovery.mjs';
@@ -37,7 +37,7 @@ export const check = async () => admissionError()
 export const fatalEdit = () => '/* testguard negative control: this file must not parse */\n(\n';
 
 const receipts = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'testguard-node-'));
+  const dir = mkdtempSync(join(scratchRoot(), 'testguard-node-'));
   const file = join(dir, 'entries.json');
   writeFileSync(file, '{"entries":[', { mode: 0o600 });
   return { dir, file };

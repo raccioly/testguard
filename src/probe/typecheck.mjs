@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { copyFileSync, existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { childScope, scratchRoot } from '../scratch-dir.mjs';
 import { extname, join, relative, sep } from 'node:path';
 import { registerChild } from './runners/lifecycle.mjs';
 import { resolveRunner, splitCommandWords, terminateProcessTree } from './runners/shared.mjs';
@@ -47,11 +47,14 @@ const clip = (text, cwd) => String(text ?? '').replaceAll(`${cwd}${sep}`, '').sl
 /** Run an argv with a budget; resolves with what happened, never rejects. */
 function execute({ argv, cwd, budgetMs }) {
   const started = Date.now();
+  const scope = childScope(); // the checker's own temp files (tsc's compile cache) go under the scratch dir too
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(argv[0], argv.slice(1), { cwd, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32', env: { ...process.env, CI: '1', FORCE_COLOR: '0', NO_COLOR: '1' } });
+      child = spawn(argv[0], argv.slice(1), { cwd, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32', env: { ...process.env, CI: '1', FORCE_COLOR: '0', NO_COLOR: '1', ...scope.env } });
+      child.once('close', scope.dispose);
     } catch (error) {
+      scope.dispose();
       resolve({ spawnError: error.message, output: '', durationMs: 0 });
       return;
     }
@@ -85,7 +88,7 @@ export async function createTypechecker({ projectDir, command = '', budgetMs = 1
   if (custom) {
     try { words = splitCommandWords(command, '--typecheck'); } catch (error) { throw new PreconditionError(error.message); }
   }
-  const dir = mkdtempSync(join(scratchBase ?? tmpdir(), 'testguard-tc-'));
+  const dir = mkdtempSync(join(scratchBase ?? scratchRoot(), 'testguard-tc-'));
   const info = join(dir, 'build.tsbuildinfo');
   const snapshot = join(dir, 'baseline.tsbuildinfo');
   const cleanup = () => rmSync(dir, { recursive: true, force: true });

@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ClaimsError } from './claims/load.mjs';
 import { PreconditionError } from './probe/worktree.mjs';
+import { resolveScratchDir, withScratchBase } from './scratch-dir.mjs';
 import { RUNNER_NAMES } from './probe/runners/index.mjs';
 import { GitError } from './git.mjs';
 import { SpecDocError } from './evidence/writer.mjs';
@@ -83,6 +84,10 @@ probe
                        unittest pin that choice and fail rather than fall back. The engine that ran is what the evidence records.)
   --runner-cmd "<cmd>" custom runner; must contain {files} and {out}, e.g. "pnpm vitest run {files} --reporter=json --outputFile={out}"
   --node-modules <dir> node_modules to link into the scratch worktree (or TESTGUARD_NODE_MODULES)
+  --scratch-dir <dir>  every scratch worktree, temporary git index, runner report and runner cache goes under this existing,
+                       writable directory (or TESTGUARD_SCRATCH_DIR); default: the OS temp directory. Missing or unwritable
+                       refuses the run (exit 2). Also written: --out, and git's worktree metadata under .git. The tests under
+                       probe run project code: this bounds where TestGuard writes, it is not a sandbox
   --typecheck[=<cmd>]  type check every fault before any test runs: a replacement that parses but does not type-check is
                        fault-invalid (replacement-does-not-typecheck) and costs no test run. Default command: the project's own
                        tsc --noEmit -p tsconfig.json --incremental (never a bundled compiler; a project without a tsconfig
@@ -123,7 +128,7 @@ sweep      --changed <ref> (required unless --save-paths; CI bases and a safe lo
                              denominator: "120 writes across 38 files, swept 12". A clean sweep over an unstated
                              denominator is a sample of unknown size, not a guarantee that saving works
            --include-dirty  --exclude <glob>  --confirm <n>  --budget <ms>  --command-budget <ms>  --workers <n>  --serial  --max <n>  --out <path>  --json
-           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>   runner selection, as for probe
+           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>  --scratch-dir <dir>   runner selection and write boundary, as for probe
            --python <path>   Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH
            the cold start: no claim and no concern needed. Everything it proposes is a DRAFT — it never writes testguard.claims.json,
            and its evidence never replaces .testguard/evidence.json. exit 1 on a fault that survived, or a file no test imports
@@ -142,12 +147,12 @@ replay     --workers <n> (default 1)  --serial  --budget <ms> (per run)
            --command-budget <ms> cooperative measurement deadline; expiry writes neither replay nor calibration, so an unmeasured suffix cannot look clean
            --out <path>       replay document (default: <dir>/.testguard/replay.json); the calibration goes beside it
            --calibration-out <path>  write the calibration document here instead of beside the replay document
-           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>   runner selection, as for probe
+           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>  --scratch-dir <dir>   runner selection and write boundary, as for probe
            --python <path>   Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH
            reports, never gates: a bug that escaped is history, not a regression in this change
 admit      --workers <n> (default 1)  --serial  --budget <ms>  --command-budget <ms>  --require-assertion-kill
            --claim <ID> (required)  --fault <FID> (one fault only)  --confirm <n>  --json
-           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>   runner selection, as for probe
+           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>  --scratch-dir <dir>   runner selection and write boundary, as for probe
            --python <path>   Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH
            ADMITTED (exit 0) only when every fault of the claim is killed N/N by defenders that are green N/N; anything else is NOT ADMITTED (exit 1) and names the first blocking fault
            the test must be a declared or discovered defender of the claim (exit 3 otherwise); evidence goes to .testguard/evidence-partial.json
@@ -182,6 +187,9 @@ brief      --evidence <path>  --baseline <path>  --max <n>  --text (print only; 
 
 exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift, or unclaimed changes) · 2 precondition failed · 3 usage
 `;
+
+/** The commands that run a project's tests, and so create scratch worktrees and runner files. */
+const SCRATCH_COMMANDS = new Set(['probe', 'sweep', 'replay', 'admit']);
 
 const COMMANDS = { mcp: mcpCommand, replay: replayCommand, probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand, admit: admitCommand, sweep: sweepCommand, concerns: concernsCommand };
 
@@ -263,6 +271,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         python: { type: 'string' },
         runner: { type: 'string', default: 'auto' },
         'node-modules': { type: 'string' },
+        'scratch-dir': { type: 'string' },
         'in-place': { type: 'boolean', default: false },
         'no-escalate': { type: 'boolean', default: false },
         'no-reuse': { type: 'boolean', default: false },
@@ -317,6 +326,10 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
     io.err('--calibration-out is only valid on replay');
     return 3;
   }
+  if (values['scratch-dir'] !== undefined && !SCRATCH_COMMANDS.has(command)) {
+    io.err('--scratch-dir is only valid on probe, sweep, replay and admit: the commands that run tests');
+    return 3;
+  }
   if (values.typecheck !== undefined && !(command === 'probe' || (command === 'claims' && values['check-anchors']))) {
     io.err('--typecheck is only valid on probe and on claims --check-anchors');
     return 3;
@@ -342,7 +355,9 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
   }
   try {
     const projectDir = command === 'scaffold' || command === 'admit' ? resolve('.') : resolve(dirArg ?? '.');
-    return await handler({ projectDir, file: dirArg, files: positionals.slice(1), values, suppliedOptions, version: VERSION }, io);
+    // Checked before the handler writes anything: a scratch directory that cannot be used refuses the run.
+    const scratchBase = SCRATCH_COMMANDS.has(command) ? resolveScratchDir(values['scratch-dir']) : undefined;
+    return await withScratchBase(scratchBase, () => handler({ projectDir, file: dirArg, files: positionals.slice(1), values, suppliedOptions, version: VERSION }, io));
   } catch (e) {
     if (e instanceof ClaimsError || e instanceof PreconditionError || e instanceof GitError || e instanceof SpecDocError) {
       io.err(`error: ${e.message}`);
