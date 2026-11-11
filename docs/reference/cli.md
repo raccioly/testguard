@@ -198,6 +198,7 @@ spec before it is written.
 | `--runner <name>` | `auto` | Test runner. See the table below. |
 | `--runner-cmd "<cmd>"` | none | A custom runner command; must contain `{files}` and `{out}`, e.g. `"pnpm vitest run {files} --reporter=json --outputFile={out}"`. |
 | `--node-modules <dir>` | `TESTGUARD_NODE_MODULES` | `node_modules` to link into the scratch worktree when it cannot see yours. |
+| `--scratch-dir <dir>` | `TESTGUARD_SCRATCH_DIR`, else the OS temp directory | An existing, writable directory for every scratch worktree, temporary git index, runner report and runner temp directory. Missing or unwritable exits 2 before anything is written. It bounds where TestGuard writes; it does not sandbox the tests. See [where TestGuard writes](configuration.md#where-testguard-writes). |
 | `--python <path>` | `TESTGUARD_PYTHON`, then `$VIRTUAL_ENV`, then `.venv`, `venv`, `.env` in the project, then `python3`, `python` on `PATH` | Interpreter for `.py` defenders, resolved against your working tree. A bare name is looked up on `PATH`. An explicit interpreter is the only one tried: it is never replaced by another. |
 | `--workers <n>` | `1` | Maximum built-in runner workers. Python stays serial. |
 | `--serial` | off | One worker, even when `--workers` is higher (vitest `--no-file-parallelism`, jest `--runInBand`, playwright `--workers=1`). With the default `--workers 1` it changes nothing. pytest always runs with `-p no:xdist`, with or without it. |

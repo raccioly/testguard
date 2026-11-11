@@ -226,6 +226,25 @@
           },
           "additionalProperties": false
         },
+        "writeBoundary": {
+          "description": "The write boundary the run started under, as signals and never as paths (evidence is shared; a host path in it would leak the machine). `scratchDir`: `configured` when the caller named a scratch directory (--scratch-dir or TESTGUARD_SCRATCH_DIR), `default` for the operating system's temp directory. `nodeModulesWritable`: whether any node_modules the run links, or --node-modules, could be written when the run started; absent when none is linked (a Python project). `false` means the verdicts were measured with the install read-only. Neither field changes a verdict, so reuse ignores both.",
+          "type": "object",
+          "required": [
+            "scratchDir"
+          ],
+          "properties": {
+            "scratchDir": {
+              "enum": [
+                "default",
+                "configured"
+              ]
+            },
+            "nodeModulesWritable": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "workers": {
           "type": "integer",
           "minimum": 1,

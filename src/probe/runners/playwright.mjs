@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { scratchRoot } from '../../scratch-dir.mjs';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
@@ -203,7 +203,7 @@ export function parseReport(report, durationMs, kinds) {
 export const KINDS_REPORTER = join(dirname(fileURLToPath(import.meta.url)), 'playwright', 'kinds-reporter.cjs');
 
 export async function run(opts) {
-  const sidecar = join(tmpdir(), `testguard-playwright-kinds-${randomBytes(6).toString('hex')}.json`);
+  const sidecar = join(scratchRoot(), `testguard-playwright-kinds-${randomBytes(6).toString('hex')}.json`);
   const env = { PLAYWRIGHT_JSON_OUTPUT_FILE: '{out}', PLAYWRIGHT_JSON_OUTPUT_NAME: '{out}', TESTGUARD_PLAYWRIGHT_KINDS: sidecar };
   const readKinds = () => {
     try { return existsSync(sidecar) ? JSON.parse(readFileSync(sidecar, 'utf8')) : undefined; } catch { return undefined; }

@@ -936,6 +936,42 @@ Exit codes: `0` every changed parent-owned source file is claimed or excused
 all-excluded or all-delegated change); `2` the change cannot be evaluated (unresolvable
 reference, invalid claims or ignore file, no repository); `3` no reference.
 
+## Write boundary
+
+TestGuard writes in a fixed, listed set of places, so a caller that confines it
+can provision exactly those. The set is: the **scratch directory**, the
+evidence path (`--out`, else `<dir>/.testguard/`), and git's own metadata under
+the repository's `.git` (`worktrees/` for each scratch worktree, plus loose
+objects when `--include-dirty` snapshots an unstaged tree). Nothing else.
+`--scratch-dir <path>`, or `TESTGUARD_SCRATCH_DIR`, names the scratch directory
+for `probe`, `sweep`, `replay` and `admit`; the flag wins. Every scratch
+worktree, temporary git index, runner report, sidecar reporter file and
+per-process runner temp directory lives under it, and the children are given
+a `TMPDIR` inside it. Unset, it is the operating system's temp directory, as
+before. A directory that does not exist or cannot be written is a precondition
+error (exit 2) reported before anything is written; it is never created.
+
+The scratch worktree gets its own `node_modules` directory whose entries link
+to the shared install, so a tool that writes `node_modules/.vite-temp`,
+`.vite` or `.cache` writes into the scratch tree and never into the install.
+Dot-entries that are not part of an install are not carried across. The
+per-run temp directory also sets `XDG_DATA_HOME` (vitest keeps an API token
+there on Linux). Runs against the caller's own tree (the dirty-tree test
+discovery, `--in-place`) cannot be redirected: discovery asks vitest 4 and
+later for `--configLoader runner` when the install is not writable, and
+`--in-place` is documented as writing the tree.
+
+`run.writeBoundary` records signals, never paths: `scratchDir` is `default` or
+`configured`; `nodeModulesWritable` is true when any linked install (or
+`--node-modules`) could be written as the run started, false when none could,
+and absent when none is linked. It does not enter reuse: it is a statement
+about where the run could write, and no verdict depends on it.
+
+What is not promised: the tests under probe run the project's own code with the
+caller's privileges. The boundary says where TestGuard and the built-in runners
+write; it is not a sandbox, and it cannot stop a test from writing elsewhere or
+opening a socket.
+
 ## Anchor preflight
 
 `claims --check-anchors` answers what is knowable before a runner starts. For
