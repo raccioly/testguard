@@ -10924,7 +10924,7 @@
     },
     {
       "id": "TG-FAN-OUT-MEASURES-BASELINES-SIDE-BY-SIDE",
-      "statement": "Under --fault-workers, baselines of independent defender sets are measured side by side, each set's asks in serial order, and a set that is not green N/N while another was running is measured again alone in a fresh tree before any record uses it; the records equal the serial ones.",
+      "statement": "Under --fault-workers, baselines of independent defender sets are measured side by side, one set per tree with each set's asks in serial order, and the records equal the serial ones; a baseline re-measure is only recorded under a fan-out.",
       "source": {
         "kind": "spec",
         "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
@@ -10952,6 +10952,39 @@
         },
         {
           "id": "F2",
+          "description": "The validator admits a baseline re-measure with no fan-out.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (r.detail.baselineRemeasuredSerially && !(doc.run.faultWorkers > 1)) {",
+          "replace": "      if (false) {",
+          "defendedBy": [
+            "spec/conformance/fault-workers.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-REMEASURES-A-CONTENDED-BASELINE",
+      "statement": "Under --fault-workers, a defender set's baseline that is not green N/N while another set was running is measured again alone in a fresh tree before any record uses it, and the record says so.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers-baselines.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
           "description": "A baseline that went red beside another set is believed.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
@@ -10963,27 +10996,12 @@
           }
         },
         {
-          "id": "F3",
+          "id": "F2",
           "description": "A record does not say its baseline was re-measured alone.",
           "faultClass": "statement-deleted",
           "file": "src/probe/probe.mjs",
           "find": "      if (baseline.remeasuredSerially) detail.baselineRemeasuredSerially = true;\n",
           "replace": "",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
-          "id": "F4",
-          "description": "The validator admits a baseline re-measure with no fan-out.",
-          "faultClass": "condition-forced",
-          "file": "spec/lib/validate.mjs",
-          "find": "      if (r.detail.baselineRemeasuredSerially && !(doc.run.faultWorkers > 1)) {",
-          "replace": "      if (false) {",
-          "defendedBy": [
-            "spec/conformance/fault-workers.test.mjs"
-          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
