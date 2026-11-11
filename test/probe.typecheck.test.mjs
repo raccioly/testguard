@@ -120,10 +120,10 @@ describe('a dirty baseline type check is a precondition error', () => {
   it('names the first diagnostic and writes nothing', async () => {
     const project = typescriptProject({ edit: (dir) => writeText(join(dir, 'src', 'extra.ts'), 'export const broken: number = "not a number";\n') });
     try {
-      await expect(run(project, { typecheck: '' })).rejects.toThrow(/does not type-check[\s\S]*src\/extra\.ts\(1,14\): error TS2322/);
+      // One run through the bin: exit 2 is how a PreconditionError leaves the process, and stderr carries its message.
       const cli = spawnSync(process.execPath, [join(ROOT, 'cli', 'testguard.mjs'), 'probe', project.dir, '--typecheck', '--quiet'], { encoding: 'utf8' });
       expect(cli.status).toBe(2);
-      expect(cli.stderr).toMatch(/does not type-check/);
+      expect(cli.stderr).toMatch(/does not type-check[\s\S]*src\/extra\.ts\(1,14\): error TS2322/);
       expect(existsSync(join(project.dir, '.testguard', 'evidence.json'))).toBe(false);
     } finally { project.cleanup(); }
   }, 300_000);
@@ -175,8 +175,9 @@ describe('claims --check-anchors --typecheck', () => {
     const project = typescriptProject();
     try {
       writeText(join(project.dir, 'src', 'extra.ts'), 'export const broken: number = "not a number";\n'); // uncommitted
-      await expect(checkAnchors(project.dir, loadClaims(join(project.dir, 'testguard.claims.json')), { typecheck: '' })).rejects.toThrow(PreconditionError);
-      await expect(checkAnchors(project.dir, loadClaims(join(project.dir, 'testguard.claims.json')), { typecheck: '' })).rejects.toThrow(/src\/extra\.ts\(1,14\): error TS2322/);
+      const failure = await checkAnchors(project.dir, loadClaims(join(project.dir, 'testguard.claims.json')), { typecheck: '' }).then(() => undefined, (e) => e);
+      expect(failure).toBeInstanceOf(PreconditionError);
+      expect(failure.message).toMatch(/src\/extra\.ts\(1,14\): error TS2322/);
     } finally { project.cleanup(); }
   }, 120_000);
 
