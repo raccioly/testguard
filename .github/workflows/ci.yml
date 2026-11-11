@@ -214,7 +214,7 @@ jobs:
       #    reuse rule); only what changed is re-probed. No escalation in CI:
       #    a survivor here is a failure either way. ──
       - name: Restore previous self-probe evidence (verdict reuse)
-        if: false # MEASUREMENT ONLY (#255): from-scratch probe; reverted before merge
+        if: matrix.node-version == 22
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .testguard/ci-self-evidence.json
