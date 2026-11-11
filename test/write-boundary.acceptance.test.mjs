@@ -65,7 +65,8 @@ function boundaryRun(fixture, expected, nodeModules, { dirty = false, changed = 
   cpSync(join(ROOT, 'fixtures', fixture.dir), project, { recursive: true, filter: (src) => !/node_modules|__pycache__|\.flake-counter|\.testguard|\.pytest_cache|test-results/.test(src) });
   git(project, 'init', '-q'); git(project, 'add', '-A'); git(project, 'commit', '-q', '-m', 'fixture');
   // `--changed HEAD~1` selects the claims a commit touched: the selection reads the diff and the status through git, and
-  // must stay inside the boundary too. The second commit edits a fault target, so some claims are selected.
+  // must stay inside the boundary too. The second commit edits a fault target, so some claims are selected; the caller
+  // narrows those to two one-fault claims (--claim), because what is measured is the reading, not every verdict again.
   if (changed) { writeFileSync(join(project, 'src', 'redact.mjs'), `${readFileSync(join(project, 'src', 'redact.mjs'), 'utf8')}// touched\n`); git(project, 'add', '-A'); git(project, 'commit', '-q', '-m', 'touch'); }
   // A dirty tree makes probe run test discovery in the caller's own tree, where node_modules is the project's own
   // (a symlink to the read-only copy here, as an installed-beforehand container has it) and cannot be swapped for a scratch one.
@@ -108,7 +109,7 @@ describe.each(FIXTURES)('write boundary: $name', (fixture) => {
       ro = boundaryRun(fixture, expected, nmRo, { dirty: Boolean(fixture.lean) });
       if (fixture.lean) roDirty = ro;
       if (!fixture.nm || fixture.writableRun) rw = boundaryRun(fixture, expected, nmRw);
-      if (nmRo && fixture.dirty) roChanged = boundaryRun(fixture, expected, nmRo, { dirty: true, changed: true, extraArgs: ['--fault-workers', '3'] });
+      if (nmRo && fixture.dirty) roChanged = boundaryRun(fixture, expected, nmRo, { dirty: true, changed: true, extraArgs: ['--fault-workers', '3', '--claim', 'REDACT-002,REDACT-007'] });
       if (nmRo && fixture.dirty && !fixture.lean) roDirty = boundaryRun(fixture, expected, nmRo, { dirty: true });
       if (rw) rw.nmChanges = nmRw ? changes(nmRwBefore, listing(nmRw)) : undefined;
     } finally {

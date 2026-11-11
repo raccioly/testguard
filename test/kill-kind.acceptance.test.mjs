@@ -1,13 +1,18 @@
 // @req FR-10
 // The kill kind, measured by the real runners. For every runner there are
-// three claims over one function: a defender that asserts a value, a defender
-// that never asserts anything (it only calls the code), and a defender whose
-// only check is "does not throw". The same two faults are used throughout:
-// one changes the result, one makes the function throw.
+// three claims, each over its own function of one source file: a defender that
+// asserts a value (f), a defender that never asserts anything, it only calls
+// the code (g), and a defender whose only check is "does not throw" (h). Two
+// faults are used: one changes the result, one makes the function throw.
 //
-//   WRONG fault vs the value-asserting defender   -> killed, killKind: assertion
-//   THROW fault vs the defender with no assertion -> killed, killKind: exception-only
-//   THROW fault vs the does-not-throw defender    -> killed, killKind: assertion
+//   WRONG fault in f vs the value-asserting defender   -> killed, killKind: assertion
+//   THROW fault in g vs the defender with no assertion -> killed, killKind: exception-only
+//   THROW fault in h vs the does-not-throw defender    -> killed, killKind: assertion
+//
+// All three claims name all three defender files, so the unmodified baseline is
+// measured once for the three of them (it is cached per defender set) instead of
+// once per claim. Each fault breaks one function and so turns exactly one
+// defender red: the kind each defender produces is not blurred by the others.
 //
 // The expectations were derived by hand: apply the fault, run the runner on
 // the defender, read whether an assertion or a bare exception failed it.
@@ -33,14 +38,15 @@ const HAS_PYTEST = HAS_PYTHON && has(['-c', 'import pytest']);
 const HAS_PLAYWRIGHT = existsSync(join(PW_FIXTURE, 'node_modules', '@playwright', 'test'));
 
 const js = (find, replace) => ({ find, replace });
+// f returns x + 1, g x + 2, h x + 3: each body is a unique anchor.
 const FAULTS = {
-  js: { wrong: js('  return x + 1;', '  return x + 2;'), throws: js('  return x + 1;', "  throw new Error('boom');") },
-  py: { wrong: js('    return x + 1', '    return x + 2'), throws: js('    return x + 1', "    raise RuntimeError('boom')") },
+  js: { wrong: js('  return x + 1;', '  return x + 9;'), crash: js('  return x + 2;', "  throw new Error('boom');"), notthrow: js('  return x + 3;', "  throw new Error('boom');") },
+  py: { wrong: js('    return x + 1', '    return x + 9'), crash: js('    return x + 2', "    raise RuntimeError('boom')"), notthrow: js('    return x + 3', "    raise RuntimeError('boom')") },
 };
 
-const SRC_MJS = 'export function f(x) {\n  return x + 1;\n}\n';
-const SRC_CJS = 'exports.f = function f(x) {\n  return x + 1;\n};\n';
-const SRC_PY = 'def f(x):\n    return x + 1\n';
+const SRC_MJS = 'export function f(x) {\n  return x + 1;\n}\nexport function g(x) {\n  return x + 2;\n}\nexport function h(x) {\n  return x + 3;\n}\n';
+const SRC_CJS = 'exports.f = function f(x) {\n  return x + 1;\n};\nexports.g = function g(x) {\n  return x + 2;\n};\nexports.h = function h(x) {\n  return x + 3;\n};\n';
+const SRC_PY = 'def f(x):\n    return x + 1\n\n\ndef g(x):\n    return x + 2\n\n\ndef h(x):\n    return x + 3\n';
 
 /** One runner = one project layout. `tests` maps the three defenders to files. */
 const RUNNERS = {
@@ -49,8 +55,8 @@ const RUNNERS = {
     files: {
       'package.json': '{"name":"kk","private":true,"type":"module"}\n',
       'test/assert.test.mjs': "import { test, expect } from 'vitest';\nimport { f } from '../src/f.mjs';\ntest('adds', () => { expect(f(1)).toBe(2); });\n",
-      'test/crash.test.mjs': "import { test } from 'vitest';\nimport { f } from '../src/f.mjs';\ntest('runs', () => { f(1); });\n",
-      'test/notthrow.test.mjs': "import { test, expect } from 'vitest';\nimport { f } from '../src/f.mjs';\ntest('does not throw', () => { expect(() => f(1)).not.toThrow(); });\n",
+      'test/crash.test.mjs': "import { test } from 'vitest';\nimport { g } from '../src/f.mjs';\ntest('runs', () => { g(1); });\n",
+      'test/notthrow.test.mjs': "import { test, expect } from 'vitest';\nimport { h } from '../src/f.mjs';\ntest('does not throw', () => { expect(() => h(1)).not.toThrow(); });\n",
     },
     link: () => join(ROOT, 'node_modules'),
   },
@@ -60,8 +66,8 @@ const RUNNERS = {
       'package.json': '{"name":"kk","private":true}\n',
       'jest.config.js': "module.exports = { testMatch: ['**/test/*.test.js'] };\n",
       'test/assert.test.js': "const { f } = require('../src/f');\ntest('adds', () => { expect(f(1)).toBe(2); });\n",
-      'test/crash.test.js': "const { f } = require('../src/f');\ntest('runs', () => { f(1); });\n",
-      'test/notthrow.test.js': "const assert = require('node:assert');\nconst { f } = require('../src/f');\ntest('does not throw', () => { assert.doesNotThrow(() => f(1)); });\n",
+      'test/crash.test.js': "const { g } = require('../src/f');\ntest('runs', () => { g(1); });\n",
+      'test/notthrow.test.js': "const assert = require('node:assert');\nconst { h } = require('../src/f');\ntest('does not throw', () => { assert.doesNotThrow(() => h(1)); });\n",
     },
     link: () => join(ROOT, 'node_modules'),
   },
@@ -70,8 +76,8 @@ const RUNNERS = {
     files: {
       'package.json': '{"name":"kk","private":true,"type":"module"}\n',
       'test/assert.test.mjs': "import test from 'node:test';\nimport assert from 'node:assert';\nimport { f } from '../src/f.mjs';\ntest('adds', () => { assert.strictEqual(f(1), 2); });\n",
-      'test/crash.test.mjs': "import test from 'node:test';\nimport { f } from '../src/f.mjs';\ntest('runs', () => { f(1); });\n",
-      'test/notthrow.test.mjs': "import test from 'node:test';\nimport assert from 'node:assert';\nimport { f } from '../src/f.mjs';\ntest('does not throw', () => { assert.doesNotThrow(() => f(1)); });\n",
+      'test/crash.test.mjs': "import test from 'node:test';\nimport { g } from '../src/f.mjs';\ntest('runs', () => { g(1); });\n",
+      'test/notthrow.test.mjs': "import test from 'node:test';\nimport assert from 'node:assert';\nimport { h } from '../src/f.mjs';\ntest('does not throw', () => { assert.doesNotThrow(() => h(1)); });\n",
     },
   },
   playwright: {
@@ -80,8 +86,8 @@ const RUNNERS = {
       'package.json': '{"name":"kk","private":true}\n',
       'playwright.config.js': "module.exports = { testDir: 'e2e', testMatch: '*.spec.js' };\n",
       'e2e/assert.spec.js': "const { test, expect } = require('@playwright/test');\nconst { f } = require('../src/f');\ntest('adds', () => { expect(f(1)).toBe(2); });\n",
-      'e2e/crash.spec.js': "const { test } = require('@playwright/test');\nconst { f } = require('../src/f');\ntest('runs', () => { f(1); });\n",
-      'e2e/notthrow.spec.js': "const { test, expect } = require('@playwright/test');\nconst { f } = require('../src/f');\ntest('does not throw', () => { expect(() => f(1)).not.toThrow(); });\n",
+      'e2e/crash.spec.js': "const { test } = require('@playwright/test');\nconst { g } = require('../src/f');\ntest('runs', () => { g(1); });\n",
+      'e2e/notthrow.spec.js': "const { test, expect } = require('@playwright/test');\nconst { h } = require('../src/f');\ntest('does not throw', () => { expect(() => h(1)).not.toThrow(); });\n",
     },
     link: () => join(PW_FIXTURE, 'node_modules'),
     reset: resetConfigCache,
@@ -90,8 +96,8 @@ const RUNNERS = {
     skip: !HAS_PYTHON, runnerName: 'unittest', fault: 'py', source: ['f.py', SRC_PY],
     files: {
       'tests/test_assert.py': 'import unittest\nfrom f import f\n\nclass T(unittest.TestCase):\n    def test_adds(self):\n        self.assertEqual(f(1), 2)\n',
-      'tests/test_crash.py': 'import unittest\nfrom f import f\n\nclass T(unittest.TestCase):\n    def test_runs(self):\n        f(1)\n',
-      'tests/test_notthrow.py': 'import unittest\nfrom f import f\n\nclass T(unittest.TestCase):\n    def test_does_not_throw(self):\n        try:\n            f(1)\n        except Exception as e:\n            self.fail("raised %r" % e)\n',
+      'tests/test_crash.py': 'import unittest\nfrom f import g\n\nclass T(unittest.TestCase):\n    def test_runs(self):\n        g(1)\n',
+      'tests/test_notthrow.py': 'import unittest\nfrom f import h\n\nclass T(unittest.TestCase):\n    def test_does_not_throw(self):\n        try:\n            h(1)\n        except Exception as e:\n            self.fail("raised %r" % e)\n',
     },
   },
   pytest: {
@@ -99,8 +105,8 @@ const RUNNERS = {
     files: {
       'conftest.py': '',
       'tests/test_assert.py': 'from f import f\n\ndef test_adds():\n    assert f(1) == 2\n',
-      'tests/test_crash.py': 'from f import f\n\ndef test_runs():\n    f(1)\n',
-      'tests/test_notthrow.py': 'import pytest\nfrom f import f\n\ndef test_does_not_throw():\n    try:\n        f(1)\n    except Exception as e:\n        pytest.fail("raised %r" % e)\n',
+      'tests/test_crash.py': 'from f import g\n\ndef test_runs():\n    g(1)\n',
+      'tests/test_notthrow.py': 'import pytest\nfrom f import h\n\ndef test_does_not_throw():\n    try:\n        h(1)\n    except Exception as e:\n        pytest.fail("raised %r" % e)\n',
     },
   },
 };
@@ -110,15 +116,17 @@ const defender = (cfg, kind) => Object.keys(cfg.files).find((p) => p.includes(ki
 function claimsFor(cfg) {
   const f = FAULTS[cfg.fault];
   const producedBy = { producer: 'agent', by: 'test' };
-  const claim = (id, kind, fault, name) => ({
+  // The same defender set on every claim, in the same order: one baseline measurement serves all three.
+  const defendedBy = ['assert', 'crash', 'notthrow'].map((kind) => defender(cfg, kind));
+  const claim = (id, fault, name) => ({
     id, statement: `f behaves (${name}).`, source: { kind: 'spec', ref: 'README.md' }, severity: 'high', producedBy,
-    defendedBy: [defender(cfg, kind)],
+    defendedBy,
     faults: [{ id: 'F1', description: name, faultClass: 'other', file: cfg.source[0], ...fault, producedBy }],
   });
   return { schemaVersion: 1, claims: [
-    claim('KK-ASSERT', 'assert', f.wrong, 'wrong result'),
-    claim('KK-CRASH', 'crash', f.throws, 'throws'),
-    claim('KK-NOTTHROW', 'notthrow', f.throws, 'throws, defender asserts it does not'),
+    claim('KK-ASSERT', f.wrong, 'wrong result'),
+    claim('KK-CRASH', f.crash, 'throws'),
+    claim('KK-NOTTHROW', f.notthrow, 'throws, defender asserts it does not'),
   ] };
 }
 
