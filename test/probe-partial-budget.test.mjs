@@ -3,7 +3,8 @@
 // deterministic with an injected clock advanced from a stage callback, never
 // with a sleep, and the scratch trees are sampled at the moment it happens.
 import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { probe } from '../src/probe/probe.mjs';
 import { probeCommand } from '../src/commands/probe.mjs';
@@ -150,6 +151,22 @@ describe('probe --partial-on-budget', () => {
       delete process.env.TG_FANOUT_MARKERS;
       rmSync(project.dir, { recursive: true, force: true });
       rmSync(project.markers, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it('an exhausted run keeps every temporary file under --scratch-dir and leaves nothing behind', async () => {
+    const project = partialBudgetProject();
+    const scratch = mkdtempSync(join(tmpdir(), 'tg-partial-scratch-'));
+    try {
+      let inside = 0;
+      const { budget, onStage } = expiry(project, { startingFault: 3, onTree: () => { inside = readdirSync(scratch).length; } });
+      const doc = await probe(options(project, { commandBudget: budget, partialOnBudget: true, onStage, scratchBase: scratch }));
+      expect(doc.run.budget.exhausted).toBe(true);
+      expect(inside).toBeGreaterThan(0); // not vacuous: the scratch tree lived there while the budget ran out
+      expect(readdirSync(scratch).filter((name) => name !== 'testguard-locks')).toEqual([]);
+    } finally {
+      rmSync(project.dir, { recursive: true, force: true });
+      rmSync(scratch, { recursive: true, force: true });
     }
   }, 60_000);
 
