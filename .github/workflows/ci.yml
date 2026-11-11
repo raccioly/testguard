@@ -223,6 +223,15 @@ jobs:
             self-evidence-${{ hashFiles('testguard.claims.json') }}-
             self-evidence-
 
+      # The cost gate divides the probe's summed seconds by the speed of the runner
+      # it ran on (#255): a fixed workload is timed here and again right after the
+      # probe, in this same job. Same step shape on both sides so the two medians
+      # are comparable; the drift between them says whether the runner's speed
+      # moved while the probe ran.
+      - name: Time the reference workload before the probe
+        if: matrix.node-version == 22
+        run: node .github/scripts/measure-reference.mjs --out .testguard/reference-before.json
+
       - name: probe TestGuard's own claims
         if: matrix.node-version == 22
         run: node cli/testguard.mjs probe . --budget 180000 --no-escalate --cost --out .testguard/ci-self-evidence.json
@@ -231,9 +240,13 @@ jobs:
       # word, because --cost only ever printed into a log. `always()` so the
       # cost is reported even when the probe itself failed: a run that got
       # slower AND found a survivor should say both, not just the second.
+      - name: Time the reference workload after the probe
+        if: always() && matrix.node-version == 22
+        run: node .github/scripts/measure-reference.mjs --out .testguard/reference-after.json
+
       - name: The gate must stay inside its cost budget
         if: always() && matrix.node-version == 22
-        run: node .github/scripts/check-cost-budget.mjs .testguard/ci-self-evidence.json
+        run: node .github/scripts/check-cost-budget.mjs .testguard/ci-self-evidence.json --reference-before .testguard/reference-before.json --reference-after .testguard/reference-after.json
 
       # A stable, branch-named artifact so a developer can fetch the evidence
       # CI produced without knowing a run id (README: read CI's evidence

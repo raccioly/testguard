@@ -144,5 +144,15 @@
       "where": "CI (ci.yml test 22); the same claim measures 66.5 s locally"
     },
     "calibratedAgainst": "CI, never local. 75 s was set from a local 66.5 s and tripped on the very first CI run, where the same claim costs 87 s — a CI runner is materially slower, and this file already says so for the total: 950 s was 18% over local 804 s but only 4.6% over CI's 906 s, and the first PR adding any claim tripped it. The same error, one level down. 100 s is ~15% over the CI worst."
+  },
+  "reference": {
+    "workload": "node-test-spawn-v1",
+    "baselineMs": 200,
+    "factorRange": [
+      0.5,
+      2.5
+    ],
+    "maxDrift": 1.5,
+    "how": "PROVISIONAL until the CI runs below are recorded."
   }
 }

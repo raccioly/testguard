@@ -18,9 +18,9 @@
  * usage: measure-reference.mjs --out <file> [--runs 9]
  */
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -34,7 +34,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 test('reference workload', () => {
   let x = 0;
@@ -84,6 +84,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.exit(2);
   }
   const result = measureReference({ runs: Number(values.runs) });
+  mkdirSync(dirname(values.out), { recursive: true });
   writeFileSync(values.out, JSON.stringify(result, null, 2) + '\n');
   console.log(`reference ${WORKLOAD}: median ${result.medianMs.toFixed(1)} ms of ${result.runs} (samples ${result.samplesMs.map((x) => x.toFixed(0)).join(', ')}) on ${result.cpus} CPUs, node ${result.node}`);
 }
