@@ -71,7 +71,7 @@ export function measureReference({ runs = 9 } = {}) {
     };
     once();
     const samplesMs = Array.from({ length: runs }, once);
-    return { schemaVersion: 1, workload: WORKLOAD, node: process.versions.node, cpus: availableParallelism(), runs, samplesMs, medianMs: median(samplesMs) };
+    return { schemaVersion: 1, workload: WORKLOAD, node: process.versions.node, cpus: availableParallelism(), platform: process.platform, runs, samplesMs, medianMs: median(samplesMs) };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -86,5 +86,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const result = measureReference({ runs: Number(values.runs) });
   mkdirSync(dirname(values.out), { recursive: true });
   writeFileSync(values.out, JSON.stringify(result, null, 2) + '\n');
-  console.log(`reference ${WORKLOAD}: median ${result.medianMs.toFixed(1)} ms of ${result.runs} (samples ${result.samplesMs.map((x) => x.toFixed(0)).join(', ')}) on ${result.cpus} CPUs, node ${result.node}`);
+  console.log(`reference ${WORKLOAD}: median ${result.medianMs.toFixed(1)} ms of ${result.runs} (samples ${result.samplesMs.map((x) => x.toFixed(0)).join(', ')}) on ${result.cpus} CPUs (${result.platform}), node ${result.node}`);
 }

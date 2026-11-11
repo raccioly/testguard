@@ -195,7 +195,19 @@ export function normalize(value, speedFactor) {
  * after the probe: `beforeMs` and `afterMs` are the medians of those two
  * batches, `baselineMs` is the median recorded in the budget file. The speed
  * factor is the mean of the two over the baseline, so a runner that sped up or
- * slowed down mid-probe is charged for the average it ran at.
+ * slowed down a little mid-probe is charged for the average it ran at. When the
+ * two differ by more than `maxDrift` the mean would credit a runner that slowed
+ * down mid-run for speed it did not have for the whole probe (170 ms then 320 ms
+ * turned 4588 normalized seconds into 3184), so the factor is the FASTER
+ * reading instead: the smaller factor, the larger normalized cost. A drifted run
+ * is never judged more kindly than its best reading.
+ *
+ * The reference tracks probe speed within one class of machine, not across
+ * classes (an 18-core laptop read 177 ms, inside CI's 166-238 ms range, and runs
+ * the probe far faster than CI). So the baseline records the class it was taken
+ * on, `runner.baseline` = `{cpus, platform}`, and a measurement from another CPU
+ * count or platform, or one that does not say, is `runner-mismatch`: refused,
+ * never normalized.
  *
  * Fails closed. A missing or non-positive number is `missing`, never a factor of
  * 1; a factor outside the range is `out-of-range`, because the workload no
@@ -204,20 +216,39 @@ export function normalize(value, speedFactor) {
  * `lowConfidence`: usable for a pass, never for excusing a run over the ceiling.
  */
 export function assessReference(reference, { reusedRecords = 0 } = {}) {
-  const { beforeMs, afterMs, baselineMs, factorRange = REFERENCE_FACTOR_RANGE, maxDrift = REFERENCE_MAX_DRIFT } = reference ?? {};
+  const { beforeMs, afterMs, baselineMs, runner, factorRange = REFERENCE_FACTOR_RANGE, maxDrift = REFERENCE_MAX_DRIFT } = reference ?? {};
   if (!positive(beforeMs) || !positive(afterMs) || !positive(baselineMs)) return { status: 'missing', beforeMs, afterMs, baselineMs };
-  const speedFactor = (beforeMs + afterMs) / 2 / baselineMs;
+  const mismatch = runnerMismatch(runner);
+  if (mismatch.length > 0) return { status: 'runner-mismatch', beforeMs, afterMs, baselineMs, mismatch, runner };
+  const meanFactor = (beforeMs + afterMs) / 2 / baselineMs;
   const drift = Math.max(beforeMs, afterMs) / Math.min(beforeMs, afterMs);
+  const drifted = drift > maxDrift;
+  const speedFactor = drifted ? Math.min(beforeMs, afterMs) / baselineMs : meanFactor;
   const lowConfidenceReasons = [
-    ...(drift > maxDrift ? ['drift'] : []),
+    ...(drifted ? ['drift'] : []),
     ...(reusedRecords > 0 ? ['reused-records'] : []),
   ];
   return {
     status: speedFactor < factorRange[0] || speedFactor > factorRange[1] ? 'out-of-range' : 'ok',
-    beforeMs, afterMs, baselineMs, speedFactor, drift, maxDrift, factorRange,
+    beforeMs, afterMs, baselineMs, speedFactor, meanFactor, factorBasis: drifted ? 'pessimistic' : 'mean', drift, maxDrift, factorRange,
     lowConfidence: lowConfidenceReasons.length > 0,
     lowConfidenceReasons,
   };
+}
+
+const runnerClass = (c) => (Number.isInteger(c?.cpus) && c.cpus > 0 && typeof c?.platform === 'string' && c.platform !== '' ? c : undefined);
+
+/** Why a measurement may not be compared with the baseline: empty when both were taken on the same CPU count and platform. */
+export function runnerMismatch(runner) {
+  const base = runnerClass(runner?.baseline);
+  if (!base) return ['the baseline records no runner class (reference.cpus and reference.platform in the budget file), so no measurement can be shown to come from the same kind of machine.'];
+  const reasons = new Set();
+  for (const name of ['before', 'after']) {
+    const measured = runnerClass(runner[name]);
+    if (!measured) reasons.add(`the ${name} reference measurement does not record the CPU count and platform it ran on.`);
+    else if (measured.cpus !== base.cpus || measured.platform !== base.platform) reasons.add(`The baseline was taken on ${base.cpus} CPUs (${base.platform}); the reference was measured on ${measured.cpus} CPUs (${measured.platform}).`);
+  }
+  return [...reasons];
 }
 
 /**
@@ -228,10 +259,12 @@ export function assessReference(reference, { reusedRecords = 0 } = {}) {
  */
 export function referenceFrom({ before, after, budget } = {}) {
   const same = (m) => (m && budget && m.workload === budget.workload ? m.medianMs : undefined);
+  const classOf = (m) => (m && budget && m.workload === budget.workload ? { cpus: m.cpus, platform: m.platform } : {});
   return {
     beforeMs: same(before),
     afterMs: same(after),
     baselineMs: budget?.baselineMs,
+    runner: { baseline: { cpus: budget?.cpus, platform: budget?.platform }, before: classOf(before), after: classOf(after) },
     ...(budget?.factorRange ? { factorRange: budget.factorRange } : {}),
     ...(budget?.maxDrift ? { maxDrift: budget.maxDrift } : {}),
   };
@@ -300,6 +333,7 @@ export function checkCostBudget(report, { budgetSeconds, perClaimSeconds, previo
   const failures = [
     ...(assessment?.status === 'missing' ? ['reference-missing'] : []),
     ...(assessment?.status === 'out-of-range' ? ['reference-out-of-range'] : []),
+    ...(assessment?.status === 'runner-mismatch' ? ['reference-runner-mismatch'] : []),
     ...(totalMs > budgetMs ? ['over-budget'] : []),
     ...(overPerClaim.length > 0 ? ['per-claim-over-ceiling'] : []),
     ...(assessment?.status === 'ok' && assessment.lowConfidence && overCeiling ? ['low-confidence-over-ceiling'] : []),
@@ -332,12 +366,16 @@ function renderReference(d) {
     const show = (x) => (x === undefined ? 'absent' : String(x));
     return [`reference: no usable measurement (before ${show(r.beforeMs)}, after ${show(r.afterMs)}, baseline ${show(r.baselineMs)}); raw ${secs(d.rawMs)} was not compared with the ceiling.`];
   }
+  if (r.status === 'runner-mismatch') return [`raw ${secs(d.rawMs)} was not compared with the ceiling.`];
   const out = [`raw ${secs(d.rawMs)}; reference before ${secs(r.beforeMs)}, after ${secs(r.afterMs)}, baseline ${secs(r.baselineMs)} (drift ${r.drift.toFixed(2)}x); speed factor ${r.speedFactor.toFixed(2)}${r.status === 'ok' ? `; normalized ${secs(d.totalMs)}.` : '; not applied.'}`];
   if (r.lowConfidence) {
     const why = r.lowConfidenceReasons.map((x) => (x === 'drift'
       ? `the runner's speed moved by ${r.drift.toFixed(2)}x during the probe (limit ${r.maxDrift}x)`
       : 'verdicts were reused from runs on other runners')).join('; ');
     out.push(`low confidence: ${why}.`);
+  }
+  if (r.factorBasis === 'pessimistic') {
+    out.push(`pessimistic reading: because the speed moved, the cost is normalized at the faster reading (factor ${r.speedFactor.toFixed(2)}; the mean would be ${r.meanFactor.toFixed(2)}), so a runner that slowed down mid-run cannot hide growth.`);
   }
   return out;
 }
@@ -352,6 +390,8 @@ export function renderCostBudget(d) {
   const unit = d.basis === 'normalized' ? 'normalized ' : '';
   if (d.failures.includes('reference-missing')) {
     out.push('COST REFERENCE MISSING: the runner-speed measurement is absent or not a positive number, so the cost cannot be compared with its ceiling. Not falling back to raw seconds.');
+  } else if (d.failures.includes('reference-runner-mismatch')) {
+    out.push(`COST REFERENCE RUNNER MISMATCH: ${d.reference.mismatch.join(' ')} The reference tracks probe speed only within one kind of machine, so it cannot normalize across them. Not falling back to raw seconds: run on the class the baseline was taken on, or take a new baseline there (reference.cpus and reference.platform in testguard.cost-budget.json).`);
   } else if (d.failures.includes('reference-out-of-range')) {
     out.push(`COST REFERENCE OUT OF RANGE: speed factor ${d.reference.speedFactor.toFixed(2)} is outside ${d.reference.factorRange[0]}–${d.reference.factorRange[1]}; the reference no longer measures what the probe does, or the runner is not comparable. Not falling back to raw seconds.`);
   } else if (overTotal) {

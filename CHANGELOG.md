@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The self-probe cost gate no longer credits a runner that slowed down
+  mid-run.** When the reference medians before and after the probe differ by
+  more than `reference.maxDrift`, the speed factor is the faster reading, not the
+  mean (170 ms then 320 ms turned 4588 normalized seconds into 3184 and passed a
+  3600 ceiling). A stable run keeps the mean, and the output names the reading.
+- **The cost reference is only valid on the runner class its baseline was taken
+  on.** `testguard.cost-budget.json` records `reference.cpus` and
+  `reference.platform`, `measure-reference.mjs` records the same for each
+  measurement, and `check-cost-budget.mjs` fails closed with
+  `reference-runner-mismatch` when they differ.
 - **SIGTERM exits 143, not 130.** SIGINT stays 130 and SIGHUP is 129 (128 plus
   the signal number). Each prints `interrupted by <signal>; scratch trees
   removed` once on stderr, and the cleanup is the same.
