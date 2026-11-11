@@ -14,11 +14,6 @@ import { FIXTURE_GIT } from './helpers/git.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'fixtures', 'known-answer-python');
 const expected = JSON.parse(readFileSync(join(FIXTURE, 'expected.json'), 'utf8'));
-// The fixture's REDACT-004 defender never returns, so its run ends at this wall-clock budget: that wait is most of
-// this file's time. A healthy unittest or pytest run of the fixture takes a fraction of a second, so 8 s is far
-// above any baseline and a timeout can only be the hang. expected.json's own budgetMs (20 s) stays the oracle's
-// figure for the CI step that drives the fixture through the bin.
-const BUDGET_MS = Math.min(expected.budgetMs, 8_000);
 
 // The interpreter TestGuard will resolve, so capability detection and the run
 // cannot disagree. CI points TESTGUARD_PYTHON at a bare venv to prove the
@@ -26,6 +21,23 @@ const BUDGET_MS = Math.min(expected.budgetMs, 8_000);
 const PYTHON = process.env.TESTGUARD_PYTHON || 'python3';
 const which = (bin, args) => spawnSync(bin, args, { encoding: 'utf8' }).status === 0;
 const HAS_PYTHON = which(PYTHON, ['-c', 'import sys']);
+
+// The fixture's REDACT-004 defender never returns, so its run ends at this wall-clock budget: that wait is most of
+// this file's time, and the same budget bounds every healthy run, so it must be long enough that a slow host never
+// reads a healthy run as the hang. Healthy runs of the fixture take 0.1 to 0.3 s on CI (this file's 17 faults times six
+// runs finish in well under 15 s apart from the one hang), so 8 s is the floor that keeps the CI wait short. On a
+// slower host the budget grows with a measurement taken here, not a second hard-coded number: 50 times the median
+// start-up of the interpreter that runs the defenders, up to expected.json's own budgetMs (20 s), the figure the
+// oracle's CI step uses for the whole fixture.
+const interpreterStartupMs = () => {
+  const samples = Array.from({ length: 3 }, () => {
+    const start = performance.now();
+    spawnSync(PYTHON, ['-c', 'import unittest, re, json'], { stdio: 'ignore' });
+    return performance.now() - start;
+  }).sort((x, y) => x - y);
+  return samples[1];
+};
+const BUDGET_MS = HAS_PYTHON ? Math.min(expected.budgetMs, Math.max(8_000, Math.ceil(50 * interpreterStartupMs()))) : 8_000;
 // pytest is optional: the stdlib engine is the one that must always work, and
 // the point of it is that a project with no test dependencies still probes.
 const HAS_PYTEST = HAS_PYTHON && which(PYTHON, ['-c', 'import pytest']);
