@@ -141,7 +141,7 @@ signals such as `MOCKED-NEVER-ASSERTED`. It never runs a test.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--claims <path>` | `<dir>/testguard.claims.json` | The claims file to read. |
+| `--claims <path>` | `<dir>/testguard.claims.json` | The claims file to read. May live outside the project: see [external claims files](../../spec/GATE-SEMANTICS.md#external-claims-files). |
 | `--check-anchors` | off | Locate every exact anchor and syntax-check each JavaScript and Python replacement in memory. No tests, no worktree, no file changes. |
 | `--python <path>` | resolved as for [probe](#probe) | The interpreter `--check-anchors` uses to parse Python replacements. |
 | `--since <ref>` | none | Report every claim and fault that existed at `<ref>` and does not now (`removed-claim`, `removed-fault`; a rename with the same statement is `renamed-claim` and does not fail). |
@@ -163,7 +163,7 @@ options that cannot combine with authoring (`--apply` without `--annotate`, or
 `--annotate` with anything but `--claims`, `--claim`, `--apply`, `--json`).
 
 **`--json` schema:** none published for the inspection document
-(`{path, claims, annotations, drift, annotationAdvisory, narrowedDefenders?, anchorChecks?, removed?, cost?}`);
+(`{path | claimsSource, claims, thinClaims, annotations, drift, annotationAdvisory, narrowedDefenders?, anchorChecks?, removed?, cost?}`; `claimsSource` replaces `path` for an external claims file; `thinClaims` is the advisory `claim-thin` list);
 [`annotations.schema.json`](../../spec/schemas/annotations.schema.json) with
 `--annotate`.
 
@@ -183,7 +183,7 @@ spec before it is written.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--claims <path>` | `<dir>/testguard.claims.json` | Claims file. |
+| `--claims <path>` | `<dir>/testguard.claims.json` | Claims file. May live outside the project (also for `claims`, `admit`, `status`): fault `file` and `defendedBy` stay project-relative, the evidence records `run.claimsSource: {external, sha256}` and never the path, and nothing is written beside the file. |
 | `--confirm <n>` | `3` | Runs per verdict. Below 3 the run is **provisional**: verdicts print with `?` and the evidence goes to `evidence-provisional.json`. |
 | `--budget <ms>` | `120000` | Wall clock for each runner invocation. At least `1000`. |
 | `--command-budget <ms>` | none | Cooperative deadline for the whole probe. Caps asynchronous children; expiry exits `2` and writes no partial result. At least `1000`. |
@@ -191,6 +191,8 @@ spec before it is written.
 | `--baseline <path>` | `<dir>/.testguard/baseline.json` if present | Baseline to gate against. |
 | `--severity <level>` | `low` | Gate only findings whose claim severity is at or above this level. Findings below are still reported and written. |
 | `--claim <ID,ID>` | every claim | Probe only these claims. Repeatable, order-preserving, duplicates collapsed. Writes `evidence-partial.json`. |
+| `--changed <ref>` | none | Probe only the claims the change since `merge-base(<ref>, HEAD)` can have affected: a fault's target, a defender, or anything they import differs (a rename counts through its old and new path; `--include-dirty` reads the working tree). Intersects with `--claim`. Writes `evidence-partial.json`. A change git cannot measure (`ref-unresolved`, `no-merge-base`, `git-timeout`, `git-failed`) exits `2` and probes nothing; it is never read as an empty change. Refused with `--ref` and `--in-place` (exit `3`). See [probing a change](../../spec/GATE-SEMANTICS.md#probing-a-change). |
+| `--fail-on-empty-selection` | off | With `--changed`: a change that selects no claim exits `2` instead of `0`. Either way the run says so, probes nothing, writes no evidence and lists the changed source files no claim covers. Refused without `--changed` (exit `3`). |
 | `--include-dirty` | off | Probe the working tree (snapshotted into a throwaway commit) instead of HEAD, so uncommitted tests count. |
 | `--ref <commit>` | `HEAD` | Probe this commit in the scratch worktree. Honoured even when defender or target files are dirty: a warning names them and the evidence records them as `repo.ignoredDirty`. |
 | `--ignore-dirty` | off | Probe HEAD as committed although defender or target files are dirty (same warning and record). Without this, `--include-dirty` or an explicit `--ref`, a dirty defender or target is refused. |
@@ -218,7 +220,7 @@ Where the evidence goes, unless `--out` says otherwise:
 | Run | File |
 |---|---|
 | Complete, `--confirm` 3 or more | `.testguard/evidence.json` |
-| `--claim` selection | `.testguard/evidence-partial.json` |
+| `--claim` or `--changed` selection | `.testguard/evidence-partial.json` |
 | `--confirm` below 3 | `.testguard/evidence-provisional.json` |
 
 Partial and provisional runs never overwrite the canonical evidence: only a
@@ -244,13 +246,13 @@ least one new finding, a failed `--require-origin` policy, or a failed
 cannot hide); `2` precondition (an empty claims file
 without `--allow-empty`, a runner that does not resolve, a dirty defender or
 target with the implicit HEAD, an exhausted command budget, an unavailable
-origin policy); `3` usage (`--confirm` not a positive integer, `--budget` or
+origin policy, a `--changed` change git could not measure, an empty `--changed` selection under `--fail-on-empty-selection`); `3` usage (`--confirm` not a positive integer, `--budget` or
 `--command-budget` below 1000, `--workers` not a positive integer, an unknown
-`--progress` mode, an empty `--claim`).
+`--progress` mode, an empty `--claim`, `--fail-on-empty-selection` without `--changed`).
 
 **`--json` schema:** [`status.schema.json`](../../spec/schemas/status.schema.json),
-with `run` = `{id, evidence, provisional, records, newSinceBaseline, exitCode, originPolicy?, scope?}`
-and `cost` when `--cost` is given. The evidence file itself conforms to
+with `run` = `{id, evidence, provisional, records, newSinceBaseline, exitCode, claims, originPolicy?, scope?}`
+and `cost` when `--cost` is given. `run.claims[]` is `{id, result: "proven" | "unproven" | "could-not-verify", faults: {total, killed, survived, nocover, unverifiable, faultInvalid, timeout, flakyDefender}, reasons: [{faultId, verdict, reason?}]}` per claim measured, keyed by claim id ([per-claim results](../../spec/GATE-SEMANTICS.md#per-claim-results)). With `--changed`, `run.scope` adds `selectedCount` and `changed` = `{ref, outcome: "determined" | "undetermined", base, head, includeDirty, files, matchedClaims, unmatchedFiles, note}` (or `{ref, outcome: "undetermined", reason: {kind, message}}`); when the selection is empty or undetermined no probe ran and `run` is only `{exitCode, scope}`. The evidence file itself conforms to
 [`evidence.schema.json`](../../spec/schemas/evidence.schema.json).
 
 ## baseline

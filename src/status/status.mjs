@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, lstatSync, realpathSync } from 'node:fs';
 import { join, relative, isAbsolute, sep } from 'node:path';
 import { readSpecDoc } from '../evidence/writer.mjs';
-import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
+import { loadClaims, defaultClaimsPath, claimsSourceOf } from '../claims/load.mjs';
 import { gate } from '../baseline/baseline.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
@@ -17,6 +17,7 @@ import { headSha, isAncestor } from '../git.mjs';
 import { checkAnchorLocations } from '../claims/anchors.mjs';
 import { computeClaimedSurface, needsClaimExpansion } from './surface.mjs';
 import { projectAnnotationAdvisory } from '../claims/annotations.mjs';
+import { thinClaims, renderThin } from '../claims/thin.mjs';
 
 export const faultContentHash = (fault) => sha256(`${fault.find}\n${fault.replace}`);
 
@@ -91,11 +92,16 @@ export function computeStatus({ projectDir, toolVersion, generatedAt = new Date(
     }
     return doc;
   }
-  doc.paths.claims = rel(paths.claims);
+  const source = claimsSourceOf(projectDir, paths.claims);
+  // An external claims file is named by hash, never by path: a relative path out of the project is a private path and a consumer that rejects `..` could not read it.
+  if (source) doc.claimsSource = source;
+  else doc.paths.claims = rel(paths.claims);
 
   const claims = loadClaims(paths.claims);
   doc.origins = declaredOriginSummary(claims.claims);
   if (claims.claims.length) doc.notes.push(...projectAnnotationAdvisory(projectDir, claims, { customClaims: paths.claims !== defaultClaimsPath(projectDir) }).notes);
+  const thin = thinClaims(claims.claims);
+  if (thin.length) doc.thinClaims = thin;
   doc.counts.claims = claims.claims.length;
   doc.counts.faults = claims.claims.reduce((n, c) => n + c.faults.length, 0);
   doc.surface = computeClaimedSurface({ projectDir, claims });
@@ -323,6 +329,7 @@ export function renderStatus(doc) {
   lines.push(`state: ${doc.state}${doc.provisional ? ' (provisional)' : ''} — ${doc.counts.claims} claims / ${doc.counts.faults} faults` + (doc.counts.byVerdict ? `; ${Object.entries(doc.counts.byVerdict).map(([k, v]) => `${v} ${k}`).join(', ')}; ${doc.counts.new ?? 0} new, ${doc.counts.baselined ?? 0} baselined` : '')
   );
   if (doc.origins) lines.push(renderOrigins(doc.origins));
+  lines.push(...renderThin(doc.thinClaims ?? []));
   if (doc.originPolicy) lines.push(renderOriginPolicy(doc.originPolicy, { basis: 'offline' }));
   if (doc.surface) {
     const s = doc.surface;

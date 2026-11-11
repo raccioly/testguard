@@ -7,6 +7,7 @@ import { reproduces, decimals, MAX_PLACES } from './wilson.mjs';
 import { isDeepStrictEqual } from 'node:util';
 import { recordedOriginSummary } from './origins.mjs';
 import { authoringInputErrors } from './authoring-input.mjs';
+import { runErrors } from './run-result.mjs';
 
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 
@@ -83,7 +84,8 @@ function originPolicyErrors(kind, doc) {
     if (kind === 'status' && (p.claims !== doc.counts.claims || p.faults !== doc.counts.faults)) fail('policy denominators must match current status claims and faults');
     if (kind === 'brief' && p.state !== 'unavailable' && (p.claims !== doc.summary.claims || p.faults !== Object.values(doc.summary.byVerdict).reduce((a, b) => a + b, 0))) fail('recorded policy denominators must match the uncapped brief summary');
   }
-  if (kind === 'status' && doc.run) {
+  // A run that selected nothing measured nothing: no gate, no policy, nothing for the completed-probe rules to read.
+  if (kind === 'status' && doc.run?.id !== undefined) {
     const p = doc.run.originPolicy;
     const expected = p?.state === 'unavailable' ? 2 : p?.state === 'failed' || doc.run.newSinceBaseline > 0 ? 1 : 0;
     if (p && doc.run.exitCode !== expected) errors.push({ path: '/run/exitCode', message: 'exit code must preserve policy refusal/failure before baseline findings' });
@@ -457,13 +459,7 @@ const semantic = {
       if (!doc.surface.history.available && doc.surface.history.commitsRead !== 0) errors.push({ path: '/surface/history/commitsRead', message: 'unavailable history must report zero commits read' });
       if (new Set(doc.surface.rankedUnclaimed.map((item) => item.file)).size !== doc.surface.rankedUnclaimed.length) errors.push({ path: '/surface/rankedUnclaimed', message: 'ranked unclaimed modules must be unique' });
     }
-    if (doc.run?.scope) {
-      const scope = doc.run.scope;
-      if (scope.requestedCount !== scope.requestedClaims.length) errors.push({ path: '/run/scope/requestedCount', message: 'requestedCount must equal requestedClaims.length' });
-      if (scope.probedCount !== scope.probedClaims.length) errors.push({ path: '/run/scope/probedCount', message: 'probedCount must equal probedClaims.length' });
-      const requested = new Set(scope.requestedClaims);
-      if (scope.probedClaims.some((id) => !requested.has(id))) errors.push({ path: '/run/scope/probedClaims', message: 'every probed claim must have been requested' });
-    }
+    if (doc.run) errors.push(...runErrors(doc.run));
     // One invocation result per document: `run` is what a probe measured,
     // `baseline` is what a baseline command wrote. A document carrying both
     // would attribute one command's result to the other.

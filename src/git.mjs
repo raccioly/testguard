@@ -5,7 +5,13 @@ import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { scratchRoot } from './scratch-dir.mjs';
 
-export class GitError extends Error {}
+export class GitError extends Error {
+  /** `timedOut`: git did not finish in time, which is not the same finding as git refusing. */
+  constructor(message, { timedOut = false } = {}) {
+    super(message);
+    this.timedOut = timedOut;
+  }
+}
 
 export function gitRaw(args, cwd, env) {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: 30_000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', ...env } });
@@ -13,7 +19,7 @@ export function gitRaw(args, cwd, env) {
   return r.stdout;
 }
 
-export const git = (args, cwd, env) => gitRaw(args, cwd, env).trim();
+export const git = (args, cwd, env, options) => gitRaw(args, cwd, env, options).trim();
 
 export const repoRoot = (dir) => git(['rev-parse', '--show-toplevel'], dir);
 

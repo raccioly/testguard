@@ -58,7 +58,7 @@ it ignores `.testguard/` as a whole, `init` leaves it alone and warns that
 |---|---|---|---|
 | `evidence.json` | `probe` (complete run, `--confirm` 3 or more) | [`evidence`](../../spec/schemas/evidence.schema.json) | ignore |
 | `evidence-provisional.json` | `probe --confirm` below 3 | [`evidence`](../../spec/schemas/evidence.schema.json) | ignore |
-| `evidence-partial.json` | `probe --claim`, `admit` | [`evidence`](../../spec/schemas/evidence.schema.json) | ignore |
+| `evidence-partial.json` | `probe --claim`, `probe --changed`, `admit` | [`evidence`](../../spec/schemas/evidence.schema.json) | ignore |
 | `baseline.json` | `baseline` | [`baseline`](../../spec/schemas/baseline.schema.json) | **commit** |
 | `brief.json` | `brief` (not with `--text` or `--markdown`) | [`brief`](../../spec/schemas/brief.schema.json) | ignore |
 | `gate.json` | `gate` | [`gate`](../../spec/schemas/gate.schema.json) | ignore |
@@ -107,10 +107,20 @@ them. A consumer judging whether a record is still fresh must compare all three
 against the current tree: the first two alone miss a changed helper that the
 target or a defender imports.
 
+### External claims files
+
+When `--claims` names a file outside the project, every evidence document it
+produces carries `run.claimsSource: { external: true, sha256 }` and nothing
+else about the file: no path. `status` reports the same `claimsSource` and
+omits `paths.claims`. Records stay self-describing (claim id, statement,
+severity and source are embedded in each), so a consumer without the claims
+file can read results per claim id; it cannot check `claim-changed` against the
+file. The project's own claims file has no `claimsSource`.
+
 ### evidence-provisional.json and evidence-partial.json
 
 `probe --confirm 1` or `2` writes the provisional file; `baseline` refuses it
-unless you pass `--allow-provisional`. `probe --claim <ID>` and `admit` write
+unless you pass `--allow-provisional`. `probe --claim <ID>`, `probe --changed <ref>` and `admit` write
 the partial file. Neither ever replaces `evidence.json`.
 
 ### baseline.json

@@ -1002,6 +1002,114 @@ the requested and actually probed claim ids and counts. Commands whose
 `--claim` is singular (`scaffold` and `admit`) reject repeated or comma-separated
 values instead of silently choosing one.
 
+## Probing a change
+
+`probe --changed <ref>` measures only the claims a change can have affected.
+The change is `merge-base(<ref>, HEAD)` against HEAD, or against the working
+tree with `--include-dirty` (tracked edits, staged or not, and untracked files).
+Paths are project-relative; a change outside the project directory is not this
+project's change. A deletion is a change. A rename or copy contributes its old
+path and its new path.
+
+A claim is **selected** when any of those paths is one of: a fault's target; a
+defender, whether the claim names it (`defendedBy`, literally or by glob) or
+discovery resolves it; or a file in the import closure of the target and the
+defenders (the same closure `inputs.dependencyHashes` records, manifests and
+runner configuration included). A closure that cannot be followed selects the
+claim whenever anything changed: not being able to tell is never read as
+"unaffected". `--claim` intersects: the selection is the requested ids that the
+change reached, in the order requested. An unknown `--claim` id is an error
+whatever the change is.
+
+Selection has three outcomes, reported in `run.scope.changed.outcome` and
+`run.scope.selectedCount`, and they are never confused:
+
+| Outcome | Meaning | `run` | Exit |
+|---|---|---|---|
+| `determined`, claims selected | those claims are probed | a measured run | the probe's own (0 or 1) |
+| `determined`, none selected | the change touches nothing any claim depends on | `exitCode` and `scope` only; `selectedCount: 0`; no evidence written | `0`, or `2` under `--fail-on-empty-selection` |
+| `undetermined` | the ref does not resolve (`ref-unresolved`), there is no merge base (`no-merge-base`), git did not finish (`git-timeout`) or git failed any other way (`git-failed`) | `exitCode` and `scope` only; no `selectedCount`; `reason` `{kind, message}` | `2` |
+
+An empty selection says so in a line of its own and is not a pass for the
+change: it says no claim was in its way. An undetermined change is not an empty
+one and never narrows a run: nothing is probed. Every git call on the selection
+path is a named site (`SCOPE_GIT_SITES` in `src/probe/scope.mjs`) and a failure
+at any of them is `undetermined`; the test suite fails every site in turn and
+pins the list, so a call added without a reviewer deciding what its failure
+means does not pass CI.
+
+`run.scope.changed` also carries `files` (every changed path), `matchedClaims`
+(the claims the change reached, before `--claim`) and `unmatchedFiles`: the
+changed source files no claim's target, defender or closure touches, with the
+note `not covered by any claim; absence from the results is not a pass`. This is
+the probe-side view of what `gate --changed` enforces; a clean result over a
+change whose files are listed there says nothing about those files.
+
+`--changed` measures the tree being probed (HEAD, or the working tree with
+`--include-dirty`), so it is refused with `--ref` and `--in-place` (exit `3`):
+the selection would describe another tree than the one measured.
+
+A `--changed` run is partial evidence: it writes `evidence-partial.json`, never
+the canonical file, and is never a baseline.
+
+## Per-claim results
+
+`probe --json` carries `run.claims[]`: one entry per claim the invocation
+measured, in the order probed, keyed by claim id (and, inside `reasons`, by
+fault id, never by position or line):
+
+```
+{ id, result: "proven" | "unproven" | "could-not-verify",
+  faults: { total, killed, survived, nocover, unverifiable, faultInvalid, timeout, flakyDefender },
+  reasons: [{ faultId, verdict, reason? }] }
+```
+
+`faults` counts verdicts and `total` is their sum. `result` is derived from the
+counts, in this order, rounding toward unproven:
+
+1. any `survived` or `nocover` fault → `unproven`, whatever happened to the others;
+2. otherwise at least one fault was measured and every one is `killed` → `proven`;
+3. anything else (`unverifiable`, `timeout`, `fault-invalid`, `flaky-defender`, or
+   no fault measured at all) → `could-not-verify`.
+
+`could-not-verify` is neither a pass nor a finding about the code: the
+measurement did not happen, so the remedy is to repair the claim or the suite's
+reliability, not to write a test for a fault nobody ran. `reasons` has exactly
+one entry for each fault that was not killed. The block ignores the baseline
+and the severity floor: it describes what this run measured, not what gates.
+The validator re-derives every `result` from its counts and rejects a block
+that disagrees, a `total` that is not the sum, a missing or duplicated reason,
+and a block that does not name exactly the probed claims.
+
+## External claims files
+
+`--claims <path>` may name a file outside the project under probe, for `probe`,
+`claims`, `admit` and `status`. Fault `file` and `defendedBy` stay
+project-relative: they name files of the project, wherever the claims live.
+`admit` takes the project to be the repository the test file lives in. A claims
+file inside the project is not external; the project's own claims need no
+mark. For an external file the evidence records `run.claimsSource: { external:
+true, sha256 }` (the hash of the file's bytes), never its path, and `status`
+reports `claimsSource` in place of `paths.claims`. Nothing is written beside the
+external file: evidence, partial evidence and baselines stay under the project's
+`.testguard/`.
+
+Every evidence record embeds the claim's id, statement, severity and source, so
+a consumer without the claims file can still read the results per claim id. It
+cannot check `claim-changed` (claim metadata against the file) and cannot tell
+whether the file it was measured against is the one a caller holds, except by
+comparing `sha256`.
+
+## Thin claims
+
+`claims` and `status` flag a claim with fewer than two faults (`fewer-than-two-faults`),
+or whose faults all share one `faultClass` (`single-fault-class`), as
+`claim-thin`. It is advisory: it never changes a state, an exit code or a
+verdict. A claim whose every fault is killed is proven against one way of being
+wrong, or one kind of wrong; the signal says how much that proves. `status`
+lists them in `thinClaims` (absent when none); `claims --json` always carries
+`thinClaims`.
+
 ## Severity floor
 
 `--severity <level>` gates only findings whose claim severity is at or above
@@ -1014,7 +1122,7 @@ evidence; they simply do not turn CI red.
 |---|---|
 | `0` | No new gating findings at or above the severity floor. |
 | `1` | At least one new gating finding. |
-| `2` | Precondition failed: test runner not resolvable (e.g. no `node_modules` linked into the scratch worktree), working tree dirty for a fault target file, claims file invalid, no commits. Nothing was probed. |
+| `2` | Precondition failed (or, for `probe --changed`, the change could not be measured, or selected nothing under `--fail-on-empty-selection`): test runner not resolvable (e.g. no `node_modules` linked into the scratch worktree), working tree dirty for a fault target file, claims file invalid, no commits. Nothing was probed. |
 | `3` | Usage or configuration error. |
 
 A tool must never exit `0` because it had nothing to check. If the claims

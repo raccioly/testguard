@@ -150,6 +150,15 @@ faults and probe the selected draft before promoting it to canonical claims.
 4. When it is `ADMITTED` at `--confirm 3`, commit the test.
 5. When everything is killed or baselined, `testguard baseline` if `next` says so, and commit `.testguard/baseline.json`.
 
+## Proving one change
+
+`testguard probe --changed <base> --json` probes only the claims the change since `<base>` can have affected, and `run.claims[]` answers per claim id: `proven`, `unproven` (a fault survived or had no defender) or `could-not-verify` (the measurement did not happen: fix the claim or the flake, do not write a test for it). Read `run.scope` first:
+
+- `selectedCount: 0` is **not** a pass. It means no claim was in the change's way; `run.scope.changed.unmatchedFiles` lists the changed source files no claim covers. Add `--fail-on-empty-selection` to make an empty selection exit 2.
+- `run.scope.changed.outcome: "undetermined"` (exit 2) means git could not say what changed. Nothing was probed; fix the base ref or fetch history, then rerun. Never treat it as "no change".
+- A claims file kept outside the repository works with `--claims <path>`; results are still keyed by claim id, and `claimsSource.sha256` names the file.
+- `status` lists `thinClaims` (a claim with fewer than two faults, or faults of one class). Advisory: a kill of such a claim proves less.
+
 ## Rules that are not yours to bend
 
 - **Never make a fault die by editing the claims file.** Editing a claim is allowed when the claim was wrong — but the evidence records every fault's content hash, and `status` lists any fault edited after it survived, with its previous verdict, as `changedFaults`. The change is permitted; it is never invisible. Say why in the commit.
