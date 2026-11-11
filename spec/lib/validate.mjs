@@ -89,8 +89,17 @@ function originPolicyErrors(kind, doc) {
     const p = doc.run.originPolicy;
     const expected = p?.state === 'unavailable' ? 2 : p?.state === 'failed' || doc.run.newSinceBaseline > 0 ? 1 : 0;
     if (p && doc.run.exitCode !== expected) errors.push({ path: '/run/exitCode', message: 'exit code must preserve policy refusal/failure before baseline findings' });
-    if (!p && doc.run.exitCode === 2) errors.push({ path: '/run/exitCode', message: 'completed probe exit 2 requires an unavailable origin policy' });
-    if (p && (doc.run.scope || doc.run.provisional)) errors.push({ path: '/run/originPolicy', message: 'origin policy cannot certify a partial or provisional invocation' });
+    const failure = doc.run.failureKind;
+    if (!p && doc.run.exitCode === 2 && failure === undefined) errors.push({ path: '/run/exitCode', message: 'completed probe exit 2 requires an unavailable origin policy or an exhausted command budget (run.failureKind)' });
+    if (p && (doc.run.scope || doc.run.provisional || doc.run.budget)) errors.push({ path: '/run/originPolicy', message: 'origin policy cannot certify a partial, provisional or budget-limited invocation' });
+    // A run whose command budget ran out is never a pass, and says which kind of failure it is.
+    if ((failure !== undefined) !== (doc.run.budget?.exhausted === true)) errors.push({ path: '/run/failureKind', message: 'failureKind is present exactly when run.budget.exhausted is true' });
+    if (failure !== undefined) {
+      if (doc.run.exitCode === 0) errors.push({ path: '/run/exitCode', message: 'an exhausted command budget cannot exit 0: the faults not reached were not measured' });
+      if ((failure === 'incomplete') !== (doc.run.exitCode === 2)) errors.push({ path: '/run/failureKind', message: 'incomplete is exit 2; a finding or failed policy in the measured part (unproven+incomplete, policy+incomplete) is exit 1' });
+    }
+    if ((doc.run.unprovenAtLeast !== undefined) !== (failure === 'unproven+incomplete')) errors.push({ path: '/run/unprovenAtLeast', message: 'unprovenAtLeast accompanies failureKind unproven+incomplete, and only it' });
+    if (doc.run.budget && doc.run.budget.reached + doc.run.budget.notReached !== doc.run.records) errors.push({ path: '/run/budget', message: 'reached plus notReached must equal the record count' });
   }
   return errors;
 }
@@ -229,8 +238,28 @@ const semantic = {
       if (doc.run.reuse.reused !== reused || doc.run.reuse.measured !== doc.records.length - reused) errors.push({ path: '/run/reuse', message: `run.reuse must count the records: ${reused} reused, ${doc.records.length - reused} measured` });
     }
     if (doc.run.repo.ignoredDirty && doc.run.repo.snapshot) errors.push({ path: '/run/repo/ignoredDirty', message: 'a working-tree snapshot has no ignored dirty files: the tree was probed as it is' });
+    // Completeness is cross-checked against the records, never asserted: a
+    // document that says it was not exhausted while holding a record the budget
+    // never reached would let the unmeasured suffix pass for measured.
+    const notReachedCount = doc.records.filter((r) => r.detail?.reason === 'not-reached-within-budget').length;
+    if (doc.run.budget) {
+      const b = doc.run.budget;
+      if (b.exhausted !== (notReachedCount > 0)) errors.push({ path: '/run/budget/exhausted', message: `exhausted must be true exactly when a record is not-reached-within-budget (${notReachedCount} found)` });
+      if (b.notReached !== notReachedCount) errors.push({ path: '/run/budget/notReached', message: `notReached ${b.notReached} disagrees with the ${notReachedCount} not-reached records` });
+      if (b.reached !== doc.records.length - notReachedCount) errors.push({ path: '/run/budget/reached', message: `reached ${b.reached} disagrees with the ${doc.records.length - notReachedCount} measured records` });
+      if (b.reached + b.notReached !== doc.records.length) errors.push({ path: '/run/budget', message: 'reached plus notReached must equal the record count' });
+    } else if (notReachedCount > 0) {
+      errors.push({ path: '/run/budget', message: 'a record not reached within the budget requires run.budget' });
+    }
+    if (doc.run.budget?.exhausted && doc.originPolicy) errors.push({ path: '/originPolicy', message: 'an origin policy cannot certify an exhausted run' });
     doc.records.forEach((r, i) => {
       const p = `/records/${i}`;
+      if (r.detail?.reason === 'not-reached-within-budget') {
+        // Nothing half-measured is ever written: a not-reached fault has no runs and no carried-forward verdict.
+        if (r.verdict !== 'unverifiable') errors.push({ path: `${p}/verdict`, message: 'a fault not reached within the budget is unverifiable, never a verdict' });
+        if (r.detail.baselineRuns?.length || r.detail.probeRuns?.length || r.detail.escalationRuns?.length) errors.push({ path: `${p}/detail`, message: 'a fault not reached within the budget has no runs: a half-measured record is never written' });
+        if (r.reusedFrom) errors.push({ path: `${p}/reusedFrom`, message: 'a not-reached record is never reused' });
+      }
       const expected = fingerprint({ claimId: r.claim.id, subjectId: r.subject.id, file: r.subject.file ?? '', verdict: r.verdict });
       if (r.fingerprint !== expected) errors.push({ path: `${p}/fingerprint`, message: `fingerprint does not match spec derivation (expected ${expected})` });
 

@@ -69,6 +69,7 @@ tags each unproven record `[NEW]`, `[baseline]` or `[below floor]`.
 | `unverifiable` | `defender-discovery-indeterminate` | Automatic discovery could not resolve a candidate test file safely. Uncertainty never becomes `nocover`. |
 | `unverifiable` | `subject-not-executed` | The negative control: with the target replaced by something that cannot compile, the defenders stayed green, so they never execute it. A survivor there would describe their reach, not their assertions. |
 | `unverifiable` | `probe-error` | Probing this fault threw. `detail.message` names what. |
+| `unverifiable` | `not-reached-within-budget` | `probe --partial-on-budget` only: the command budget ran out before this fault was fully measured (in flight, or never started). No runs, no resolved defenders, never reused. It gates, so the unmeasured suffix cannot look clean. |
 | `fault-invalid` | `replacement-does-not-compile` | The runner reported a parse or transform error. |
 | `fault-invalid` | `suite-failed-to-load` | The suite failed to load for another reason. |
 | `fault-invalid` | `replacement-does-not-typecheck` | `--typecheck`: the project's own type checker refuses the replacement. `detail.message` is the first diagnostic and `detail.typecheck` is `diagnostics`; no test ran (`baselineRuns` and `probeRuns` are empty). |
