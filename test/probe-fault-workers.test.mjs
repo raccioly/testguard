@@ -27,7 +27,7 @@ describe('a fan-out reports what a serial run reports', () => {
     try {
       evidence = await probe({
         projectDir: project.dir, claims: project.claims, runnerName: 'node-test', confirmRuns: 3,
-        budgetMs: 1200, escalate: false, faultWorkers: 3, onProgress: (record) => published.push(`${record.claim.id}/${record.subject.id}`),
+        budgetMs: 800, escalate: false, faultWorkers: 3, onProgress: (record) => published.push(`${record.claim.id}/${record.subject.id}`),
       });
     } finally {
       clearInterval(sampler);

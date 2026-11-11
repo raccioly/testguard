@@ -20,7 +20,7 @@ import { FIXTURE_GIT } from './git.mjs';
  * Plus one fault that never mutates (an anchor that is not in the file), so
  * planning-only records are interleaved with measured ones in the order.
  */
-export function fanOutProject({ holdMs = 250 } = {}) {
+export function fanOutProject({ holdMs = 180 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'tg-fanout-'));
   const markers = mkdtempSync(join(tmpdir(), 'tg-fanout-markers-'));
   mkdirSync(join(dir, 'src'));

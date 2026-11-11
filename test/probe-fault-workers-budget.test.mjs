@@ -18,10 +18,10 @@ it('a command budget that runs out mid-fan-out throws, and leaves no scratch tre
     // all three trees are in flight.
     const attempt = probe({
       projectDir: project.dir, claims: project.claims, runnerName: 'node-test', confirmRuns: 3,
-      budgetMs: 60_000, escalate: false, faultWorkers: 3, commandBudget: createCommandBudget(5000),
+      budgetMs: 60_000, escalate: false, faultWorkers: 3, commandBudget: createCommandBudget(3500),
     });
     await expect(attempt).rejects.toThrow(PreconditionError);
-    await expect(attempt).rejects.toThrow(/command budget of 5000ms exhausted/);
+    await expect(attempt).rejects.toThrow(/command budget of 3500ms exhausted/);
     expect(peak).toBe(4); // not vacuous: the fan-out was running when the budget ran out
     expect(project.worktrees()).toBe(1);
   } finally {

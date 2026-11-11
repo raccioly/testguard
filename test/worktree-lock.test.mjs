@@ -71,7 +71,7 @@ describe('lock staleness', () => {
       const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
       for (let i = 0; i < 3; i++) withWorktreeLock(${JSON.stringify(dir)}, () => {
         appendFileSync(${JSON.stringify(log)}, 'enter ' + process.pid + '\\n');
-        pause(150);
+        pause(60);
         appendFileSync(${JSON.stringify(log)}, 'leave ' + process.pid + '\\n');
       });`;
     const run = () => new Promise((resolve, reject) => {
@@ -94,17 +94,17 @@ describe('createScratch takes the lock in the git common directory', () => {
     const dir = repo();
     const common = gitCommonDir(dir);
     expect(existsSync(common)).toBe(true);
-    // Another process holds the lock for 1.5 s.
+    // Another process holds the lock for 0.7 s.
     const holder = spawn(process.execPath, ['--input-type=module', '-e', `
       import { withWorktreeLock } from ${JSON.stringify(pathToFileURL(join(ROOT, 'src/probe/worktree-lock.mjs')).href)};
-      withWorktreeLock(${JSON.stringify(common)}, () => { process.stdout.write('held\\n'); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500); });`]);
+      withWorktreeLock(${JSON.stringify(common)}, () => { process.stdout.write('held\\n'); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 700); });`]);
     await new Promise((resolve) => holder.stdout.once('data', resolve));
     const started = Date.now();
     const s = createScratch({ repoRoot: dir, projectDir: dir });
     const waited = Date.now() - started;
     s.cleanup();
     await new Promise((resolve) => holder.once('close', resolve));
-    expect(waited).toBeGreaterThan(1000);
+    expect(waited).toBeGreaterThan(500);
     expect(existsSync(join(common, LOCK_NAME))).toBe(false);
   }, 20_000);
 
