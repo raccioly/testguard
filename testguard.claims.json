@@ -9717,8 +9717,8 @@
           "description": "The replacement stays applied after its type check, so the next fault is judged on top of it.",
           "faultClass": "statement-deleted",
           "file": "src/probe/probe.mjs",
-          "find": "    mutation.restore();\n    if (mutation.restoreSkipped) detail.restoreSkipped = mutation.restoreSkipped;\n  }\n}\n\n/**\n * The part of probing a fault",
-          "replace": "    if (mutation.restoreSkipped) detail.restoreSkipped = mutation.restoreSkipped;\n  }\n}\n\n/**\n * The part of probing a fault",
+          "find": "    mutation.restore();\n    if (mutation.restoreSkipped) detail.restoreSkipped = mutation.restoreSkipped;\n  }\n}\n\n/**\n * Everything about a fault decided before",
+          "replace": "    if (mutation.restoreSkipped) detail.restoreSkipped = mutation.restoreSkipped;\n  }\n}\n\n/**\n * Everything about a fault decided before",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -9958,8 +9958,8 @@
           "description": "A clean verdict is carried forward without checking that the fault still type-checks.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "  if (reusable && typechecker && defenders.length > 0 && targetExists",
-          "replace": "  if (false && reusable && typechecker && defenders.length > 0 && targetExists",
+          "find": "  if (typechecker && anchor?.status === 'ok') {",
+          "replace": "  if (typechecker && anchor?.status === 'ok' && !reusable) {",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -10859,7 +10859,7 @@
           "description": "The re-measure inherits the first tree and its stale state.",
           "faultClass": "argument-swapped",
           "file": "src/probe/probe.mjs",
-          "find": "          record = await measureOne(state, treeContext(fresh));",
+          "find": "          record = await measureOne(state, freshTree());",
           "replace": "          record = await measureOne(state, primary);",
           "producedBy": {
             "producer": "agent",
@@ -10871,7 +10871,7 @@
           "description": "The fan-out trees are kept through the re-measure.",
           "faultClass": "statement-deleted",
           "file": "src/probe/probe.mjs",
-          "find": "      while (extraTrees.length) extraTrees.pop().cleanup();\n",
+          "find": "      // The fan-out is over: its trees go now, so no more than n ever exist.\n      releaseTrees();\n",
           "replace": "",
           "producedBy": {
             "producer": "agent",
@@ -10901,8 +10901,8 @@
           "description": "Faults are planned without the type checker.",
           "faultClass": "argument-swapped",
           "file": "src/probe/probe.mjs",
-          "find": "        const planned = await planFault({ ...common, typechecker, typecheckBudget:",
-          "replace": "        const planned = await planFault({ ...common, typechecker: undefined, typecheckBudget:",
+          "find": "        const args = { ...common, typechecker, typecheckBudget:",
+          "replace": "        const args = { ...common, typechecker: undefined, typecheckBudget:",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -11831,6 +11831,135 @@
           "file": "src/commands/probe.mjs",
           "find": "    io.err('--partial-on-budget needs --command-budget <ms>: without a command budget there is nothing to run out');\n    return 3;",
           "replace": "    io.err('--partial-on-budget needs --command-budget <ms>: without a command budget there is nothing to run out');\n    return 0;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-MEASURES-BASELINES-SIDE-BY-SIDE",
+      "statement": "Under --fault-workers, baselines of independent defender sets are measured side by side, one set per tree with each set's asks in serial order, and the records equal the serial ones; a baseline re-measure is only recorded under a fan-out.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers-baselines.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Baselines are measured one set at a time.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/probe.mjs",
+          "find": "      for (let i = 1; i < Math.min(faultWorkers, sets.length); i++) {",
+          "replace": "      for (let i = 1; i < 0; i++) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The validator admits a baseline re-measure with no fan-out.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (r.detail.baselineRemeasuredSerially && !(doc.run.faultWorkers > 1)) {",
+          "replace": "      if (false) {",
+          "defendedBy": [
+            "spec/conformance/fault-workers.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-REMEASURES-A-CONTENDED-BASELINE",
+      "statement": "Under --fault-workers, a defender set's baseline that is not green N/N while another set was running is measured again alone in a fresh tree before any record uses it, and the record says so.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers-baselines.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A baseline that went red beside another set is believed.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "      if (baselineContended) {",
+          "replace": "      if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A record does not say its baseline was re-measured alone.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "      if (baseline.remeasuredSerially) detail.baselineRemeasuredSerially = true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-BASELINE-BUDGET-CUT-KEEPS-WHAT-IT-CAN",
+      "statement": "When the command budget runs out while baselines are fanned out, every fault that depends on a baseline is not reached and every fault that needs no baseline keeps its record.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers-baseline-budget.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Faults that need no baseline wait for the baseline phase.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "        if (!p.record && !p.pre.reuseAsk && !p.pre.fullAsk) {",
+          "replace": "        if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A record finished before the baselines is not published then.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "        if (p.record) settle(index, p.record);\n",
+          "replace": "",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

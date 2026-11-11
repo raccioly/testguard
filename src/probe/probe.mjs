@@ -534,9 +534,9 @@ async function measureProbe({
       };
     };
     const primary = treeContext(iso);
-    // Baselines are measured one at a time in the first tree before any fan-out
-    // and then frozen: a worker that found one missing would be a planning bug,
-    // and running it beside other suites would be a contended baseline.
+    // Under a fan-out every baseline is measured before any fault is applied,
+    // then frozen: planning that found one missing would be a bug in the
+    // replay below, and a fault worker must never run a baseline itself.
     let baselinesFrozen = false;
     /**
      * The defenders' runs on unmodified source, shared by every fault with the
@@ -547,17 +547,20 @@ async function measureProbe({
      * be told from a broken one. A prefix that already stopped is never
      * extended with more normal runs.
      */
-    const ensureBaseline = async (defenders, want, stage, { reuse = false } = {}) => {
+    const ensureBaseline = async (defenders, want, stage, { reuse = false, tree = primary } = {}) => {
       const key = defenders.join('\n');
       if (!baselineCache.has(key)) baselineCache.set(key, { runs: [], loadMessage: undefined, flakeFinished: false });
       const entry = baselineCache.get(key);
+      // Measured ahead under a fan-out and it threw: every fault that asks
+      // gets the same error, as it would have met it asking serially.
+      if (entry.error) throw entry.error;
       const stopped = () => entry.runs.length > 0 && entry.runs[entry.runs.length - 1].outcome !== 'pass';
       const needed = (entry.runs.length < want && !stopped())
         || (want === confirmRuns && !entry.flakeFinished && entry.runs.length < confirmRuns && entry.runs[entry.runs.length - 1].outcome === 'fail');
       if (baselinesFrozen && needed) throw new Error('internal: a baseline was requested after the fan-out started');
       while (entry.runs.length < want && !stopped()) {
         stage(reuse ? 'reuse-baseline' : 'baseline', entry.runs.length + 1, want);
-        const res = await runDefenders(defenders);
+        const res = await tree.runDefenders(defenders);
         if (reuse) measurements.reuseBaselineRuns++;
         entry.runs.push(res.run);
         if (res.run.outcome !== 'pass') entry.loadMessage = res.loadMessage;
@@ -565,7 +568,7 @@ async function measureProbe({
       if (want === confirmRuns && !entry.flakeFinished && entry.runs.length < confirmRuns && entry.runs[entry.runs.length - 1].outcome === 'fail') {
         for (let i = entry.runs.length; i < confirmRuns; i++) {
           stage('baseline-flake', i + 1, confirmRuns);
-          entry.runs.push((await runDefenders(defenders)).run);
+          entry.runs.push((await tree.runDefenders(defenders)).run);
         }
         entry.flakeFinished = true;
       }
@@ -612,7 +615,7 @@ async function measureProbe({
      * measurement needs. A fault that never mutates (no defenders, a bad
      * anchor, a baseline that is not green N/N) finishes here.
      */
-    const planOne = async ({ claim, fault }) => {
+    const prePlanOne = async ({ claim, fault }) => {
       const { requested } = defenderSelection(claim, fault);
       const declared = requested.length ? resolveDefenders(iso.projectDir, requested) : null;
       if (declared && !commandTemplate) {
@@ -639,14 +642,61 @@ async function measureProbe({
         if (!declared && mockInfo.indeterminate.length > 0) {
           return { record: discoveryIndeterminateRecord({ ...common, inputs: safeInputs(iso.projectDir, fault, defenders, { testUniverseHash, discoveryHashes }), indeterminate: mockInfo.indeterminate }) };
         }
-        const planned = await planFault({ ...common, typechecker, typecheckBudget: () => commandBudget?.runBudget(budgetMs) ?? budgetMs, typecheckCut: (granted, outcome) => commandBudget?.assertNotCut(granted, budgetMs, outcome.status === 'timeout' ? 1 : 0), allTests, iso, onWarn, confirmRuns, escalate, controlCache, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, testUniverseHash, discoveryHashes, ensureBaseline, dependencyHasher,
-          historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root });
+        const args = { ...common, typechecker, typecheckBudget: () => commandBudget?.runBudget(budgetMs) ?? budgetMs, typecheckCut: (granted, outcome) => commandBudget?.assertNotCut(granted, budgetMs, outcome.status === 'timeout' ? 1 : 0), allTests, iso, onWarn, confirmRuns, escalate, controlCache, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, testUniverseHash, discoveryHashes, ensureBaseline, dependencyHasher,
+          historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root };
+        return { args, pre: await prePlanFault(args), common, discoveryHashes };
+      } catch (err) {
+        return { record: failed(common, err, primary, discoveryHashes) };
+      }
+    };
+    const finishPlanOne = async ({ args, pre, common, discoveryHashes }) => {
+      try {
+        const planned = await planFault(args, pre);
         if (planned.record) return planned;
         return { state: { ...planned.state, common } };
       } catch (err) {
         return { record: failed(common, err, primary, discoveryHashes) };
       }
     };
+    const planOne = async (item) => {
+      const pre = await prePlanOne(item);
+      return pre.record ? pre : finishPlanOne(pre);
+    };
+    /**
+     * Every defender set's baseline asks, replayed in the order a serial run
+     * makes them (one live run to license reuse, then N unless reuse held),
+     * so the runs and their counts are the serial ones. Sets are independent:
+     * they run side by side, one set per tree; a set's asks stay in order.
+     */
+    const measureBaselineSet = async ({ defenders, asks }, tree) => {
+      for (const ask of asks) {
+        let reused = false;
+        if (ask.reuseAsk) {
+          const live = await ensureBaseline(defenders, 1, ask.stage, { reuse: true, tree });
+          reused = live.runs.every((run) => run.outcome === 'pass');
+        }
+        if (!reused && ask.fullAsk) await ensureBaseline(defenders, confirmRuns, ask.stage, { tree });
+      }
+    };
+    const baselineAsks = (prePlanned) => {
+      const sets = new Map();
+      for (const p of prePlanned) {
+        if (p.record || !(p.pre.reuseAsk || p.pre.fullAsk)) continue;
+        const key = p.args.defenders.join('\n');
+        if (!sets.has(key)) sets.set(key, { defenders: p.args.defenders, asks: [] });
+        sets.get(key).asks.push({ reuseAsk: p.pre.reuseAsk, fullAsk: p.pre.fullAsk, stage: p.args.stage });
+      }
+      return [...sets.values()];
+    };
+    // A precondition failure is about the whole run; anything else a baseline
+    // throws belongs to the faults that ask for that baseline.
+    const fatalToTheRun = (err) => err instanceof PreconditionError;
+    const freshTree = () => {
+      const scratch = createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules });
+      extraTrees.push(scratch);
+      return treeContext(scratch);
+    };
+    const releaseTrees = () => { while (extraTrees.length) extraTrees.pop().cleanup(); };
     /** Apply, probe, control, escalate and restore one fault in `tree`. */
     const measureOne = async (state, tree) => {
       try {
@@ -665,27 +715,79 @@ async function measureProbe({
         settle(index, planned.record ?? await measureOne(planned.state, primary));
       }
     } else {
-      // Plan every fault first, in order, on the clean first tree: input
-      // hashes and anchors are read before any fault is applied anywhere, and
-      // each defender set's baseline is measured once, alone, in exactly the
-      // order a serial run would ask for it.
-      const pending = [];
+      // 1. Everything before a baseline, for every fault, in order, on the
+      //    clean first tree: input hashes, anchors and type checks are read
+      //    before any fault is applied anywhere and before any baseline runs.
+      // A fault that asks for no baseline (discovery indeterminate, a bad
+      // anchor, a refused type check, reused outright, a planning error) is
+      // finished and published now: a command budget that runs out during
+      // the baselines must take along only the faults that depend on them.
+      const prePlanned = [];
       for (const [index, item] of faults.entries()) {
         if (item.firstOfClaim) commandBudget?.assertOpen();
         commandBudget?.assertOpen();
-        const planned = await planOne(item);
+        let p = await prePlanOne(item);
+        if (!p.record && !p.pre.reuseAsk && !p.pre.fullAsk) {
+          const planned = await finishPlanOne(p);
+          p = { record: planned.record ?? await measureOne(planned.state, primary) };
+        }
+        prePlanned.push(p);
+        if (p.record) settle(index, p.record);
+      }
+      // 2. Baselines: independent defender sets side by side, one per tree,
+      //    each set's asks in serial order. A set that came out anything but
+      //    green while another set was running is measured again, alone, in a
+      //    fresh tree, before it is believed: a loaded machine fails suites.
+      const sets = baselineAsks(prePlanned);
+      const baselineSlots = [primary];
+      for (let i = 1; i < Math.min(faultWorkers, sets.length); i++) {
+        commandBudget?.assertOpen();
+        baselineSlots.push(freshTree());
+      }
+      const baselineContended = baselineSlots.length > 1;
+      await runPool(sets, baselineSlots, async (set, tree) => {
+        try {
+          await measureBaselineSet(set, tree);
+        } catch (err) {
+          if (fatalToTheRun(err)) throw err;
+          baselineCache.get(set.defenders.join('\n')).error = err;
+        }
+      }, { beforeEach: () => commandBudget?.assertOpen() });
+      releaseTrees();
+      if (baselineContended) {
+        for (const set of sets) {
+          const key = set.defenders.join('\n');
+          const entry = baselineCache.get(key);
+          if (!entry || entry.error || entry.runs.every((run) => run.outcome === 'pass')) continue;
+          commandBudget?.assertOpen();
+          baselineCache.delete(key);
+          const fresh = freshTree();
+          try {
+            await measureBaselineSet(set, fresh);
+          } catch (err) {
+            if (fatalToTheRun(err)) throw err;
+            baselineCache.get(key).error = err;
+          } finally {
+            releaseTrees();
+          }
+          baselineCache.get(key).remeasuredSerially = true;
+        }
+      }
+      baselinesFrozen = true;
+      // 3. The rest of planning, in order, against the measured baselines.
+      const pending = [];
+      for (const [index, p] of prePlanned.entries()) {
+        if (p.record) continue;
+        const planned = await finishPlanOne(p);
         if (planned.record) settle(index, planned.record);
         else if (!planned.state.mutate) settle(index, await measureOne(planned.state, primary));
         else pending.push({ index, state: planned.state });
       }
-      baselinesFrozen = true;
-      // One tree per fault in flight, never more trees than faults to probe.
+      // 4. Faults: one tree per fault in flight, never more trees than faults.
       const slots = [primary];
       for (let i = 1; i < Math.min(faultWorkers, pending.length); i++) {
         commandBudget?.assertOpen();
-        const scratch = createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules });
-        extraTrees.push(scratch);
-        slots.push(treeContext(scratch));
+        slots.push(freshTree());
       }
       const contended = slots.length > 1;
       const remeasure = [];
@@ -697,20 +799,17 @@ async function measureProbe({
         else settle(index, record);
       }, { beforeEach: () => commandBudget?.assertOpen() });
       // The fan-out is over: its trees go now, so no more than n ever exist.
-      while (extraTrees.length) extraTrees.pop().cleanup();
+      releaseTrees();
       // Each re-measure gets a fresh tree: the contended run may have left
       // state behind in its tree (a counter, a cache, a half-written file from
       // a killed process), and the serial answer must not inherit it.
       for (const { index, state } of remeasure.sort((a, b) => a.index - b.index)) {
         commandBudget?.assertOpen();
-        const fresh = createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules });
-        extraTrees.push(fresh);
         let record;
         try {
-          record = await measureOne(state, treeContext(fresh));
+          record = await measureOne(state, freshTree());
         } finally {
-          extraTrees.splice(extraTrees.indexOf(fresh), 1);
-          fresh.cleanup();
+          releaseTrees();
         }
         record.detail.remeasuredSerially = true;
         settle(index, record);
@@ -897,13 +996,17 @@ async function typecheckFault({ typechecker, iso, fault, budgetMs, stage, detail
 }
 
 /**
- * The part of probing a fault that reads only unmodified source: input hashes,
- * verdict reuse, the anchor and the shared baseline. Returns `{ record }` for
- * a reused verdict, otherwise `{ state }` for `measureFault`. `state.mutate`
- * says whether the fault will be applied at all.
+ * Everything about a fault decided before its first baseline run, and no test
+ * runner: input hashes, reuse eligibility, the anchor and the type check. None
+ * of it depends on a baseline, so a fan-out can do it for every fault first and
+ * then measure the baselines of independent defender sets side by side. The
+ * type check runs exactly where a serial run would reach it: for a reusable
+ * fault in the reuse check, otherwise just before its baseline, under the same
+ * condition. Returns what `planFault` needs, and which baseline asks the fault
+ * will make (`reuseAsk`: one live run; `fullAsk`: N runs unless reuse holds).
  */
-async function planFault(args) {
-  const { typechecker, typecheckBudget, typecheckCut, claim, fault, defenders, iso, confirmRuns, ensureBaseline, dependencyHasher, stage, prior, priorRunId, testUniverseHash, discoveryHashes = {} } = args;
+async function prePlanFault(args) {
+  const { typechecker, typecheckBudget, typecheckCut, claim, fault, defenders, iso, dependencyHasher, stage, prior, testUniverseHash, discoveryHashes = {} } = args;
   const targetPath = join(iso.projectDir, fault.file);
   const targetExists = existsSync(targetPath);
   const inputs = {
@@ -918,6 +1021,39 @@ async function planFault(args) {
   };
 
   const subject = subjectOf(fault, sha256);
+  const anchor = defenders.length > 0
+    ? (targetExists ? locate(readFileSync(targetPath, 'utf8'), fault) : { status: 'file-missing', hits: 0, expected: fault.expectHits ?? 1 })
+    : null;
+
+  // Whether a replacement type-checks is a property of the WHOLE program, which
+  // no per-fault hash sees: a file added elsewhere can make yesterday's clean
+  // fault invalid. So under --typecheck the fault is checked again before any
+  // record is carried forward (one warm check, no test run), and reuse needs the
+  // same answer. The answer is kept for the measurement if reuse fails, and it
+  // comes first there too: a replacement the project's own compiler refuses is
+  // a bad fault whatever the defenders do.
+  let typecheck; // the type check's outcome for this fault, when one was asked for
+  const detail = { baselineRuns: [], probeRuns: [] };
+  const reusable = isReusable(prior, { claim, inputs, ...defenderSelection(claim, fault), resolved: defenders, contentHash: subject.contentHash });
+  if (typechecker && anchor?.status === 'ok') {
+    typecheck = await typecheckFault({ typechecker, iso, fault, budgetMs: typecheckBudget(), stage, detail, cut: typecheckCut });
+  }
+  const typecheckAgrees = !typechecker || typecheck === undefined || typecheck.status === prior?.detail?.typecheck;
+  // A fault the type check refused ran no test, so there is no test run to confirm.
+  const reusedOutright = reusable && typecheckAgrees && (defenders.length === 0 || typecheck?.status === 'diagnostics');
+  const reuseAsk = reusable && typecheckAgrees && !reusedOutright;
+  const fullAsk = !reusedOutright && anchor?.status === 'ok' && !refusedByTypecheck(typecheck);
+  return { targetExists, inputs, subject, anchor, typecheck, typecheckAgrees, reusable, detail, reusedOutright, reuseAsk, fullAsk };
+}
+
+/**
+ * The rest of planning: verdict reuse and the shared baseline. Returns
+ * `{ record }` for a reused verdict, otherwise `{ state }` for
+ * `measureFault`. `state.mutate` says whether the fault will be applied.
+ */
+async function planFault(args, pre) {
+  const { typechecker, claim, fault, defenders, confirmRuns, ensureBaseline, stage, prior, priorRunId } = args;
+  const { targetExists, inputs, subject, typecheck, detail } = pre;
 
   // Same source, same imports, same defenders, same N, same fault — and the
   // defenders still green right now. The hashes cannot see the environment
@@ -925,40 +1061,21 @@ async function planFault(args) {
   // live unmodified run of the defender set licenses the carry-forward. It is
   // the first run of the shared baseline, so a fault that is probed after all
   // pays nothing twice. Not green: the fault is probed in full.
-  // Whether a replacement type-checks is a property of the WHOLE program, which
-  // no per-fault hash sees: a file added elsewhere can make yesterday's clean
-  // fault invalid. So under --typecheck the fault is checked again before any
-  // record is carried forward (one warm check, no test run), and reuse needs the
-  // same answer. The answer is kept for the measurement below if reuse fails.
-  let typecheck; // the type check's outcome for this fault, when one was asked for
-  const detail = { baselineRuns: [], probeRuns: [] };
-  const reusable = isReusable(prior, { claim, inputs, ...defenderSelection(claim, fault), resolved: defenders, contentHash: subject.contentHash });
-  if (reusable && typechecker && defenders.length > 0 && targetExists && locate(readFileSync(targetPath, 'utf8'), fault).status === 'ok') {
-    typecheck = await typecheckFault({ typechecker, iso, fault, budgetMs: typecheckBudget(), stage, detail, cut: typecheckCut });
-  }
-  const typecheckAgrees = !typechecker || typecheck === undefined || typecheck.status === prior?.detail?.typecheck;
-  if (reusable && typecheckAgrees) {
-    // A fault the type check refused ran no test, so there is no test run to confirm.
-    const refused = typecheck?.status === 'diagnostics';
-    const live = defenders.length && !refused ? await ensureBaseline(defenders, 1, stage, { reuse: true }) : null;
+  if (pre.reusedOutright || pre.reuseAsk) {
+    const live = pre.reuseAsk ? await ensureBaseline(defenders, 1, stage, { reuse: true }) : null;
     if (!live || live.runs.every((run) => run.outcome === 'pass')) {
       return { record: { ...prior, defenders: { ...prior.defenders, ...defenderSelection(claim, fault) }, reusedFrom: prior.reusedFrom ?? priorRunId } };
     }
   }
 
-  let anchor = null;
+  let anchor = pre.anchor;
 
   if (defenders.length > 0) {
-    anchor = targetExists ? locate(readFileSync(targetPath, 'utf8'), fault) : { status: 'file-missing', hits: 0, expected: fault.expectHits ?? 1 };
-
-    // The type check comes first and spends no test run: a replacement the
-    // project's own compiler refuses is a bad fault whatever the defenders do.
     if (anchor.status === 'ok' && typechecker) {
-      typecheck ??= await typecheckFault({ typechecker, iso, fault, budgetMs: typecheckBudget(), stage, detail, cut: typecheckCut });
       detail.typecheck = typecheck.status;
       if (typecheck.message) detail.message = typecheck.message;
     }
-    if (anchor.status === 'ok' && !refusedByTypecheck(typecheck)) {
+    if (pre.fullAsk) {
       // The decision stops at the first non-green run — nothing about this
       // fault can be trusted after it. But "failed once in three" and "fails
       // every time" are different problems for whoever has to fix the
@@ -966,6 +1083,7 @@ async function planFault(args) {
       // Paid once per defender set, and only when it is already broken.
       const baseline = await ensureBaseline(defenders, confirmRuns, stage);
       detail.baselineRuns = [...baseline.runs];
+      if (baseline.remeasuredSerially) detail.baselineRemeasuredSerially = true;
       // Observed instability of the defenders on UNMODIFIED source: `fail` is
       // the tests running and disagreeing with themselves. A load error or a
       // timeout is not flakiness — nothing was measured about stability — so

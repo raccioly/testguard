@@ -20,7 +20,7 @@ import { FIXTURE_GIT } from './git.mjs';
  * Plus one fault that never mutates (an anchor that is not in the file), so
  * planning-only records are interleaved with measured ones in the order.
  */
-export function fanOutProject({ holdMs = 180 } = {}) {
+export function fanOutProject({ holdMs = 180, only = ['SLOW', 'FAST', 'MISSING', 'QUIET'] } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'tg-fanout-'));
   const markers = mkdtempSync(join(tmpdir(), 'tg-fanout-markers-'));
   mkdirSync(join(dir, 'src'));
@@ -71,6 +71,28 @@ test('slow', async () => {
       claim('QUIET', 'test/quiet.test.mjs', [fault('F1', 'src/quiet.mjs', '=> 2', '=> 0', 'return-altered')]),
     ],
   };
+  // BUSY always holds a marker while it runs, unfaulted too; TOUCHY fails
+  // whenever it sees one. Serially TOUCHY's baseline is green. With baselines
+  // of independent defender sets measured side by side it is red, which only
+  // a serial re-measure of that baseline can tell from a broken defender.
+  writeFileSync(join(dir, 'src/busy.mjs'), 'export const busy = () => 4;\n');
+  writeFileSync(join(dir, 'src/touchy.mjs'), 'export const touchy = () => 5;\n');
+  writeFileSync(join(dir, 'test/busy.test.mjs'), `${header}import { busy } from '../src/busy.mjs';\ntest('busy', async () => {${hold('true')}\n  assert.equal(busy(), 4);\n});\n`);
+  writeFileSync(join(dir, 'test/touchy.test.mjs'), `${header}import { touchy } from '../src/touchy.mjs';
+test('touchy', async () => {
+  const markers = process.env.TG_FANOUT_MARKERS;
+  for (let waited = 0; markers && waited < ${holdMs}; waited += 25) {
+    assert.equal(readdirSync(markers).length, 0, 'another suite is running beside this one');
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  assert.equal(touchy(), 5);
+});
+`);
+  claims.claims.push(
+    claim('BUSY', 'test/busy.test.mjs', [fault('F1', 'src/busy.mjs', '=> 4', '=> 0', 'return-altered')]),
+    claim('TOUCHY', 'test/touchy.test.mjs', [fault('F1', 'src/touchy.mjs', '=> 5', '=> 0', 'return-altered')]),
+  );
+  claims.claims = claims.claims.filter((c) => only.includes(c.id));
   writeFileSync(join(dir, 'testguard.claims.json'), JSON.stringify(claims, null, 2));
   const g = (...args) => {
     const r = spawnSync('git', [...FIXTURE_GIT, '-c', 'user.email=t@example.invalid', '-c', 'user.name=t', ...args], { cwd: dir, encoding: 'utf8' });

@@ -591,6 +591,10 @@
               "type": "string",
               "maxLength": 1024
             },
+            "baselineRemeasuredSerially": {
+              "description": "Under a fault fan-out (`run.faultWorkers` above one) the baselines of independent defender sets are measured side by side. This record's defender set came out anything but green N/N while another set was running, so its baseline was measured again with nothing else in flight, in a fresh scratch tree, and `baselineRuns` are those serial runs, whatever they show.",
+              "const": true
+            },
             "remeasuredSerially": {
               "description": "This record was first measured under a fault fan-out (`run.faultWorkers` above one) and came out `timeout` or `flaky-defender`/`inconsistent-probe` — verdicts a loaded machine can manufacture, since per-run budgets do not scale with the fan-out. It was therefore measured again, with no other fault in flight, and that serial measurement is what this record reports, whatever its verdict.",
               "const": true

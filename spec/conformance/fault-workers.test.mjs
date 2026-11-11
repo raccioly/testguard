@@ -36,3 +36,21 @@ describe('fault fan-out evidence', () => {
     expect(paths(doc)).toContain('/records/2/detail/remeasuredSerially');
   });
 });
+
+describe('baseline fan-out evidence', () => {
+  it('a record whose baseline was re-measured alone conforms under a fan-out', () => {
+    const doc = load('examples', 'evidence-fault-workers-baseline.json');
+    expect(doc.records[0].detail.baselineRemeasuredSerially).toBe(true);
+    expect(validate('evidence', doc).errors).toEqual([]);
+  });
+
+  it('a baseline re-measure without a fan-out describes a run that cannot have happened', () => {
+    expect(paths(load('invalid', 'evidence.baseline-remeasured-without-fan-out.json'))).toEqual(['/records/0/detail/baselineRemeasuredSerially']);
+  });
+
+  it('baselineRemeasuredSerially is only ever true', () => {
+    const doc = load('examples', 'evidence-fault-workers-baseline.json');
+    doc.records[0].detail.baselineRemeasuredSerially = false;
+    expect(paths(doc)).toContain('/records/0/detail/baselineRemeasuredSerially');
+  });
+});

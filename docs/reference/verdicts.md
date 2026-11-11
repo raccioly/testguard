@@ -104,6 +104,7 @@ none of them changes it.
 | `undeclaredKillers` | `killed-by-undeclared-tests` | The tests that failed in every escalation run. |
 | `anchor` | anchor reasons | `{hits, expected}`. |
 | `restoreSkipped` | rare | `target-missing`: something outside the process deleted the target during the run. |
+| `baselineRemeasuredSerially` | with `--fault-workers` above 1 | `true`: this defender set's baseline was not green N/N while another set's baseline was running, so it was measured again alone, in a fresh scratch tree; `baselineRuns` are those serial runs. |
 | `remeasuredSerially` | with `--fault-workers` above 1 | `true`: the record first came out `timeout` or `inconsistent-probe` while other faults were in flight, so it was measured again alone, in a fresh scratch tree; the verdict is from that serial measurement. |
 | `message` | `probe-error` | The first line of what threw. |
 
