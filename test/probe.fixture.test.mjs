@@ -220,7 +220,8 @@ describe('probe reproduces the known-answer fixture', () => {
       const claimsPath = join(scratch, 'testguard.claims.json');
       const original = readFileSync(claimsPath, 'utf8');
       const claims = JSON.parse(original);
-      const claim = claims.claims.find((c) => c.id === 'REDACT-001');
+      // REDACT-002 has one fault, so the re-measure that proves the point costs one claim, not three.
+      const claim = claims.claims.find((c) => c.id === 'REDACT-002');
       claim.source = { kind: 'comment', ref: 'changed-origin' };
       const out = join(scratch, 'changed-origin.json');
       cpSync(join(scratch, '.testguard', 'evidence.json'), out);
@@ -255,7 +256,7 @@ describe('probe reproduces the known-answer fixture', () => {
       const { lines, io } = capture();
       const before = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json')).records.length;
       // REDACT-003 is deliberately repeated: it must be collapsed, not probed twice.
-      expect(await main(['probe', scratch, '--claim', 'REDACT-003', '--claim', 'REDACT-002,REDACT-003', '--budget', '30000', '--quiet'], io)).toBe(0);
+      expect(await main(['probe', scratch, '--claim', 'REDACT-003', '--claim', 'REDACT-002,REDACT-003', '--budget', '30000', '--quiet', '--no-escalate'], io)).toBe(0);
       const partial = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence-partial.json'));
       expect(partial.records.map((r) => r.claim.id)).toEqual(['REDACT-003', 'REDACT-002']);
       expect(readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json')).records).toHaveLength(before);
@@ -307,11 +308,11 @@ describe('probe reproduces the known-answer fixture', () => {
 
     it('default output lists only unproven faults plus a killed count; --verbose lists everything', async () => {
       const a = capture();
-      await main(['probe', scratch, '--claim', 'REDACT-001', '--budget', '30000', '--no-reuse'], a.io);
+      await main(['probe', scratch, '--claim', 'REDACT-001', '--budget', '30000', '--no-escalate'], a.io);
       expect(a.lines.out.some((l) => /^killed/.test(l))).toBe(false);
       expect(a.lines.out.join('\n')).toMatch(/1 killed \(not listed; --verbose to see them\)/);
       const b = capture();
-      await main(['probe', scratch, '--claim', 'REDACT-001', '--budget', '30000', '--verbose'], b.io);
+      await main(['probe', scratch, '--claim', 'REDACT-001', '--budget', '30000', '--no-escalate', '--verbose'], b.io);
       expect(b.lines.out.some((l) => /^killed\s+REDACT-001\/F2/.test(l))).toBe(true);
     }, 90_000);
 
