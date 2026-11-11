@@ -13,7 +13,7 @@
 // written to either is a write outside the boundary. Expectations come from
 // the fixtures' own expected.json, which was verified by hand.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -102,6 +102,9 @@ describe.each(FIXTURES)('write boundary: $name', (fixture) => {
       sandboxes.push(holder);
       nmRo = join(holder, 'ro', 'node_modules'); makeDir(dirname(nmRo)); copyTree(fixture.nm, nmRo);
       if (fixture.writableRun) { nmRw = join(holder, 'rw', 'node_modules'); makeDir(dirname(nmRw)); copyTree(fixture.nm, nmRw); }
+      // A copy that holds no packages (a linked source copied as a link) fails later with an unrelated import error.
+      expect(lstatSync(nmRo).isSymbolicLink()).toBe(false);
+      expect(existsSync(join(nmRo, fixture.runner === 'jest' ? 'jest' : 'vitest', 'package.json'))).toBe(true);
     }
     const nmRwBefore = nmRw ? listing(nmRw) : undefined;
     if (nmRo) chmodTree(nmRo, 'ro');

@@ -11683,8 +11683,8 @@
           "description": "The copy resolves symlinks instead of keeping them.",
           "faultClass": "argument-swapped",
           "file": "test/helpers/write-boundary.mjs",
-          "find": "spawnSync('cp', ['-R', from, to]",
-          "replace": "spawnSync('cp', ['-RL', from, to]",
+          "find": "spawnSync('cp', ['-R', realpathSync(from), to]",
+          "replace": "spawnSync('cp', ['-RL', realpathSync(from), to]",
           "defendedBy": [
             "test/write-boundary.helpers.test.mjs"
           ],
@@ -11888,7 +11888,8 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/partial-budget.test.mjs"
+        "test/partial-budget.test.mjs",
+        "test/probe-partial-document-reuse.test.mjs"
       ],
       "faults": [
         {
@@ -12456,6 +12457,198 @@
           "file": "src/probe/probe.mjs",
           "find": "throw new UsageError('--include-dirty applies to worktree mode; drop --in-place');",
           "replace": "throw new PreconditionError('--include-dirty applies to worktree mode; drop --in-place', 'dirty-tree');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COST-GATE-IS-WIRED-AND-SAYS-WHAT-HAPPENED",
+      "statement": "The cost gate script passes the per-claim ceiling to the decision, and the decision reports what happened: one reused record makes a run low confidence, an out-of-range reference leaves the total unnormalized, and a low-confidence run over only the per-claim ceiling names its low confidence.",
+      "source": {
+        "kind": "manual",
+        "ref": "white-box verification of 0.22.1, items J, K, O"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/cost-gate-holes.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The script stops passing perClaimSeconds, so the per-claim ceiling is silently disabled.",
+          "faultClass": "argument-swapped",
+          "file": ".github/scripts/check-cost-budget.mjs",
+          "find": "  perClaimSeconds: budget.perClaimSeconds,\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Two reused records are needed before a run is low confidence.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/cost.mjs",
+          "find": "...(reusedRecords > 0 ? ['reused-records'] : [])",
+          "replace": "...(reusedRecords > 1 ? ['reused-records'] : [])",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An out-of-range reference still divides the total by its absurd factor while the basis says unnormalized.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "const factor = assessment?.status === 'ok' ? assessment.speedFactor : 1;",
+          "replace": "const factor = assessment?.speedFactor ?? 1;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A low-confidence run over only the per-claim ceiling does not list its low confidence.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "assessment.lowConfidence && overCeiling",
+          "replace": "assessment.lowConfidence && totalMs > budgetMs",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SCRATCH-REMOVAL-TAKES-THE-ALLOCATION-LOCK",
+      "statement": "Removing a scratch worktree takes the same repository-keyed lock as allocating one, and that lock lives under the scratch directory: an add and a prune never interleave.",
+      "source": {
+        "kind": "manual",
+        "ref": "white-box verification of 0.22.1, items L, P"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/worktree-lock-cleanup.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Removal runs outside the lock, so a prune can interleave with another probe's add.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/worktree.mjs",
+          "find": "const remove = () => withWorktreeLock(lockDir, () => removeWorktree(repoRoot, dest));",
+          "replace": "const remove = () => removeWorktree(repoRoot, dest);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The lock directory is keyed outside the scratch directory.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/worktree.mjs",
+          "find": "const lockDir = worktreeLockDir(gitCommonDir(repoRoot));",
+          "replace": "const lockDir = worktreeLockDir(gitCommonDir(repoRoot), dirname(repoRoot));",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-LONE-FAULT-IS-NEVER-REMEASURED",
+      "statement": "Under --fault-workers n > 1 a single pending fault runs beside nothing, so a timeout is measured once and is not stamped remeasuredSerially.",
+      "source": {
+        "kind": "manual",
+        "ref": "white-box verification of 0.22.1, item M"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-lone-fault.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The contention guard is dropped, so a lone timing-out fault is measured twice.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/probe.mjs",
+          "find": "if (contended && needsSerialRemeasure(record))",
+          "replace": "if (needsSerialRemeasure(record))",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Every fan-out counts as contended.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/probe.mjs",
+          "find": "const contended = slots.length > 1;",
+          "replace": "const contended = true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PROGRESS-AFTER-EXPIRY-IS-THE-FULL-LIST",
+      "statement": "After a command budget expires, the progress stream carries every record once, in order: the measured prefix, then the not-reached suffix.",
+      "source": {
+        "kind": "manual",
+        "ref": "white-box verification of 0.22.1, item N"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-progress-after-expiry.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The first unpublished record is dropped from the progress stream.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/probe.mjs",
+          "find": "for (const record of records.slice(ctx.records.length)) onProgress(record);",
+          "replace": "for (const record of records.slice(ctx.records.length + 1)) onProgress(record);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The unpublished records never reach the progress stream.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "  for (const record of records.slice(ctx.records.length)) onProgress(record);\n",
+          "replace": "",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
