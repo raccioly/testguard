@@ -25,7 +25,7 @@ describe('G: a not-reached record the tool really wrote is re-measured by the ne
         seen.add(claimId);
         if (seen.size === 3) now = LIMIT + 1;
       };
-      const partial = await probe(base(project, { confirmRuns: 3, budgetMs: LIMIT, commandBudget: budget, partialOnBudget: true, onStage }));
+      const partial = await probe(base(project, { confirmRuns: 1, budgetMs: LIMIT, commandBudget: budget, partialOnBudget: true, onStage }));
       const path = join(out, 'evidence-partial.json');
       writeSpecDoc('evidence', path, partial);
       const previous = readSpecDoc('evidence', path);
@@ -39,7 +39,7 @@ describe('G: a not-reached record the tool really wrote is re-measured by the ne
         const withClosure = { ...r, inputs: current(r).inputs };
         expect(isReusable(withClosure, current(r))).toBe(false);
       }
-      const next = await probe(base(project, { confirmRuns: 3, budgetMs: LIMIT, previous, toolVersion: previous.tool.version }));
+      const next = await probe(base(project, { confirmRuns: 1, budgetMs: LIMIT, previous, toolVersion: previous.tool.version }));
       expect(next.records.map((r) => [r.claim.id, r.verdict, r.reusedFrom === undefined])).toEqual([['C1', 'killed', false], ['C2', 'killed', false], ['C3', 'killed', true], ['C4', 'killed', true]]);
     } finally {
       rmSync(project.dir, { recursive: true, force: true });

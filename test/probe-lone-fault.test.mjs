@@ -11,7 +11,7 @@ describe('M: one pending fault under --fault-workers 4 is not re-measured', () =
   it('a timing-out lone fault gets exactly one measurement, the serial run\'s, and no remeasuredSerially stamp', async () => {
     const project = partialBudgetProject({ hang: 'C1' });
     try {
-      const fanned = await probe(base(project, { only: ['C1'], confirmRuns: 1, budgetMs: 2500, faultWorkers: 4 }));
+      const fanned = await probe(base(project, { only: ['C1'], confirmRuns: 1, budgetMs: 1500, faultWorkers: 4 }));
       expect(fanned.records[0].verdict).toBe('timeout');
       expect(fanned.records[0].detail.remeasuredSerially).toBeUndefined();
       expect(fanned.records[0].detail.probeRuns).toHaveLength(1);

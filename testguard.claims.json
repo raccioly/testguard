@@ -11888,8 +11888,7 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/partial-budget.test.mjs",
-        "test/probe-partial-document-reuse.test.mjs"
+        "test/partial-budget.test.mjs"
       ],
       "faults": [
         {
@@ -12649,6 +12648,48 @@
           "file": "src/probe/probe.mjs",
           "find": "  for (const record of records.slice(ctx.records.length)) onProgress(record);\n",
           "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-NOT-REACHED-RECORD-IS-REMEASURED-FROM-A-WRITTEN-DOCUMENT",
+      "statement": "A not-reached record the tool wrote into a partial document is measured again by the next run: reuse is refused on what the tool emits (no dependency closure) and, with a closure supplied, by the reason alone.",
+      "source": {
+        "kind": "manual",
+        "ref": "white-box verification of 0.22.1, item G"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-partial-document-reuse.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The not-reached reason no longer stops reuse.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/attribution.mjs",
+          "find": "  if (prior.detail?.reason === 'not-reached-within-budget') return false;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The not-reached reason is renamed, so documents and guards disagree about what it is.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/partial-budget.mjs",
+          "find": "export const NOT_REACHED = 'not-reached-within-budget';",
+          "replace": "export const NOT_REACHED = 'not-reached';",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
