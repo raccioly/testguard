@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-11-11
+
+Automated weekly release — everything merged since `v0.22.0`.
+
+### Changed
+
+- feat(probe): --fault-workers also fans out baselines of independent defender sets (#237 follow-up) (#249)
+
+
 ### Added
 
 - **`--fault-workers` also fans out baselines (#237 follow-up).** Baselines of
