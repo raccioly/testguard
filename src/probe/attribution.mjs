@@ -147,6 +147,9 @@ export function isReusable(prior, current) {
   // A record that exists because the probe threw is a statement about the run,
   // not about the code. Reusing it would make one disturbed run permanent.
   if (prior.detail?.reason === 'probe-error') return false;
+  // A fault the command budget never reached was not measured at all
+  // (`--partial-on-budget`): there is no verdict to carry forward.
+  if (prior.detail?.reason === 'not-reached-within-budget') return false;
   // Defenders that never loaded say something about the environment — a
   // broken --runner-cmd, a missing dependency, an interpreter without the test
   // requirements — and none of that is hashed below. Fixing it changes no

@@ -711,8 +711,8 @@
           "description": "Certify a provisional status invocation through an origin policy projection.",
           "faultClass": "condition-forced",
           "file": "spec/lib/validate.mjs",
-          "find": "    if (p && (doc.run.scope || doc.run.provisional)) errors.push({ path: '/run/originPolicy', message: 'origin policy cannot certify a partial or provisional invocation' });",
-          "replace": "    if (false) errors.push({ path: '/run/originPolicy', message: 'origin policy cannot certify a partial or provisional invocation' });",
+          "find": "    if (p && (doc.run.scope || doc.run.provisional || doc.run.budget)) errors.push({ path: '/run/originPolicy', message: 'origin policy cannot certify a partial, provisional or budget-limited invocation' });",
+          "replace": "    if (false) errors.push({ path: '/run/originPolicy', message: 'origin policy cannot certify a partial, provisional or budget-limited invocation' });",
           "producedBy": { "producer": "agent", "by": "codex" },
           "defendedBy": ["spec/conformance/origin-policy.test.mjs"]
         }
@@ -10241,7 +10241,7 @@
           "description": "Fan-out records are published in completion order, bypassing the ordered emitter.",
           "faultClass": "call-removed",
           "file": "src/probe/probe.mjs",
-          "find": "        else emitter.settle(index, record);",
+          "find": "        else settle(index, record);",
           "replace": "        else { records.push(record); onProgress(record); }",
           "producedBy": {
             "producer": "agent",
@@ -11521,6 +11521,324 @@
       ]
     },
     {
+      "id": "TG-PARTIAL-BUDGET-NEVER-REPORTS-UNMEASURED-AS-MEASURED",
+      "statement": "When the command budget runs out under --partial-on-budget, every fault that was not fully measured is an unverifiable record with reason not-reached-within-budget, no runs and no resolved defenders, every measured record keeps its place in claim/fault order, and the exit code is never 0: 1 with an unproven floor when the measured part already gates, otherwise 2.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#opt-in-partial-result-probe---partial-on-budget"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/partial-budget.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A not-reached record carries another reason.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/partial-budget.mjs",
+          "find": "      reason: NOT_REACHED,\n",
+          "replace": "      reason: 'probe-error',\n",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A not-reached record claims no defender exists.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/partial-budget.mjs",
+          "find": "resolved: [], nocover: false,",
+          "replace": "resolved: [], nocover: true,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Records that finished are discarded and every fault is reported not reached.",
+          "faultClass": "return-altered",
+          "file": "src/probe/partial-budget.mjs",
+          "find": "settled.get(index) ?? reachedOf(item)",
+          "replace": "reachedOf(item)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The summary asserts exhaustion instead of deriving it from the records.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/partial-budget.mjs",
+          "find": "exhausted: notReached > 0,",
+          "replace": "exhausted: true,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A finding in the measured part no longer outranks incompleteness.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/partial-budget.mjs",
+          "find": "const findings = newGating > 0 || policyFailed;",
+          "replace": "const findings = false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "An incomplete run with a finding exits 2.",
+          "faultClass": "return-altered",
+          "file": "src/probe/partial-budget.mjs",
+          "find": "exitCode: findings ? 1 : 2",
+          "replace": "exitCode: 2",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "A record is recognized as not reached by its reason alone, whatever its verdict.",
+          "faultClass": "return-altered",
+          "file": "src/probe/partial-budget.mjs",
+          "find": "record?.verdict === 'unverifiable' && record.detail?.reason === NOT_REACHED;",
+          "replace": "record?.detail?.reason === NOT_REACHED;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-NOT-REACHED-RECORD-IS-NEVER-REUSED",
+      "statement": "A fault the command budget did not reach carries no verdict, so a later run never carries it forward, however well its recorded inputs match.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#opt-in-partial-result-probe---partial-on-budget"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/partial-budget.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Reuse stops refusing a not-reached record.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/attribution.mjs",
+          "find": "  if (prior.detail?.reason === 'not-reached-within-budget') return false;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The reason a not-reached record carries is not the specified literal.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/partial-budget.mjs",
+          "find": "export const NOT_REACHED = 'not-reached-within-budget';",
+          "replace": "export const NOT_REACHED = 'not-reached';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COMMAND-BUDGET-EXPIRY-IS-TOLD-BY-IDENTITY-AND-A-CUT-RUN-IS-THE-DEADLINE",
+      "statement": "Expiry of the command budget is a PreconditionError of its own class with the unchanged message, so only the budget's own expiry can become a partial document; and a child the budget itself killed at its cap is the deadline, never a timeout verdict.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#opt-in-partial-result-probe---partial-on-budget"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/partial-budget.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A run cut short by the budget is published as a timeout when the clock still shows time.",
+          "faultClass": "condition-forced",
+          "file": "src/command-budget.mjs",
+          "find": "if (grantedMs < perRunMs && timeouts > 0) {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Budget expiry is no longer a precondition failure.",
+          "faultClass": "other",
+          "file": "src/command-budget.mjs",
+          "find": "export class BudgetExhaustedError extends PreconditionError {}",
+          "replace": "export class BudgetExhaustedError extends Error {}",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-EXHAUSTED-EVIDENCE-IS-CROSS-CHECKED",
+      "statement": "A document that says its command budget ran out is checked against its own records: exhausted must agree with the presence of not-reached records, the counts with the records, a not-reached record has no runs and is never reused, and an exhausted run never exits 0.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#opt-in-partial-result-probe---partial-on-budget"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "spec/conformance/budget.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The validator accepts exhausted that disagrees with the records.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (b.exhausted !== (notReachedCount > 0))",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The validator accepts a notReached count that disagrees with the records.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (b.notReached !== notReachedCount)",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The validator accepts a reused not-reached record.",
+          "faultClass": "statement-deleted",
+          "file": "spec/lib/validate.mjs",
+          "find": "        if (r.reusedFrom) errors.push({ path: `${p}/reusedFrom`, message: 'a not-reached record is never reused' });\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The validator accepts failureKind that disagrees with the budget.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "if ((failure !== undefined) !== (doc.run.budget?.exhausted === true))",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The validator accepts an exhausted run that exits 0.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (doc.run.exitCode === 0) errors.push({ path: '/run/exitCode', message: 'an exhausted command",
+          "replace": "if (false) errors.push({ path: '/run/exitCode', message: 'an exhausted command",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PARTIAL-BUDGET-STAYS-OUT-OF-BASELINES-AND-OTHER-COMMANDS",
+      "statement": "A budget-exhausted document is never frozen into a baseline, the flag needs a command budget, and sweep, replay and admit refuse it instead of silently ignoring it.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#opt-in-partial-result-probe---partial-on-budget"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/partial-budget.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The flag is accepted by every command.",
+          "faultClass": "condition-forced",
+          "file": "src/cli.mjs",
+          "find": "if (values['partial-on-budget'] && command !== 'probe') {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "baseline freezes an exhausted document.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/baseline.mjs",
+          "find": "if (evidence.run.budget?.exhausted) {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The flag without a command budget runs anyway.",
+          "faultClass": "return-altered",
+          "file": "src/commands/probe.mjs",
+          "find": "    io.err('--partial-on-budget needs --command-budget <ms>: without a command budget there is nothing to run out');\n    return 3;",
+          "replace": "    io.err('--partial-on-budget needs --command-budget <ms>: without a command budget there is nothing to run out');\n    return 0;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
       "id": "TG-FAN-OUT-MEASURES-BASELINES-SIDE-BY-SIDE",
       "statement": "Under --fault-workers, baselines of independent defender sets are measured side by side, one set per tree with each set's asks in serial order, and the records equal the serial ones; a baseline re-measure is only recorded under a fan-out.",
       "source": {
@@ -11599,6 +11917,48 @@
           "faultClass": "statement-deleted",
           "file": "src/probe/probe.mjs",
           "find": "      if (baseline.remeasuredSerially) detail.baselineRemeasuredSerially = true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-BASELINE-BUDGET-CUT-KEEPS-WHAT-IT-CAN",
+      "statement": "When the command budget runs out while baselines are fanned out, every fault that depends on a baseline is not reached and every fault that needs no baseline keeps its record.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers-baseline-budget.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Faults that need no baseline wait for the baseline phase.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "        if (!p.record && !p.pre.reuseAsk && !p.pre.fullAsk) {",
+          "replace": "        if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A record finished before the baselines is not published then.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "        if (p.record) settle(index, p.record);\n",
           "replace": "",
           "producedBy": {
             "producer": "agent",

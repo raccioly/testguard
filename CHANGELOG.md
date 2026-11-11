@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`probe --partial-on-budget` writes what was proven and marks the rest not reached (#235).**
+  With `--command-budget`, expiry no longer has to throw away the minutes already paid for: the run
+  stops starting work, restores every tree, and writes a document where every fault fully measured
+  keeps its record and every fault in flight or not started is `unverifiable` with reason
+  `not-reached-within-budget` (it gates, and is never reused). `run.budget` is
+  `{limitMs, exhausted, reached, notReached}` and the validator cross-checks it against the records.
+  The document goes to `--out` or `.testguard/evidence-partial.json`, never the canonical file or a
+  baseline (`baseline` refuses it). Exit `1` when the measured part already holds a gating finding
+  (`--json`: `run.failureKind: "unproven+incomplete"`, `run.unprovenAtLeast` a floor), otherwise `2`
+  (`incomplete`). Works with `--fault-workers`: every fault in flight is not reached. `probe` only
+  (`sweep`, `replay` and `admit` refuse the flag); refused with `--require-origin`. Without the flag
+  behavior is unchanged, message included. A child the budget itself killed at its cap is now the
+  deadline, never a `timeout` verdict.
+
 - **`probe --fault-workers <n>` probes several faults at once (#237).** Each
   fault in flight gets its own scratch worktree; the default 1 is the serial
   run exactly. Baselines are still measured once per defender set, alone,

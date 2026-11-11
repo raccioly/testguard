@@ -51,6 +51,12 @@ probe
   --confirm <n>        runs per verdict        (default: 3)
   --budget <ms>        wall clock per run      (default: 120000)
   --command-budget <ms> cooperative measurement deadline for probe, sweep, replay, or admit. Caps async children; expiry exits 2 and writes no partial result
+  --partial-on-budget (probe) with --command-budget: when the budget runs out, stop starting work, restore every tree, and write
+                       the document anyway. Faults fully measured keep their record; the ones in flight and not started
+                       are unverifiable with reason not-reached-within-budget (they gate, and are never reused).
+                       Written to --out or <dir>/.testguard/evidence-partial.json, never the canonical file or a baseline.
+                       Exit 1 when the measured part already holds a gating finding (--json: run.failureKind
+                       unproven+incomplete, the count a floor), otherwise 2. Not with --require-origin
   --out <path>         evidence file           (default: <dir>/.testguard/evidence.json)
   --baseline <path>    baseline to gate against (default: <dir>/.testguard/baseline.json if present)
   --severity <level>   gate only at or above   (default: low)
@@ -232,6 +238,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
         confirm: { type: 'string', default: '3' },
         budget: { type: 'string', default: '120000' },
         'command-budget': { type: 'string' },
+        'partial-on-budget': { type: 'boolean', default: false },
         out: { type: 'string' },
         evidence: { type: 'string' },
         baseline: { type: 'string' },
@@ -324,6 +331,10 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
   }
   if (values['calibration-out'] !== undefined && command !== 'replay') {
     io.err('--calibration-out is only valid on replay');
+    return 3;
+  }
+  if (values['partial-on-budget'] && command !== 'probe') {
+    io.err('--partial-on-budget is only valid on probe: sweep, replay and admit still refuse to publish when the command budget runs out');
     return 3;
   }
   if (values['scratch-dir'] !== undefined && !SCRATCH_COMMANDS.has(command)) {

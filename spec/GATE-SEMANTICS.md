@@ -619,6 +619,59 @@ after the deadline, but no record from the incomplete operation becomes
 evidence. This is deliberately stricter than a per-run timeout: publishing
 the completed prefix would let the unattempted suffix look clean.
 
+### Opt-in partial result: `probe --partial-on-budget`
+
+A caller with a fixed time box (an agent loop, a CI step) can opt into a
+partial result for `probe` only (`sweep`, `replay` and `admit` refuse the flag;
+it needs `--command-budget`, and it is refused with `--require-origin`, whose
+policy needs complete evidence). The default above is unchanged. With the flag,
+when the budget runs out the run stops starting work, restores and removes
+every scratch tree, and writes a document under one rule: nothing that was not
+fully measured is reported as measured.
+
+1. **Reached.** A fault whose measurement finished keeps its record, whatever
+   order a `--fault-workers` fan-out finished them in. "Reached" is decided per
+   record: under a fan-out a record that finished behind an unfinished
+   predecessor is kept.
+2. **Not reached.** Every other fault — the ones in flight, the ones never
+   started, and one waiting for its serial re-measure (a contended record is not
+   a measurement) — gets verdict `unverifiable` with `detail.reason`
+   `not-reached-within-budget`, no baseline or probe runs, no resolved
+   defenders and `defenders.nocover: false`. It gates, so the suffix cannot look
+   clean. It is never reusable (`isReusable` refuses the reason) and carries
+   no `reusedFrom`. Expiry before any fault is measured (during discovery,
+   planning or a baseline) writes a document with zero reached.
+3. **A run the budget itself cut short is the deadline.** A child killed at the
+   cap of the command's remaining time is not a `timeout` verdict about the
+   defenders even if the clock shows a sliver left; the run is over.
+4. **Order.** Faults are probed in the caller's order: `--claim` order, else the
+   claims file's order. The emitted order is always claim/fault order.
+5. **`run.budget`** is `{ limitMs, exhausted, reached, notReached }`, recorded
+   whenever the flag is given. `exhausted` is true exactly when a
+   `not-reached-within-budget` record exists; `reached + notReached` equals the
+   record count, and each count equals the records it names. The validator
+   re-derives all of it and rejects a document that disagrees, a not-reached
+   record outside `run.budget`, one that has runs or a verdict other than
+   `unverifiable`, and an origin policy on an exhausted run. A run that finished
+   every fault inside the budget is complete (`exhausted: false`) even if the
+   clock ran out while its result was being written: the deadline bounds
+   measuring.
+6. **Where it goes.** An exhausted document is written to `--out` or
+   `.testguard/evidence-partial.json`, never the canonical evidence file (an
+   `--out` that names the canonical file is redirected with a warning), and
+   `baseline` refuses it.
+7. **Exit code.** Never `0`. The gate reads the measured records only (a
+   not-reached record always gates and is not counted): when they already hold a
+   new gating verdict, or a failed policy, the exit code is `1` and `--json`
+   carries `run.failureKind` `unproven+incomplete` with `run.unprovenAtLeast`, the
+   count of those verdicts — a floor, since the faults not reached are not
+   counted — or `policy+incomplete` for a failed assertion policy alone.
+   Otherwise the exit code is `2` and `run.failureKind` is `incomplete`. `run.budget`
+   is copied into the `--json` run block.
+8. **Per-claim results.** `run.claims[]` reports a claim with a not-reached
+   fault as `could-not-verify` with the reason, unless another of its faults
+   survived, in which case it is `unproven` (the rule below is unchanged).
+
 Timeout cleanup is best effort, not portable process containment. TestGuard
 hard-kills the runner's original process group and every descendant still
 attributable through the process table. A daemon that detached, reparented,
@@ -1172,7 +1225,7 @@ evidence; they simply do not turn CI red.
 |---|---|
 | `0` | No new gating findings at or above the severity floor. |
 | `1` | At least one new gating finding. |
-| `2` | Precondition failed (or, for `probe --changed`, the change could not be measured, or selected nothing under `--fail-on-empty-selection`): test runner not resolvable (e.g. no `node_modules` linked into the scratch worktree), working tree dirty for a fault target file, claims file invalid, no commits. Nothing was probed. |
+| `2` | Precondition failed (or, with `probe --partial-on-budget`, the command budget ran out and the measured part holds nothing that gates: `run.failureKind` `incomplete`; or, for `probe --changed`, the change could not be measured, or selected nothing under `--fail-on-empty-selection`): test runner not resolvable (e.g. no `node_modules` linked into the scratch worktree), working tree dirty for a fault target file, claims file invalid, no commits. Nothing was probed. |
 | `3` | Usage or configuration error. |
 
 A tool must never exit `0` because it had nothing to check. If the claims
