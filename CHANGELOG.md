@@ -13,9 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   change coverage to the `--json` status. It now probes only the claims the change reaches and writes
   `evidence-partial.json`; it refuses `--ref` and `--in-place` (exit 3). Callers that relied on a full
   probe plus change coverage should use `status --changed <ref>` or drop `--changed`.
-- `assertionFailures` is now assertion-only; a kill is `assertionFailures + exceptionFailures > 0`. Evidence written earlier has no `exceptionFailures` or `killKind` and reads as before; under the policy a kill with no recorded kind fails (unknown rounds toward unproven).
-- Under `--require-assertion-kill`, an exception-only kill whose runner reported no error identity (a custom `--runner-cmd` without `failureDetails`) says so per kill: `reason: "kind-not-reported-by-runner"` (`testRun.kindNotReported`, `detail.killKindReason`).
-- vitest and Playwright runs add an injected reporter beside the JSON one (a sidecar file in the temp dir) to read error identity; a custom `--runner-cmd` without `failureDetails` classifies every failure as an exception.
 
 ### Added
 
@@ -48,8 +45,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   took the claims file's directory for the project.
 - **`claim-thin` (#234).** `claims` and `status` flag a claim with fewer than
   two faults, or whose faults share one class, as advisory `thinClaims`.
+
+## [0.21.0] - 2026-11-10
+
+Automated weekly release — everything merged since `v0.20.1`.
+
+### Changed
+
+- feat(probe): tell a kill by assertion from a kill by crash; --require-assertion-kill (#233) (#241)
+- fix(probe): bind verdict reuse to the import closure, a live baseline and the instrument (#232) (#240)
+- chore(deps-dev): bump vitest from 5.0.2 to 5.0.5 in the all-npm group (#229)
+- chore(deps): bump fast-uri from 3.1.8 to 3.1.9 (#228)
+- [jules:docs-drift] brief — remove unsupported flags from docs (#227)
+- chore(deps-dev): bump vite from 8.3.1 to 8.3.4 (#224)
+- chore(deps-dev): bump vite from 8.3.0 to 8.3.4 in /fixtures/known-answer-playwright (#223)
+- [jules:docs-drift] probe — remove removed --changed flag (#220)
+- chore(homebrew): sha256 for v0.20.1 (#218)
+
+
+### Added
+
 - `killKind` on every kill: each failed test is classified `assertion` or `exception` from structured error identity (never message wording), `testRun.exceptionFailures` sits beside `assertionFailures`, and a `killed` record carries `detail.killKind` (`assertion`, `exception-only`, `mixed`). The default verdict is unchanged: an exception the fault provokes still kills.
 - `probe --require-assertion-kill` (and `admit`): an exception-only kill fails the policy, exit 1, verdict still `killed`. `status` and `brief` count exception-only kills as a named weakness.
+
+### Changed
+
+- `assertionFailures` is now assertion-only; a kill is `assertionFailures + exceptionFailures > 0`. Evidence written earlier has no `exceptionFailures` or `killKind` and reads as before; under the policy a kill with no recorded kind fails (unknown rounds toward unproven).
+- Under `--require-assertion-kill`, an exception-only kill whose runner reported no error identity (a custom `--runner-cmd` without `failureDetails`) says so per kill: `reason: "kind-not-reported-by-runner"` (`testRun.kindNotReported`, `detail.killKindReason`).
+- vitest and Playwright runs add an injected reporter beside the JSON one (a sidecar file in the temp dir) to read error identity; a custom `--runner-cmd` without `failureDetails` classifies every failure as an exception.
 
 ### Fixed
 
