@@ -1,6 +1,6 @@
 {
   "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine.",
-  "seconds": 4300,
+  "seconds": 3850,
   "measured": {
     "seconds": 816,
     "at": "2026-09-18",
@@ -61,6 +61,11 @@
       "seconds": 4300,
       "at": "2026-11-11",
       "why": "PR #244 (#239, the write boundary) run on head d1d6802 measured 3839 s on the Node 22 leg (567 faults, all killed) against 3400, over by 439 s. The branch merges main after #242 (probe --changed, external claims), #245 (fan-out) and #247 (--typecheck), which together took the fault count from 478 to 538 before this PR; this PR adds 29 faults in nine claims, measured at about 150 s locally (144 s runner time, the worst claim 25 s, under the 100 s per-claim ceiling). The rest of the growth is not this PR's and is not decomposed here. 4300 is 12% above the measured leg, the same CI-variance rule as 3400."
+    },
+    {
+      "seconds": 3850,
+      "at": "2026-11-11",
+      "why": "The ceiling goes DOWN from 4300. PR #254 (the suite runtime budget) ran the self-probe at 592 faults, all killed, on two heads with identical claims and defenders: 2901 s (run 43062166737, Node 22 leg) and 3366 s (run 43064382390, same leg); the earlier CI measurement was 3396 s. 3366 + 14% = 3837, rounded to 3850. The 465 s spread between two runs of the same code is the CI variance this headroom exists for (the lower run restored more reusable verdicts from the cache). No claim or defender changed in this PR; the 4300 set at 3839 s / 567 faults was a ceiling over a run that no longer reproduces."
     }
   ],
   "measuredInCI": {
