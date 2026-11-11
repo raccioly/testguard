@@ -72,6 +72,33 @@ export function buildScorecard({ toolRoot, results, mutants, machine }) {
   };
 }
 
+/**
+ * Joins scorecards from parallel shards (CI runs one per subject and per
+ * mutant shard). Rows and mutants are concatenated; each shard's normalized
+ * seconds stay as that shard measured them on its own runner. An empty input,
+ * or two shards from different tool builds, is refused.
+ */
+export function mergeScorecards(docs) {
+  if (docs.length === 0) throw new Error('mergeScorecards: nothing to merge');
+  const heads = new Set(docs.map((d) => d.tool.head));
+  if (heads.size > 1) throw new Error(`mergeScorecards: shards measured different builds (${[...heads].join(', ')})`);
+  const rows = docs.flatMap((d) => d.rows);
+  const mutantResults = docs.flatMap((d) => d.mutants?.results ?? []);
+  const totals = { right: 0, wrong: 0, critical: 0, known: 0, differentialMismatches: 0 };
+  for (const d of docs) for (const k of Object.keys(totals)) totals[k] += d.totals[k];
+  const factors = docs.map((d) => d.machine.speedFactor).filter((f) => f);
+  const mid = (a) => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
+  return {
+    schemaVersion: 1,
+    tool: docs[0].tool,
+    machine: { before: docs[0].machine.before, after: docs[docs.length - 1].machine.after, speedFactor: factors.length ? mid(factors) : null },
+    ok: docs.every((d) => d.ok),
+    totals,
+    rows,
+    ...(mutantResults.length || docs.some((d) => d.mutants) ? { mutants: { total: mutantResults.length, caught: mutantResults.filter((m) => m.caught).length, results: mutantResults } } : {}),
+  };
+}
+
 export function validateScorecard(doc) {
   const require = createRequire(import.meta.url);
   const Ajv = require('ajv');

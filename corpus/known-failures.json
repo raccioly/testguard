@@ -1,0 +1,8 @@
+{
+  "why": "Reviewed TestGuard defects the corpus exposes, each filed as an issue. An entry excuses exactly the observation it names, in any mode; a different observation is still a failure. A false kill (observed killed where the key says otherwise) can never be listed here: corpus/lib/checks.mjs refuses such an entry. Remove an entry in the pull request that fixes its issue.",
+  "entries": [
+    { "subject": "node-test-floorplan", "fault": "LSHAPE-ESTIMATE-USES-CORE-AREA/F1", "expected": { "verdict": "killed" }, "observed": { "verdict": "unverifiable", "reason": "subject-not-executed" }, "issue": 263 },
+    { "subject": "node-test-floorplan", "fault": "LSHAPE-ESTIMATE-USES-CORE-AREA/F2", "expected": { "verdict": "killed" }, "observed": { "verdict": "unverifiable", "reason": "subject-not-executed" }, "issue": 263 },
+    { "subject": "js-jest-newsletter", "fault": "SCHEDULE-VALIDATION/F1", "expected": { "verdict": "unverifiable", "reason": "anchor-ambiguous" }, "observed": { "verdict": "nocover" }, "issue": 265 }
+  ]
+}

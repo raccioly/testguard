@@ -31,5 +31,5 @@ Written by the orchestrator (infrastructure, not behavior): package.json (pinned
 
 ## Notes
 
-- The orchestrator first wrote vitest.config.ts with `fileURLToPath(new URL('./src', import.meta.url))`. TestGuard 0.22.1 refuses that project outright (exit 2: discovery follows `./src` into src/index.ts and cannot resolve `@/errors` without the alias). The config was changed to the equivalent `join(dirname(...), 'src')` so the subject measures everything else, the defect was filed (see corpus/README.md, known defects), and the key was re-derived under the new config (identical verdicts).
+- The orchestrator first wrote vitest.config.ts with `fileURLToPath(new URL('./src', import.meta.url))`. TestGuard 0.22.1 refuses that project outright (exit 2: discovery follows `./src` into src/index.ts and cannot resolve `@/errors` without the alias). The config was changed to the equivalent `join(dirname(...), 'src')` so the subject measures everything else, the defect was filed as #264, and the key was re-derived under the new config (identical verdicts).
 - The implementer added `"baseUrl": "."` to tsconfig.json beside the requested paths.

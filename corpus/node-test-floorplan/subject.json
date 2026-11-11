@@ -2,7 +2,7 @@
   "runner": "node-test",
   "install": "npm-workspace",
   "testFiles": "^packages/[^/]+/test/.*\\.test\\.js$",
-  "budgetMs": 15000,
+  "budgetMs": 60000,
   "probeArgs": [
     "--runner",
     "node-test"

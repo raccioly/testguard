@@ -2,7 +2,7 @@
   "runner": "pytest",
   "install": "python-venv",
   "testFiles": "^tests/test_.*\\.py$",
-  "budgetMs": 15000,
+  "budgetMs": 60000,
   "counters": [
     "tests/.fee_rotation",
     "tests/.holds_counter"

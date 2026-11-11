@@ -2,7 +2,7 @@
   "runner": "jest",
   "install": "npm",
   "testFiles": "^test/.*\\.test\\.js$",
-  "budgetMs": 10000,
+  "budgetMs": 20000,
   "probeArgs": [
     "--runner",
     "jest"

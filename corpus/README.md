@@ -132,6 +132,14 @@ and after the run, divided by the `baselineMs` in `testguard.cost-budget.json`),
 and each mode's speedup against the reference. CI publishes it as a job
 summary, with the base branch's numbers beside it when the base has one.
 
+## Known TestGuard defects the corpus found
+
+| Issue | Subject | What |
+|---|---|---|
+| #263 | `node-test-floorplan` | A fault in a workspace package, defended by a sibling package's test through the `node_modules` link, reads `unverifiable`/`subject-not-executed`: the scratch worktree's link resolves to the original checkout. Known failure for `LSHAPE-ESTIMATE-USES-CORE-AREA/F1`, `/F2`. |
+| #264 | `ts-vitest-stock` | A vitest alias written `fileURLToPath(new URL('./src', import.meta.url))` makes `probe` refuse the whole project (exit 2). The subject uses the equivalent `join()` form so it measures everything else. |
+| #265 | `js-jest-newsletter` | GATE-SEMANTICS does not order `nocover` against an invalid anchor; the tool says `nocover`, the key says `anchor-ambiguous`. Known failure for `SCHEDULE-VALIDATION/F1` until the spec settles it. |
+
 ## A project outside the repository
 
 The private real-codebase benchmark (see `bench/README.md`) runs through the

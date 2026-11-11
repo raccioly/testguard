@@ -12,6 +12,8 @@
  *   npm run corpus -- --check-mutants               every patch still applies (no runs)
  *   npm run corpus -- --install [--subject <name>]  install subjects' pinned dependencies
  *   --json <out>   write the scorecard JSON;  --markdown <out>  the rendered table
+ *   npm run corpus -- --merge a.json b.json ... [--base base.json]   join shard scorecards
+ *   --base <scorecard.json>  print the base's normalized seconds beside each row
  *   --python <interpreter>  (or TESTGUARD_PYTHON) for Python subjects
  *   --tool <dir>   the TestGuard checkout to measure (default: this one)
  *
@@ -20,14 +22,14 @@
  * a subject cannot be measured at all (missing dependencies, a key that does
  * not match its claims).
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { loadKnownFailures } from './lib/checks.mjs';
 import { MODES, RUN, applies } from './lib/modes.mjs';
-import { checkMutants, runMutants } from './lib/mutants.mjs';
-import { buildScorecard, measureMachine, renderMarkdown, validateScorecard } from './lib/scorecard.mjs';
+import { checkMutants, loadManifest, runMutants } from './lib/mutants.mjs';
+import { buildScorecard, measureMachine, mergeScorecards, renderMarkdown, validateScorecard } from './lib/scorecard.mjs';
 import { CORPUS, SubjectError, install, listSubjects, loadSubject, preflight } from './lib/subject.mjs';
 
 const TOOL_ROOT = resolve(CORPUS, '..');
@@ -60,8 +62,11 @@ export async function runSubject(subject, { modes, toolRoot = TOOL_ROOT, python,
 }
 
 async function main() {
-  const { values } = parseArgs({
+  const { values, positionals } = parseArgs({
+    allowPositionals: true,
     options: {
+      merge: { type: 'boolean' },
+      base: { type: 'string' },
       subject: { type: 'string', multiple: true },
       mode: { type: 'string', multiple: true },
       'subject-dir': { type: 'string' },
@@ -82,6 +87,21 @@ async function main() {
   const log = values.quiet ? () => {} : (s) => console.error(s);
   const toolRoot = values.tool ? resolve(values.tool) : TOOL_ROOT;
 
+  const base = values.base && existsSync(values.base) ? JSON.parse(readFileSync(values.base, 'utf8')) : null;
+  const emit = (scorecard) => {
+    validateScorecard(scorecard);
+    const markdown = renderMarkdown(scorecard, { base });
+    if (values.json) { mkdirSync(dirname(resolve(values.json)), { recursive: true }); writeFileSync(values.json, `${JSON.stringify(scorecard, null, 2)}\n`); }
+    if (values.markdown) { mkdirSync(dirname(resolve(values.markdown)), { recursive: true }); writeFileSync(values.markdown, markdown); }
+    console.log(markdown);
+    process.exit(scorecard.ok ? 0 : 1);
+  };
+
+  if (values.merge) {
+    if (positionals.length === 0) { console.error('corpus: --merge needs scorecard files'); process.exit(3); }
+    emit(mergeScorecards(positionals.map((p) => validateScorecard(JSON.parse(readFileSync(p, 'utf8'))))));
+  }
+
   if (values['check-mutants']) {
     const report = checkMutants(toolRoot);
     for (const m of report) console.log(`${m.applies ? 'applies ' : 'DRIFTED '} ${m.name}${m.applies ? '' : `: ${m.error}`}`);
@@ -94,10 +114,15 @@ async function main() {
       if (!values.key) throw new SubjectError('--subject-dir needs --key <expected.json>');
       subjects.push(loadSubject(values['subject-dir'], { keyPath: values.key, claimsPath: values.claims, configPath: values.config }));
     } else {
-      const names = values.subject ?? listSubjects();
+      // A mutant shard needs only the subjects its mutants name.
+      const targeted = values['tool-mutants'] && !values.subject
+        ? [...new Set(loadManifest().filter((m) => !values.mutant || values.mutant.includes(m.name)).flatMap((m) => m.targets.map((t) => t.subject)))]
+        : null;
+      const names = values.subject ?? targeted ?? listSubjects();
       for (const n of names) subjects.push(loadSubject(join(CORPUS, n)));
     }
     if (subjects.length === 0) throw new SubjectError('no subject selected');
+    if (values.mutant) for (const m of values.mutant) if (!loadManifest().some((x) => x.name === m)) throw new SubjectError(`unknown mutant ${m}`);
     if (values.install) {
       for (const s of subjects) { log(`installing ${s.name}`); install(s, { python: values.python }); }
       return;
@@ -120,13 +145,7 @@ async function main() {
     for (const s of subjects) results.push(...await runSubject(s, { modes, toolRoot, python: values.python, known, log }));
   }
   const machineAfter = measureMachine();
-  const scorecard = buildScorecard({ toolRoot, results, mutants, machine: { before: machineBefore, after: machineAfter } });
-  validateScorecard(scorecard);
-  const markdown = renderMarkdown(scorecard);
-  if (values.json) { mkdirSync(dirname(resolve(values.json)), { recursive: true }); writeFileSync(values.json, `${JSON.stringify(scorecard, null, 2)}\n`); }
-  if (values.markdown) { mkdirSync(dirname(resolve(values.markdown)), { recursive: true }); writeFileSync(values.markdown, markdown); }
-  console.log(markdown);
-  process.exit(scorecard.ok ? 0 : 1);
+  emit(buildScorecard({ toolRoot, results, mutants, machine: { before: machineBefore, after: machineAfter } }));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

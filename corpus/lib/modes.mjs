@@ -95,6 +95,7 @@ export const RUN = {
       commitEdits(repo, spec.edits, 'corpus: reuse edit');
       const edited = await p([]);
       runs.push(runSummary('after-edit', edited));
+      checks.push(exitCheck(edited));
       const b = keyAndDiff({ ...ctx, reference: null }, 'reuse-edit', edited);
       const notRemeasured = spec.mustRemeasure.filter((id) => b.observed.map[id]?.reused !== false);
       checks.push(check('edit-remeasures-importers', notRemeasured.length === 0, notRemeasured.length ? { reusedAfterTheirImportChanged: notRemeasured } : `${spec.mustRemeasure.length} measured again`));
@@ -103,6 +104,7 @@ export const RUN = {
       try {
         const version = await p([], bumped);
         runs.push(runSummary('after-version-change', version));
+        checks.push(exitCheck(version));
         const c = keyAndDiff({ ...ctx, reference: null }, 'reuse-edit', version);
         checks.push(check('version-change-reuses-nothing', (version.evidence?.run?.reuse?.reused ?? -1) === 0, version.evidence?.run?.reuse));
         key = mergeKey(key, c.key);

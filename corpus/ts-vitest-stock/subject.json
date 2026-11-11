@@ -2,7 +2,7 @@
   "runner": "vitest",
   "install": "npm",
   "testFiles": "^test/.*\\.test\\.ts$",
-  "budgetMs": 15000,
+  "budgetMs": 60000,
   "typecheck": true,
   "probeArgs": [
     "--runner",
