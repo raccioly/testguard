@@ -92,7 +92,8 @@ describe('testguard admit on the known-answer fixture', () => {
     expect(ev.records).toHaveLength(out.faults.length);
     expect(existsSync(join(scratch, '.testguard', 'evidence.json'))).toBe(false); // never the canonical file
     const b = capture();
-    expect(await main(['admit', testFile(), '--claim', 'REDACT-001', '--budget', '30000'], b.io)).toBe(1);
+    // The text rendering of the same refusal, on the one fault that blocks: the full fault list was measured and asserted above.
+    expect(await main(['admit', testFile(), '--claim', 'REDACT-001', '--fault', 'F1', '--budget', '30000'], b.io)).toBe(1);
     expect(b.lines.out.join('\n')).toMatch(/^NOT ADMITTED: survived on REDACT-001\/F1$/m);
   }, 120_000);
 
