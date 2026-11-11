@@ -1,0 +1,402 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "RECT-AREA-PERIMETER",
+      "statement": "A rectangle of width w and height h reports area w × h and perimeter 2 × (w + h), so a 4 by 2.5 rectangle has area 10 and perimeter 13.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:node-test-floorplan#R1"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "packages/geometry/test/shapes.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The perimeter getter is replaced by an incomplete expression, so the module cannot be parsed or loaded.",
+          "faultClass": "return-altered",
+          "file": "packages/geometry/src/shapes.js",
+          "find": "return 2 * (this.width + this.height);",
+          "replace": "return 2 * (this.width + ;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The area is computed from the width twice instead of width times height.",
+          "faultClass": "variable-swap",
+          "file": "packages/geometry/src/shapes.js",
+          "find": "this.width * this.height",
+          "replace": "this.width * this.width",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SHAPE-REJECTS-INVALID",
+      "statement": "Shape creation rejects zero, negative, NaN and infinite dimensions, and an L-shape whose notch is as wide or as tall as the outer rectangle, with InvalidDimension.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:node-test-floorplan#R3"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "packages/geometry/test/shapes.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A zero dimension is accepted because the lower bound check becomes strict.",
+          "faultClass": "literal-changed",
+          "file": "packages/geometry/src/shapes.js",
+          "find": "value <= 0",
+          "replace": "value < 0",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A notch width equal to the outer width is accepted because the comparison becomes strict.",
+          "faultClass": "condition-forced",
+          "file": "packages/geometry/src/shapes.js",
+          "find": "this.notchWidth >= this.outerWidth",
+          "replace": "this.notchWidth > this.outerWidth",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LENGTH-CONVERSION",
+      "statement": "convertLength converts using exactly 1 ft = 0.3048 m and 1 in = 0.0254 m and rounds to 4 decimals half away from zero, so 10 ft is 3.048 m and 100 cm is 39.3701 in.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:node-test-floorplan#R4"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "packages/geometry/test/units.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The conversion factor is inverted (target and source swapped) for lengths; the anchor also matches the area conversion, so only the first hit is replaced.",
+          "faultClass": "argument-swapped",
+          "file": "packages/geometry/src/units.js",
+          "find": "value * factor(from, to)",
+          "replace": "value * factor(to, from)",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The feet-to-meter constant is wrong (digits transposed).",
+          "faultClass": "literal-changed",
+          "file": "packages/geometry/src/units.js",
+          "find": "ft: 0.3048",
+          "replace": "ft: 0.3408",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Rounding truncates instead of rounding to nearest, so 39.37007874 becomes 39.37 rather than 39.3701.",
+          "faultClass": "return-altered",
+          "file": "packages/geometry/src/units.js",
+          "find": "Math.round(Math.abs(value)",
+          "replace": "Math.trunc(Math.abs(value)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "OVERLAP-INTERIOR-ONLY",
+      "statement": "overlaps returns true only when two rectangles share interior area; rectangles touching along an edge or corner do not overlap.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:node-test-floorplan#R6"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "packages/geometry/test/units.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The horizontal comparison becomes inclusive, so rectangles touching along a vertical edge count as overlapping.",
+          "faultClass": "condition-forced",
+          "file": "packages/geometry/src/units.js",
+          "find": "a.x < b.x + b.width",
+          "replace": "a.x <= b.x + b.width",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "One of the horizontal separation checks is forced true so rectangles that are apart horizontally can still be reported as overlapping.",
+          "faultClass": "guard-removed",
+          "file": "packages/geometry/src/units.js",
+          "find": "b.x < a.x + a.width &&",
+          "replace": "true &&",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The vertical check is removed (anchor written against an older shorter property name).",
+          "faultClass": "guard-removed",
+          "file": "packages/geometry/src/units.js",
+          "find": "a.y < b.y + b.h &&",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PLACE-ROOM-REJECTIONS",
+      "statement": "placeRoom rejects a room that overlaps an existing room with RoomOverlap naming the new room and then the first overlapping existing room, and rejects a duplicate name with DuplicateRoom.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:node-test-floorplan#R7"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "packages/planner/test/layout.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Overlap detection is disabled so overlapping rooms are accepted.",
+          "faultClass": "condition-forced",
+          "file": "packages/planner/src/plan.js",
+          "find": "if (hit) throw",
+          "replace": "if (false) throw",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The RoomOverlap message names the rooms in the wrong order.",
+          "faultClass": "argument-swapped",
+          "file": "packages/planner/src/plan.js",
+          "find": "new RoomOverlap(name, hit.name)",
+          "replace": "new RoomOverlap(hit.name, name)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The duplicate-name check is deleted, so a repeated name is reported as an overlap or accepted.",
+          "faultClass": "statement-deleted",
+          "file": "packages/planner/src/plan.js",
+          "find": "if (plan.rooms.some((r) => r.name === name)) throw new DuplicateRoom(name);",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LOT-SETBACK",
+      "statement": "With a setback of s, fitsInLot requires every room to lie at least s inside every lot edge, and a negative setback is rejected with InvalidDimension.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:node-test-floorplan#R9"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "packages/planner/test/layout.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The left edge check ignores the setback and compares against zero.",
+          "faultClass": "literal-changed",
+          "file": "packages/planner/src/plan.js",
+          "find": "r.x >= setback &&",
+          "replace": "r.x >= 0 &&",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The negative setback check is removed so negative values are accepted.",
+          "faultClass": "guard-removed",
+          "file": "packages/planner/src/plan.js",
+          "find": "|| setback < 0",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LSHAPE-ESTIMATE-USES-CORE-AREA",
+      "statement": "A flooring estimate for an L-shaped room is based on the geometry core's L-shape area, so a 68 square meter L-shape in carpet yields 71.5.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:node-test-floorplan#R12"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "packages/planner/test/estimate.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The L-shape area adds the notch instead of subtracting it.",
+          "faultClass": "return-altered",
+          "file": "packages/geometry/src/shapes.js",
+          "find": "- this.notchWidth * this.notchHeight;",
+          "replace": "+ this.notchWidth * this.notchHeight;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The outer area is computed from the outer height twice instead of width times height.",
+          "faultClass": "variable-swap",
+          "file": "packages/geometry/src/shapes.js",
+          "find": "this.outerWidth * this.outerHeight -",
+          "replace": "this.outerHeight * this.outerHeight -",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The estimator no longer reads the area from a shape object, so an L-shape is rejected as an invalid area.",
+          "faultClass": "field-dropped",
+          "file": "packages/planner/src/estimate.js",
+          "find": "area.area : area",
+          "replace": "area : area",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SUMMARY-TOTALS-AND-NAMES",
+      "statement": "summarize returns the room count, the total floor area in square meters rounded to 2 decimals, and the room names sorted alphabetically ignoring case.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:node-test-floorplan#R13"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "packages/planner/test/summary.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The area reduction reads a nonexistent size property on each room, so summarize throws a TypeError for any non-empty plan.",
+          "faultClass": "variable-swap",
+          "file": "packages/planner/src/estimate.js",
+          "find": "sum + r.width * r.height",
+          "replace": "sum + r.size.width * r.size.height",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Names are compared case-sensitively, so \"Den\" sorts before \"attic\".",
+          "faultClass": "call-removed",
+          "file": "packages/planner/src/estimate.js",
+          "find": "const x = a.toLowerCase();\n      const y = b.toLowerCase();",
+          "replace": "const x = a;\n      const y = b;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The total area is rounded to 1 decimal instead of 2.",
+          "faultClass": "literal-changed",
+          "file": "packages/planner/src/estimate.js",
+          "find": "Math.round(v * 100 + 1e-9) / 100",
+          "replace": "Math.round(v * 10 + 1e-9) / 10",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    }
+  ]
+}

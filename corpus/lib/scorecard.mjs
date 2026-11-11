@@ -1,0 +1,121 @@
+/**
+ * The scorecard: one JSON document (corpus/scorecard.schema.json) and a
+ * rendered Markdown table. Seconds are also given normalized by the reference
+ * workload of #255, timed before and after the run on the same machine, so two
+ * scorecards from different runners can be compared.
+ */
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { createRequire } from 'node:module';
+import { CORPUS } from './subject.mjs';
+import { measureReference, WORKLOAD } from '../../.github/scripts/measure-reference.mjs';
+
+export const SCHEMA_PATH = join(CORPUS, 'scorecard.schema.json');
+
+export function measureMachine() {
+  const r = measureReference({ runs: 5 });
+  return { workload: WORKLOAD, medianMs: r.medianMs, samplesMs: r.samplesMs.map((x) => Math.round(x)) };
+}
+
+function speedFactor(machine, toolRoot) {
+  const budget = JSON.parse(readFileSync(join(toolRoot, 'testguard.cost-budget.json'), 'utf8'));
+  const baselineMs = budget.reference?.baselineMs;
+  if (!(baselineMs > 0) || budget.reference?.workload !== WORKLOAD) return null;
+  return ((machine.before.medianMs + machine.after.medianMs) / 2) / baselineMs;
+}
+
+export function buildScorecard({ toolRoot, results, mutants, machine }) {
+  const factor = speedFactor(machine, toolRoot);
+  const norm = (ms) => (factor ? Math.round((ms / 1000 / factor) * 10) / 10 : null);
+  let head = null;
+  try { head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: toolRoot, encoding: 'utf8' }).trim(); } catch {}
+  const version = JSON.parse(readFileSync(join(toolRoot, 'package.json'), 'utf8')).version;
+  const refSeconds = {};
+  for (const r of results) if (r.mode === 'reference') refSeconds[r.subject] = r.runs.reduce((s, x) => s + x.elapsedMs, 0);
+  const rows = results.map((r) => {
+    const ms = r.runs.reduce((s, x) => s + x.elapsedMs, 0);
+    const inv = r.runs.every((x) => x.runnerInvocations !== null) ? r.runs.reduce((s, x) => s + x.runnerInvocations, 0) : null;
+    const ref = refSeconds[r.subject];
+    return {
+      subject: r.subject,
+      mode: r.mode,
+      ok: r.ok,
+      error: r.error ? String(r.error).split('\n')[0] : null,
+      faults: r.key ? { total: r.key.total, right: r.key.right, wrong: r.key.wrong, critical: r.key.critical, known: r.key.known } : null,
+      mismatches: r.key?.mismatches ?? [],
+      differential: r.differential ? { equal: r.differential.equal, compared: r.differential.compared, orderEqual: r.differential.orderEqual, mismatches: r.differential.mismatches } : null,
+      checks: r.checks.map((c) => ({ check: c.check, ok: c.ok, detail: c.detail ?? null })),
+      runs: r.runs,
+      runnerInvocations: inv,
+      seconds: Math.round(ms / 100) / 10,
+      normalizedSeconds: norm(ms),
+      speedup: ref && r.mode !== 'reference' && r.runs.length === 1 ? Math.round((ref / ms) * 100) / 100 : null,
+      ...(r.partial ? { partial: r.partial } : {}),
+    };
+  });
+  const totals = rows.reduce((t, r) => {
+    if (r.faults) { t.right += r.faults.right; t.wrong += r.faults.wrong; t.critical += r.faults.critical; t.known += r.faults.known; }
+    if (r.differential && !r.differential.equal) t.differentialMismatches++;
+    return t;
+  }, { right: 0, wrong: 0, critical: 0, known: 0, differentialMismatches: 0 });
+  const mutantSummary = mutants ? { total: mutants.length, caught: mutants.filter((m) => m.caught).length, results: mutants } : null;
+  const ok = rows.every((r) => r.ok) && (!mutantSummary || (mutantSummary.caught === mutantSummary.total));
+  return {
+    schemaVersion: 1,
+    tool: { version, head },
+    machine: { ...machine, speedFactor: factor && Math.round(factor * 1000) / 1000 },
+    ok,
+    totals,
+    rows,
+    ...(mutantSummary ? { mutants: mutantSummary } : {}),
+  };
+}
+
+export function validateScorecard(doc) {
+  const require = createRequire(import.meta.url);
+  const Ajv = require('ajv');
+  const ajv = new Ajv({ allErrors: true, strict: false });
+  const validate = ajv.compile(JSON.parse(readFileSync(SCHEMA_PATH, 'utf8')));
+  if (!validate(doc)) throw new Error(`scorecard does not conform to ${SCHEMA_PATH}: ${ajv.errorsText(validate.errors)}`);
+  return doc;
+}
+
+const cell = (x) => (x === null || x === undefined ? '–' : String(x));
+
+export function renderMarkdown(doc, { base = null } = {}) {
+  const lines = [];
+  lines.push(`## Corpus scorecard — TestGuard ${doc.tool.version}${doc.tool.head ? ` @ ${doc.tool.head.slice(0, 12)}` : ''}`);
+  lines.push('');
+  lines.push(doc.ok ? '**All checks passed.**' : '**RED: at least one check failed.**');
+  lines.push('');
+  lines.push(`Totals: ${doc.totals.right} right, ${doc.totals.wrong} wrong, ${doc.totals.critical} critical, ${doc.totals.known} known (filed), ${doc.totals.differentialMismatches} differential mismatches.${doc.machine.speedFactor ? ` Machine speed factor ${doc.machine.speedFactor} (reference workload ${doc.machine.before.medianMs.toFixed(0)} / ${doc.machine.after.medianMs.toFixed(0)} ms).` : ''}`);
+  if (doc.rows.length) {
+    lines.push('');
+    const baseRows = new Map((base?.rows ?? []).map((r) => [`${r.subject}/${r.mode}`, r]));
+    lines.push(`| subject | mode | ok | right | wrong | critical | known | differential | checks | invocations | seconds | normalized s | speedup${base ? ' | base normalized s' : ''} |`);
+    lines.push(`|---|---|---|---|---|---|---|---|---|---|---|---|---${base ? '|---' : ''}|`);
+    for (const r of doc.rows) {
+      const failed = r.checks.filter((c) => !c.ok).map((c) => c.check);
+      const b = baseRows.get(`${r.subject}/${r.mode}`);
+      lines.push(`| ${r.subject} | ${r.mode} | ${r.ok ? 'yes' : '**NO**'} | ${cell(r.faults?.right)} | ${cell(r.faults?.wrong)} | ${cell(r.faults?.critical)} | ${cell(r.faults?.known)} | ${r.differential ? (r.differential.equal ? 'equal' : '**mismatch**') : '–'} | ${failed.length ? `**${failed.join(', ')}**` : `${r.checks.length} ok`}${r.error ? ` error: ${r.error}` : ''} | ${cell(r.runnerInvocations)} | ${r.seconds} | ${cell(r.normalizedSeconds)} | ${cell(r.speedup)}${base ? ` | ${cell(b?.normalizedSeconds)}` : ''} |`);
+    }
+    const mism = doc.rows.flatMap((r) => r.mismatches.map((m) => ({ ...m, subject: r.subject, mode: r.mode })));
+    if (mism.length) {
+      lines.push('');
+      lines.push('| subject | mode | fault | expected | observed | |');
+      lines.push('|---|---|---|---|---|---|');
+      const fmt = (v) => (v ? `${v.verdict}${v.reason ? ` (${v.reason})` : ''}${v.killKind ? ` [${v.killKind}]` : ''}` : 'not reported');
+      for (const m of mism) lines.push(`| ${m.subject} | ${m.mode} | ${m.fault} | ${fmt(m.expected)} | ${fmt(m.observed)} | ${m.critical ? '**CRITICAL**' : m.knownIssue ? `known: #${m.knownIssue}` : '**wrong**'} |`);
+    }
+  }
+  if (doc.mutants) {
+    lines.push('');
+    lines.push(`### Tool mutants: ${doc.mutants.caught} of ${doc.mutants.total} caught`);
+    lines.push('');
+    lines.push('| mutant | caught | by |');
+    lines.push('|---|---|---|');
+    for (const m of doc.mutants.results) lines.push(`| ${m.name} | ${m.caught ? 'yes' : '**NO**'} | ${m.caught ? m.caughtBy : (m.error ?? 'nothing went red')} |`);
+  }
+  return `${lines.join('\n')}\n`;
+}

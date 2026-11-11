@@ -1,0 +1,390 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "LOAN-DUE-DATE",
+      "statement": "A loan's due date is the checkout date plus the item type's loan period: 21 days for a book, 7 for a tool, 14 for a game and 7 for a dvd.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-pytest-circulation#R1"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_loans.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Books get a 28-day loan period instead of 21.",
+          "faultClass": "literal-changed",
+          "file": "circulation/loans.py",
+          "find": "\"book\": 21",
+          "replace": "\"book\": 28",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Every loan uses the book loan period regardless of item type.",
+          "faultClass": "variable-swap",
+          "file": "circulation/loans.py",
+          "find": "checkout + timedelta(days=LOAN_DAYS[item_type])",
+          "replace": "checkout + timedelta(days=LOAN_DAYS[\"book\"])",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LATE-FEE-GRACE",
+      "statement": "Members get 3 grace days and guests get none; billable days are days late minus grace days, never negative.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-pytest-circulation#R5"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_fees.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Members get only 2 grace days (guests unaffected).",
+          "faultClass": "literal-changed",
+          "file": "circulation/fees.py",
+          "find": "{\"member\": 3, \"guest\": 0}",
+          "replace": "{\"member\": 2, \"guest\": 0}",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Guests get 1 grace day (members unaffected).",
+          "faultClass": "literal-changed",
+          "file": "circulation/fees.py",
+          "find": "\"guest\": 0}",
+          "replace": "\"guest\": 1}",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Billable days ignore grace days entirely.",
+          "faultClass": "statement-deleted",
+          "file": "circulation/fees.py",
+          "find": "billable = max(0, days_late - grace[patron_class])",
+          "replace": "billable = days_late",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LATE-FEE-RATE",
+      "statement": "The daily late rate is 10 cents for book and dvd and 25 cents for tool and game for members, and doubled for guests.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-pytest-circulation#R6"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_fees.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Guests are no longer charged double (members unaffected).",
+          "faultClass": "condition-forced",
+          "file": "circulation/fees.py",
+          "find": "(2 if patron_class == \"guest\" else 1)",
+          "replace": "1",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The dvd daily rate becomes 15 cents for everyone.",
+          "faultClass": "literal-changed",
+          "file": "circulation/fees.py",
+          "find": "\"dvd\": 10",
+          "replace": "\"dvd\": 15",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Members are charged the doubled rate too (guests unaffected).",
+          "faultClass": "literal-changed",
+          "file": "circulation/fees.py",
+          "find": "\"guest\" else 1)",
+          "replace": "\"guest\" else 2)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LATE-FEE-CAP",
+      "statement": "A late fee never exceeds 1500 cents for members or 1000 cents for guests, and an unknown patron class is rejected with INVALID_PATRON_CLASS.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-pytest-circulation#R7"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_fees.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The guest cap is raised to 1500 cents (members unaffected).",
+          "faultClass": "literal-changed",
+          "file": "circulation/fees.py",
+          "find": "\"guest\": 1000}",
+          "replace": "\"guest\": 1500}",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The cap is not applied for anyone.",
+          "faultClass": "guard-removed",
+          "file": "circulation/fees.py",
+          "find": "min(billable * rate, CAPS[patron_class])",
+          "replace": "billable * rate",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The patron class check is skipped, so an unknown class fails with a different error.",
+          "faultClass": "condition-forced",
+          "file": "circulation/fees.py",
+          "find": "if patron_class not in GRACE_DAYS:",
+          "replace": "if False:",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "HOLD-QUEUE-ORDER",
+      "statement": "A hold queue is ordered by priority class (staff, then member, then guest) and, within a class, by the order holds were placed.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-pytest-circulation#R8"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_holds.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The queue is sorted by arrival only, ignoring priority class.",
+          "faultClass": "argument-swapped",
+          "file": "circulation/holds.py",
+          "find": "queue.sort(key=lambda entry: entry[:2])",
+          "replace": "queue.sort(key=lambda entry: entry[1])",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Guests outrank members in the priority ranking.",
+          "faultClass": "literal-changed",
+          "file": "circulation/holds.py",
+          "find": "\"member\": 1, \"guest\": 2",
+          "replace": "\"member\": 2, \"guest\": 1",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "HOLD-DUPLICATE-AND-PRIORITY",
+      "statement": "A patron may have only one hold per item (a second is rejected with DUPLICATE_HOLD) and an unknown priority class is rejected with INVALID_PRIORITY.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-pytest-circulation#R9"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_holds.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The duplicate check is inverted, rejecting holds from patrons who are not already queued.",
+          "faultClass": "condition-forced",
+          "file": "circulation/holds.py",
+          "find": "entry[2] == patron_id",
+          "replace": "entry[2] != patron_id",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The priority validation is skipped, so an unknown class fails with a different error.",
+          "faultClass": "guard-removed",
+          "file": "circulation/holds.py",
+          "find": "if priority not in PRIORITY_RANK:",
+          "replace": "if False:",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MEMBERSHIP-NEW-EXPIRY",
+      "statement": "Renewing before or on expiry extends from the current expiry by one year, a lapsed renewal extends from the renewal date by one year, and 29 February maps to 28 February in a non-leap year.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-pytest-circulation#R12"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_membership.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The new expiry is always based on the current expiry, even for lapsed memberships.",
+          "faultClass": "variable-swap",
+          "file": "circulation/membership.py",
+          "find": "expiry if renewal <= expiry else renewal",
+          "replace": "expiry",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A 29 February expiry moves to 1 February instead of 28 February in a non-leap year.",
+          "faultClass": "literal-changed",
+          "file": "circulation/membership.py",
+          "find": ", day=28)",
+          "replace": ", day=1)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MEMBERSHIP-EARLY-DISCOUNT",
+      "statement": "Renewing from 30 days before expiry up to the expiry date, inclusive, earns a 10% discount rounded down to a whole cent; all other renewals pay the full fee.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-pytest-circulation#R13"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_membership.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The 30-days-before boundary is made exclusive, so a renewal exactly 30 days early pays full price.",
+          "faultClass": "condition-forced",
+          "file": "circulation/membership.py",
+          "find": "expiry - timedelta(days=EARLY_WINDOW_DAYS) <= renewal <= expiry",
+          "replace": "expiry - timedelta(days=EARLY_WINDOW_DAYS) < renewal <= expiry",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The early-renewal window shrinks to 14 days.",
+          "faultClass": "literal-changed",
+          "file": "circulation/membership.py",
+          "find": "EARLY_WINDOW_DAYS = 30",
+          "replace": "EARLY_WINDOW_DAYS = 14",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The discount calculation is left incomplete, so the module cannot be imported.",
+          "faultClass": "return-altered",
+          "file": "circulation/membership.py",
+          "find": "return fee * 90 // 100",
+          "replace": "return fee * 90 //",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    }
+  ]
+}

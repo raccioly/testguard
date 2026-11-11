@@ -1,0 +1,26 @@
+{
+  "runner": "node-test",
+  "install": "npm-workspace",
+  "testFiles": "^packages/[^/]+/test/.*\\.test\\.js$",
+  "budgetMs": 15000,
+  "probeArgs": [
+    "--runner",
+    "node-test"
+  ],
+  "noise": [
+    {
+      "add": "packages/geometry/src/unused-banner.js",
+      "content": "// corpus metamorphic noise: an unrelated module nothing imports\nexport const BANNER = 'corpus';\n"
+    },
+    {
+      "rename": [
+        "SPEC.md",
+        "docs/SPEC.md"
+      ]
+    }
+  ],
+  "workspaceLinks": [
+    "@floorplan/geometry",
+    "@floorplan/planner"
+  ]
+}

@@ -1,0 +1,395 @@
+{
+  "confirmRuns": 3,
+  "derivedWith": "node corpus/derive.mjs (applies each fault by hand to a scratch copy and runs the subject's own runner; never TestGuard). Verdicts written by hand in provenance/judgments.json.",
+  "expected": {
+    "RESERVE-SUCCEEDS-WITHIN-AVAILABLE/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Baseline green 3/3; duplicate ids fail the unique-id assertion in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/reserve.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe RRR",
+        "outputHash": "eb6de171b568a1449b4f34323df6a1f0a9e482a36243e8428f7b74c7bfebcbe8",
+        "derivedAt": "2026-11-11T23:16:11.694Z"
+      }
+    },
+    "RESERVE-SUCCEEDS-WITHIN-AVAILABLE/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Available stock no longer drops; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/reserve.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe RRR",
+        "outputHash": "d34c8826b025468dba5a591aadf8ee8ff8950c12fc433d6ab43e98fe028f4a56",
+        "derivedAt": "2026-11-11T23:16:13.635Z"
+      }
+    },
+    "RESERVE-SUCCEEDS-WITHIN-AVAILABLE/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Reserving exactly the available quantity throws InsufficientStock (an exception in that test) and other tests fail by assertion; every run has at least one assertion failure, so the kill is by assertion.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/reserve.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe RRR",
+        "outputHash": "b29f76f7b71a8a7c194813b4ea5f703def85957d72c5c39e6a39b378874b3694",
+        "derivedAt": "2026-11-11T23:16:15.598Z"
+      }
+    },
+    "RESERVE-REJECTS-INVALID-INPUT/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Every run has assertion failures (the InvalidQuantity checks) beside exceptions.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/reserve.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe RRR",
+        "outputHash": "0410123c63800cc7454e2d2fb6f0c6ccd95d2838c7c5da65bea5204284eb4feb",
+        "derivedAt": "2026-11-11T23:16:17.266Z"
+      }
+    },
+    "RESERVE-REJECTS-INVALID-INPUT/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "An unknown SKU fails with InsufficientStock; the toBeInstanceOf(UnknownSku) assertion fails in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/reserve.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe RRR",
+        "outputHash": "6d20fe69769c13ba5d8e0843d907459985399b5ecd33ba6057ec55ad193de4f6",
+        "derivedAt": "2026-11-11T23:16:18.743Z"
+      }
+    },
+    "SWEEP-EXPIRES-AT-EXPIRY-INSTANT/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The exact-expiry-instant assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/lifetime.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe RRR",
+        "outputHash": "2aac66397b0eea9d646df1c871e5e2935aa7a18c896036f635cac4a29bf70783",
+        "derivedAt": "2026-11-11T23:16:20.291Z"
+      }
+    },
+    "SWEEP-EXPIRES-AT-EXPIRY-INSTANT/F2": {
+      "verdict": "fault-invalid",
+      "reason": "replacement-does-not-compile",
+      "why": "`r.expiresAt <= )` does not parse: vitest reports the suite failed to load in all three runs (tsc: TS1109 Expression expected).",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/lifetime.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 2; probe LLL",
+        "outputHash": "057c6d759f50a937ca23b71820d94ff9813787415cb9a714cf8cbd89efb018d7",
+        "derivedAt": "2026-11-11T23:16:21.801Z"
+      }
+    },
+    "RECEIVE-ADDS-STOCK/F1": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "Receiving any new SKU throws a TypeError (seedWarehouse calls receive), so every test fails by exception and none by assertion, in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/adjustments.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe RRR",
+        "outputHash": "e4afc47690b069f6ed914e64676adfddf6fafa8b267a99c7c2e4f2a9deea0b86",
+        "derivedAt": "2026-11-11T23:16:23.605Z"
+      }
+    },
+    "RECEIVE-ADDS-STOCK/F2": {
+      "verdict": "survived",
+      "why": "test/adjustments.test.ts never tries an over-long SKU: green 3/3. Control red (it executes adjustments.ts). No test in the whole suite fails in every run.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/adjustments.test.ts --reporter=json --outputFile=<report> --no-file-parallelism",
+          "wholeSuite": "node_modules/.bin/vitest run test/adjustments.test.ts test/lifetime.test.ts test/pricing.test.ts test/report.test.ts test/reserve.test.ts test/totals.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "a88c33620ba84cf9f629738868774ae80f37c4c22eb5eb1b1a09c8fe71062a54",
+        "derivedAt": "2026-11-11T23:16:26.891Z"
+      }
+    },
+    "RECEIVE-ADDS-STOCK/F3": {
+      "verdict": "survived",
+      "why": "As F2: InvalidSku is never tested.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/adjustments.test.ts --reporter=json --outputFile=<report> --no-file-parallelism",
+          "wholeSuite": "node_modules/.bin/vitest run test/adjustments.test.ts test/lifetime.test.ts test/pricing.test.ts test/report.test.ts test/reserve.test.ts test/totals.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "a88c33620ba84cf9f629738868774ae80f37c4c22eb5eb1b1a09c8fe71062a54",
+        "derivedAt": "2026-11-11T23:16:30.114Z"
+      }
+    },
+    "WRITEOFF-PROTECTS-RESERVED/F1": {
+      "verdict": "unverifiable",
+      "reason": "anchor-missing",
+      "why": "`current - quantity` does not occur in src/adjustments.ts (the source says onHand - quantity).",
+      "derivation": {
+        "commands": null,
+        "observed": "anchor: 0 hits, expected 1",
+        "outputHash": "266b10d1856181e1e8dc4d4d8b10ae708fd07aa21abd3c3608821fb3acf7fb4a",
+        "derivedAt": "2026-11-11T23:16:30.122Z"
+      }
+    },
+    "WRITEOFF-PROTECTS-RESERVED/F2": {
+      "verdict": "survived",
+      "why": "writeOff is never called by any test: declared defender green 3/3, control red, no whole-suite killer.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/adjustments.test.ts --reporter=json --outputFile=<report> --no-file-parallelism",
+          "wholeSuite": "node_modules/.bin/vitest run test/adjustments.test.ts test/lifetime.test.ts test/pricing.test.ts test/report.test.ts test/reserve.test.ts test/totals.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "a88c33620ba84cf9f629738868774ae80f37c4c22eb5eb1b1a09c8fe71062a54",
+        "derivedAt": "2026-11-11T23:16:33.218Z"
+      }
+    },
+    "WRITEOFF-PROTECTS-RESERVED/F3": {
+      "verdict": "survived",
+      "why": "As F2.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/adjustments.test.ts --reporter=json --outputFile=<report> --no-file-parallelism",
+          "wholeSuite": "node_modules/.bin/vitest run test/adjustments.test.ts test/lifetime.test.ts test/pricing.test.ts test/report.test.ts test/reserve.test.ts test/totals.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "a88c33620ba84cf9f629738868774ae80f37c4c22eb5eb1b1a09c8fe71062a54",
+        "derivedAt": "2026-11-11T23:16:36.311Z"
+      }
+    },
+    "PRICING-BULK-DISCOUNT-AND-ROUNDING/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Without the type check the string '5' concatenates into the percent and the bulk assertions fail in all three runs. (Under --typecheck the key differs: see modes.typecheck.)",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/pricing.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 2; probe RRR",
+        "outputHash": "455f81a21681e1e7ce5e2346266ecc7e8dce8ce68decb56fc055cbab9e6b240c",
+        "derivedAt": "2026-11-11T23:16:37.828Z"
+      }
+    },
+    "PRICING-BULK-DISCOUNT-AND-ROUNDING/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Truncation gives 1851; the spec-example assertion fails in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/pricing.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe RRR",
+        "outputHash": "a448c41831913c8843c5f09744352e3fe14396caf6a4fd58ac2433cb007ca4e0",
+        "derivedAt": "2026-11-11T23:16:39.272Z"
+      }
+    },
+    "PRICING-BULK-DISCOUNT-AND-ROUNDING/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Pricing throws a TypeError; several tests use toThrow/toEqual around it and fail by assertion in every run.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/pricing.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe RRR",
+        "outputHash": "8fbc5dbdd82b0015b096ed15f510ef26d4332fb6fcfe00725275d20caada4158",
+        "derivedAt": "2026-11-11T23:16:40.841Z"
+      }
+    },
+    "STOCK-REPORT-STATUS-AND-RESERVED/F1": {
+      "verdict": "unverifiable",
+      "reason": "anchor-ambiguous",
+      "why": "`r.status === 'active'` occurs twice in src/reservations.ts; expectHits is 1.",
+      "derivation": {
+        "commands": null,
+        "observed": "anchor: 2 hits, expected 1",
+        "outputHash": "446a52738cf6b241227abfade4ad0b97a0a265c043a66649043ae55fe86b5161",
+        "derivedAt": "2026-11-11T23:16:40.846Z"
+      }
+    },
+    "STOCK-REPORT-STATUS-AND-RESERVED/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The threshold assertions (10 available is 'ok') fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/report.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe RRR",
+        "outputHash": "9d3ef827be53920f8539dd3446354c17f195d947034e890273c9949a7c2bfeb0",
+        "derivedAt": "2026-11-11T23:16:42.432Z"
+      }
+    },
+    "STOCK-REPORT-STATUS-AND-RESERVED/F3": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "stockReport throws a TypeError whenever a SKU exists; every failing test fails by exception, none by assertion, in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/report.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe RRR",
+        "outputHash": "da895d6698611e9cb5d40b3f6cf4ae43cf0cb90efb8601e6787f951f96e80597",
+        "derivedAt": "2026-11-11T23:16:44.122Z"
+      }
+    },
+    "REPORT-TOTALS-SUMS/F1": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "The declared defender test/totals.test.ts checks only skuCount and the empty case: green 3/3, control red. In the whole suite test/report.test.ts fails in every run (its column-sum test), so the suite is not blind but the declared chain is broken.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/totals.test.ts --reporter=json --outputFile=<report> --no-file-parallelism",
+          "wholeSuite": "node_modules/.bin/vitest run test/adjustments.test.ts test/lifetime.test.ts test/pricing.test.ts test/report.test.ts test/reserve.test.ts test/totals.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe GGG; negative control red; whole suite: 1 test(s) fail every run",
+        "outputHash": "b99119f59669cdb8066c3c05c6200e7a41fc2bd51af5937b01bcdb4d88cdc3f9",
+        "derivedAt": "2026-11-11T23:16:47.314Z"
+      }
+    },
+    "REPORT-TOTALS-SUMS/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "skuCount pinned to 1 fails the declared skuCount assertion in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/totals.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe RRR",
+        "outputHash": "1cd2c75b9e83233ca54b303952fdca1300b61b55792fd123d2b60c079f8c7207",
+        "derivedAt": "2026-11-11T23:16:49.061Z"
+      }
+    },
+    "REPORT-TOTALS-SUMS/F3": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "As F1: totals.test.ts green 3/3, control red, report.test.ts fails every whole-suite run.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/totals.test.ts --reporter=json --outputFile=<report> --no-file-parallelism",
+          "wholeSuite": "node_modules/.bin/vitest run test/adjustments.test.ts test/lifetime.test.ts test/pricing.test.ts test/report.test.ts test/reserve.test.ts test/totals.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+        },
+        "observed": "baseline GGG; tsc exit 0; probe GGG; negative control red; whole suite: 1 test(s) fail every run",
+        "outputHash": "b99119f59669cdb8066c3c05c6200e7a41fc2bd51af5937b01bcdb4d88cdc3f9",
+        "derivedAt": "2026-11-11T23:16:52.515Z"
+      }
+    }
+  },
+  "modes": {
+    "typecheck": {
+      "expected": {
+        "PRICING-BULK-DISCOUNT-AND-ROUNDING/F1": {
+          "verdict": "fault-invalid",
+          "reason": "replacement-does-not-typecheck",
+          "why": "tsc --noEmit -p tsconfig.json exits 2 with the fault applied: TS2322 Type 'string' is not assignable to type 'number' (src/pricing.ts). The unmodified tree type-checks clean."
+        },
+        "SWEEP-EXPIRES-AT-EXPIRY-INSTANT/F2": {
+          "verdict": "fault-invalid",
+          "why": "tsc reports TS1109 (Expression expected) and the suite cannot load. The verdict is fault-invalid either way; whether the reason is replacement-does-not-compile or replacement-does-not-typecheck is not settled by GATE-SEMANTICS, so the key fixes the verdict only."
+        }
+      }
+    },
+    "reuse-edit": {
+      "why": "test/helpers.ts is imported by every defender except test/pricing.test.ts. The edit makes seedWarehouse() check its own on-hand total, which turns REPORT-TOTALS-SUMS/F3 (on-hand total keeps only the last SKU) from survived into an exception-only kill: derived by running corpus/derive.mjs --edits with this exact edit (provenance/derivation-reuse-edit.json); every other answer is unchanged. A reuse that ignores the import closure would carry the old survived forward.",
+      "edits": [
+        {
+          "file": "test/helpers.ts",
+          "find": "  w.receive('SCREW-03', 12);\n  return w;",
+          "replace": "  w.receive('SCREW-03', 12);\n  // corpus reuse edit: a seed that checks its own totals\n  if (w.reportTotals().onHand !== 67) throw new Error('seed drift: on-hand total is not 67');\n  return w;"
+        }
+      ],
+      "expected": {
+        "REPORT-TOTALS-SUMS/F3": {
+          "verdict": "killed",
+          "killKind": "exception-only",
+          "why": "With the edit, every test that calls seedWarehouse() throws 'seed drift' under this fault; test/totals.test.ts fails by exception in all three runs.",
+          "derivation": {
+            "commands": {
+              "defenders": "node_modules/.bin/vitest run test/totals.test.ts --reporter=json --outputFile=<report> --no-file-parallelism"
+            },
+            "observed": "baseline GGG; tsc exit 0; probe RRR",
+            "outputHash": "38667255e1655be4d67cfd88ce68ab25878d50dab8088d21e626e6f151f80eef",
+            "derivedAt": "2026-11-11T23:24:54.810Z"
+          }
+        }
+      },
+      "mustRemeasure": [
+        "RESERVE-SUCCEEDS-WITHIN-AVAILABLE/F1",
+        "RESERVE-SUCCEEDS-WITHIN-AVAILABLE/F2",
+        "RESERVE-SUCCEEDS-WITHIN-AVAILABLE/F3",
+        "RESERVE-REJECTS-INVALID-INPUT/F1",
+        "RESERVE-REJECTS-INVALID-INPUT/F2",
+        "SWEEP-EXPIRES-AT-EXPIRY-INSTANT/F1",
+        "SWEEP-EXPIRES-AT-EXPIRY-INSTANT/F2",
+        "RECEIVE-ADDS-STOCK/F1",
+        "RECEIVE-ADDS-STOCK/F2",
+        "RECEIVE-ADDS-STOCK/F3",
+        "WRITEOFF-PROTECTS-RESERVED/F2",
+        "WRITEOFF-PROTECTS-RESERVED/F3",
+        "STOCK-REPORT-STATUS-AND-RESERVED/F2",
+        "STOCK-REPORT-STATUS-AND-RESERVED/F3",
+        "REPORT-TOTALS-SUMS/F1",
+        "REPORT-TOTALS-SUMS/F2",
+        "REPORT-TOTALS-SUMS/F3"
+      ]
+    },
+    "changed": {
+      "why": "Selections derived by reading the imports: every test imports the barrel '@/index', which re-exports every module, so a change to any src module can affect every claim; a change to one test file affects only the claims it defends.",
+      "steps": [
+        {
+          "name": "pricing-source",
+          "edits": [
+            {
+              "file": "src/pricing.ts",
+              "find": "const MEMBER_PERCENT = 10;",
+              "replace": "// corpus: a scripted change, behavior-neutral\nconst MEMBER_PERCENT = 10;"
+            }
+          ],
+          "expectedClaims": [
+            "PRICING-BULK-DISCOUNT-AND-ROUNDING",
+            "RECEIVE-ADDS-STOCK",
+            "REPORT-TOTALS-SUMS",
+            "RESERVE-REJECTS-INVALID-INPUT",
+            "RESERVE-SUCCEEDS-WITHIN-AVAILABLE",
+            "STOCK-REPORT-STATUS-AND-RESERVED",
+            "SWEEP-EXPIRES-AT-EXPIRY-INSTANT",
+            "WRITEOFF-PROTECTS-RESERVED"
+          ],
+          "why": "src/pricing.ts is in every defender's closure through the barrel (and Warehouse extends PricedBook)."
+        },
+        {
+          "name": "adjustments-test",
+          "edits": [
+            {
+              "file": "test/adjustments.test.ts",
+              "find": "describe('receive (R6, partial)', () => {",
+              "replace": "// corpus: a scripted change, behavior-neutral\ndescribe('receive (R6, partial)', () => {"
+            }
+          ],
+          "expectedClaims": [
+            "RECEIVE-ADDS-STOCK",
+            "WRITEOFF-PROTECTS-RESERVED"
+          ],
+          "why": "Only the two claims tied to R6/R7 declare test/adjustments.test.ts; no target or other defender imports a test file."
+        }
+      ],
+      "badRef": {
+        "ref": "refs/heads/corpus-no-such-branch",
+        "exit": 2,
+        "why": "A reference git cannot resolve is a change TestGuard cannot measure: a precondition failure (exit 2), never an empty change."
+      }
+    }
+  }
+}

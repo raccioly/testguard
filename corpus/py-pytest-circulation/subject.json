@@ -1,0 +1,26 @@
+{
+  "runner": "pytest",
+  "install": "python-venv",
+  "testFiles": "^tests/test_.*\\.py$",
+  "budgetMs": 15000,
+  "counters": [
+    "tests/.fee_rotation",
+    "tests/.holds_counter"
+  ],
+  "probeArgs": [
+    "--runner",
+    "pytest"
+  ],
+  "noise": [
+    {
+      "add": "circulation/unused_banner.py",
+      "content": "# corpus metamorphic noise: an unrelated module nothing imports\nBANNER = 'corpus'\n"
+    },
+    {
+      "rename": [
+        "SPEC.md",
+        "docs/SPEC.md"
+      ]
+    }
+  ]
+}

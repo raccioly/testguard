@@ -1,0 +1,11 @@
+{
+  "rule": "Fixed before the claim and test authors ran: a claim tied to a requirement is defended by the test file the test author was told to write for that requirement.",
+  "byRequirement": {
+    "R1": ["test/reserve.test.ts"], "R2": ["test/reserve.test.ts"],
+    "R3": ["test/lifetime.test.ts"], "R4": ["test/lifetime.test.ts"], "R5": ["test/lifetime.test.ts"],
+    "R6": ["test/adjustments.test.ts"], "R7": ["test/adjustments.test.ts"],
+    "R8": ["test/pricing.test.ts"], "R9": ["test/pricing.test.ts"], "R10": ["test/pricing.test.ts"],
+    "R11": ["test/report.test.ts"], "R12": ["test/report.test.ts"],
+    "R13": ["test/totals.test.ts"]
+  }
+}
