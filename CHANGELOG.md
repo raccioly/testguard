@@ -26,8 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   probe. Refused with `--in-place`. `run.measurements.runnerMs` now charges
   overlapping runner invocations once (their union), which equals the old sum
   for a serial run.
-- Scratch-worktree creation and removal take a lock in the git common
-  directory (stale when its owner pid is gone), so two probes of one repository
+- Scratch-worktree creation and removal take a lock keyed by the git common
+  directory and kept outside the repository (stale when its owner pid is gone), so two probes of one repository
   cannot allocate or prune each other's trees. Git calls on scratch trees drop
   inherited `GIT_*` variables (a probe run from a git hook no longer reads the
   hook's `GIT_INDEX_FILE`) and disable prompts and fsmonitor.

@@ -1289,9 +1289,10 @@ run exactly: the same invocations in the same order, and evidence without
    serial run would have met first). Cancellation stops every tree's runners
    and removes every tree. Interrupted runs leave no scratch worktree.
 8. **Shared worktree registry.** Scratch-worktree allocation and removal (add,
-   remove, prune) hold one lock file, `testguard-worktrees.lock`, in the git
-   common directory, so two probes of one repository, or of its linked
-   worktrees, cannot allocate or prune each other's trees. The lock is held
+   remove, prune) hold one lock file, `testguard-worktrees.lock`, keyed by the
+   git common directory and kept under TestGuard's scratch root (never inside
+   the repository), so two probes of one repository, or of its linked
+   worktrees, sharing a scratch root cannot allocate or prune each other's trees. The lock is held
    only around those synchronous git calls. A lock whose owner pid is no longer
    running on the same host is stale and is taken over; a live owner is waited
    on for at most two minutes, after which the command fails rather than

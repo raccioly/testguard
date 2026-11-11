@@ -1,6 +1,7 @@
-import { closeSync, openSync, readFileSync, rmSync, writeSync } from 'node:fs';
-import { hostname } from 'node:os';
+import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from 'node:fs';
+import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { defaultAlive } from './contention.mjs';
 
 /**
@@ -10,14 +11,27 @@ import { defaultAlive } from './contention.mjs';
  * shared worktree registry under the git common directory. Two `probe`
  * commands on one repository — two agents, or one agent and CI on a dev box —
  * could otherwise interleave an add with a prune and lose or corrupt each
- * other's scratch trees. The lock lives in the git COMMON directory, so linked
- * worktrees of the same repository share it.
+ * other's scratch trees. The lock is keyed by the git COMMON directory, so
+ * linked worktrees of the same repository share it, and it lives under
+ * TestGuard's scratch root, never inside the repository: a file in the git
+ * directory is a write outside the boundary a confined caller grants, and
+ * `git worktree prune` deletes anything it does not recognize under
+ * `.git/worktrees`. Probes that name different scratch directories therefore
+ * do not coordinate; git's own `locked` marker during `worktree add` still
+ * keeps a prune from removing a tree being created.
  *
  * Held only around the synchronous git calls, never across an await, and so
  * never for longer than a checkout.
  */
 
 export const LOCK_NAME = 'testguard-worktrees.lock';
+
+/** The directory holding the lock for one repository (its git common directory), under `base`. */
+export function worktreeLockDir(gitCommonDir, base = tmpdir()) {
+  const dir = join(base, 'testguard-locks', createHash('sha256').update(gitCommonDir).digest('hex').slice(0, 24));
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
 
 /** What a lock file says about its owner, or null when it cannot be read. */
 export function parseLock(text) {
@@ -44,12 +58,12 @@ export function lockIsStale(owner, { alive = defaultAlive, host = hostname() } =
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /**
- * Take the lock, run `fn`, release. Synchronous by design (see above).
+ * Take the lock in `lockDir` (from `worktreeLockDir`), run `fn`, release. Synchronous by design (see above).
  * Waits up to `timeoutMs` for a live owner, then fails loudly rather than
  * proceeding unlocked.
  */
-export function withWorktreeLock(gitCommonDir, fn, { timeoutMs = 120_000, alive = defaultAlive, now = Date.now, pause = sleep } = {}) {
-  const path = join(gitCommonDir, LOCK_NAME);
+export function withWorktreeLock(lockDir, fn, { timeoutMs = 120_000, alive = defaultAlive, now = Date.now, pause = sleep } = {}) {
+  const path = join(lockDir, LOCK_NAME);
   const deadline = now() + timeoutMs;
   let delay = 10;
   for (;;) {

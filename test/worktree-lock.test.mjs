@@ -6,7 +6,7 @@ import { hostname, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { LOCK_NAME, lockIsStale, parseLock, withWorktreeLock } from '../src/probe/worktree-lock.mjs';
+import { LOCK_NAME, lockIsStale, parseLock, withWorktreeLock, worktreeLockDir } from '../src/probe/worktree-lock.mjs';
 import { NO_HOOKS, gitCommonDir, scratchGitEnv } from '../src/git.mjs';
 import { createScratch } from '../src/probe/worktree.mjs';
 import { FIXTURE_GIT } from './helpers/git.mjs';
@@ -89,11 +89,11 @@ describe('lock staleness', () => {
   }, 20_000);
 });
 
-describe('createScratch takes the lock in the git common directory', () => {
+describe('createScratch takes one lock per repository, outside it', () => {
   it('waits for a live holder before adding a worktree', async () => {
     const dir = repo();
-    const common = gitCommonDir(dir);
-    expect(existsSync(common)).toBe(true);
+    const common = worktreeLockDir(gitCommonDir(dir));
+    expect(common.startsWith(gitCommonDir(dir))).toBe(false);
     // Another process holds the lock for 0.7 s.
     const holder = spawn(process.execPath, ['--input-type=module', '-e', `
       import { withWorktreeLock } from ${JSON.stringify(pathToFileURL(join(ROOT, 'src/probe/worktree-lock.mjs')).href)};
@@ -108,11 +108,13 @@ describe('createScratch takes the lock in the git common directory', () => {
     expect(existsSync(join(common, LOCK_NAME))).toBe(false);
   }, 20_000);
 
-  it('a linked worktree locks in the common directory it shares with the main tree', () => {
+  it('a linked worktree shares the main tree\'s lock: it is keyed by the common directory', () => {
     const dir = repo();
     const linked = join(mkdtempSync(join(tmpdir(), 'tg-linked-')), 'wt');
     spawnSync('git', [...FIXTURE_GIT, 'worktree', 'add', '-q', '--detach', linked], { cwd: dir });
     expect(gitCommonDir(linked)).toBe(gitCommonDir(dir));
+    expect(worktreeLockDir(gitCommonDir(linked))).toBe(worktreeLockDir(gitCommonDir(dir)));
+    expect(worktreeLockDir(gitCommonDir(dir))).not.toBe(worktreeLockDir(gitCommonDir(repo())));
   });
 });
 

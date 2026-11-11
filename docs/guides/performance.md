@@ -195,7 +195,8 @@ testguard probe --fault-workers 4
 - Evidence measured with a fan-out is never reused by a serial probe; serial
   evidence is reused by any.
 - Two probes of the same repository at once are safe: scratch-worktree
-  creation and removal take turns on a lock in the git directory.
+  creation and removal take turns on a lock keyed by the repository (kept in
+  the temp or scratch directory, never inside the repository).
 
 **Contention.** Before the first run, the probe looks for test runners already
 running on the machine (Vitest, Jest, Playwright, Mocha, AVA, Karma, Cypress)
