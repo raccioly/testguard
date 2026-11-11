@@ -1,11 +1,13 @@
 import { registerCleanup } from './runners/lifecycle.mjs';
-import { existsSync, mkdtempSync, readdirSync, symlinkSync, mkdirSync, statSync, realpathSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdtempSync, readdirSync, mkdirSync, statSync, realpathSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
 import { addWorktree, removeWorktree, headSha, gitCommonDir } from '../git.mjs';
 import { withWorktreeLock, worktreeLockDir } from './worktree-lock.mjs';
+import { PreconditionError } from './precondition-error.mjs';
+import { linkNodeModules, writable } from './node-modules-link.mjs';
+import { scratchConfigured, scratchRoot } from '../scratch-dir.mjs';
 
-export class PreconditionError extends Error {}
+export { PreconditionError };
 
 /**
  * Find every node_modules directory in the main tree (to a shallow depth) so
@@ -49,7 +51,7 @@ export function findNodeModules(root, depth = 3) {
  * A scratch git worktree at HEAD, with the main tree's node_modules linked in.
  * Faults are applied here; the user's tree is never touched.
  */
-export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase = tmpdir(), nodeModules }) {
+export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase = scratchRoot(), nodeModules }) {
   const sha = headSha(repoRoot, ref);
   if (!sha) {
     throw new PreconditionError(ref === 'HEAD' ? 'repository has no commits; commit first, or run with --in-place' : `ref ${ref} does not resolve to a commit`);
@@ -72,7 +74,7 @@ export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase 
     const at = join(dest, rel);
     if (existsSync(at)) continue;
     mkdirSync(dirname(at), { recursive: true });
-    symlinkSync(target, at, 'dir');
+    linkNodeModules(target, at);
   }
   return {
     mode: 'worktree',
@@ -86,4 +88,19 @@ export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase 
 /** No isolation: mutate the user's tree and rely on restore. */
 export function inPlace({ repoRoot, projectDir }) {
   return { mode: 'in-place', root: repoRoot, projectDir, cleanup: () => {} };
+}
+
+/**
+ * The write boundary a run started under, as the evidence records it: a signal,
+ * never a path. `scratchDir` says whether the caller named one; `nodeModulesWritable`
+ * whether any node_modules the run links (or its `--node-modules`) could be
+ * written, absent when there is none (a Python project). A reader who sees
+ * `false` knows the verdicts were measured with the install read-only.
+ */
+export function writeBoundary({ repoRoot, nodeModules }) {
+  const targets = [...(nodeModules ? [realpathSync(nodeModules)] : []), ...findNodeModules(repoRoot).map((link) => link.target)];
+  return {
+    scratchDir: scratchConfigured() ? 'configured' : 'default',
+    ...(targets.length ? { nodeModulesWritable: targets.some(writable) } : {}),
+  };
 }

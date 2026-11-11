@@ -4,6 +4,13 @@
   "entries": [
     {
       "kind": "path",
+      "pattern": "test/write-boundary.acceptance.test.mjs",
+      "reason": "Real-runner acceptance for the declared write boundary: four fixtures (vitest, jest, unittest, Playwright), each probed in a sandbox with a read-only and a writable copy of node_modules and a before/after listing, a few minutes in total. Mandatory in npm test and CI. The claims about the boundary (TG-SCRATCH-ROOT-IS-ONE-CALLS-DIRECTORY, TG-NODE-MODULES-IS-NEVER-WRITTEN-THROUGH and the others) are defended by the fast tests in test/scratch-dir.test.mjs and test/write-boundary.helpers.test.mjs; naming this file as a self-probe defender would re-run four runners for every fault.",
+      "by": "claude",
+      "at": "2026-11-10T23:55:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/probe.typecheck.test.mjs",
       "reason": "Real-compiler acceptance for --typecheck on fixtures/known-answer-typescript (hand-verified expected.json): about a minute of nested probes with a real tsc and vitest. Mandatory in npm test and CI, where the fixture's dependencies are installed and a missing install fails loudly. The behavior is claimed by the fast defenders test/typecheck-*.test.mjs files (a stub typescript), named in TG-TYPECHECK-*; naming this file as a self-probe defender would pay for real nested probes on every fault.",
       "by": "claude",

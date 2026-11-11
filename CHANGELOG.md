@@ -99,6 +99,9 @@ Automated weekly release — everything merged since `v0.20.1`.
 - `killKind` on every kill: each failed test is classified `assertion` or `exception` from structured error identity (never message wording), `testRun.exceptionFailures` sits beside `assertionFailures`, and a `killed` record carries `detail.killKind` (`assertion`, `exception-only`, `mixed`). The default verdict is unchanged: an exception the fault provokes still kills.
 - `probe --require-assertion-kill` (and `admit`): an exception-only kill fails the policy, exit 1, verdict still `killed`. `status` and `brief` count exception-only kills as a named weakness.
 
+- **A declared write boundary (#239).** `--scratch-dir <path>` (or `TESTGUARD_SCRATCH_DIR`) on `probe`, `sweep`, `replay` and `admit` puts every scratch worktree, temporary git index, runner report, sidecar reporter file and a private per-process temp and data directory under one existing, writable directory; missing or unwritable exits 2 before anything is written. The full list of paths TestGuard writes is in `docs/reference/configuration.md` and `docs-canonical/SECURITY.md`, with the plain statement that tests under probe run project code and are not sandboxed.
+- `run.writeBoundary` in the evidence: `scratchDir` (`default` or `configured`) and `nodeModulesWritable`, a signal that never carries a host path.
+
 ### Changed
 
 - `assertionFailures` is now assertion-only; a kill is `assertionFailures + exceptionFailures > 0`. Evidence written earlier has no `exceptionFailures` or `killKind` and reads as before; under the policy a kill with no recorded kind fails (unknown rounds toward unproven).
@@ -107,6 +110,7 @@ Automated weekly release — everything merged since `v0.20.1`.
 
 ### Fixed
 
+- **A read-only `node_modules` no longer breaks a probe, and is no longer written through (#239).** The scratch worktree's `node_modules` is now a directory of links into the install, so vite's config loader (`.vite-temp`), vitest's results cache (`.vite`) and any other tool cache write into the scratch tree. Before, they wrote into the shared install and a read-only one failed with `EACCES`. The dirty-tree test discovery in your own tree asks vitest 4 and later for `--configLoader runner` when the install is not writable. Git commands run with `GIT_OPTIONAL_LOCKS=0`, so a probe no longer rewrites `.git/index` while it reads status.
 - **Verdict reuse no longer carries a kill over a red suite (#232).** Reuse
   compared only the target and defender files, so breaking a helper the target
   imports reused the old `killed`. Evidence now records

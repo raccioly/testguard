@@ -107,6 +107,44 @@ to run `npm test` on. This is a property of test execution, not of TestGuard,
 but it is the single most important thing to understand before pointing the tool
 at code you did not write.
 
-**6. Reporting.** Vulnerability reports go to the process in `SECURITY.md` at
+**6. Declared write boundary.** TestGuard writes only where this list says, so
+a confined caller (no network, read-only root, one writable workspace and one
+temp directory, `node_modules` installed beforehand) can provision exactly
+that and verify it.
+
+| Path | Written by | Why |
+|---|---|---|
+| the scratch directory (`--scratch-dir`, `TESTGUARD_SCRATCH_DIR`, else the OS temp directory) | `probe`, `sweep`, `replay`, `admit` | scratch worktrees, the temporary git index, runner report and sidecar reporter files, one private temp and data directory per runner process, each removed when its run ends; and `testguard-locks/`, the worktree-allocation lock directory (kept, empty between runs) |
+| the evidence path (`--out`, else `<dir>/.testguard/`; `replay` also writes its calibration beside its report) | every command that writes evidence | the result of the run |
+| the repository's `.git` | `probe`, `sweep`, `replay`, `admit` | `worktrees/` metadata for each scratch worktree (removed with it), and loose objects when `--include-dirty` snapshots an unstaged tree |
+| the working tree and `.testguard/` | `scaffold --into`, `claims --annotate --apply`, `init`, `baseline`, `--in-place` | commands whose job is to write the project; `probe --in-place` edits the fault target and restores it |
+
+`--scratch-dir` must name a directory that exists and can be written; otherwise
+the command exits 2 before it writes anything. It is never created on the
+caller's behalf. Every other path is read-only to TestGuard.
+
+**The linked `node_modules` is never written through.** The scratch worktree
+gets a `node_modules` directory of its own whose entries link to the shared
+install, so a tool that writes `node_modules/.vite-temp`, `.vite`, `.vitest` or
+`.cache` writes into the scratch tree. Tool caches that live in the temp
+directory (jest's haste map and transform cache, Playwright's transform cache)
+follow the runner's `TMPDIR`, which TestGuard points into the scratch
+directory. Python writes no bytecode (`PYTHONDONTWRITEBYTECODE`,
+`PYTHONPYCACHEPREFIX`) and pytest runs with `-p no:cacheprovider`. The
+dirty-tree test discovery runs in your own tree, whose `node_modules` cannot be
+swapped; against a read-only install it asks vitest 4 and later for
+`--configLoader runner`. The evidence records `run.writeBoundary` (a signal for
+whether the install was writable, never a path).
+
+**What this does not promise.** Tests under probe run the project's own code,
+with your privileges, and are not sandboxed. The write boundary lists where
+TestGuard and its built-in runners write; it does not stop a test from writing
+elsewhere, reading your files or opening a socket. Known leaks it does not
+close: vitest keeps an API token in the per-user data directory, which only
+Linux redirects (`XDG_DATA_HOME`); macOS and Windows write it under the home
+directory. `--in-place` writes the working tree by definition. Use a container
+or VM for untrusted code, and give it a writable scratch directory.
+
+**7. Reporting.** Vulnerability reports go to the process in `SECURITY.md` at
 the repository root. This document describes the design; that file describes
 the disclosure process.

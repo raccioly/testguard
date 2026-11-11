@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { builtinModules, createRequire } from 'node:module';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { tmpdir } from 'node:os';
+import { childScope, scratchRoot } from '../../scratch-dir.mjs';
 import { sha256 } from '../../util/hash.mjs';
 import { globToRegExp, walk } from '../../util/glob.mjs';
 import { parseModuleSource, tokenizeModule } from '../imports.mjs';
@@ -173,6 +173,7 @@ export function runDiscoveryProcess({
   positiveInteger('maxOutputBytes', maxOutputBytes);
   if (env == null || typeof env !== 'object' || Array.isArray(env)) throw new DiscoveryError('discovery env must be an object');
 
+  const scope = childScope();
   return new Promise((resolvePromise, rejectPromise) => {
     const [command, ...args] = argv;
     let child;
@@ -181,9 +182,11 @@ export function runDiscoveryProcess({
         cwd: projectDir,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: process.platform !== 'win32',
-        env: { ...process.env, CI: '1', FORCE_COLOR: '0', ...env },
+        env: { ...process.env, CI: '1', FORCE_COLOR: '0', ...scope.env, ...env },
       });
+      child.once('close', scope.dispose);
     } catch (error) {
+      scope.dispose();
       rejectPromise(new DiscoveryError(`native test discovery could not start: ${error.message}`, { cause: error }));
       return;
     }
@@ -547,7 +550,7 @@ export function hashDiscoveryConfigs(projectDir, runnerConfigFiles = [], {
 
 /** Run a discovery command whose JSON reporter is directed to `{out}` in env. */
 export async function runDiscoveryReportProcess(options) {
-  const outFile = join(tmpdir(), `testguard-discovery-${randomBytes(8).toString('hex')}.json`);
+  const outFile = join(scratchRoot(), `testguard-discovery-${randomBytes(8).toString('hex')}.json`);
   const env = Object.fromEntries(Object.entries(options.env ?? {}).map(([key, value]) => [key, String(value).replaceAll('{out}', outFile)]));
   try {
     const processResult = await runDiscoveryProcess({ ...options, env });

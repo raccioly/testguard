@@ -1,9 +1,10 @@
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { scratchRoot } from '../../scratch-dir.mjs';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { TEST_GLOBS, runProcess, checkRunner, runnerArgv, listTestFiles, parseReport } from './shared.mjs';
+import { TEST_GLOBS, runProcess, checkRunner, runnerArgv, listTestFiles, parseReport, resolveRunner } from './shared.mjs';
+import { nearestNodeModulesWritable } from '../node-modules-link.mjs';
 import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs, normalizeDiscoveredFiles, runDiscoveryProcess } from './discovery.mjs';
 
 export const name = 'vitest';
@@ -14,8 +15,22 @@ const DISCOVERY_CONFIG_FILES = [
   ...['js', 'mjs', 'cjs', 'ts', 'mts', 'cts'].flatMap((ext) => [`vitest.config.${ext}`, `vite.config.${ext}`, `vitest.workspace.${ext}`]),
   'vitest.workspace.json',
 ];
+/**
+ * Discovery runs in the caller's own tree, whose node_modules cannot be swapped
+ * for a scratch one. Vitest's default config loader bundles the config to a
+ * temp file under `node_modules/.vite-temp` and dies with EACCES when that
+ * install is read-only (a confined container). `--configLoader runner` loads
+ * it in process and writes nothing; verified on vitest 5.0.2. It is asked for
+ * only when the install is not writable (so a writable project keeps the
+ * loader it always had) and only on a vitest that has the flag (4 and later).
+ */
+export const configLoaderArgs = (projectDir) => {
+  const major = Number.parseInt(resolveRunner({ projectDir, pkg: 'vitest', bin: 'vitest' })?.version ?? '', 10);
+  return major >= 4 && nearestNodeModulesWritable(projectDir) === false ? ['--configLoader', 'runner'] : [];
+};
+
 /** Ask Vitest itself to load config and enumerate the files it would collect. */
-export const discoveryArgvFor = (projectDir) => [...runnerArgv(projectDir, 'vitest', 'vitest'), 'list', '--filesOnly', '--passWithNoTests', '--maxWorkers=1'];
+export const discoveryArgvFor = (projectDir) => [...runnerArgv(projectDir, 'vitest', 'vitest'), 'list', '--filesOnly', '--passWithNoTests', '--maxWorkers=1', ...configLoaderArgs(projectDir)];
 
 export function parseDiscoveryOutput(stdout) {
   if (typeof stdout !== 'string') throw new TypeError('Vitest discovery output must be text');
@@ -43,7 +58,7 @@ export const argvFor = (projectDir, files, outFile, { serial = false, workers = 
 export const KINDS_REPORTER = join(dirname(fileURLToPath(import.meta.url)), 'vitest', 'kinds-reporter.mjs');
 
 export async function run(opts) {
-  const sidecar = join(tmpdir(), `testguard-vitest-kinds-${randomBytes(6).toString('hex')}.json`);
+  const sidecar = join(scratchRoot(), `testguard-vitest-kinds-${randomBytes(6).toString('hex')}.json`);
   const readKinds = () => {
     try { return existsSync(sidecar) ? JSON.parse(readFileSync(sidecar, 'utf8')) : undefined; } catch { return undefined; }
   };

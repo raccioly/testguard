@@ -1,8 +1,9 @@
 import { spawnSync } from 'node:child_process';
 import { realpathSync, rmSync } from 'node:fs';
-import { devNull, tmpdir } from 'node:os';
+import { devNull } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { scratchRoot } from './scratch-dir.mjs';
 
 export class GitError extends Error {
   /** `timedOut`: git did not finish in time, which is not the same finding as git refusing. */
@@ -13,7 +14,7 @@ export class GitError extends Error {
 }
 
 export function gitRaw(args, cwd, env, { timeoutMs = 30_000 } = {}) {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, env: env ? { ...process.env, ...env } : process.env });
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', ...env } });
   if (r.status !== 0) {
     const timedOut = r.error?.code === 'ETIMEDOUT';
     throw new GitError(`git ${args.join(' ')}: ${timedOut ? `timed out after ${timeoutMs} ms` : (r.stderr || r.stdout || r.error?.message || '').trim()}`, { timedOut });
@@ -94,7 +95,7 @@ export function addWorktree(repo, dest, ref = 'HEAD') {
  * area is never read or written.
  */
 export function snapshotWorkingTree(repo) {
-  const index = join(tmpdir(), `testguard-index-${randomBytes(6).toString('hex')}`);
+  const index = join(scratchRoot(), `testguard-index-${randomBytes(6).toString('hex')}`);
   const env = {
     GIT_INDEX_FILE: index,
     GIT_AUTHOR_NAME: 'testguard', GIT_AUTHOR_EMAIL: 'testguard@localhost',

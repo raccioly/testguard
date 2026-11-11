@@ -4,7 +4,7 @@ import { readBoundedJsonFile } from './discovery.mjs';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
-import { tmpdir } from 'node:os';
+import { childScope, scratchRoot } from '../../scratch-dir.mjs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { matchGlobs } from '../../util/glob.mjs';
@@ -299,15 +299,17 @@ export function parseReport(report, durationMs, kinds) {
  */
 export function runProcess({ projectDir, files, budgetMs = 120_000, command, commandTemplate, argv, env = {}, parse = parseReport, cleanupOnClose = false }) {
   assertNotCancelled();
-  const outFile = join(tmpdir(), `testguard-run-${randomBytes(6).toString('hex')}.json`);
+  const outFile = join(scratchRoot(), `testguard-run-${randomBytes(6).toString('hex')}.json`);
   const [cmd, ...args] = command
     ?? (commandTemplate ? expandCommand(commandTemplate, files, outFile) : argv(files, outFile));
   // A runner that names its report through the environment (Playwright) gets `{out}` substituted there too.
   const extraEnv = Object.fromEntries(Object.entries(env).map(([k, v]) => [k, String(v).replaceAll('{out}', outFile)]));
   const started = Date.now();
+  const scope = childScope();
 
   return new Promise((resolve) => {
-    const child = spawn(cmd, args, { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32', env: { ...process.env, CI: '1', FORCE_COLOR: '0', ...extraEnv } });
+    const child = spawn(cmd, args, { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32', env: { ...process.env, CI: '1', FORCE_COLOR: '0', ...scope.env, ...extraEnv } });
+    child.once('close', scope.dispose);
     registerChild(child, () => terminateProcessTree(child));
     child.stdout.resume(); // Reports are read from the file; drain logs to prevent pipe backpressure.
     let stderr = '';
