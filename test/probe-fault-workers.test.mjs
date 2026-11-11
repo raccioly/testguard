@@ -48,7 +48,7 @@ describe('a fan-out reports what a serial run reports', () => {
   });
 
   it('records and progress follow claim/fault order, with the serial verdicts', () => {
-    const order = ['FAST/F1', 'MISSING/F1', 'QUIET/F1', 'SLOW/F1'];
+    const order = ['SLOW/F1', 'FAST/F1', 'MISSING/F1', 'QUIET/F1'];
     expect(evidence.records.map((r) => `${r.claim.id}/${r.subject.id}`)).toEqual(order);
     expect(published).toEqual(order);
     expect(Object.fromEntries(evidence.records.map((r) => [r.claim.id, r.verdict])))
@@ -58,7 +58,9 @@ describe('a fan-out reports what a serial run reports', () => {
   it('a defender that times out only beside other suites is re-measured alone, and only that one', () => {
     const slow = evidence.records.find((r) => r.claim.id === 'SLOW');
     expect(slow.detail.remeasuredSerially).toBe(true);
-    expect(slow.verdict).toBe('killed'); // the serial answer, not the contended timeout
+    // The serial answer, measured in a fresh tree: not the contended timeout,
+    // and not the survivor a re-measure in the contended tree would report.
+    expect(slow.verdict).toBe('killed');
     expect(slow.detail.probeRuns).toHaveLength(3);
     expect(evidence.records.filter((r) => r.detail.remeasuredSerially).map((r) => r.claim.id)).toEqual(['SLOW']);
   });

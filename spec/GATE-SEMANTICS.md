@@ -1160,7 +1160,8 @@ run exactly: the same invocations in the same order, and evidence without
    with the fan-out. A record measured while another fault was in flight whose
    verdict is `timeout`, or `flaky-defender` with reason `inconsistent-probe`,
    is not reported from that measurement: after the fan-out it is measured
-   again with nothing else in flight, reusing its frozen baseline, and the
+   again with nothing else in flight, in a fresh scratch tree (the contended
+   run may have left state in its own), reusing its frozen baseline, and the
    serial measurement is what the record reports, whatever its verdict, with
    `detail.remeasuredSerially: true`. Records after it in order wait for it.
    `defenders-not-green` is never re-measured: its baseline was never

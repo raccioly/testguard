@@ -10,7 +10,7 @@ import { FIXTURE_GIT } from './git.mjs';
  * Three faults are probed after their baselines:
  * - FAST/F1 is killed.
  * - QUIET/F1 survives: its test runs but never looks at the value.
- * - SLOW/F1 is killed when probed ALONE and times out when another faulted
+ * - SLOW/F1 (probed first) is killed when probed ALONE, in a clean tree, and times out when another faulted
  *   suite is running at the same moment. Each faulted FAST/QUIET run leaves a
  *   marker in `markers` while it runs; the SLOW defender, once faulted, waits
  *   briefly, and if any marker is present it hangs past the per-run budget.
@@ -38,7 +38,7 @@ if (markers && ${check}) {
   await new Promise((resolve) => setTimeout(resolve, ${holdMs}));
   rmSync(mine, { force: true });
 }`;
-  const header = "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { writeFileSync, rmSync, readdirSync } from 'node:fs';\nimport { join } from 'node:path';\n";
+  const header = "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { existsSync, writeFileSync, rmSync, readdirSync } from 'node:fs';\nimport { join } from 'node:path';\n";
   writeFileSync(join(dir, 'test/fast.test.mjs'), `${header}import { fast } from '../src/fast.mjs';\ntest('fast', async () => {${hold('fast() !== 1')}\n  assert.equal(fast(), 1);\n});\n`);
   writeFileSync(join(dir, 'test/quiet.test.mjs'), `${header}import { quiet } from '../src/quiet.mjs';\ntest('quiet', async () => {${hold('quiet() !== 2')}\n  assert.equal(typeof quiet, 'function');\n});\n`);
   // Polls rather than looks once: a loaded CI machine can start the trees'
@@ -47,8 +47,11 @@ if (markers && ${check}) {
 test('slow', async () => {
   const markers = process.env.TG_FANOUT_MARKERS;
   if (markers && slow() !== 3) {
+    // Stale state from a contended run that was killed in this tree: a
+    // re-measure that inherits the tree passes, and reports a survivor.
+    if (existsSync('.slow-hung')) return;
     for (let waited = 0; waited < ${holdMs}; waited += 25) {
-      if (readdirSync(markers).length > 0) await new Promise((resolve) => setTimeout(resolve, 60_000));
+      if (readdirSync(markers).length > 0) { writeFileSync('.slow-hung', ''); await new Promise((resolve) => setTimeout(resolve, 60_000)); }
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
   }
@@ -59,11 +62,13 @@ test('slow', async () => {
   const claim = (id, test, faults) => ({ id, statement: `${id} holds.`, source: { kind: 'manual', ref: 'test' }, severity: 'high', producedBy: { producer: 'human' }, defendedBy: [test], faults });
   const claims = {
     schemaVersion: 1,
+    // SLOW first: the first fault in flight is measured in the first tree,
+    // so its contended run always leaves its stale state there.
     claims: [
+      claim('SLOW', 'test/slow.test.mjs', [fault('F1', 'src/slow.mjs', '=> 3', '=> 0', 'return-altered')]),
       claim('FAST', 'test/fast.test.mjs', [fault('F1', 'src/fast.mjs', '=> 1', '=> 0', 'return-altered')]),
       claim('MISSING', 'test/fast.test.mjs', [fault('F1', 'src/fast.mjs', 'not in the file', 'x', 'return-altered')]),
       claim('QUIET', 'test/quiet.test.mjs', [fault('F1', 'src/quiet.mjs', '=> 2', '=> 0', 'return-altered')]),
-      claim('SLOW', 'test/slow.test.mjs', [fault('F1', 'src/slow.mjs', '=> 3', '=> 0', 'return-altered')]),
     ],
   };
   writeFileSync(join(dir, 'testguard.claims.json'), JSON.stringify(claims, null, 2));

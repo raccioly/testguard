@@ -61,7 +61,7 @@ it('two concurrent fan-out probes on one repository both finish with the right v
       // QUIET survives and MISSING cannot be probed: unproven, so exit 1, not 2 or 3.
       expect(result.code, result.stderr).toBe(1);
       const evidence = JSON.parse(readFileSync(join(out, `${i}.json`), 'utf8'));
-      expect(evidence.records.map((r) => `${r.claim.id}:${r.verdict}`)).toEqual(['FAST:killed', 'MISSING:unverifiable', 'QUIET:survived', 'SLOW:killed']);
+      expect(evidence.records.map((r) => `${r.claim.id}:${r.verdict}`)).toEqual(['SLOW:killed', 'FAST:killed', 'MISSING:unverifiable', 'QUIET:survived']);
       expect(evidence.run.faultWorkers).toBe(2);
     }
     expect(scratchTrees(project.dir)).toEqual([]);

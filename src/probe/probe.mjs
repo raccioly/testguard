@@ -589,9 +589,22 @@ export async function probe({
         if (contended && needsSerialRemeasure(record)) remeasure.push({ index, state });
         else emitter.settle(index, record);
       }, { beforeEach: () => commandBudget?.assertOpen() });
+      // The fan-out is over: its trees go now, so no more than n ever exist.
+      while (extraTrees.length) extraTrees.pop().cleanup();
+      // Each re-measure gets a fresh tree: the contended run may have left
+      // state behind in its tree (a counter, a cache, a half-written file from
+      // a killed process), and the serial answer must not inherit it.
       for (const { index, state } of remeasure.sort((a, b) => a.index - b.index)) {
         commandBudget?.assertOpen();
-        const record = await measureOne(state, primary);
+        const fresh = createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules });
+        extraTrees.push(fresh);
+        let record;
+        try {
+          record = await measureOne(state, treeContext(fresh));
+        } finally {
+          extraTrees.splice(extraTrees.indexOf(fresh), 1);
+          fresh.cleanup();
+        }
         record.detail.remeasuredSerially = true;
         emitter.settle(index, record);
       }

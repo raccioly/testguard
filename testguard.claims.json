@@ -9528,7 +9528,7 @@
           "find": "    for (const scratch of extraTrees.reverse()) scratch.cleanup();\n",
           "replace": "",
           "defendedBy": [
-            "test/probe-fault-workers.test.mjs"
+            "test/probe-fault-workers-budget.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",
@@ -9669,8 +9669,8 @@
           "description": "The SLOW defender never hangs, so contention is never produced.",
           "faultClass": "condition-forced",
           "file": "test/helpers/fan-out-project.mjs",
-          "find": "      if (readdirSync(markers).length > 0) await new Promise((resolve) => setTimeout(resolve, 60_000));",
-          "replace": "      if (false) await new Promise((resolve) => setTimeout(resolve, 60_000));",
+          "find": "      if (readdirSync(markers).length > 0) { writeFileSync('.slow-hung', ''); await new Promise((resolve) => setTimeout(resolve, 60_000)); }",
+          "replace": "      if (false) { writeFileSync('.slow-hung', ''); await new Promise((resolve) => setTimeout(resolve, 60_000)); }",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -9682,6 +9682,48 @@
           "faultClass": "statement-deleted",
           "file": "test/helpers/fan-out-project.mjs",
           "find": "  writeFileSync(mine, '');\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-REMEASURES-IN-A-FRESH-TREE",
+      "statement": "A serial re-measure runs in a fresh scratch tree, never in a tree a contended run may have left state in, and the fan-out releases its own trees first so no more than n exist at once.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-fan-out"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The re-measure inherits the first tree and its stale state.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/probe.mjs",
+          "find": "          record = await measureOne(state, treeContext(fresh));",
+          "replace": "          record = await measureOne(state, primary);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The fan-out trees are kept through the re-measure.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "      while (extraTrees.length) extraTrees.pop().cleanup();\n",
           "replace": "",
           "producedBy": {
             "producer": "agent",
