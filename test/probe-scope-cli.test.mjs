@@ -25,6 +25,8 @@ describe('probe --changed through the CLI', () => {
     return { code, out: c.lines.out.join('\n'), err: c.lines.err.join('\n') };
   };
   const common = ['--runner', 'node-test', '--confirm', '3'];
+  // The measured runs below prove what the caller reads, not the verdict's stability: one run each keeps them cheap.
+  const quick = ['--runner', 'node-test', '--confirm', '1'];
 
   it('selects zero claims when the ref is HEAD: says so, exits 0, probes and writes nothing', async () => {
     const p = repo();
@@ -77,7 +79,7 @@ describe('probe --changed through the CLI', () => {
     edit(p.dir, 'src/tax.mjs', 'export const tax = (n) => n * 2 + 0;\n');
     edit(p.dir, 'src/orphan.mjs', 'export const orphan = () => 2;\n');
     commit(p.dir);
-    const r = await run(['probe', p.dir, '--changed', p.base, ...common]);
+    const r = await run(['probe', p.dir, '--changed', p.base, ...quick]);
     expect(r.out).toContain('not covered by any claim; absence from the results is not a pass: src/orphan.mjs');
   });
   it('an unknown --claim is an error whatever the change is', async () => {
@@ -100,7 +102,7 @@ describe('probe --changed through the CLI', () => {
     const p = repo();
     edit(p.dir, 'src/helper.mjs', 'export const round = (n) => Math.round(n * 1);\n');
     commit(p.dir);
-    const r = await run(['probe', p.dir, '--changed', p.base, '--json', ...common]);
+    const r = await run(['probe', p.dir, '--changed', p.base, '--json', ...quick]);
     expect(r.code, r.err).toBe(0);
     const doc = JSON.parse(r.out);
     expect(validate('status', doc).errors).toEqual([]);
@@ -118,7 +120,7 @@ describe('probe --changed through the CLI', () => {
     const weak = "import { test } from 'node:test';\nimport { tax } from '../src/tax.mjs';\n\ntest('tax runs', () => { tax(2); });\n";
     edit(p.dir, 'test/tax.test.mjs', weak);
     commit(p.dir);
-    const r = await run(['probe', p.dir, '--changed', p.base, '--json', ...common]);
+    const r = await run(['probe', p.dir, '--changed', p.base, '--json', ...quick]);
     const doc = JSON.parse(r.out);
     expect(validate('status', doc).errors).toEqual([]);
     expect(r.code).toBe(1);
