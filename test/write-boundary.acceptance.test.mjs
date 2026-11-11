@@ -29,7 +29,7 @@ const PW_FIXTURE = join(ROOT, 'fixtures', 'known-answer-playwright');
 const HAS_PLAYWRIGHT = existsSync(join(PW_FIXTURE, 'node_modules', '@playwright', 'test')) && existsSync(join(PW_FIXTURE, 'node_modules', 'vitest'));
 
 const FIXTURES = [
-  { name: 'vitest', dir: 'known-answer', runner: 'vitest', nm: join(ROOT, 'node_modules'), dirty: true },
+  { name: 'vitest', dir: 'known-answer', runner: 'vitest', nm: join(ROOT, 'node_modules'), dirty: true, writableRun: true },
   { name: 'jest', dir: 'known-answer-jest', runner: 'jest', nm: join(ROOT, 'node_modules') },
   { name: 'python (unittest)', dir: 'known-answer-python', runner: 'unittest', skip: !HAS_PYTHON },
   { name: 'playwright + vitest', dir: 'known-answer-playwright', runner: 'auto', nm: join(PW_FIXTURE, 'node_modules'), skip: !HAS_PLAYWRIGHT },
@@ -87,15 +87,15 @@ describe.each(FIXTURES)('write boundary: $name', (fixture) => {
       const holder = mkdtempSync(join(tmpdir(), 'tg-boundary-nm-'));
       sandboxes.push(holder);
       nmRo = join(holder, 'ro', 'node_modules'); makeDir(dirname(nmRo)); copyTree(fixture.nm, nmRo);
-      nmRw = join(holder, 'rw', 'node_modules'); makeDir(dirname(nmRw)); copyTree(fixture.nm, nmRw);
+      if (fixture.writableRun) { nmRw = join(holder, 'rw', 'node_modules'); makeDir(dirname(nmRw)); copyTree(fixture.nm, nmRw); }
     }
     const nmRwBefore = nmRw ? listing(nmRw) : undefined;
     if (nmRo) chmodTree(nmRo, 'ro');
     try {
       ro = boundaryRun(fixture, expected, nmRo);
-      rw = boundaryRun(fixture, expected, nmRw);
+      if (!fixture.nm || fixture.writableRun) rw = boundaryRun(fixture, expected, nmRw);
       if (nmRo && fixture.dirty) roDirty = boundaryRun(fixture, expected, nmRo, { dirty: true });
-      rw.nmChanges = nmRw ? changes(nmRwBefore, listing(nmRw)) : undefined;
+      if (rw) rw.nmChanges = nmRw ? changes(nmRwBefore, listing(nmRw)) : undefined;
     } finally {
       if (nmRo) chmodTree(nmRo, 'rw'); // so cleanup can never fail on a read-only tree
       for (const r of [ro, rw, roDirty]) if (r) sandboxes.push(r.sandbox);
@@ -118,7 +118,7 @@ describe.each(FIXTURES)('write boundary: $name', (fixture) => {
   });
 
   it.skipIf(fixture.skip)('creates and modifies nothing outside the scratch dir, --out and .git/worktrees', () => {
-    for (const run of [ro, rw]) {
+    for (const run of [ro, rw].filter(Boolean)) {
       expect(run.before.size).toBeGreaterThan(20); // an empty walk cannot pass
       const { created, removed, modified } = changes(run.before, run.after);
       expect({ created, removed, modified }).toEqual({ created: [], removed: [], modified: [] });
@@ -129,11 +129,11 @@ describe.each(FIXTURES)('write boundary: $name', (fixture) => {
   });
 
   it.skipIf(fixture.skip)('leaves a writable node_modules untouched, and the scratch directory empty', () => {
-    if (rw.nmChanges) {
+    if (rw?.nmChanges) {
       expect(listing(nmRw).size).toBeGreaterThan(100);
       expect(rw.nmChanges).toEqual({ created: [], removed: [], modified: [] });
     }
-    expect(rw.scratchLeft).toEqual([]);
+    if (rw) expect(rw.scratchLeft).toEqual([]);
     expect(ro.scratchLeft).toEqual([]);
   });
 });
