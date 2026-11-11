@@ -1,0 +1,8 @@
+diff --git a/src/probe/attribution.mjs b/src/probe/attribution.mjs
+index 2a24f8a..b923a51 100644
+--- a/src/probe/attribution.mjs
++++ b/src/probe/attribution.mjs
+@@ -171,3 +171,2 @@ export function isReusable(prior, current) {
+     && same(prior.defenders.resolved, current.resolved)
+-    && sameDependencies(prior.inputs, current.inputs)
+     && prior.subject.contentHash === current.contentHash;

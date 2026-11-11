@@ -1,0 +1,9 @@
+diff --git a/src/probe/classify.mjs b/src/probe/classify.mjs
+index 4003912..cce852f 100644
+--- a/src/probe/classify.mjs
++++ b/src/probe/classify.mjs
+@@ -40,3 +40,3 @@ export function classify({ defenders, anchor, baselineRuns, probeRuns, confirmRu
+   const passedRuns = probeRuns.filter((r) => r.outcome === 'pass');
+-  if (probeRuns.length === confirmRuns && killedRuns.length === confirmRuns) return { verdict: 'killed', killKind: killKindOf(probeRuns) };
++  if (probeRuns.length === confirmRuns && killedRuns.length > 0) return { verdict: 'killed', killKind: killKindOf(probeRuns) };
+   if (probeRuns.length === confirmRuns && passedRuns.length === confirmRuns) {

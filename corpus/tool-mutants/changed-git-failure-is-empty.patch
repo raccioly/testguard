@@ -1,0 +1,12 @@
+diff --git a/src/probe/scope.mjs b/src/probe/scope.mjs
+index f9ff69b..7f9604e 100644
+--- a/src/probe/scope.mjs
++++ b/src/probe/scope.mjs
+@@ -89,5 +89,4 @@ export function changedSince({ projectDir, ref, includeDirty = false, timeoutMs
+     runSite('resolve-ref', ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], root, options);
+-  } catch (error) {
+-    if (error instanceof ScopeUndetermined && error.kind === 'ref-unresolved') throw new ScopeUndetermined('ref-unresolved', `resolve-ref: ${ref} does not resolve to a commit in this repository`);
+-    throw error;
++  } catch {
++    return { base: null, head: null, files: [] };
+   }

@@ -1,0 +1,9 @@
+diff --git a/src/probe/classify.mjs b/src/probe/classify.mjs
+index 4003912..41dfb8a 100644
+--- a/src/probe/classify.mjs
++++ b/src/probe/classify.mjs
+@@ -36,3 +36,3 @@ export function classify({ defenders, anchor, baselineRuns, probeRuns, confirmRu
+   }
+-  if (probeRuns.some((r) => r.outcome === 'timeout' || r.timeouts > 0)) return { verdict: 'timeout', reason: 'test-timed-out' };
++  if (probeRuns.some((r) => r.outcome === 'timeout' || r.timeouts > 0)) return { verdict: 'killed', killKind: 'exception-only' };
+ 

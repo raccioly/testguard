@@ -37,17 +37,14 @@ function apply(dir, patch, { check = false } = {}) {
   execFileSync('git', ['apply', ...(check ? ['--check'] : []), '--whitespace=nowarn', join(MUTANTS_DIR, patch)], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
 }
 
-/** Every patch must apply to the current tree; nothing is run. */
+/** Every patch must apply to the current tree; nothing is run and nothing is written (`git apply --check`). */
 export function checkMutants(toolRoot) {
   return loadManifest().map((m) => {
-    const dir = copyTool(toolRoot);
     try {
-      apply(dir, m.patch, { check: true });
+      apply(toolRoot, m.patch, { check: true });
       return { name: m.name, applies: true };
     } catch (error) {
       return { name: m.name, applies: false, error: (error.stderr || error.message).trim().split('\n')[0] };
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
     }
   });
 }

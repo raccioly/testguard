@@ -112,6 +112,9 @@ export function prepareRepo(subject, { scratchRoot, nodeModules } = {}) {
   const dir = mkdtempSync(join(scratchRoot ?? tmpdir(), `corpus-${subject.name}-`));
   cpSync(subject.dir, dir, { recursive: true, verbatimSymlinks: true, filter: (src) => { const rel = relative(subject.dir, src); return rel === '' || !skipped(rel, subject); } });
   writeFileSync(join(dir, '.gitignore'), `${IGNORE.join('\n')}\n`);
+  // A project outside the corpus keeps its claims outside the project; the
+  // copy carries them as claims.json so every mode can read (and reorder) them.
+  if (resolve(subject.claimsFile) !== join(subject.dir, 'claims.json')) cpSync(subject.claimsFile, join(dir, 'claims.json'));
   linkDependencies(subject, dir, { nodeModules });
   git(dir, 'init', '-q', '-b', 'main');
   git(dir, 'add', '-A');
