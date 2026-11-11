@@ -281,6 +281,44 @@ neither the file nor the script ships in the package. To see what your own
 probe costs, use `probe --cost` or `claims --cost`; see the
 [performance guide](../guides/performance.md).
 
+## Where TestGuard writes
+
+For a confined run (no network, read-only root, one writable workspace and one
+temp directory, `node_modules` installed beforehand), this is the whole list.
+
+| Path | Written by | Why |
+|---|---|---|
+| the scratch directory (`--scratch-dir`, `TESTGUARD_SCRATCH_DIR`, else the OS temp directory) | `probe`, `sweep`, `replay`, `admit` | scratch worktrees, the temporary git index, runner report and sidecar reporter files, one private temp and data directory per runner process, each removed when its run ends; and `testguard-locks/`, the worktree-allocation lock directory (kept, empty between runs) |
+| the evidence path (`--out`, else `<dir>/.testguard/`; `replay` also writes its calibration beside its report) | every command that writes evidence | the result of the run |
+| the repository's `.git` | `probe`, `sweep`, `replay`, `admit` | `worktrees/` metadata for each scratch worktree (removed with it), and loose objects when `--include-dirty` snapshots an unstaged tree |
+| the working tree and `.testguard/` | `scaffold --into`, `claims --annotate --apply`, `init`, `baseline`, `--in-place` | commands whose job is to write the project; `probe --in-place` edits the fault target and restores it |
+
+`--scratch-dir` must name a directory that exists and can be written; otherwise
+the command exits 2 before it writes anything. It is never created on the
+caller's behalf. Every other path is read-only to TestGuard.
+
+**The linked `node_modules` is never written through.** The scratch worktree
+gets a `node_modules` directory of its own whose entries link to the shared
+install, so a tool that writes `node_modules/.vite-temp`, `.vite`, `.vitest` or
+`.cache` writes into the scratch tree. Tool caches that live in the temp
+directory (jest's haste map and transform cache, Playwright's transform cache)
+follow the runner's `TMPDIR`, which TestGuard points into the scratch
+directory. Python writes no bytecode (`PYTHONDONTWRITEBYTECODE`,
+`PYTHONPYCACHEPREFIX`) and pytest runs with `-p no:cacheprovider`. The
+dirty-tree test discovery runs in your own tree, whose `node_modules` cannot be
+swapped; against a read-only install it asks vitest 4 and later for
+`--configLoader runner`. The evidence records `run.writeBoundary` (a signal for
+whether the install was writable, never a path).
+
+**What this does not promise.** Tests under probe run the project's own code,
+with your privileges, and are not sandboxed. The write boundary lists where
+TestGuard and its built-in runners write; it does not stop a test from writing
+elsewhere, reading your files or opening a socket. Known leaks it does not
+close: vitest keeps an API token in the per-user data directory, which only
+Linux redirects (`XDG_DATA_HOME`); macOS and Windows write it under the home
+directory. `--in-place` writes the working tree by definition. Use a container
+or VM for untrusted code, and give it a writable scratch directory.
+
 ## Environment variables
 
 ### Variables you can set
@@ -289,6 +327,7 @@ probe costs, use `probe --cost` or `claims --cost`; see the
 |---|---|---|
 | `TESTGUARD_CHANGED_REF` | `gate`, `sweep`, `status`, `brief`, the MCP tools | The reference to measure a change against when `--changed` is absent. Checked before the CI variables below. |
 | `TESTGUARD_NODE_MODULES` | `probe`, `admit`, `sweep`, `replay` | A `node_modules` directory to link into the scratch worktree. `--node-modules` wins. |
+| `TESTGUARD_SCRATCH_DIR` | `probe`, `admit`, `sweep`, `replay` | An existing, writable directory for everything TestGuard creates while it runs tests: scratch worktrees, the temporary git index, runner reports and runner temp directories. `--scratch-dir` wins. Missing or unwritable is an error (exit 2) before anything is written. Default: the OS temp directory. |
 | `TESTGUARD_PYTHON` | `probe`, `claims --check-anchors`, `admit`, `sweep`, `replay` | The Python interpreter for `.py` defenders. `--python` wins when both are given; the two mean the same thing: a bare name such as `python3` is looked up on `PATH`, anything containing `/` is a path. |
 | `TESTGUARD_GITLAB_TOKEN` | the GitLab CI template only | A project or group access token with `api` scope, used when `post_note: true` to post the brief as a merge-request note. `CI_JOB_TOKEN` cannot write notes. The CLI never reads it. See the [GitLab guide](../guides/ci/gitlab.md). |
 

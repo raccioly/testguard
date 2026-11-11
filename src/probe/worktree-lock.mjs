@@ -1,8 +1,9 @@
 import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from 'node:fs';
-import { hostname, tmpdir } from 'node:os';
+import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { defaultAlive } from './contention.mjs';
+import { scratchRoot } from '../scratch-dir.mjs';
 
 /**
  * One lock around scratch-worktree allocation and removal (issue #237).
@@ -27,7 +28,7 @@ import { defaultAlive } from './contention.mjs';
 export const LOCK_NAME = 'testguard-worktrees.lock';
 
 /** The directory holding the lock for one repository (its git common directory), under `base`. */
-export function worktreeLockDir(gitCommonDir, base = tmpdir()) {
+export function worktreeLockDir(gitCommonDir, base = scratchRoot()) {
   const dir = join(base, 'testguard-locks', createHash('sha256').update(gitCommonDir).digest('hex').slice(0, 24));
   mkdirSync(dir, { recursive: true });
   return dir;
