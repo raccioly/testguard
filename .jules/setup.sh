@@ -21,7 +21,7 @@ npm ci --no-audit --no-fund
 npm ci --prefix fixtures/known-answer-playwright --no-audit --no-fund
 npm ci --prefix fixtures/known-answer-typescript --no-audit --no-fund
 # The docs check CI runs, at CI's pin, cached into the snapshot.
-npx -y docguard-cli@0.41.5 --version
+npx -y docguard-cli@0.47.0 --version
 
 echo "== the suite must be green here before any routine runs"
 npm test
