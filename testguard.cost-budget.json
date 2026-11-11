@@ -1,6 +1,6 @@
 {
   "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine.",
-  "seconds": 4750,
+  "seconds": 3600,
   "measured": {
     "seconds": 816,
     "at": "2026-09-18",
@@ -10,7 +10,7 @@
     "how": "probe . --include-dirty --budget 180000 --cost, from scratch, idle developer machine, after the shared-defender cut",
     "note": "LOCAL. Not comparable with measuredInCI and not what this budget is set from. The previous local from-scratch figure (1168 s, 129 faults) was taken on a contended machine, so 1168 -> 816 overstates the cut."
   },
-  "headroom": "PR #244 measured 3839 s at 567 faults against 3400 and the ceiling is now 4300 (see history). Earlier note: PR #245 (#237, --fault-workers) run 42934145571 measured 3077 s on the Node 22 leg with every fault killed (478/478), against 2700; PR #241 on the same base measured 2521 s at 444 faults. The 34 new faults guard the fault fan-out, the worktree-allocation lock, scratch git isolation and cleanup on cancellation, several of which are only provable end to end (a SIGINT mid-fan-out, a command budget expiring mid-fan-out, two concurrent probes). Before raising, those integration defenders were shortened (lock hold 1.5 -> 0.7 s, contention hold 250 -> 180 ms, per-run budget 1200 -> 800 ms, command budget 5 -> 3.5 s), an estimated 100 s. 3400 is 10.5% above the measured leg and about 14% above the expected post-cut figure, the same CI-variance rule as 2700; the 100 s per-claim ceiling is unchanged (worst new claim 58 s). The CI self-probe stays serial; --fault-workers would cut its wall time but not this cost, which sums per-record durations.",
+  "headroom": "Ceilings are in normalized seconds (see `reference`). Headroom rule: the median of at least three from-scratch CI runs, normalized, plus the observed spread several times over; the first derivation (history, 2026-11-11, #255) used 9% over a 1.4% spread. The raw-seconds notes in earlier history entries describe the runner variance this replaced.",
   "history": [
     {
       "seconds": 950,
@@ -71,6 +71,11 @@
       "seconds": 4750,
       "at": "2026-11-11",
       "why": "3850 was set the same day from two samples (2901 s and 3366 s) and was wrong within hours: PR #230, a workflow-actions bump with identical claims and defenders, measured 4159 s on the Node 22 leg (run for head 6ddb8ac) and failed by 309 s. Four CI measurements of the same 592 faults now span 2876 s to 4159 s, a 45% spread that is the runner, not the suite. 4159 + 14% = 4741, rounded to 4750. A ceiling in summed seconds cannot be tight while runner speed varies this much; normalizing the cost by a per-run speed reference is the real fix and is tracked as an issue."
+    },
+    {
+      "seconds": 3600,
+      "at": "2026-11-11",
+      "why": "The ceiling is now in NORMALIZED seconds (#255), so it is not comparable with the raw ceilings above it. Four from-scratch CI runs of the same 604 faults (verdict reuse off, 0 reused records) measured 2730, 3334, 3913 and 3963 s raw, a 45% spread, on runners whose reference workload took 166, 202, 237 and 238 ms. Normalized by the factor against baselineMs 200 they are 3278, 3300, 3306 and 3323 s, a 1.4% spread; median 3303 s (runs in `reference.runs`). 3600 is the median plus 9%: about six times the observed spread, kept because four runs on three machine speeds do not bound a fourth runner class. It replaces 4750 raw, which sat 19% above the slowest raw measurement and 74% above the fastest. Per-claim ceiling unchanged, now also normalized."
     }
   ],
   "measuredInCI": {
@@ -144,5 +149,49 @@
       "where": "CI (ci.yml test 22); the same claim measures 66.5 s locally"
     },
     "calibratedAgainst": "CI, never local. 75 s was set from a local 66.5 s and tripped on the very first CI run, where the same claim costs 87 s — a CI runner is materially slower, and this file already says so for the total: 950 s was 18% over local 804 s but only 4.6% over CI's 906 s, and the first PR adding any claim tripped it. The same error, one level down. 100 s is ~15% over the CI worst."
+  },
+  "reference": {
+    "workload": "node-test-spawn-v1",
+    "baselineMs": 200,
+    "factorRange": [
+      0.5,
+      2.5
+    ],
+    "maxDrift": 1.5,
+    "how": "Normalization unit, not a hardware claim: the speed factor is (mean of the before/after reference medians) / baselineMs, and normalized seconds are raw seconds / factor. 200 ms was fixed before any CI measurement, near the median of the four from-scratch CI runs in `history` (166-238 ms on the Node 22 leg's 4-CPU runners). Changing it rescales every ceiling in this file; changing the workload in .github/scripts/measure-reference.mjs requires re-taking it in the same pull request.",
+    "runs": [
+      {
+        "run": "43084655769",
+        "commit": "47a8fb6",
+        "rawSeconds": 2730,
+        "referenceBeforeMs": 167.0,
+        "referenceAfterMs": 166.1,
+        "normalizedSeconds": 3278.3
+      },
+      {
+        "run": "43092015429",
+        "commit": "bbce90d",
+        "rawSeconds": 3963,
+        "referenceBeforeMs": 238.5,
+        "referenceAfterMs": 238.5,
+        "normalizedSeconds": 3323.3
+      },
+      {
+        "run": "43092085432",
+        "commit": "640e6a2",
+        "rawSeconds": 3334,
+        "referenceBeforeMs": 201.2,
+        "referenceAfterMs": 202.9,
+        "normalizedSeconds": 3300.2
+      },
+      {
+        "run": "43092150734",
+        "commit": "c239d35",
+        "rawSeconds": 3913,
+        "referenceBeforeMs": 237.9,
+        "referenceAfterMs": 235.5,
+        "normalizedSeconds": 3306.3
+      }
+    ]
   }
 }

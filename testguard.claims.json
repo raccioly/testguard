@@ -5158,8 +5158,8 @@
           "description": "Any total passes the budget, so the check reports success on a gate that has tripled and nothing ever fails.",
           "faultClass": "condition-forced",
           "file": "src/probe/cost.mjs",
-          "find": "    ok: totalMs <= budgetMs && overPerClaim.length === 0,",
-          "replace": "    ok: overPerClaim.length === 0,",
+          "find": "    ...(totalMs > budgetMs ? ['over-budget'] : []),",
+          "replace": "    ...(false ? ['over-budget'] : []),",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -5201,8 +5201,8 @@
           "description": "The worst-claims list reads a field the report does not carry, so every name is undefined.",
           "faultClass": "variable-swap",
           "file": "src/probe/cost.mjs",
-          "find": "    worst: (report.claims ?? []).slice(0, worst).map((c) => ({ id: c.claimId, ms: c.ms, runs: c.runs })),",
-          "replace": "    worst: (report.claims ?? []).slice(0, worst).map((c) => ({ id: c.id, ms: c.ms, runs: c.runs })),",
+          "find": "({ id: c.claimId, ms: normalize(c.ms, factor)",
+          "replace": "({ id: c.id, ms: normalize(c.ms, factor)",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -5628,8 +5628,8 @@
           "description": "A claim over the ceiling no longer fails the gate: the per-claim result is computed and then ignored in the verdict.",
           "faultClass": "condition-forced",
           "file": "src/probe/cost.mjs",
-          "find": "    ok: totalMs <= budgetMs && overPerClaim.length === 0,",
-          "replace": "    ok: totalMs <= budgetMs,",
+          "find": "    ...(overPerClaim.length > 0 ? ['per-claim-over-ceiling'] : []),",
+          "replace": "    ...(false ? ['per-claim-over-ceiling'] : []),",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -5654,7 +5654,7 @@
           "description": "A breach stops naming the claims it found, so the operator is told a number is wrong but not which claim to look at.",
           "faultClass": "statement-deleted",
           "file": "src/probe/cost.mjs",
-          "find": "    for (const c of d.overPerClaim) out.push(`  ${secs(c.ms).padStart(7)}  ${c.id}  (${c.runs} runs)`);",
+          "find": "    for (const c of d.overPerClaim) out.push(`  ${secs(c.ms).padStart(7)}  ${c.id}  (${c.runs} runs${d.basis === 'normalized' ? `, raw ${secs(c.rawMs)}` : ''})`);",
           "replace": "",
           "producedBy": {
             "producer": "human",
@@ -8329,6 +8329,219 @@
           "producedBy": {
             "producer": "agent",
             "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COST-NORMALIZES-BY-RUNNER-SPEED",
+      "statement": "The self-probe cost ceilings are compared in normalized seconds: the summed run durations divided by the speed factor of the runner, taken from a reference workload timed before and after the probe. Unchanged work on a slow runner passes, and real growth on a fast runner fails, instead of the ceiling following the runner (the same 592 faults cost 2876 s to 4159 s on four CI runs).",
+      "source": {
+        "kind": "manual",
+        "ref": "GitHub issue #255"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-11T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/cost-normalize.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Normalization multiplies by the speed factor instead of dividing, so a slow runner is charged and a fast one credited.",
+          "faultClass": "return-altered",
+          "file": "src/probe/cost.mjs",
+          "find": "  return value / speedFactor;",
+          "replace": "  return value * speedFactor;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-11T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The factor is always 1, so the gate compares raw seconds and follows the runner again.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "const factor = assessment?.status === 'ok' ? assessment.speedFactor : 1;",
+          "replace": "const factor = 1;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-11T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The speed factor uses only the before-probe median, so a runner that changed speed during the probe is not averaged.",
+          "faultClass": "variable-swap",
+          "file": "src/probe/cost.mjs",
+          "find": "const speedFactor = (beforeMs + afterMs) / 2 / baselineMs;",
+          "replace": "const speedFactor = beforeMs / baselineMs;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-11T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The per-claim ceiling is compared in raw milliseconds while the total is normalized.",
+          "faultClass": "variable-swap",
+          "file": "src/probe/cost.mjs",
+          "find": "ms: normalize(c.ms, factor)",
+          "replace": "ms: c.ms",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-11T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COST-REFERENCE-FAILS-CLOSED",
+      "statement": "A cost-gate run whose runner-speed reference is missing, absurd, or of a different workload fails and names which; a low-confidence run (the runner's speed moved during the probe, or verdicts were reused from other runners) that is over the ceiling fails too. None of them falls back to raw seconds silently.",
+      "source": {
+        "kind": "manual",
+        "ref": "GitHub issue #255"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-11T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/cost-normalize.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A missing or non-positive measurement is treated as usable, so the gate decides on NaN or a default instead of failing.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/cost.mjs",
+          "find": "if (!positive(beforeMs) || !positive(afterMs) || !positive(baselineMs)) return",
+          "replace": "if (false) return",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-11T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The sane range is never applied, so a factor of 0.1 or 9 is accepted as a measurement of the runner.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "status: speedFactor < factorRange[0] || speedFactor > factorRange[1] ? 'out-of-range' : 'ok',",
+          "replace": "status: 'ok',",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-11T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A low-confidence run over the ceiling is excused by the correction it cannot trust.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/cost.mjs",
+          "find": "...(assessment?.status === 'ok' && assessment.lowConfidence && overCeiling ? ['low-confidence-over-ceiling'] : []),",
+          "replace": "...([]),",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-11T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Drift between the before and after batches is never reported, so a runner that moved during the probe looks steady.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "drift > maxDrift ? ['drift'] : []",
+          "replace": "[]",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-11T00:00:00Z"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A measurement of another workload is accepted against this workload's baseline.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "const same = (m) => (m && budget && m.workload === budget.workload ? m.medianMs : undefined);",
+          "replace": "const same = (m) => (m ? m.medianMs : undefined);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-11T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COST-REFERENCE-IS-TIMED-AROUND-THE-PROBE",
+      "statement": "CI times the reference workload immediately before and immediately after the self-probe, in the same job, even when the probe failed, and the cost check reads both. Without that, the speed factor measures a different moment on a different runner than the one the probe used.",
+      "source": {
+        "kind": "manual",
+        "ref": "GitHub issue #255"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-11T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/cost-gate-script.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The check script ignores the reference files, so it never asks for normalization and compares raw seconds.",
+          "faultClass": "statement-deleted",
+          "file": ".github/scripts/check-cost-budget.mjs",
+          "find": "  reference: referenceFrom({ before: tryRead(values['reference-before']), after: tryRead(values['reference-after']), budget: budget.reference }),",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-11T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The reference batch is one run short of the number asked for, so the median is taken over fewer samples than reported.",
+          "faultClass": "return-altered",
+          "file": ".github/scripts/measure-reference.mjs",
+          "find": "const samplesMs = Array.from({ length: runs }, once);",
+          "replace": "const samplesMs = Array.from({ length: runs - 1 }, once);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-11T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The after-probe measurement is written to the before-probe file, so the workflow has no second measurement of the runner.",
+          "faultClass": "other",
+          "file": ".github/workflows/ci.yml",
+          "find": "run: node .github/scripts/measure-reference.mjs --out .testguard/reference-after.json",
+          "replace": "run: node .github/scripts/measure-reference.mjs --out .testguard/reference-before.json",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-11T00:00:00Z"
           }
         }
       ]

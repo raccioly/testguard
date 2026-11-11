@@ -163,6 +163,80 @@ export function renderCost(report, { limit = 10 } = {}) {
   return out.join('\n');
 }
 
+/** The speed factor a reference may take before the run is rejected as absurd. */
+export const REFERENCE_FACTOR_RANGE = Object.freeze([0.5, 2.5]);
+/** Largest ratio between the before and after reference medians before the run is low confidence. */
+export const REFERENCE_MAX_DRIFT = 1.5;
+
+const positive = (x) => typeof x === 'number' && Number.isFinite(x) && x > 0;
+
+/** Median of a batch; the mean of the middle two when the batch is even. Never reorders its input. */
+export function median(xs) {
+  if (!Array.isArray(xs) || xs.length === 0 || !xs.every((x) => typeof x === 'number' && Number.isFinite(x))) {
+    throw new TypeError('median: a non-empty array of finite numbers is required');
+  }
+  const s = [...xs].sort((a, b) => a - b);
+  const mid = s.length >> 1;
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+/** A cost in a runner-independent unit: what it would have measured on the baseline runner. */
+export function normalize(value, speedFactor) {
+  if (!positive(speedFactor)) throw new TypeError('normalize: speedFactor must be a positive finite number');
+  return value / speedFactor;
+}
+
+/**
+ * What a reference measurement says about the runner (issue #255).
+ *
+ * The same 592 faults cost 2876 s, 2901 s, 3366 s and 4159 s on four CI runs,
+ * so a summed-seconds ceiling either flakes on a slow runner or hides growth on
+ * a fast one. A fixed workload is timed in the same job immediately before and
+ * after the probe: `beforeMs` and `afterMs` are the medians of those two
+ * batches, `baselineMs` is the median recorded in the budget file. The speed
+ * factor is the mean of the two over the baseline, so a runner that sped up or
+ * slowed down mid-probe is charged for the average it ran at.
+ *
+ * Fails closed. A missing or non-positive number is `missing`, never a factor of
+ * 1; a factor outside the range is `out-of-range`, because the workload no
+ * longer measures the same thing as the probe. If the two batches differ by more
+ * than `maxDrift`, or verdicts were reused from another runner, the factor is
+ * `lowConfidence`: usable for a pass, never for excusing a run over the ceiling.
+ */
+export function assessReference(reference, { reusedRecords = 0 } = {}) {
+  const { beforeMs, afterMs, baselineMs, factorRange = REFERENCE_FACTOR_RANGE, maxDrift = REFERENCE_MAX_DRIFT } = reference ?? {};
+  if (!positive(beforeMs) || !positive(afterMs) || !positive(baselineMs)) return { status: 'missing', beforeMs, afterMs, baselineMs };
+  const speedFactor = (beforeMs + afterMs) / 2 / baselineMs;
+  const drift = Math.max(beforeMs, afterMs) / Math.min(beforeMs, afterMs);
+  const lowConfidenceReasons = [
+    ...(drift > maxDrift ? ['drift'] : []),
+    ...(reusedRecords > 0 ? ['reused-records'] : []),
+  ];
+  return {
+    status: speedFactor < factorRange[0] || speedFactor > factorRange[1] ? 'out-of-range' : 'ok',
+    beforeMs, afterMs, baselineMs, speedFactor, drift, maxDrift, factorRange,
+    lowConfidence: lowConfidenceReasons.length > 0,
+    lowConfidenceReasons,
+  };
+}
+
+/**
+ * The `reference` argument of `checkCostBudget`, from the two measurement files
+ * the job wrote and the `reference` block of the budget file. A measurement of
+ * a different workload than the baseline was taken with is not comparable, so
+ * it is dropped, which `assessReference` then reports as missing.
+ */
+export function referenceFrom({ before, after, budget } = {}) {
+  const same = (m) => (m && budget && m.workload === budget.workload ? m.medianMs : undefined);
+  return {
+    beforeMs: same(before),
+    afterMs: same(after),
+    baselineMs: budget?.baselineMs,
+    ...(budget?.factorRange ? { factorRange: budget.factorRange } : {}),
+    ...(budget?.maxDrift ? { maxDrift: budget.maxDrift } : {}),
+  };
+}
+
 /**
  * Is this probe within its cost budget?
  *
@@ -180,14 +254,24 @@ export function renderCost(report, { limit = 10 } = {}) {
  * a much weaker signal than "804s, was 780s", and the prior total is already in
  * the evidence CI restores for verdict reuse.
  *
+ * `reference` makes the comparison runner-independent (see `assessReference`):
+ * `undefined` compares raw seconds and says so; anything else, `null` included,
+ * is a request to normalize, and a reference that cannot be used fails the gate
+ * rather than falling back to raw seconds. Both ceilings are in normalized
+ * seconds then: the time the work would take on the baseline runner.
+ *
  * Pure. Reads a report, returns a decision; the caller owns exit codes and I/O.
  */
-export function checkCostBudget(report, { budgetSeconds, perClaimSeconds, previousMs, worst = 5 } = {}) {
+export function checkCostBudget(report, { budgetSeconds, perClaimSeconds, previousMs, worst = 5, reference } = {}) {
   if (typeof budgetSeconds !== 'number' || !Number.isFinite(budgetSeconds) || budgetSeconds <= 0) {
     throw new TypeError('checkCostBudget: budgetSeconds must be a positive number');
   }
   const budgetMs = budgetSeconds * 1000;
-  const totalMs = report.totalMs ?? 0;
+  const rawMs = report.totalMs ?? 0;
+  const assessment = reference === undefined ? undefined : assessReference(reference, { reusedRecords: report.reusedRecords ?? 0 });
+  const factor = assessment?.status === 'ok' ? assessment.speedFactor : 1;
+  const basis = assessment === undefined ? 'raw' : assessment.status === 'ok' ? 'normalized' : 'unnormalized';
+  const totalMs = normalize(rawMs, factor);
 
   // ── Why a SECOND ceiling, on the claim. ──
   // The total alone is a treadmill: claims should grow forever, so it can only
@@ -206,42 +290,86 @@ export function checkCostBudget(report, { budgetSeconds, perClaimSeconds, previo
   // So the rule is "no new claim may be worse than the worst we already have",
   // which stays meaningful as claims are added and tightens as they get cheaper.
   const perClaimMs = typeof perClaimSeconds === 'number' && perClaimSeconds > 0 ? perClaimSeconds * 1000 : undefined;
+  // `rawMs` appears only when a reference was asked for: without one, `ms` already is the raw figure.
+  const inUnits = (c) => ({ id: c.claimId, ms: normalize(c.ms, factor), ...(assessment === undefined ? {} : { rawMs: c.ms }), runs: c.runs });
   const overPerClaim = perClaimMs === undefined ? [] : (report.claims ?? [])
-    .filter((c) => c.ms > perClaimMs)
-    .map((c) => ({ id: c.claimId, ms: c.ms, runs: c.runs }));
+    .map(inUnits)
+    .filter((c) => c.ms > perClaimMs);
+
+  const overCeiling = totalMs > budgetMs || overPerClaim.length > 0;
+  const failures = [
+    ...(assessment?.status === 'missing' ? ['reference-missing'] : []),
+    ...(assessment?.status === 'out-of-range' ? ['reference-out-of-range'] : []),
+    ...(totalMs > budgetMs ? ['over-budget'] : []),
+    ...(overPerClaim.length > 0 ? ['per-claim-over-ceiling'] : []),
+    ...(assessment?.status === 'ok' && assessment.lowConfidence && overCeiling ? ['low-confidence-over-ceiling'] : []),
+  ];
 
   return {
-    ok: totalMs <= budgetMs && overPerClaim.length === 0,
+    ok: failures.length === 0,
+    failures,
+    basis,
+    rawMs,
+    ...(assessment === undefined ? {} : { reference: assessment }),
     totalMs,
     budgetMs,
     overByMs: Math.max(0, totalMs - budgetMs),
     headroomMs: Math.max(0, budgetMs - totalMs),
     ...(perClaimMs === undefined ? {} : { perClaimMs, overPerClaim }),
-    ...(typeof previousMs === 'number' ? { previousMs, deltaMs: totalMs - previousMs } : {}),
+    ...(typeof previousMs === 'number' ? { previousMs, deltaMs: rawMs - previousMs } : {}),
     // Named so a failure opens with which claims to look at, not just a number.
     // claimCosts emits `claimId`; reading `id` here printed "undefined" for every
     // claim the first time the budget fired, and the test had fed the wished-for shape.
-    worst: (report.claims ?? []).slice(0, worst).map((c) => ({ id: c.claimId, ms: c.ms, runs: c.runs })),
+    worst: (report.claims ?? []).slice(0, worst).map(inUnits),
   };
+}
+
+/** The reference measurement and what it did to the total, as the lines the log always carries. */
+function renderReference(d) {
+  const r = d.reference;
+  if (!r) return [`basis: raw seconds, not normalized by runner speed (raw ${secs(d.rawMs)}).`];
+  if (r.status === 'missing') {
+    const show = (x) => (x === undefined ? 'absent' : String(x));
+    return [`reference: no usable measurement (before ${show(r.beforeMs)}, after ${show(r.afterMs)}, baseline ${show(r.baselineMs)}); raw ${secs(d.rawMs)} was not compared with the ceiling.`];
+  }
+  const out = [`raw ${secs(d.rawMs)}; reference before ${secs(r.beforeMs)}, after ${secs(r.afterMs)}, baseline ${secs(r.baselineMs)} (drift ${r.drift.toFixed(2)}x); speed factor ${r.speedFactor.toFixed(2)}${r.status === 'ok' ? `; normalized ${secs(d.totalMs)}.` : '; not applied.'}`];
+  if (r.lowConfidence) {
+    const why = r.lowConfidenceReasons.map((x) => (x === 'drift'
+      ? `the runner's speed moved by ${r.drift.toFixed(2)}x during the probe (limit ${r.maxDrift}x)`
+      : 'verdicts were reused from runs on other runners')).join('; ');
+    out.push(`low confidence: ${why}.`);
+  }
+  return out;
 }
 
 /** The budget decision as text, for a CI log that someone reads only when it fails. */
 export function renderCostBudget(d) {
   const out = [];
   const delta = typeof d.deltaMs === 'number'
-    ? ` (${d.deltaMs >= 0 ? '+' : ''}${secs(Math.abs(d.deltaMs))} against the previous run's ${secs(d.previousMs)})`
+    ? ` (${d.deltaMs >= 0 ? '+' : ''}${secs(Math.abs(d.deltaMs))} raw against the previous run's ${secs(d.previousMs)})`
     : '';
   const overTotal = d.totalMs > d.budgetMs;
-  out.push(overTotal
-    ? `COST BUDGET EXCEEDED: ${secs(d.totalMs)} against a ${secs(d.budgetMs)} budget, over by ${secs(d.overByMs)}${delta}.`
-    : `cost ${secs(d.totalMs)} of a ${secs(d.budgetMs)} budget — ${secs(d.headroomMs)} to spare${delta}.`);
+  const unit = d.basis === 'normalized' ? 'normalized ' : '';
+  if (d.failures.includes('reference-missing')) {
+    out.push('COST REFERENCE MISSING: the runner-speed measurement is absent or not a positive number, so the cost cannot be compared with its ceiling. Not falling back to raw seconds.');
+  } else if (d.failures.includes('reference-out-of-range')) {
+    out.push(`COST REFERENCE OUT OF RANGE: speed factor ${d.reference.speedFactor.toFixed(2)} is outside ${d.reference.factorRange[0]}–${d.reference.factorRange[1]}; the reference no longer measures what the probe does, or the runner is not comparable. Not falling back to raw seconds.`);
+  } else if (overTotal) {
+    out.push(`COST BUDGET EXCEEDED: ${unit}${secs(d.totalMs)} against a ${secs(d.budgetMs)} budget, over by ${secs(d.overByMs)}${delta}.`);
+  } else {
+    out.push(`cost ${unit}${secs(d.totalMs)} of a ${secs(d.budgetMs)} budget — ${secs(d.headroomMs)} to spare${delta}.`);
+  }
+  out.push(...renderReference(d));
+  if (d.failures.includes('low-confidence-over-ceiling')) {
+    out.push('LOW-CONFIDENCE RUN OVER THE CEILING: the runner-speed correction cannot be trusted here, so it does not excuse the overage. Re-run the job; if it repeats, the suite grew.');
+  }
 
   // A per-claim breach is its own finding and names its own remedy: the claim
   // is not too big, it is pointed at too expensive a defender file.
   if (d.overPerClaim?.length) {
     out.push('');
     out.push(`PER-CLAIM BUDGET EXCEEDED: ${d.overPerClaim.length} claim${d.overPerClaim.length === 1 ? '' : 's'} over the ${secs(d.perClaimMs)} per-claim ceiling.`);
-    for (const c of d.overPerClaim) out.push(`  ${secs(c.ms).padStart(7)}  ${c.id}  (${c.runs} runs)`);
+    for (const c of d.overPerClaim) out.push(`  ${secs(c.ms).padStart(7)}  ${c.id}  (${c.runs} runs${d.basis === 'normalized' ? `, raw ${secs(c.rawMs)}` : ''})`);
     out.push('');
     out.push('A claim pays for every test in the file it names. Point it at a test that');
     out.push('does not need the expensive setup, re-probe to confirm the fault still dies,');
