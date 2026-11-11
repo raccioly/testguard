@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { main } from '../src/cli.mjs';
 import { probe } from '../src/probe/probe.mjs';
 import { loadClaims } from '../src/claims/load.mjs';
-import { evaluateAssertionPolicy } from '../src/probe/assertion-policy.mjs';
+import { evaluateAssertionPolicy, renderAssertionPolicy } from '../src/probe/assertion-policy.mjs';
 import { readSpecDoc } from '../src/evidence/writer.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { FIXTURE_GIT } from './helpers/git.mjs';
@@ -56,8 +56,10 @@ describe('the real CLI: a defender with no assertion, a fault that throws', () =
     expect(evidence.assertionPolicy).toBeUndefined();
     expect(plain.l.out.join('\n')).toMatch(/1 of 2 kills are by crash, not by assertion/);
 
+    // No --no-reuse: the flag is a verdict over the records, not over a measurement, and the plain run above already
+    // measured them (killKind rides along in a reused record; the legacy case below covers the one that has none).
     const strict = capture();
-    expect(await main(['probe', dir, '--runner', 'vitest', '--no-escalate', '--no-reuse', '--require-assertion-kill'], strict.io)).toBe(1);
+    expect(await main(['probe', dir, '--runner', 'vitest', '--no-escalate', '--require-assertion-kill'], strict.io)).toBe(1);
     const text = strict.l.out.join('\n');
     expect(text).toMatch(/killed\s+P-CRASH\/F1.*killed by exception only/);
     expect(text).toMatch(/assertion policy: failed; 1 kill was by exception only.*P-CRASH\/F1/);
@@ -76,6 +78,20 @@ describe('the real CLI: a defender with no assertion, a fault that throws', () =
     expect(doc.run.assertionPolicy).toEqual({ state: 'failed', exceptionOnlyKills: [{ claimId: 'P-CRASH', faultId: 'F1' }] });
     expect(doc.counts.killedExceptionOnly).toBe(1);
   }, 120_000);
+
+  it('legacy evidence (no killKind): re-measured on a tool-version change; if reused at the same version it keeps no kind and fails the policy', async () => {
+    // The evidence the strict run above wrote, with the kind stripped: the shape a pre-killKind TestGuard left behind.
+    const legacy = readSpecDoc('evidence', join(dir, '.testguard', 'evidence.json'));
+    for (const r of legacy.records) { delete r.detail.killKind; for (const x of r.detail.probeRuns) delete x.exceptionFailures; }
+    const options = { projectDir: dir, claims: loadClaims(join(dir, 'testguard.claims.json')), runnerName: 'vitest', confirmRuns: 3, budgetMs: 60_000, escalate: false };
+    const sameVersion = await probe({ ...options, toolVersion: legacy.tool.version, previous: legacy });
+    expect(sameVersion.records.map((r) => r.reusedFrom !== undefined)).toEqual([true, true]);
+    expect(sameVersion.records.map((r) => r.detail.killKind)).toEqual([undefined, undefined]);
+    expect(evaluateAssertionPolicy(sameVersion.records).state).toBe('failed');
+    const newVersion = await probe({ ...options, toolVersion: '99.0.0', previous: legacy });
+    expect(newVersion.records.map((r) => r.reusedFrom)).toEqual([undefined, undefined]);
+    expect(newVersion.records.map((r) => r.detail.killKind).sort()).toEqual(['assertion', 'exception-only']);
+  }, 240_000);
 
   it('status names the exception-only count as a weakness; brief does too', async () => {
     const status = capture();
@@ -113,9 +129,8 @@ describe('the real CLI: a defender with no assertion, a fault that throws', () =
     expect(doc.run.assertionPolicy.exceptionOnlyKills).toEqual([{ claimId: 'P-ASSERT', faultId: 'F1', reason }, { claimId: 'P-CRASH', faultId: 'F1', reason }]);
     const evidence = readSpecDoc('evidence', join(dir, '.testguard', 'evidence.json'));
     expect(evidence.records.map((r) => [r.detail.killKind, r.detail.killKindReason])).toEqual([['exception-only', reason], ['exception-only', reason]]);
-    const text = capture();
-    await main(['probe', dir, '--runner-cmd', cmd, '--no-escalate', '--no-reuse', '--require-assertion-kill'], text.io);
-    expect(text.l.out.join('\n')).toMatch(/P-ASSERT\/F1 \(kind-not-reported-by-runner: the runner reported no error identity/);
+    // The line a user reads is renderAssertionPolicy's over this very document; the CLI wiring of the text is asserted above.
+    expect(renderAssertionPolicy(doc.run.assertionPolicy)).toMatch(/P-ASSERT\/F1 \(kind-not-reported-by-runner: the runner reported no error identity/);
   }, 180_000);
 
   it('the flag is refused on every other command, exit 3', async () => {
@@ -123,19 +138,6 @@ describe('the real CLI: a defender with no assertion, a fault that throws', () =
     expect(await main(['status', dir, '--require-assertion-kill'], c.io)).toBe(3);
     expect(c.l.err.join('\n')).toMatch(/only valid on probe and admit/);
   });
-
-  it('legacy evidence (no killKind): re-measured on a tool-version change; if reused at the same version it keeps no kind and fails the policy', async () => {
-    const options = { projectDir: dir, claims: loadClaims(join(dir, 'testguard.claims.json')), runnerName: 'vitest', confirmRuns: 3, budgetMs: 60_000, escalate: false };
-    const legacy = await probe({ ...options, toolVersion: '1.0.0' });
-    for (const r of legacy.records) { delete r.detail.killKind; for (const x of r.detail.probeRuns) delete x.exceptionFailures; }
-    const sameVersion = await probe({ ...options, toolVersion: '1.0.0', previous: legacy });
-    expect(sameVersion.records.map((r) => r.reusedFrom !== undefined)).toEqual([true, true]);
-    expect(sameVersion.records.map((r) => r.detail.killKind)).toEqual([undefined, undefined]);
-    expect(evaluateAssertionPolicy(sameVersion.records).state).toBe('failed');
-    const newVersion = await probe({ ...options, toolVersion: '1.1.0', previous: legacy });
-    expect(newVersion.records.map((r) => r.reusedFrom)).toEqual([undefined, undefined]);
-    expect(newVersion.records.map((r) => r.detail.killKind).sort()).toEqual(['assertion', 'exception-only']);
-  }, 240_000);
 
   it('a pre-kind evidence record that was reused fails the policy: unknown rounds toward unproven', () => {
     const legacy = { claim: { id: 'L' }, subject: { id: 'F1' }, verdict: 'killed', detail: {} };
