@@ -58,11 +58,12 @@ export const NO_HOOKS = Object.freeze(['-c', `core.hooksPath=${devNull}`, '-c', 
  * tree. Inherited `GIT_*` variables are stripped: run from a pre-commit hook,
  * `GIT_INDEX_FILE`, `GIT_DIR` or `GIT_WORK_TREE` would point the call at the
  * user's index or tree instead of the scratch one. Prompts are disabled — no
- * scratch-tree operation may ever wait on a terminal. Exported for tests.
+ * scratch-tree operation may ever wait on a terminal — and so are git's
+ * optional locks, so a scratch call never refreshes the user's index. Exported for tests.
  */
 export function scratchGitEnv(env = process.env) {
   const clean = Object.fromEntries(Object.entries(env).filter(([key]) => !/^GIT_/i.test(key)));
-  return { ...clean, GIT_TERMINAL_PROMPT: '0' };
+  return { ...clean, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' };
 }
 
 function scratchGit(args, cwd) {

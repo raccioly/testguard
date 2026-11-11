@@ -121,7 +121,7 @@ describe('createScratch takes one lock per repository, outside it', () => {
 describe('scratch git is isolated from the caller', () => {
   it('strips every inherited GIT_* variable and disables prompts', () => {
     const env = scratchGitEnv({ PATH: '/bin', HOME: '/h', GIT_DIR: '/x', GIT_INDEX_FILE: '/i', GIT_WORK_TREE: '/w', git_trace: '1' });
-    expect(env).toEqual({ PATH: '/bin', HOME: '/h', GIT_TERMINAL_PROMPT: '0' });
+    expect(env).toEqual({ PATH: '/bin', HOME: '/h', GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' });
   });
 
   it('disables hooks and fsmonitor on every scratch git call', () => {

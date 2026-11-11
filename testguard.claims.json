@@ -9898,10 +9898,10 @@
         },
         {
           "id": "F3",
-          "description": "Terminal prompts stay enabled.",
+          "description": "Terminal prompts and git optional locks stay enabled.",
           "faultClass": "field-dropped",
           "file": "src/git.mjs",
-          "find": "  return { ...clean, GIT_TERMINAL_PROMPT: '0' };",
+          "find": "  return { ...clean, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' };",
           "replace": "  return clean;",
           "producedBy": {
             "producer": "agent",
