@@ -155,9 +155,16 @@
       "additionalProperties": false
     },
     "run": {
-      "description": "Present on probe --json: the validated status document plus the completed invocation's result. scope is present only for a partial --claim run.",
+      "description": "Present on probe --json: the validated status document plus the invocation's result. A measured run carries id, evidence, provisional, records and newSinceBaseline, and claims[] (optional in the schema so documents written before it existed stay valid; `probe --json` always writes it). An invocation that selected no claim (--changed matched nothing) or could not tell what changed measured nothing: it carries only exitCode and scope, and names no evidence because none was written. scope is present for a --claim or --changed run.",
       "type": "object",
-      "required": ["id", "evidence", "provisional", "records", "newSinceBaseline", "exitCode"],
+      "required": ["exitCode"],
+      "allOf": [
+        {
+          "if": { "properties": { "id": true }, "required": ["id"] },
+          "then": { "properties": { "evidence": true, "provisional": true, "records": true, "newSinceBaseline": true }, "required": ["evidence", "provisional", "records", "newSinceBaseline"] },
+          "else": { "properties": { "scope": true }, "required": ["scope"] }
+        }
+      ],
       "properties": {
         "originPolicy": { "$ref": "urn:claimspec:v1:common#/$defs/originPolicy" },
         "assertionPolicy": { "$ref": "urn:claimspec:v1:common#/$defs/assertionPolicy" },
@@ -174,9 +181,16 @@
           "properties": { "reused": { "type": "integer", "minimum": 0 }, "measured": { "type": "integer", "minimum": 0 } },
           "additionalProperties": false
         },
+        "claims": {
+          "description": "One entry per claim this invocation measured, in the order the claims were probed, keyed by claim id (never by position or line). `result` is derived from `faults` by the rule in GATE-SEMANTICS.md: proven only when at least one fault was measured and every fault is killed; unproven when any fault survived or had no defender; could-not-verify otherwise (the measurement did not happen). It ignores the baseline and the severity floor: it describes this run's measurement, not what gates. `reasons` has one entry per fault that was not killed, keyed by fault id.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/claimResult" }
+        },
         "scope": {
+          "description": "What this invocation selected. `requestedClaims`/`requestedCount` come from --claim; `selectedCount` and `changed` from --changed. Every probed claim was selected.",
           "type": "object",
-          "required": ["requestedClaims", "requestedCount", "probedClaims", "probedCount"],
+          "required": ["probedClaims", "probedCount"],
           "properties": {
             "requestedClaims": {
               "type": "array",
@@ -190,8 +204,15 @@
               "uniqueItems": true,
               "items": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" }
             },
-            "probedCount": { "type": "integer", "minimum": 0 }
+            "probedCount": { "type": "integer", "minimum": 0 },
+            "selectedCount": {
+              "description": "Claims left after the change selection and any --claim intersection. 0 means nothing was probed; it is not a pass.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "changed": { "$ref": "#/$defs/changedScope" }
           },
+          "dependentRequired": { "requestedClaims": ["requestedCount"], "requestedCount": ["requestedClaims"] },
           "additionalProperties": false
         }
       },
@@ -432,6 +453,15 @@
         "additionalProperties": false
       }
     },
+    "claimsSource": {
+      "description": "Present when the claims file lives outside the project: its hash, never its path (paths.claims is then omitted).",
+      "$ref": "urn:claimspec:v1:common#/$defs/claimsSource"
+    },
+    "thinClaims": {
+      "description": "Advisory `claim-thin` signal: claims with fewer than two faults, or whose faults all share one class. Never changes `state`, an exit code or a verdict.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/thinClaim" }
+    },
     "changes": {
       "description": "Claim coverage of the change since `ref`, present only when a reference was given (--changed) or detected from CI. Uncovered files come first in every rendering: the claim is written before more code. Same per-file shapes as the gate document.",
       "type": "object",
@@ -530,6 +560,99 @@
   },
   "additionalProperties": false,
   "$defs": {
+    "claimResult": {
+      "type": "object",
+      "required": ["id", "result", "faults", "reasons"],
+      "properties": {
+        "id": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" },
+        "result": { "enum": ["proven", "unproven", "could-not-verify"] },
+        "faults": {
+          "description": "Verdict counts over the claim's measured faults. total is their sum.",
+          "type": "object",
+          "required": ["total", "killed", "survived", "nocover", "unverifiable", "faultInvalid", "timeout", "flakyDefender"],
+          "properties": {
+            "total": { "type": "integer", "minimum": 0 },
+            "killed": { "type": "integer", "minimum": 0 },
+            "survived": { "type": "integer", "minimum": 0 },
+            "nocover": { "type": "integer", "minimum": 0 },
+            "unverifiable": { "type": "integer", "minimum": 0 },
+            "faultInvalid": { "type": "integer", "minimum": 0 },
+            "timeout": { "type": "integer", "minimum": 0 },
+            "flakyDefender": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "reasons": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": ["faultId", "verdict"],
+            "properties": {
+              "faultId": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" },
+              "verdict": { "$ref": "urn:claimspec:v1:common#/$defs/verdict" },
+              "reason": { "type": "string", "minLength": 1, "maxLength": 1024 }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "changedScope": {
+      "description": "How `probe --changed <ref>` selected claims. `determined`: files, matchedClaims and unmatchedFiles are present (all project-relative; a rename lists its old and new path). `undetermined`: git could not say what changed, `reason` names why, nothing was probed and the exit code is 2; it is never an empty change.",
+      "type": "object",
+      "required": ["ref", "outcome"],
+      "properties": {
+        "ref": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "outcome": { "enum": ["determined", "undetermined"] },
+        "base": { "$ref": "urn:claimspec:v1:common#/$defs/gitSha" },
+        "head": { "$ref": "urn:claimspec:v1:common#/$defs/gitSha" },
+        "includeDirty": { "type": "boolean" },
+        "files": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "matchedClaims": {
+          "description": "Claims a changed file reaches through a fault target, a defender or the import closure, before --claim intersects. A claim whose closure cannot be followed is matched whenever anything changed.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" }
+        },
+        "unmatchedFiles": {
+          "description": "Changed source files no claim's target, defender or closure touches.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "note": {
+          "description": "Always: not covered by any claim; absence from the results is not a pass.",
+          "const": "not covered by any claim; absence from the results is not a pass"
+        },
+        "reason": {
+          "type": "object",
+          "required": ["kind", "message"],
+          "properties": {
+            "kind": { "enum": ["ref-unresolved", "no-merge-base", "git-timeout", "git-failed"] },
+            "message": { "type": "string", "minLength": 1, "maxLength": 2048 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "if": { "properties": { "outcome": { "const": "determined" } } },
+      "then": { "properties": { "base": true, "head": true, "includeDirty": true, "files": true, "matchedClaims": true, "unmatchedFiles": true, "note": true, "reason": false }, "required": ["base", "head", "includeDirty", "files", "matchedClaims", "unmatchedFiles", "note"] },
+      "else": { "properties": { "reason": true, "files": false, "matchedClaims": false, "unmatchedFiles": false }, "required": ["reason"] },
+      "additionalProperties": false
+    },
+    "thinClaim": {
+      "type": "object",
+      "required": ["claimId", "signal", "reason", "faults", "faultClasses"],
+      "properties": {
+        "claimId": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" },
+        "signal": { "const": "claim-thin" },
+        "reason": { "enum": ["fewer-than-two-faults", "single-fault-class"] },
+        "faults": { "type": "integer", "minimum": 0 },
+        "faultClasses": { "type": "array", "uniqueItems": true, "items": { "$ref": "urn:claimspec:v1:common#/$defs/faultClass" } }
+      },
+      "additionalProperties": false
+    },
     "costDefender": {
       "type": "object",
       "required": ["file", "ms", "runs", "claims"],

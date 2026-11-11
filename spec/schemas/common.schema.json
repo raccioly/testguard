@@ -124,6 +124,16 @@
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
     },
+    "claimsSource": {
+      "description": "A claims file that lives outside the project under probe, named by content and never by path: the path is the caller's and often a private one. Present only for an external file; the project's own claims file is already named by the repository.",
+      "type": "object",
+      "required": ["external", "sha256"],
+      "properties": {
+        "external": { "const": true },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
     "gitSha": {
       "type": "string",
       "pattern": "^[a-f0-9]{7,40}$"
