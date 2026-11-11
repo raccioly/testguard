@@ -40,11 +40,13 @@ const options = (project, extra) => ({
 });
 
 describe('probe --partial-on-budget', () => {
-  it('a run that expires mid-run keeps the measured prefix and marks the suffix not reached', async () => {
+  it('a run that expires mid-run keeps the measured prefix and marks the suffix not reached, leaves nothing behind, and is not reused by a later run', async () => {
     const project = partialBudgetProject();
+    const scratch = mkdtempSync(join(tmpdir(), 'tg-partial-scratch-'));
     try {
-      const { budget, onStage, peak } = expiry(project, { startingFault: 3 });
-      const doc = await probe(options(project, { commandBudget: budget, partialOnBudget: true, onStage }));
+      let inside = 0;
+      const { budget, onStage, peak } = expiry(project, { startingFault: 3, onTree: () => { inside = readdirSync(scratch).length; } });
+      const doc = await probe(options(project, { commandBudget: budget, partialOnBudget: true, onStage, scratchBase: scratch }));
       expect(validate('evidence', doc).errors).toEqual([]);
       expect(doc.records.map((r) => [r.claim.id, r.verdict])).toEqual([['C1', 'killed'], ['C2', 'killed'], ['C3', 'unverifiable'], ['C4', 'unverifiable']]);
       expect(doc.records.slice(2).map((r) => r.detail.reason)).toEqual(['not-reached-within-budget', 'not-reached-within-budget']);
@@ -55,7 +57,19 @@ describe('probe --partial-on-budget', () => {
       expect(peak.worktrees).toBeGreaterThan(1);
       expect(project.worktrees()).toBe(1);
       expect(project.status()).toBe('');
-    } finally { rmSync(project.dir, { recursive: true, force: true }); }
+      // Every temporary file lived under --scratch-dir, and nothing is left there.
+      expect(inside).toBeGreaterThan(0);
+      expect(readdirSync(scratch).filter((name) => name !== 'testguard-locks')).toEqual([]);
+      // A later run does not reuse a not-reached record: C1 and C2 are carried, C3 and C4 are measured.
+      const later = await probe(options(project, { previous: doc, toolVersion: doc.tool.version }));
+      expect(later.records.map((r) => r.verdict)).toEqual(['killed', 'killed', 'killed', 'killed']);
+      expect(later.records[2].reusedFrom).toBeUndefined();
+      expect(later.records[3].reusedFrom).toBeUndefined();
+      expect(later.run.budget).toBeUndefined();
+    } finally {
+      rmSync(project.dir, { recursive: true, force: true });
+      rmSync(scratch, { recursive: true, force: true });
+    }
   }, 60_000);
 
   it('under --fault-workers 3 every fault in flight is not reached and nothing half-measured is written', async () => {
@@ -154,22 +168,6 @@ describe('probe --partial-on-budget', () => {
     }
   }, 60_000);
 
-  it('an exhausted run keeps every temporary file under --scratch-dir and leaves nothing behind', async () => {
-    const project = partialBudgetProject();
-    const scratch = mkdtempSync(join(tmpdir(), 'tg-partial-scratch-'));
-    try {
-      let inside = 0;
-      const { budget, onStage } = expiry(project, { startingFault: 3, onTree: () => { inside = readdirSync(scratch).length; } });
-      const doc = await probe(options(project, { commandBudget: budget, partialOnBudget: true, onStage, scratchBase: scratch }));
-      expect(doc.run.budget.exhausted).toBe(true);
-      expect(inside).toBeGreaterThan(0); // not vacuous: the scratch tree lived there while the budget ran out
-      expect(readdirSync(scratch).filter((name) => name !== 'testguard-locks')).toEqual([]);
-    } finally {
-      rmSync(project.dir, { recursive: true, force: true });
-      rmSync(scratch, { recursive: true, force: true });
-    }
-  }, 60_000);
-
   it('a run the budget cut short is the deadline, not a timeout verdict, even with clock left over', async () => {
     const project = partialBudgetProject({ hang: 'C2' });
     try {
@@ -188,18 +186,6 @@ describe('probe --partial-on-budget', () => {
     } finally { rmSync(project.dir, { recursive: true, force: true }); }
   }, 60_000);
 
-  it('a later run does not reuse a not-reached record', async () => {
-    const project = partialBudgetProject();
-    try {
-      const { budget, onStage } = expiry(project, { startingFault: 3 });
-      const partial = await probe(options(project, { commandBudget: budget, partialOnBudget: true, onStage }));
-      const later = await probe(options(project, { previous: partial, toolVersion: partial.tool.version }));
-      expect(later.records.map((r) => r.verdict)).toEqual(['killed', 'killed', 'killed', 'killed']);
-      expect(later.records[2].reusedFrom).toBeUndefined();
-      expect(later.records[3].reusedFrom).toBeUndefined();
-      expect(later.run.budget).toBeUndefined();
-    } finally { rmSync(project.dir, { recursive: true, force: true }); }
-  }, 60_000);
 });
 
 describe('probe --partial-on-budget through the command', () => {
@@ -251,8 +237,10 @@ describe('probe --partial-on-budget through the command', () => {
     const project = partialBudgetProject();
     try {
       const canonical = join(project.dir, '.testguard', 'evidence.json');
-      const first = await run(project, { 'command-budget': undefined, 'partial-on-budget': false, out: canonical }, 99);
+      // A real evidence document at the canonical path, from one claim: how much it holds is not what is under test.
+      const first = await run(project, { 'command-budget': undefined, 'partial-on-budget': false, claim: ['C1'], out: canonical }, 99);
       expect(first.code).toBe(0);
+      expect(existsSync(canonical)).toBe(true);
       const before = readFileSync(canonical, 'utf8');
       const out = await run(project, { out: canonical }, 3);
       expect(out.code).toBe(2);
