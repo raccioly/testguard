@@ -12,8 +12,9 @@
  */
 
 import { isDeepStrictEqual } from 'node:util';
+import { isKillRun } from './kill-kind.mjs';
 
-const isKill = (r) => r.outcome === 'fail' && (r.assertionFailures ?? 0) > 0;
+const isKill = isKillRun;
 
 /** Compare only the claim metadata actually recorded in evidence. */
 export function sameClaimMetadata(recorded, current) {
@@ -125,17 +126,40 @@ export function defenderSelection(claim, fault) {
   return { requested: [], selectionSource: 'discovery' };
 }
 
+/**
+ * The dependency predicate every freshness decision shares (see dependencies.mjs): may a record's dependency inputs stand for the current tree?
+ *
+ * Only when both closures are complete and every file hashes the same. A
+ * record with no `dependencyHashes` predates this rule and cannot establish
+ * equality; an indeterminate closure on either side cannot either. Both are
+ * re-measured: the cost is a run, the other direction is a verdict nobody
+ * measured.
+ */
+export function sameDependencies(recorded, current) {
+  if (!recorded?.dependencyHashes || recorded.dependencyClosure !== 'complete') return false;
+  if (!current?.dependencyHashes || current.dependencyClosure !== 'complete') return false;
+  return isDeepStrictEqual(recorded.dependencyHashes, current.dependencyHashes);
+}
+
 export function isReusable(prior, current) {
   if (!prior || !prior.subject?.contentHash) return false;
   if (current.claim && !sameClaimMetadata(prior.claim, current.claim)) return false;
   // A record that exists because the probe threw is a statement about the run,
   // not about the code. Reusing it would make one disturbed run permanent.
   if (prior.detail?.reason === 'probe-error') return false;
+  // A fault the command budget never reached was not measured at all
+  // (`--partial-on-budget`): there is no verdict to carry forward.
+  if (prior.detail?.reason === 'not-reached-within-budget') return false;
   // Defenders that never loaded say something about the environment — a
   // broken --runner-cmd, a missing dependency, an interpreter without the test
   // requirements — and none of that is hashed below. Fixing it changes no
   // input, so the failure would keep being reported as the current answer.
   if (prior.detail?.reason === 'defenders-failed-to-load') return false;
+  // A timeout and a flaky defender are statements about the run's
+  // environment too — a loaded machine, a nondeterministic suite. A green live
+  // baseline today does not make yesterday's timeout today's answer.
+  if (prior.verdict === 'timeout') return false;
+  if (prior.verdict === 'flaky-defender') return false;
   const origin = prior.defenders.selectionSource ?? (prior.defenders.requested.length ? 'claim' : 'discovery');
   if (current.selectionSource && origin !== current.selectionSource) return false;
   const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
@@ -145,5 +169,6 @@ export function isReusable(prior, current) {
     && same(prior.inputs.discoveryHashes, current.inputs.discoveryHashes)
     && same(prior.defenders.requested, current.requested)
     && same(prior.defenders.resolved, current.resolved)
+    && sameDependencies(prior.inputs, current.inputs)
     && prior.subject.contentHash === current.contentHash;
 }

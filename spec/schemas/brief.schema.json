@@ -31,6 +31,7 @@
           },
           "additionalProperties": { "type": "integer", "minimum": 0 }
         },
+        "killedExceptionOnly": { "description": "Kills made only by an uncaught exception, never by an assertion. A named weakness; legacy records without a recorded kind are not counted.", "type": "integer", "minimum": 0 },
         "new": { "type": "integer", "minimum": 0 },
         "baselined": { "type": "integer", "minimum": 0 }
       },

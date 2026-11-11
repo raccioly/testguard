@@ -7,6 +7,180 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-11-11
+
+Automated weekly release — everything merged since `v0.22.0`.
+
+### Changed
+
+- feat(probe): --fault-workers also fans out baselines of independent defender sets (#237 follow-up) (#249)
+
+
+### Added
+
+- **`--fault-workers` also fans out baselines (#237 follow-up).** Baselines of
+  independent defender sets, about half of all runs, now run side by side, one
+  set per scratch tree, each set's runs in the order a serial probe asks for
+  them, so run counts and records are the serial ones. A baseline that is not
+  green N/N while another set was running is measured again alone, in a fresh
+  tree, before any verdict uses it (`detail.baselineRemeasuredSerially: true`).
+  Everything a fault decides before its baseline (hashes, anchor, reuse
+  eligibility, `--typecheck`) is still decided first, in order, on the first
+  tree.
+
+## [0.22.0] - 2026-11-11
+
+Automated weekly release — everything merged since `v0.21.0`.
+
+### Changed
+
+- feat(probe): --partial-on-budget writes what was proven and marks the rest not reached (#235) (#248)
+- feat(probe): a declared write boundary: --scratch-dir, node_modules never written through (#239) (#244)
+- feat(probe): --fault-workers probes several faults at once, each in its own scratch worktree (#237) (#245)
+- feat(probe): --typecheck — a replacement that does not type-check is fault-invalid (#236) (#247)
+- feat(probe): probe a change — --changed selection, run.claims[], external claims, claim-thin (#234) (#242)
+- chore(homebrew): sha256 for v0.21.0 (#246)
+
+
+### Changed
+
+- **`probe --changed <ref>` now selects claims (#234).** It used to run every claim and only add
+  change coverage to the `--json` status. It now probes only the claims the change reaches and writes
+  `evidence-partial.json`; it refuses `--ref` and `--in-place` (exit 3). Callers that relied on a full
+  probe plus change coverage should use `status --changed <ref>` or drop `--changed`.
+
+### Added
+
+- **`probe --partial-on-budget` writes what was proven and marks the rest not reached (#235).**
+  With `--command-budget`, expiry no longer has to throw away the minutes already paid for: the run
+  stops starting work, restores every tree, and writes a document where every fault fully measured
+  keeps its record and every fault in flight or not started is `unverifiable` with reason
+  `not-reached-within-budget` (it gates, and is never reused). `run.budget` is
+  `{limitMs, exhausted, reached, notReached}` and the validator cross-checks it against the records.
+  The document goes to `--out` or `.testguard/evidence-partial.json`, never the canonical file or a
+  baseline (`baseline` refuses it). Exit `1` when the measured part already holds a gating finding
+  (`--json`: `run.failureKind: "unproven+incomplete"`, `run.unprovenAtLeast` a floor), otherwise `2`
+  (`incomplete`). Works with `--fault-workers`: every fault in flight is not reached. `probe` only
+  (`sweep`, `replay` and `admit` refuse the flag); refused with `--require-origin`. Without the flag
+  behavior is unchanged, message included. A child the budget itself killed at its cap is now the
+  deadline, never a `timeout` verdict.
+
+- **`probe --fault-workers <n>` probes several faults at once (#237).** Each
+  fault in flight gets its own scratch worktree; the default 1 is the serial
+  run exactly. Baselines are still measured once per defender set, alone,
+  before the fan-out, and records keep claim/fault order. A `timeout` or
+  `inconsistent-probe` measured beside other faults is measured again alone, in a fresh scratch tree,
+  before it is reported (`detail.remeasuredSerially: true`). The evidence
+  records `run.faultWorkers`; fan-out evidence is never reused by a serial
+  probe. Refused with `--in-place`. `run.measurements.runnerMs` now charges
+  overlapping runner invocations once (their union), which equals the old sum
+  for a serial run.
+- Scratch-worktree creation and removal take a lock keyed by the git common
+  directory and kept outside the repository (stale when its owner pid is gone), so two probes of one repository
+  cannot allocate or prune each other's trees. Git calls on scratch trees drop
+  inherited `GIT_*` variables (a probe run from a git hook no longer reads the
+  hook's `GIT_INDEX_FILE`) and disable prompts and fsmonitor.
+- `probe --typecheck[=<cmd>]` and `claims --check-anchors --typecheck` (#236): a replacement that parses but does not type-check is `fault-invalid` (`replacement-does-not-typecheck`, first diagnostic in `detail.message`) before any test runs, so it spends zero test runs. The checker is the project's own `tsc --noEmit -p tsconfig.json --incremental` (never a bundled compiler; no new dependency) or a custom argv command. The unmodified tree is checked first: not clean is exit 2 naming the first diagnostic, and no evidence is written; a missing tsconfig, an unresolvable `typescript`, an unreadable configuration or a program with no project file is exit 2, never a skipped check; a file the checker never reads (`.py`, a `.js` the project does not check, a `.ts` outside the tsconfig) is `not-applicable`, never `clean`. One incremental build-info file per worktree is snapshotted after the baseline and restored around every fault, so one fault's diagnostics never reach the next. Evidence gains `run.typecheck: { commandHash, version }` (part of the reuse key; a reused record is re-checked once, with no test run, because type validity belongs to the whole program) and `detail.typecheck` (`clean`, `diagnostics`, `timeout`, `not-applicable`); a type check over budget is `timeout` (`typecheck-timed-out`). GATE-SEMANTICS rule 16, schema, validator and conformance cases ship with it, and `fixtures/known-answer-typescript` has hand-verified expectations.
+
+- **Probe a change (#234).** `probe --changed <ref>` probes only the claims a
+  change can have affected: a fault's target, a defender (named or discovered)
+  or anything in their import closure differs between `merge-base(<ref>, HEAD)`
+  and HEAD (or the working tree with `--include-dirty`). A rename selects
+  through its old and new path, a deletion counts, a closure that cannot be
+  followed selects the claim. Intersects with `--claim`; writes
+  `evidence-partial.json`. `run.scope` reports `selectedCount` and
+  `changed: {ref, outcome, files, matchedClaims, unmatchedFiles}`. Three
+  outcomes are kept apart: claims selected; none selected (an explicit line,
+  `selectedCount: 0`, exit 0, or exit 2 with the new `--fail-on-empty-selection`,
+  no evidence written); and `undetermined` (ref does not resolve, no merge base,
+  git failed or timed out: exit 2, nothing probed, never an empty change). Every
+  git call on the path is a named site, failed in turn by the test suite.
+  `--require-origin` refuses `--changed`, as it does `--claim`. `git.mjs`
+  reports a timed-out call as such.
+- **Results keyed by claim id (#234).** `probe --json` carries `run.claims[]`:
+  `{id, result: proven | unproven | could-not-verify, faults: {total, killed,
+  survived, nocover, unverifiable, faultInvalid, timeout, flakyDefender},
+  reasons: [{faultId, verdict, reason?}]}`, derived by a pure function
+  (survived or nocover → unproven; all killed and at least one → proven; else
+  could-not-verify) that the validator re-derives and enforces.
+- **External claims files are a supported contract (#234).** `--claims` may
+  point outside the project for `probe`, `claims`, `admit` and `status`. The
+  evidence records `run.claimsSource: {external: true, sha256}` and never the
+  path; `status` reports `claimsSource` and omits `paths.claims`; nothing is
+  written beside the file. `status` previously ignored `--claims`; `admit`
+  took the claims file's directory for the project.
+- **`claim-thin` (#234).** `claims` and `status` flag a claim with fewer than
+  two faults, or whose faults share one class, as advisory `thinClaims`.
+
+## [0.21.0] - 2026-11-10
+
+Automated weekly release — everything merged since `v0.20.1`.
+
+### Changed
+
+- feat(probe): tell a kill by assertion from a kill by crash; --require-assertion-kill (#233) (#241)
+- fix(probe): bind verdict reuse to the import closure, a live baseline and the instrument (#232) (#240)
+- chore(deps-dev): bump vitest from 5.0.2 to 5.0.5 in the all-npm group (#229)
+- chore(deps): bump fast-uri from 3.1.8 to 3.1.9 (#228)
+- [jules:docs-drift] brief — remove unsupported flags from docs (#227)
+- chore(deps-dev): bump vite from 8.3.1 to 8.3.4 (#224)
+- chore(deps-dev): bump vite from 8.3.0 to 8.3.4 in /fixtures/known-answer-playwright (#223)
+- [jules:docs-drift] probe — remove removed --changed flag (#220)
+- chore(homebrew): sha256 for v0.20.1 (#218)
+
+
+### Added
+
+- `killKind` on every kill: each failed test is classified `assertion` or `exception` from structured error identity (never message wording), `testRun.exceptionFailures` sits beside `assertionFailures`, and a `killed` record carries `detail.killKind` (`assertion`, `exception-only`, `mixed`). The default verdict is unchanged: an exception the fault provokes still kills.
+- `probe --require-assertion-kill` (and `admit`): an exception-only kill fails the policy, exit 1, verdict still `killed`. `status` and `brief` count exception-only kills as a named weakness.
+
+- **A declared write boundary (#239).** `--scratch-dir <path>` (or `TESTGUARD_SCRATCH_DIR`) on `probe`, `sweep`, `replay` and `admit` puts every scratch worktree, temporary git index, runner report, sidecar reporter file and a private per-process temp and data directory under one existing, writable directory; missing or unwritable exits 2 before anything is written. The full list of paths TestGuard writes is in `docs/reference/configuration.md` and `docs-canonical/SECURITY.md`, with the plain statement that tests under probe run project code and are not sandboxed.
+- `run.writeBoundary` in the evidence: `scratchDir` (`default` or `configured`) and `nodeModulesWritable`, a signal that never carries a host path.
+
+### Changed
+
+- `assertionFailures` is now assertion-only; a kill is `assertionFailures + exceptionFailures > 0`. Evidence written earlier has no `exceptionFailures` or `killKind` and reads as before; under the policy a kill with no recorded kind fails (unknown rounds toward unproven).
+- Under `--require-assertion-kill`, an exception-only kill whose runner reported no error identity (a custom `--runner-cmd` without `failureDetails`) says so per kill: `reason: "kind-not-reported-by-runner"` (`testRun.kindNotReported`, `detail.killKindReason`).
+- vitest and Playwright runs add an injected reporter beside the JSON one (a sidecar file in the temp dir) to read error identity; a custom `--runner-cmd` without `failureDetails` classifies every failure as an exception.
+
+### Fixed
+
+- **A read-only `node_modules` no longer breaks a probe, and is no longer written through (#239).** The scratch worktree's `node_modules` is now a directory of links into the install, so vite's config loader (`.vite-temp`), vitest's results cache (`.vite`) and any other tool cache write into the scratch tree. Before, they wrote into the shared install and a read-only one failed with `EACCES`. The dirty-tree test discovery in your own tree asks vitest 4 and later for `--configLoader runner` when the install is not writable. Git commands run with `GIT_OPTIONAL_LOCKS=0`, so a probe no longer rewrites `.git/index` while it reads status.
+- **Verdict reuse no longer carries a kill over a red suite (#232).** Reuse
+  compared only the target and defender files, so breaking a helper the target
+  imports reused the old `killed`. Evidence now records
+  `inputs.dependencyHashes` (the transitive project import closure of the
+  target and every defender, plus root lockfiles, manifests and runner config;
+  Python by module name, including ancestor `conftest.py`) and
+  `inputs.dependencyClosure`. Reuse requires equal hashes and a `complete`
+  closure; a computed `import()`/`require()`/`import_module()`, an unresolvable
+  relative import or an over-limit graph makes it `indeterminate` (reasons in
+  `inputs.dependencyIssues`) and that fault is probed every time. Before any
+  record is carried forward its defender set runs once unmodified, shared with
+  the baseline, so a red defender is probed in full; `run.measurements` gains
+  `reuseBaselineRuns`. `status` staleness and the origin-policy freshness check
+  apply the same closure and predicate. Evidence written before this change is
+  re-probed once, and until then `status` reports each of its records as
+  stale ("predates dependency hashing"). An indeterminate closure makes `--require-origin` policy
+  `unavailable`.
+- **Reuse names its instrument, and says how much it reused (#232).** Evidence
+  records `run.instrument` (TestGuard version plus a digest of resolver alias
+  sources and root runner config/lockfiles); evidence from another version or
+  digest is never reused. `run.reuse: { reused, measured }` is in the evidence
+  and in `probe --json`. `GATE-SEMANTICS.md` now states that a gate over
+  authors who can write the evidence file must run `--no-reuse`.
+- A `timeout` or `flaky-defender` record is never reused: like `probe-error`
+  it describes the run's environment, and a green live baseline today does not
+  make an old timeout the current answer. `status` reports evidence from
+  another TestGuard version or configuration digest as stale, in one line.
+- Spec documents are written atomically (exclusive temporary file, then
+  rename): a run killed mid-write no longer leaves a truncated evidence file
+  the next probe reads as prior evidence.
+- The module lexer behind defender discovery now reads regex literals,
+  numeric literals and template expressions containing quotes or nested
+  templates; before, a module with `/'/` in it was unreadable and discovery
+  through it was indeterminate.
+
 ## [0.20.1] - 2026-10-12
 
 Automated weekly release — everything merged since `v0.20.0`.

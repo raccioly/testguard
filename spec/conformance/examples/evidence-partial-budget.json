@@ -1,0 +1,444 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.21.0"
+  },
+  "run": {
+    "id": "run-20261111T030000",
+    "startedAt": "2026-11-11T03:00:00.000Z",
+    "finishedAt": "2026-11-11T03:00:05.000Z",
+    "repo": {
+      "head": "69806b50ef481c22636247767e111e452cb11de1",
+      "dirty": false
+    },
+    "runner": {
+      "name": "node-test",
+      "version": "24.22.2",
+      "source": "builtin"
+    },
+    "instrument": {
+      "toolVersion": "0.21.0",
+      "digest": "f7d941f950e66288366c0109e11a25e8838fd654b7659c3f27c863f6a4b7dd6b"
+    },
+    "reuse": {
+      "reused": 0,
+      "measured": 4
+    },
+    "confirmRuns": 3,
+    "measurements": {
+      "elapsedMs": 1576.7224999999999,
+      "runnerMs": 1081.1706239999999,
+      "overheadMs": 495.551876,
+      "runnerInvocations": 16,
+      "reuseBaselineRuns": 0
+    },
+    "workers": 1,
+    "serial": true,
+    "mode": "worktree",
+    "budget": {
+      "limitMs": 60000,
+      "exhausted": true,
+      "reached": 2,
+      "notReached": 2
+    }
+  },
+  "records": [
+    {
+      "fingerprint": "dbd56f767d06bb225000d92b5469323b066735f476d9a7927176286cdda30f14",
+      "claim": {
+        "id": "C1",
+        "statement": "C1 holds.",
+        "severity": "high",
+        "source": {
+          "kind": "manual",
+          "ref": "test"
+        },
+        "producedBy": {
+          "producer": "human"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "C1 fault",
+        "file": "src/c1.mjs",
+        "faultClass": "return-altered",
+        "producedBy": {
+          "producer": "human"
+        },
+        "contentHash": "d758dea2a994dfb19feb81b08092835244d3f7b41e702e2aa0e475046d980e17"
+      },
+      "verdict": "survived",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 63
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 67
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 68
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 71
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 65
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 67
+          }
+        ],
+        "flakeRate": {
+          "runs": 3,
+          "failures": 0
+        },
+        "negativeControl": "reached"
+      },
+      "defenders": {
+        "requested": [
+          "test/c1.test.mjs"
+        ],
+        "selectionSource": "claim",
+        "resolved": [
+          "test/c1.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "a3283af1b60f1ff287cf9bcf62f6acf77ff13a150596d04c6bcb4ca3b7f4e34f",
+        "defenderHashes": {
+          "test/c1.test.mjs": "01ee464dc93bc13871eb7ea41c2fe3c5673c1ef70c07db1bfcfde67dc0c4c51d"
+        },
+        "testUniverseHash": "53b442f861ce85410ddd01b20c0a5d17d96bc33839bfe5b014c5c8e311f2e7e9",
+        "discoveryHashes": {},
+        "dependencyHashes": {
+          "package.json": "fd303d427534ff657c739faa73425a570910feddc7cca22a660f945ea2667177",
+          "src/c1.mjs": "a3283af1b60f1ff287cf9bcf62f6acf77ff13a150596d04c6bcb4ca3b7f4e34f",
+          "test/c1.test.mjs": "01ee464dc93bc13871eb7ea41c2fe3c5673c1ef70c07db1bfcfde67dc0c4c51d"
+        },
+        "dependencyClosure": "complete"
+      },
+      "rank": {
+        "score": 3.6,
+        "blastRadius": 0,
+        "tier": "high"
+      }
+    },
+    {
+      "fingerprint": "b867b854bfb2feb8d912f4f1450ed3733dd0d954445cffb7d00c85401086690e",
+      "claim": {
+        "id": "C2",
+        "statement": "C2 holds.",
+        "severity": "high",
+        "source": {
+          "kind": "manual",
+          "ref": "test"
+        },
+        "producedBy": {
+          "producer": "human"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "C2 fault",
+        "file": "src/c2.mjs",
+        "faultClass": "return-altered",
+        "producedBy": {
+          "producer": "human"
+        },
+        "contentHash": "faafb7b6857f7d7649c617c01e9855570a3c435670506b84547e953452ebcaff"
+      },
+      "verdict": "killed",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 65
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 64
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 64
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 64
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 64
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 65
+          }
+        ],
+        "flakeRate": {
+          "runs": 3,
+          "failures": 0
+        },
+        "killKind": "assertion",
+        "independence": {
+          "class": "co-authored",
+          "defenderCommit": "69806b50ef481c22636247767e111e452cb11de1",
+          "targetCommit": "69806b50ef481c22636247767e111e452cb11de1",
+          "sameAuthor": true
+        }
+      },
+      "defenders": {
+        "requested": [
+          "test/c2.test.mjs"
+        ],
+        "selectionSource": "claim",
+        "resolved": [
+          "test/c2.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "72b18cf4cbd72dd98645351931be3969a0964fbe9fc1eb0e1a5bb26631d7497e",
+        "defenderHashes": {
+          "test/c2.test.mjs": "ce706562e026c866f7cfc9541da8ee462416d942e3893eef33856d8af2802c7e"
+        },
+        "testUniverseHash": "53b442f861ce85410ddd01b20c0a5d17d96bc33839bfe5b014c5c8e311f2e7e9",
+        "discoveryHashes": {},
+        "dependencyHashes": {
+          "package.json": "fd303d427534ff657c739faa73425a570910feddc7cca22a660f945ea2667177",
+          "src/c2.mjs": "72b18cf4cbd72dd98645351931be3969a0964fbe9fc1eb0e1a5bb26631d7497e",
+          "test/c2.test.mjs": "ce706562e026c866f7cfc9541da8ee462416d942e3893eef33856d8af2802c7e"
+        },
+        "dependencyClosure": "complete"
+      },
+      "rank": {
+        "score": 3.06,
+        "blastRadius": 0,
+        "tier": "high"
+      }
+    },
+    {
+      "fingerprint": "2272fa06352208619942ce05f71bfc5029503f1a4c7f364845fad0baf23e8856",
+      "claim": {
+        "id": "C3",
+        "statement": "C3 holds.",
+        "severity": "high",
+        "source": {
+          "kind": "manual",
+          "ref": "test"
+        },
+        "producedBy": {
+          "producer": "human"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "C3 fault",
+        "file": "src/c3.mjs",
+        "faultClass": "return-altered",
+        "producedBy": {
+          "producer": "human"
+        },
+        "contentHash": "93b89cd3ad3a3d300d1036e77c32263fe5e53a48c376269a29558cf638621ec0"
+      },
+      "verdict": "unverifiable",
+      "detail": {
+        "baselineRuns": [],
+        "probeRuns": [],
+        "reason": "not-reached-within-budget",
+        "message": "the command budget of 60000ms ran out before this fault was fully measured"
+      },
+      "defenders": {
+        "requested": [
+          "test/c3.test.mjs"
+        ],
+        "selectionSource": "claim",
+        "resolved": [],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "18d65ecd8ab17322b9cc3d25b7e8db27afe56e0c1bea74ab7f9be70146e664ad",
+        "defenderHashes": {}
+      }
+    },
+    {
+      "fingerprint": "5487e182540b15fd66f77500fed5d4f9cee1094ee40e3dc64a6a00e9136a222f",
+      "claim": {
+        "id": "C4",
+        "statement": "C4 holds.",
+        "severity": "high",
+        "source": {
+          "kind": "manual",
+          "ref": "test"
+        },
+        "producedBy": {
+          "producer": "human"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "C4 fault",
+        "file": "src/c4.mjs",
+        "faultClass": "return-altered",
+        "producedBy": {
+          "producer": "human"
+        },
+        "contentHash": "7490c2eea93cc8c3d81ebf8fb716e0958ad2caed121eb18fb628adb030d517e3"
+      },
+      "verdict": "unverifiable",
+      "detail": {
+        "baselineRuns": [],
+        "probeRuns": [],
+        "reason": "not-reached-within-budget",
+        "message": "the command budget of 60000ms ran out before this fault was fully measured"
+      },
+      "defenders": {
+        "requested": [
+          "test/c4.test.mjs"
+        ],
+        "selectionSource": "claim",
+        "resolved": [],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "5cc010cf756223877f397e2e54d5f8dcd2d60be4c120b84ebec596314db6ec0b",
+        "defenderHashes": {}
+      }
+    }
+  ],
+  "origins": {
+    "basis": "recorded",
+    "claims": {
+      "total": 4,
+      "byKind": {
+        "spec": 0,
+        "adr": 0,
+        "annotation": 0,
+        "comment": 0,
+        "manual": 4,
+        "doc": 0,
+        "bug": 0,
+        "incident": 0,
+        "review": 0,
+        "inferred": 0
+      },
+      "mixed": 0
+    },
+    "records": {
+      "total": 4,
+      "byKind": {
+        "spec": 0,
+        "adr": 0,
+        "annotation": 0,
+        "comment": 0,
+        "manual": 4,
+        "doc": 0,
+        "bug": 0,
+        "incident": 0,
+        "review": 0,
+        "inferred": 0
+      }
+    }
+  }
+}

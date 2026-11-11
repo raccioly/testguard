@@ -1,3 +1,5 @@
+import { isKillRun, killKindOf } from './kill-kind.mjs';
+
 /**
  * The verdict function. Pure: everything it needs is passed in, so every
  * branch is unit-testable without a runner.
@@ -11,10 +13,18 @@
  * point only: a would-be `survived`. It is never asked about a kill — a kill
  * already proves the defenders reached the code — and `undefined` (the control
  * was not run) never changes a verdict.
+ *
+ * `typecheck` is the type check's outcome for this fault, when one was asked
+ * for and applied: it is passed in, never run here. A replacement the
+ * project's own compiler refuses is `fault-invalid` — a property of the fault,
+ * decided before any test ran, so it ranks above the defenders' baseline.
+ * `{ status: 'clean' | 'not-applicable' }` and `undefined` change nothing.
  */
-export function classify({ defenders, anchor, baselineRuns, probeRuns, confirmRuns, subjectReached }) {
+export function classify({ defenders, anchor, baselineRuns, probeRuns, confirmRuns, subjectReached, typecheck }) {
   if (defenders.length === 0) return { verdict: 'nocover' };
   if (anchor && anchor.status !== 'ok') return { verdict: 'unverifiable', reason: anchor.status };
+  if (typecheck?.status === 'diagnostics') return { verdict: 'fault-invalid', reason: 'replacement-does-not-typecheck' };
+  if (typecheck?.status === 'timeout') return { verdict: 'timeout', reason: 'typecheck-timed-out' };
   if (baselineRuns.length === 0 || baselineRuns.some((r) => r.outcome !== 'pass')) {
     return { verdict: 'flaky-defender', reason: 'defenders-not-green' };
   }
@@ -26,9 +36,9 @@ export function classify({ defenders, anchor, baselineRuns, probeRuns, confirmRu
   }
   if (probeRuns.some((r) => r.outcome === 'timeout' || r.timeouts > 0)) return { verdict: 'timeout', reason: 'test-timed-out' };
 
-  const killedRuns = probeRuns.filter((r) => r.outcome === 'fail' && r.assertionFailures > 0);
+  const killedRuns = probeRuns.filter(isKillRun);
   const passedRuns = probeRuns.filter((r) => r.outcome === 'pass');
-  if (probeRuns.length === confirmRuns && killedRuns.length === confirmRuns) return { verdict: 'killed' };
+  if (probeRuns.length === confirmRuns && killedRuns.length === confirmRuns) return { verdict: 'killed', killKind: killKindOf(probeRuns) };
   if (probeRuns.length === confirmRuns && passedRuns.length === confirmRuns) {
     // The negative control. A green baseline proves the defenders can PASS; it
     // says nothing about whether they can fail because of THIS file. If the

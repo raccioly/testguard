@@ -18,6 +18,7 @@ their first consumer.
 ```bash
 npm test               # unit + fixture acceptance (~15s)
 npm ci --prefix fixtures/known-answer-playwright   # once; without it the Playwright fixture acceptance silently skips
+npm ci --prefix fixtures/known-answer-typescript   # once; without it the type-check suites fail loudly (they never skip)
 npm run test:spec      # conformance suite only
 npm run self:probe     # TestGuard probes its own claims; must exit 0
 npm run test:install   # the packed tarball must run with production deps only

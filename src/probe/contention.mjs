@@ -93,12 +93,19 @@ export function detectContention({ self = process.pid, alive = defaultAlive, ...
 /**
  * What would actually change this run. `--serial` is the same as `--workers 1`,
  * which is the default, so advising it to a run that is already serial offers
- * a flag that changes nothing; a custom command's concurrency is its own.
+ * a flag that changes nothing; a custom command's concurrency is its own. A
+ * fan-out (`--fault-workers` above 1) multiplies whatever each suite costs, so
+ * it is the first thing to lower; its timeouts and inconsistent probes are
+ * measured again serially before they are reported, which costs time, not
+ * honesty (#237).
  */
-function contentionAdvice({ serial = true, workers = 1, custom = false }) {
-  if (custom) return 'Wait for it to finish; a --runner-cmd manages its own concurrency, so make that command run one test file at a time if it does not already.';
-  if (serial || workers <= 1) return 'Wait for it to finish: this probe already runs one test file at a time (--workers 1), so --serial would change nothing.';
-  return `Wait for it to finish, or lower --workers ${workers} (or pass --serial) to run one test file at a time.`;
+function contentionAdvice({ serial = true, workers = 1, custom = false, faultWorkers = 1 }) {
+  const fanOut = faultWorkers > 1
+    ? ` This probe also runs ${faultWorkers} faults at once; lower --fault-workers ${faultWorkers} first — a timeout or inconsistent probe measured under the fan-out is re-measured serially before it is reported, so contention costs time here, not verdicts.`
+    : '';
+  if (custom) return 'Wait for it to finish; a --runner-cmd manages its own concurrency, so make that command run one test file at a time if it does not already.' + fanOut;
+  if (serial || workers <= 1) return 'Wait for it to finish: this probe already runs one test file at a time (--workers 1), so --serial would change nothing.' + fanOut;
+  return `Wait for it to finish, or lower --workers ${workers} (or pass --serial) to run one test file at a time.` + fanOut;
 }
 
 /** One line for the operator: what is running, what it costs, and what would help. */
@@ -106,3 +113,15 @@ export const contentionWarning = (c, policy = {}) =>
   `${c.runners.length} test runner${c.runners.length === 1 ? ' is' : 's are'} already running (${c.runners.map((r) => `pid ${r.pid}`).join(', ')}); ` +
   'defenders run N times each here, and a suite that times out under parallel load yields TIMEOUT or FLAKY-DEFENDER — verdicts about the load, not the claim. ' +
   contentionAdvice(policy);
+
+/**
+ * The fan-out's own load: n trees times each runner's workers, against the
+ * CPUs this process may use. Above that the probe contends with itself, which
+ * no process list can show. Returns the warning, or undefined.
+ */
+export function fanOutWarning({ faultWorkers = 1, workers = 1, serial = workers === 1, cpus }) {
+  if (faultWorkers <= 1) return undefined;
+  const load = faultWorkers * (serial ? 1 : workers);
+  if (!(cpus >= 1) || load <= cpus) return undefined;
+  return `--fault-workers ${faultWorkers} × ${serial ? 1 : workers} runner worker${serial || workers === 1 ? '' : 's'} = ${load} concurrent test processes on ${cpus} available CPU${cpus === 1 ? '' : 's'}; the probe will contend with itself. Timeouts and inconsistent probes are re-measured serially before they are reported, which can cost more than the fan-out saves — lower --fault-workers to ${Math.max(1, Math.floor(cpus / (serial ? 1 : workers)))} or fewer.`;
+}

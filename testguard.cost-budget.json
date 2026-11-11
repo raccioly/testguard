@@ -1,6 +1,6 @@
 {
   "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine.",
-  "seconds": 2700,
+  "seconds": 4300,
   "measured": {
     "seconds": 816,
     "at": "2026-09-18",
@@ -10,7 +10,7 @@
     "how": "probe . --include-dirty --budget 180000 --cost, from scratch, idle developer machine, after the shared-defender cut",
     "note": "LOCAL. Not comparable with measuredInCI and not what this budget is set from. The previous local from-scratch figure (1168 s, 129 faults) was taken on a contended machine, so 1168 -> 816 overstates the cut."
   },
-  "headroom": "PR #210 run 38087039461 measured 2438 s on the Node 22 leg with every fault killed, before the init/helper defender split that removes an estimated 60-70 s. The growth is 22 claims and 43 faults guarding the docs-audit fixes (security, verdict reuse, init preflight). 2700 keeps the established ~14% CI-variance headroom over the expected post-split leg; the 100 s per-claim ceiling is unchanged. Tighten again from the next measured leg or from-scratch release evidence.",
+  "headroom": "PR #244 measured 3839 s at 567 faults against 3400 and the ceiling is now 4300 (see history). Earlier note: PR #245 (#237, --fault-workers) run 42934145571 measured 3077 s on the Node 22 leg with every fault killed (478/478), against 2700; PR #241 on the same base measured 2521 s at 444 faults. The 34 new faults guard the fault fan-out, the worktree-allocation lock, scratch git isolation and cleanup on cancellation, several of which are only provable end to end (a SIGINT mid-fan-out, a command budget expiring mid-fan-out, two concurrent probes). Before raising, those integration defenders were shortened (lock hold 1.5 -> 0.7 s, contention hold 250 -> 180 ms, per-run budget 1200 -> 800 ms, command budget 5 -> 3.5 s), an estimated 100 s. 3400 is 10.5% above the measured leg and about 14% above the expected post-cut figure, the same CI-variance rule as 2700; the 100 s per-claim ceiling is unchanged (worst new claim 58 s). The CI self-probe stays serial; --fault-workers would cut its wall time but not this cost, which sums per-record durations.",
   "history": [
     {
       "seconds": 950,
@@ -51,6 +51,16 @@
       "seconds": 2700,
       "at": "2026-10-10",
       "why": "PR #210 (the docs-audit fixes) adds 22 claims and 43 faults guarding a GitHub Action shell injection, verdict reuse surviving a changed --runner-cmd or a different runner, defender load failures never being reused, the pip wrapper's pinned fallback, init's all-or-nothing preflight, and runner-source binding. Run 38087039461 (ci.yml test (22)) measured 2438 s against 2250 with every fault killed; the new claims cost 365 s of it. Before raising anything the four init/helper claims were moved off test/init.test.mjs (43 tests, about 1.8 s a run) onto four single-purpose files and per-fault GitHub/GitLab helper files, re-probed 17/17 killed, which cuts an estimated 60-70 s. The rest is the deliberate coverage. 2700 is 10.7% above the pre-cut 2438 s leg and about 14% above the expected post-cut figure, the same CI-variance rule as 2250; the 100 s per-claim ceiling is unchanged and no new claim is near it (worst 43 s before the cut). Record the next leg's measured figure here and tighten if the cut landed bigger."
+    },
+    {
+      "seconds": 3400,
+      "at": "2026-11-10",
+      "why": "PR #245 (#237, --fault-workers) run 42934145571 measured 3077 s on the Node 22 leg with every fault killed (478/478), against 2700; PR #241 on the same base measured 2521 s at 444 faults. The 34 new faults guard the fault fan-out, the worktree-allocation lock, scratch git isolation and cleanup on cancellation, several of which are only provable end to end (a SIGINT mid-fan-out, a command budget expiring mid-fan-out, two concurrent probes). Before raising, those integration defenders were shortened (lock hold 1.5 -> 0.7 s, contention hold 250 -> 180 ms, per-run budget 1200 -> 800 ms, command budget 5 -> 3.5 s), an estimated 100 s. 3400 is 10.5% above the measured leg and about 14% above the expected post-cut figure, the same CI-variance rule as 2700; the 100 s per-claim ceiling is unchanged (worst new claim 58 s). The CI self-probe stays serial; --fault-workers would cut its wall time but not this cost, which sums per-record durations."
+    },
+    {
+      "seconds": 4300,
+      "at": "2026-11-11",
+      "why": "PR #244 (#239, the write boundary) run on head d1d6802 measured 3839 s on the Node 22 leg (567 faults, all killed) against 3400, over by 439 s. The branch merges main after #242 (probe --changed, external claims), #245 (fan-out) and #247 (--typecheck), which together took the fault count from 478 to 538 before this PR; this PR adds 29 faults in nine claims, measured at about 150 s locally (144 s runner time, the worst claim 25 s, under the 100 s per-claim ceiling). The rest of the growth is not this PR's and is not decomposed here. 4300 is 12% above the measured leg, the same CI-variance rule as 3400."
     }
   ],
   "measuredInCI": {

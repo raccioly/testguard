@@ -7,6 +7,7 @@ import { createDiscoveryManifest } from '../src/probe/runners/discovery.mjs';
 import { hashNativeTestUniverse } from '../src/probe/universe.mjs';
 import { discoverDefendersDetailed } from '../src/probe/discover.mjs';
 import { subjectOf } from '../src/probe/attribution.mjs';
+import { createDependencyHasher } from '../src/probe/dependencies.mjs';
 import { hashFile, sha256 } from '../src/util/hash.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { fingerprint } from '../spec/lib/fingerprint.mjs';
@@ -39,6 +40,7 @@ function fixture(discovered = false) {
     defenderHashes: Object.fromEntries(resolved.map((file) => [file, hashFile(join(projectDir, file))])),
     testUniverseHash: universe.testUniverseHash,
     discoveryHashes: Object.fromEntries((discovery?.dependencies ?? []).map((file) => [file, hashFile(join(projectDir, file))])),
+    ...createDependencyHasher(projectDir).inputsFor([fault.file, ...resolved]),
   };
   const claims = { schemaVersion: 1, claims: [claim] };
   const evidence = { ...structuredClone(example), records: [record] };
@@ -58,6 +60,28 @@ it.each(['src/value.mjs', 'test/value.test.mjs'])('refuses changed or absent inp
   const input = fixture(); writeFileSync(join(input.projectDir, file), 'changed\n');
   expect(originPolicyInputsFresh(input)).toBe(false);
   rmSync(join(input.projectDir, file)); expect(originPolicyInputsFresh(input)).toBe(false);
+});
+it('refuses a changed import of a declared defender: the same predicate as verdict reuse (#232)', () => {
+  const input = fixture();
+  expect(input.evidence.records[0].inputs.dependencyHashes).toHaveProperty('src/index.mjs');
+  writeFileSync(join(input.projectDir, 'src/index.mjs'), "export { value } from './value.mjs';\n// changed\n");
+  expect(originPolicyInputsFresh(input)).toBe(false);
+});
+it('refuses an import closure that cannot be followed, even unchanged (#232)', () => {
+  const input = fixture();
+  writeFileSync(join(input.projectDir, 'src/index.mjs'), "export { value } from './value.mjs';\nexport const load = (name) => import(name);\n");
+  const record = input.evidence.records[0];
+  Object.assign(record.inputs, createDependencyHasher(input.projectDir).inputsFor([record.subject.file, ...record.defenders.resolved]));
+  expect(record.inputs.dependencyClosure).toBe('indeterminate');
+  expect(validate('evidence', input.evidence).errors).toEqual([]);
+  expect(originPolicyInputsFresh(input)).toBe(false);
+});
+it('refuses legacy evidence without dependency hashes (#232)', () => {
+  const input = fixture();
+  delete input.evidence.records[0].inputs.dependencyHashes;
+  delete input.evidence.records[0].inputs.dependencyClosure;
+  expect(validate('evidence', input.evidence).errors).toEqual([]);
+  expect(originPolicyInputsFresh(input)).toBe(false);
 });
 it.each(['src/index.mjs', 'test/negative.test.mjs'])('recomputes current discovery dependencies including %s', (file) => {
   const input = fixture(true); writeFileSync(join(input.projectDir, file), '// changed\n');

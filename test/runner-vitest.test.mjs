@@ -13,28 +13,33 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const file = (status, tests, message) => ({ status, message, assertionResults: tests });
 const t = (status, ...failureMessages) => ({ status, failureMessages });
+// A failed test whose serialized error identity says it was an assertion (jest's `matcherResult`).
+const assertion = (...failureMessages) => ({ status: 'failed', failureMessages, failureDetails: [{ matcherResult: { pass: false, message: 'm' } }] });
 
 describe('parseReport', () => {
   it('pass', () => {
     const { run } = parseReport({ success: true, numTotalTests: 2, numPassedTests: 2, numFailedTests: 0, testResults: [file('passed', [t('passed'), t('passed')])] }, 10);
-    expect(run).toEqual({ outcome: 'pass', tests: { total: 2, passed: 2, failed: 0 }, assertionFailures: 0, durationMs: 10 });
+    expect(run).toEqual({ outcome: 'pass', tests: { total: 2, passed: 2, failed: 0 }, assertionFailures: 0, exceptionFailures: 0, durationMs: 10 });
   });
 
   it('assertion failure counts toward killing', () => {
-    const { run, timeouts } = parseReport({ success: false, numTotalTests: 2, numPassedTests: 1, numFailedTests: 1, testResults: [file('failed', [t('passed'), t('failed', 'AssertionError: expected 1 to be 2')])] }, 10);
+    const { run, timeouts } = parseReport({ success: false, numTotalTests: 2, numPassedTests: 1, numFailedTests: 1, testResults: [file('failed', [t('passed'), assertion('AssertionError: expected 1 to be 2')])] }, 10);
     expect(run.outcome).toBe('fail');
     expect(run.assertionFailures).toBe(1);
+    expect(run.exceptionFailures).toBe(0);
     expect(timeouts).toBe(0);
   });
 
-  it('a thrown exception in the test body also counts (it is neither timeout nor load failure)', () => {
+  it('a thrown exception in the test body still kills, but is counted as an exception, not an assertion', () => {
     const { run } = parseReport({ success: false, numTotalTests: 1, numPassedTests: 0, numFailedTests: 1, testResults: [file('failed', [t('failed', 'TypeError: cannot read properties of undefined')])] }, 10);
-    expect(run.assertionFailures).toBe(1);
+    expect(run.assertionFailures).toBe(0);
+    expect(run.exceptionFailures).toBe(1);
   });
 
   it('timeout is separated from assertion failures', () => {
-    const { run, timeouts } = parseReport({ success: false, numTotalTests: 2, numPassedTests: 0, numFailedTests: 2, testResults: [file('failed', [t('failed', 'Error: Test timed out in 1000ms.'), t('failed', 'AssertionError: x')])] }, 10);
+    const { run, timeouts } = parseReport({ success: false, numTotalTests: 2, numPassedTests: 0, numFailedTests: 2, testResults: [file('failed', [t('failed', 'Error: Test timed out in 1000ms.'), assertion('AssertionError: x')])] }, 10);
     expect(run.assertionFailures).toBe(1);
+    expect(run.exceptionFailures).toBe(0);
     expect(timeouts).toBe(1);
   });
 
@@ -45,7 +50,7 @@ describe('parseReport', () => {
     'Error: expected output\n    Exceeded timeout of 5000 ms for a test.',
   ])('does not turn quoted timeout text into a runner timeout: %s', (message) => {
     const { run, timeouts } = parseReport({ success: false, numTotalTests: 1, numFailedTests: 1, testResults: [file('failed', [t('failed', message)])] }, 10);
-    expect(run.assertionFailures).toBe(1);
+    expect(run.assertionFailures + run.exceptionFailures).toBe(1);
     expect(timeouts).toBe(0);
   });
 

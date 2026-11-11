@@ -1,13 +1,14 @@
 import { existsSync, readFileSync, lstatSync, realpathSync } from 'node:fs';
 import { join, relative, isAbsolute, sep } from 'node:path';
 import { readSpecDoc } from '../evidence/writer.mjs';
-import { loadClaims, defaultClaimsPath } from '../claims/load.mjs';
+import { loadClaims, defaultClaimsPath, claimsSourceOf } from '../claims/load.mjs';
 import { gate } from '../baseline/baseline.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
 import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { defenderSelection, sameClaimMetadata } from '../probe/attribution.mjs';
-import { coAuthorshipWarning, sortForReport, renderOrigins, renderOriginPolicy } from '../render.mjs';
+import { createDependencyHasher, dependencyChanges, instrumentOf } from '../probe/dependencies.mjs';
+import { coAuthorshipWarning, exceptionOnlyWarning, sortForReport, renderOrigins, renderOriginPolicy } from '../render.mjs';
 import { evaluateOriginPolicy } from '../probe/origin-policy.mjs';
 import { declaredOriginSummary } from '../../spec/lib/origins.mjs';
 import { intentHandoff } from '../scaffold/intent.mjs';
@@ -16,6 +17,7 @@ import { headSha, isAncestor } from '../git.mjs';
 import { checkAnchorLocations } from '../claims/anchors.mjs';
 import { computeClaimedSurface, needsClaimExpansion } from './surface.mjs';
 import { projectAnnotationAdvisory } from '../claims/annotations.mjs';
+import { thinClaims, renderThin } from '../claims/thin.mjs';
 
 export const faultContentHash = (fault) => sha256(`${fault.find}\n${fault.replace}`);
 
@@ -41,11 +43,11 @@ const P = (projectDir) => ({
  * is computed from the recorded input hashes exactly as for a local run, so a
  * foreign document is trusted only for the faults whose inputs still match.
  */
-export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20, changedRef, includeDirty = false, evidence: evidenceOverride }) {
+export function computeStatus({ projectDir, toolVersion, generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20, changedRef, includeDirty = false, evidence: evidenceOverride }) {
   const rel = (p) => relative(projectDir, p) || '.';
   const doc = {
     schemaVersion: 1,
-    tool: { name: 'testguard', version: toolVersion },
+    tool: { name: 'testguard', version: toolVersion ?? '0.0.0' },
     generatedAt,
     state: 'no-claims',
     next: { action: 'scaffold', command: 'testguard scaffold <source-file>', why: `No testguard.claims.json in this project. Scaffold proposes mechanical faults, not intent. ${intentHandoff}` },
@@ -90,11 +92,16 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
     }
     return doc;
   }
-  doc.paths.claims = rel(paths.claims);
+  const source = claimsSourceOf(projectDir, paths.claims);
+  // An external claims file is named by hash, never by path: a relative path out of the project is a private path and a consumer that rejects `..` could not read it.
+  if (source) doc.claimsSource = source;
+  else doc.paths.claims = rel(paths.claims);
 
   const claims = loadClaims(paths.claims);
   doc.origins = declaredOriginSummary(claims.claims);
   if (claims.claims.length) doc.notes.push(...projectAnnotationAdvisory(projectDir, claims, { customClaims: paths.claims !== defaultClaimsPath(projectDir) }).notes);
+  const thin = thinClaims(claims.claims);
+  if (thin.length) doc.thinClaims = thin;
   doc.counts.claims = claims.claims.length;
   doc.counts.faults = claims.claims.reduce((n, c) => n + c.faults.length, 0);
   doc.surface = computeClaimedSurface({ projectDir, claims });
@@ -172,6 +179,9 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   // ── Staleness: does the evidence still describe this claims file and this tree? ──
   const probed = new Map(evidence.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]));
   const discoveryHashCache = new Map();
+  // The same closure walk and the same comparison `probe` uses to decide reuse,
+  // so a changed import is stale here exactly when a re-probe would re-measure.
+  let dependencyHasher;
   for (const key of faultIndex.keys()) if (!probed.has(key)) doc.stale.push(`fault ${key} has never been probed`);
   for (const [key, r] of probed) {
     const cur = faultIndex.get(key);
@@ -206,6 +216,22 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
       if (!h) doc.stale.push(`${d} now defends ${key} but was not probed`);
       else if (existsSync(join(projectDir, d)) && hashFile(join(projectDir, d)) !== h) doc.stale.push(`${d} changed since ${key} was probed`);
     }
+    dependencyHasher ??= createDependencyHasher(projectDir);
+    const roots = [cur.fault.file, ...defenders];
+    doc.stale.push(...dependencyChanges(r.inputs, dependencyHasher.inputsFor(roots), key, { roots }));
+  }
+  // The instrument rule `probe` applies before any record (reusableRun): one
+  // line for the whole document, because it re-measures every record at once.
+  // Only when the caller says which TestGuard is asking; a library caller
+  // that names no version has nothing to compare.
+  if (toolVersion !== undefined && evidence.records.length) {
+    const current = instrumentOf(projectDir, toolVersion);
+    const recorded = evidence.run.instrument;
+    if (evidence.tool?.version !== toolVersion || recorded?.toolVersion !== toolVersion) {
+      doc.stale.unshift(`evidence was measured by TestGuard ${recorded?.toolVersion ?? evidence.tool?.version ?? 'unknown'} and this is ${toolVersion}; the next probe re-measures every record`);
+    } else if (recorded?.digest !== current.digest) {
+      doc.stale.unshift('resolver or runner configuration (tsconfig paths, vite/vitest aliases, package.json imports, runner config, lockfiles) changed since the evidence was measured; the next probe re-measures every record');
+    }
   }
   doc.stale = [...new Set(doc.stale)];
 
@@ -217,6 +243,7 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
   // L3 independence and observed flakiness, as numbers rather than adjectives.
   const kills = evidence.records.filter((r) => r.verdict === 'killed');
   if (kills.length) doc.counts.killedCoAuthored = kills.filter((r) => r.detail.independence?.class === 'co-authored').length;
+  if (kills.length) doc.counts.killedExceptionOnly = kills.filter((r) => r.detail.killKind === 'exception-only').length;
   const flaky = evidence.records.filter((r) => r.detail.flakeRate?.failures > 0);
   if (flaky.length) {
     doc.counts.flakyDefenderSets = new Set(flaky.map((r) => r.defenders.resolved.join('\n'))).size;
@@ -260,7 +287,7 @@ export function computeStatus({ projectDir, toolVersion = '0.0.0', generatedAt =
       survived: `${top.claimId}/${top.subjectId} (${top.severity}) survived: "${cur.claim.statement}" can be false with the suite green.`,
       nocover: `${top.claimId}/${top.subjectId} (${top.severity}) has no defender: no test file imports ${cur.fault.file}.`,
       unverifiable: `${top.claimId}/${top.subjectId} cannot be probed (${top.reason ?? 'anchor'}); fix the fault definition in testguard.claims.json, not the code.`,
-      'fault-invalid': `${top.claimId}/${top.subjectId}'s replacement does not load; fix the fault definition.`,
+      'fault-invalid': `${top.claimId}/${top.subjectId}'s replacement does not load or type-check${top.reason ? ` (${top.reason})` : ''}; fix the fault definition.`,
       timeout: `${top.claimId}/${top.subjectId} makes the defenders hang; a hang is not a detection — write an assertion that fails on it.`,
       'flaky-defender': `${top.claimId}/${top.subjectId}'s defenders are not reliably green (${top.reason ?? ''}); fix the flake before any verdict can be trusted.`,
     };
@@ -302,6 +329,7 @@ export function renderStatus(doc) {
   lines.push(`state: ${doc.state}${doc.provisional ? ' (provisional)' : ''} — ${doc.counts.claims} claims / ${doc.counts.faults} faults` + (doc.counts.byVerdict ? `; ${Object.entries(doc.counts.byVerdict).map(([k, v]) => `${v} ${k}`).join(', ')}; ${doc.counts.new ?? 0} new, ${doc.counts.baselined ?? 0} baselined` : '')
   );
   if (doc.origins) lines.push(renderOrigins(doc.origins));
+  lines.push(...renderThin(doc.thinClaims ?? []));
   if (doc.originPolicy) lines.push(renderOriginPolicy(doc.originPolicy, { basis: 'offline' }));
   if (doc.surface) {
     const s = doc.surface;
@@ -312,6 +340,7 @@ export function renderStatus(doc) {
   const coAuthored = doc.counts.killedCoAuthored ?? 0;
   const kills = doc.counts.byVerdict?.killed ?? 0;
   if (coAuthored) lines.push(`evidence: ${coAuthorshipWarning(coAuthored, kills)}`);
+  if (doc.counts.killedExceptionOnly) lines.push(`evidence: ${exceptionOnlyWarning(doc.counts.killedExceptionOnly, kills)}`);
   if (doc.changes) {
     const c = doc.changes;
     lines.push(`changes:  ${c.changed} file${c.changed === 1 ? '' : 's'} since ${c.ref}; ${c.evaluated} evaluated, ${c.excluded} excluded, ${c.uncovered.length} unclaimed`);

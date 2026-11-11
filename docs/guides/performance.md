@@ -141,7 +141,8 @@ npx testguard-cli probe . --progress ndjson 2>events.ndjson  # machine-readable 
 {"event":"verdict","claim":"REDACT-001","fault":"F1","verdict":"survived","severity":"critical","file":"demo/redact.py","at":"…"}
 ```
 
-The stages are `baseline`, `baseline-flake` (finishing the baseline runs after
+The stages are `reuse-baseline` (the one live run that licenses carrying a
+verdict forward), `baseline`, `baseline-flake` (finishing the baseline runs after
 a red one, so "failed once in three" can be told from "fails every time"),
 `probe`, `negative-control` and `escalation`. A verdict reused from earlier
 evidence carries `"reused": true`.
@@ -158,10 +159,46 @@ shows a rewritten stage line at a terminal only.
 `replay` and `admit`, which already means one test file at a time.
 `--workers 2` raises the ceiling for Vitest, Jest, Playwright and Node's test
 runner; `--serial` forces one whatever `--workers` says, so it only changes a
-run that also raised `--workers`. Python is always serial. Faults run one after another, and so do the runner groups of a
-mixed-runner defender set. [Languages and
+run that also raised `--workers`. Python is always serial. Faults run one after another unless `--fault-workers`
+says otherwise (below), and the runner groups of a mixed-runner defender set
+always do. [Languages and
 runners](../reference/languages-and-runners.md#runner-summary) shows the flag
 each runner receives.
+
+**Probe several faults at once.** <a id="probe-several-faults-at-once"></a>
+Almost all of a probe's time is spent inside the test runner, one fault after
+another. `--fault-workers <n>` probes up to n faults at once, each in its own
+scratch worktree, so it is the flag that shortens a cold probe:
+
+```bash
+testguard probe --fault-workers 4
+```
+
+- Baselines are still measured once per defender set, before any fault is
+  applied; the baselines of different defender sets run side by side, and a
+  baseline that is not green while another set was running is measured again
+  alone before any verdict uses it (`detail.baselineRemeasuredSerially`).
+  Then the faulted runs, negative controls and escalations run side by side.
+- Verdicts and record order are those of a serial run. A `TIMEOUT` or an
+  inconsistent probe measured while other faults were running is measured again
+  alone before it is reported, and says so (`detail.remeasuredSerially`). A
+  fan-out that keeps hitting that path is costing time, not honesty: lower n.
+  A defender that hangs until `--budget` is paid twice that way (once under
+  the fan-out, once alone); measured on the Python known-answer fixture with
+  a 60 s budget, its one hanging fault made `--fault-workers 4` slower than
+  serial (126 s against 75 s). Keep `--budget` close to what a healthy run
+  needs.
+- Pick n at or below your CPU count divided by `--workers`; the probe warns
+  when it oversubscribes the machine. Each tree is one more checkout on disk
+  (`node_modules` is linked, not copied).
+- Not with `--in-place`. A project whose tests bind a fixed port or share an
+  external database or directory outside the project can collide across
+  trees; keep the default for it.
+- Evidence measured with a fan-out is never reused by a serial probe; serial
+  evidence is reused by any.
+- Two probes of the same repository at once are safe: scratch-worktree
+  creation and removal take turns on a lock keyed by the repository (kept in
+  the temp or scratch directory, never inside the repository).
 
 **Contention.** Before the first run, the probe looks for test runners already
 running on the machine (Vitest, Jest, Playwright, Mocha, AVA, Karma, Cypress)
@@ -171,7 +208,8 @@ records the detection in the evidence (`run.contention`). Wait for the other
 run to finish before trusting a timeout. The warning's advice follows the run:
 a default run is already one file at a time, so it says to wait; a run that
 raised `--workers` is told to lower it or pass `--serial`; a `--runner-cmd` is
-told that its concurrency is the command's own.
+told that its concurrency is the command's own; a fan-out is told to lower
+`--fault-workers` first.
 
 **Budgets.**
 
@@ -186,8 +224,8 @@ Synchronous setup can overrun it slightly, because JavaScript cannot preempt
 it.
 
 **Cancellation.** Ctrl-C (or `SIGTERM`/`SIGHUP`) kills the runners TestGuard
-started, then restores applied faults, then removes scratch worktrees, and
-exits `130`. A daemon a test started that has already re-parented itself is
+started, then restores applied faults, then removes scratch worktrees (every
+one, under `--fault-workers`), and exits `130`. A daemon a test started that has already re-parented itself is
 outside that guarantee.
 
 **This is not a sandbox.** A custom `--runner-cmd`, browser subprocesses,
@@ -203,6 +241,13 @@ changed. All of these must match the evidence at the output path:
 
 - the fault itself (its content hash) and the claim's metadata;
 - the target file's hash and every selected defender's hash;
+- everything the target and the defenders import, transitively, inside the
+  project (`inputs.dependencyHashes`), plus the lockfiles, `package.json`,
+  `pyproject.toml` and runner/compiler config at the project root. Python
+  closures include every `conftest.py` above each file. When an import cannot
+  be followed — a computed `import(name)`, `require(x)` or
+  `importlib.import_module(name)`, a relative import that resolves to no file —
+  the closure is `indeterminate` and that fault is probed every time;
 - the requested and resolved defender sets and where they came from;
 - the test universe and the discovery inputs. For built-in runners this
   binds the runner, its version and the hashes of its config files,
@@ -212,6 +257,13 @@ changed. All of these must match the evidence at the output path:
 - the runner the evidence records (`run.runner`): the engine that ran, its
   version, and where it was resolved from (`project`, `path`, `builtin`);
 - `--confirm` and the worker policy (`--workers`, `--serial`).
+
+Then one more check that no hash can make: the defender set runs once on
+unmodified source. Green, and every fault it defends is reused; red, and each
+is probed in full. That run is the first run of the shared baseline, so it
+costs one run per defender set, never one per fault, and
+`run.measurements.reuseBaselineRuns` counts it. Evidence written before this
+rule has no `dependencyHashes` and is probed again once.
 
 A record produced by a probe error is never reused, and neither is one whose
 defenders failed to load (`defenders-failed-to-load`): that is a statement
@@ -226,9 +278,12 @@ names. A cold run, a changed runner config or a changed worker policy probes
 from scratch even when your source has not changed.
 
 One kind of change reuse cannot see: anything outside the hashed inputs that
-changes a verdict without breaking the load, such as an environment variable,
-a package upgraded inside the same virtualenv, or a service your tests read.
-Pass `--no-reuse` after one.
+changes a verdict while the defenders stay green, such as an environment
+variable, a package upgraded inside the same virtualenv, or a service your
+tests read, a `setupFiles`/`globalSetup` file the runner config names by
+string, or a lockfile above the project directory in a monorepo. A change that
+turns the defenders red is caught by the live run.
+Pass `--no-reuse` after one that does not.
 
 In CI, restore the previous run's evidence from a cache and write to the same
 path, so only claims whose inputs changed are probed again. TestGuard's own CI
