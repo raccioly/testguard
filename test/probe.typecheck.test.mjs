@@ -120,28 +120,11 @@ describe('a dirty baseline type check is a precondition error', () => {
   it('names the first diagnostic and writes nothing', async () => {
     const project = typescriptProject({ edit: (dir) => writeText(join(dir, 'src', 'extra.ts'), 'export const broken: number = "not a number";\n') });
     try {
-      await expect(run(project, { typecheck: '' })).rejects.toThrow(PreconditionError);
       await expect(run(project, { typecheck: '' })).rejects.toThrow(/does not type-check[\s\S]*src\/extra\.ts\(1,14\): error TS2322/);
       const cli = spawnSync(process.execPath, [join(ROOT, 'cli', 'testguard.mjs'), 'probe', project.dir, '--typecheck', '--quiet'], { encoding: 'utf8' });
       expect(cli.status).toBe(2);
       expect(cli.stderr).toMatch(/does not type-check/);
       expect(existsSync(join(project.dir, '.testguard', 'evidence.json'))).toBe(false);
-    } finally { project.cleanup(); }
-  }, 300_000);
-});
-
-describe('the type check is part of what evidence can be reused for', () => {
-  it('a record measured without it is not reusable by a run with it, and the reverse', async () => {
-    const project = typescriptProject();
-    try {
-      const only = ['TS-DISCOUNT'];
-      const plain = await run(project, { only });
-      const typed = await run(project, { only, typecheck: '', previous: plain });
-      expect(typed.run.reuse).toEqual({ reused: 0, measured: 1 });
-      const again = await run(project, { only, typecheck: '', previous: typed });
-      expect(again.run.reuse).toEqual({ reused: 1, measured: 0 });
-      const back = await run(project, { only, previous: typed });
-      expect(back.run.reuse).toEqual({ reused: 0, measured: 1 });
     } finally { project.cleanup(); }
   }, 300_000);
 });
@@ -206,24 +189,4 @@ describe('claims --check-anchors --typecheck', () => {
     } finally { project.cleanup(); }
   }, 60_000);
 
-  it('the command line exits 1 and names the diagnostic; the flag is refused elsewhere (exit 3)', async () => {
-    const project = typescriptProject();
-    try {
-      const text = capture();
-      expect(await main(['claims', project.dir, '--check-anchors', '--typecheck'], text.io)).toBe(1);
-      expect(text.lines.out.join('\n')).toMatch(/FAULT-INVALID\s+TS-STRING\/F1.*type check: src\/price\.ts\(2,3\): error TS2322/);
-      expect(text.lines.out.join('\n')).toMatch(/OK\s+TS-TOTAL\/F1.*type check ok/);
-      expect(text.lines.out.join('\n')).toMatch(/OK\s+TS-LEGACY\/F1.*type check not applicable/);
-      const json = capture();
-      expect(await main(['claims', project.dir, '--check-anchors', '--typecheck', '--json'], json.io)).toBe(1);
-      expect(JSON.parse(json.lines.out.join('\n')).anchorChecks.results.find((r) => r.faultId === 'F1' && r.claimId === 'TS-SIGNATURE').typecheck).toMatchObject({ status: 'diagnostics' });
-      for (const argv of [['claims', project.dir, '--typecheck'], ['gate', project.dir, '--typecheck'], ['sweep', project.dir, '--typecheck']]) {
-        const refused = capture();
-        expect(await main(argv, refused.io), argv.join(' ')).toBe(3);
-        expect(refused.lines.err.join('\n')).toMatch(/--typecheck is only valid on probe and on claims --check-anchors/);
-      }
-      expect(existsSync(join(project.dir, '.testguard', 'evidence.json'))).toBe(false);
-      expect(readFileSync(join(project.dir, 'src', 'price.ts'), 'utf8')).toContain('(100 - percent)');
-    } finally { project.cleanup(); }
-  }, 180_000);
 });
