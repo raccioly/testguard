@@ -12,6 +12,7 @@ import { PreconditionError } from '../src/probe/worktree.mjs';
 import { readSpecDoc } from '../src/evidence/writer.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { partialBudgetProject } from './helpers/partial-budget-project.mjs';
+import { fanOutProject } from './helpers/fan-out-project.mjs';
 
 const LIMIT = 60_000;
 
@@ -115,6 +116,41 @@ describe('probe --partial-on-budget', () => {
       const doc = await probe(options(project, { commandBudget: budget, partialOnBudget: true, onStage, only: ['C4', 'C2', 'C1', 'C3'] }));
       expect(doc.records.map((r) => [r.claim.id, r.verdict])).toEqual([['C4', 'killed'], ['C2', 'killed'], ['C1', 'unverifiable'], ['C3', 'unverifiable']]);
     } finally { rmSync(project.dir, { recursive: true, force: true }); }
+  }, 60_000);
+
+  it('expiry while the fan-out is still planning reports every unmeasured fault not reached', async () => {
+    const project = partialBudgetProject();
+    try {
+      let now = 0;
+      const budget = new CommandBudget(LIMIT, { now: () => now });
+      const onStage = ({ claimId, stage }) => { if (claimId === 'C3' && stage === 'baseline') now = LIMIT + 1; };
+      const doc = await probe(options(project, { commandBudget: budget, partialOnBudget: true, faultWorkers: 3, onStage }));
+      expect(validate('evidence', doc).errors).toEqual([]);
+      expect(doc.run.budget).toEqual({ limitMs: LIMIT, exhausted: true, reached: 0, notReached: 4 });
+      expect(project.worktrees()).toBe(1);
+    } finally { rmSync(project.dir, { recursive: true, force: true }); }
+  }, 60_000);
+
+  it('expiry during a serial re-measure leaves that fault not reached, never its contended verdict', async () => {
+    const project = fanOutProject();
+    process.env.TG_FANOUT_MARKERS = project.markers;
+    try {
+      let now = 0;
+      const budget = new CommandBudget(LIMIT, { now: () => now });
+      let slowProbes = 0;
+      const onStage = ({ claimId, stage }) => { if (claimId === 'SLOW' && stage === 'probe' && ++slowProbes === 2) now = LIMIT + 1; };
+      const doc = await probe({ projectDir: project.dir, claims: project.claims, runnerName: 'node-test', confirmRuns: 3, budgetMs: 3000, escalate: false, faultWorkers: 3, commandBudget: budget, partialOnBudget: true, onStage });
+      expect(validate('evidence', doc).errors).toEqual([]);
+      const slow = doc.records.find((r) => r.claim.id === 'SLOW');
+      expect(slow.verdict).toBe('unverifiable');
+      expect(slow.detail.reason).toBe('not-reached-within-budget');
+      expect(doc.records.some((r) => r.verdict === 'timeout')).toBe(false);
+      expect(project.worktrees()).toBe(1);
+    } finally {
+      delete process.env.TG_FANOUT_MARKERS;
+      rmSync(project.dir, { recursive: true, force: true });
+      rmSync(project.markers, { recursive: true, force: true });
+    }
   }, 60_000);
 
   it('a run the budget cut short is the deadline, not a timeout verdict, even with clock left over', async () => {
