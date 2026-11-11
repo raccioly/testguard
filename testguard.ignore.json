@@ -186,6 +186,20 @@
       "reason": "Wiring for the Jules routines: it reads the public pull request list, the claims file and --help, then prints what the policy decided. Every decision (queue cap, decline window, weekly rotation, target lists) is a pure function in .github/scripts/jules-policy.mjs, claimed as TG-JULES-TRIAGE-BOUNDS-THE-QUEUE and TG-JULES-MERGE-GATE-HOLDS-BY-DEFAULT. Maintenance tooling; not shipped in the package.",
       "by": "maintainer",
       "at": "2026-10-10T18:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/probe-partial-budget.test.mjs",
+      "reason": "Acceptance for --partial-on-budget: it probes a generated four-claim project (serial, --fault-workers 3, a budget-capped hang, a reuse round trip, and the command in-process) with an injected clock, about twenty seconds in total. Mandatory in npm test and CI. The behavior it exercises is claimed where it lives and defended by fast pure tests: TG-PARTIAL-BUDGET-NEVER-REPORTS-UNMEASURED-AS-MEASURED, TG-NOT-REACHED-RECORD-IS-NEVER-REUSED, TG-COMMAND-BUDGET-EXPIRY-IS-TOLD-BY-IDENTITY-AND-A-CUT-RUN-IS-THE-DEADLINE and TG-EXHAUSTED-EVIDENCE-IS-CROSS-CHECKED name test/partial-budget.test.mjs and the conformance suite; naming this file would re-run all of it for every fault.",
+      "by": "claude",
+      "at": "2026-11-11T03:30:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/helpers/partial-budget-project.mjs",
+      "reason": "Fixture builder for test/probe-partial-budget.test.mjs, the slow acceptance test above: it builds a four-claim node:test project in a temporary git repository and asserts nothing. The claims that matter are defended by test/partial-budget.test.mjs and the conformance suite, which do not use it.",
+      "by": "claude",
+      "at": "2026-11-11T03:30:00Z"
     }
   ]
 }
