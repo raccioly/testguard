@@ -71,12 +71,16 @@ describe('claims --check-anchors: cheap preflight before a probe', () => {
     expect(text.lines.out.join('\n')).toMatch(/ANCHOR-MISSING\s+REDACT-001\/F1.*0 hits, expected 1/);
   });
 
-  it('checks this repository, including replacement syntax, in under one second', async () => {
+  // The bound scales with the claims file: an absolute second held at ~130 anchors and
+  // failed by 6 ms at 592 on a loaded CI runner (about 1.7 ms each). What this guards is
+  // the preflight staying a pure text check; a process spawn or a file re-read per anchor
+  // costs tens of milliseconds each and still fails.
+  it('checks this repository, including replacement syntax, within 5 ms per anchor', async () => {
     const report = await checkAnchors(ROOT, loadClaims(join(ROOT, 'testguard.claims.json')));
     expect(report.invalid).toBe(0);
     expect(report.checked).toBeGreaterThan(100);
-    expect(report.durationMs).toBeLessThan(1_000);
-  }, 5_000);
+    expect(report.durationMs).toBeLessThan(report.checked * 5);
+  }, 10_000);
 
   it('places the failing preflight before self-probe in CI, with no failure bypass', () => {
     const workflow = readFileSync(join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
