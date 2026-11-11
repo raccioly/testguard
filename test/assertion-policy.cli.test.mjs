@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { main } from '../src/cli.mjs';
 import { probe } from '../src/probe/probe.mjs';
 import { loadClaims } from '../src/claims/load.mjs';
-import { evaluateAssertionPolicy, renderAssertionPolicy } from '../src/probe/assertion-policy.mjs';
+import { evaluateAssertionPolicy } from '../src/probe/assertion-policy.mjs';
 import { readSpecDoc } from '../src/evidence/writer.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { FIXTURE_GIT } from './helpers/git.mjs';
@@ -129,8 +129,10 @@ describe('the real CLI: a defender with no assertion, a fault that throws', () =
     expect(doc.run.assertionPolicy.exceptionOnlyKills).toEqual([{ claimId: 'P-ASSERT', faultId: 'F1', reason }, { claimId: 'P-CRASH', faultId: 'F1', reason }]);
     const evidence = readSpecDoc('evidence', join(dir, '.testguard', 'evidence.json'));
     expect(evidence.records.map((r) => [r.detail.killKind, r.detail.killKindReason])).toEqual([['exception-only', reason], ['exception-only', reason]]);
-    // The line a user reads is renderAssertionPolicy's over this very document; the CLI wiring of the text is asserted above.
-    expect(renderAssertionPolicy(doc.run.assertionPolicy)).toMatch(/P-ASSERT\/F1 \(kind-not-reported-by-runner: the runner reported no error identity/);
+    // The text a user reads, from the CLI: the same measurement reused (the document above just wrote it), so one baseline run.
+    const text = capture();
+    await main(['probe', dir, '--runner-cmd', cmd, '--no-escalate', '--require-assertion-kill'], text.io);
+    expect(text.l.out.join('\n')).toMatch(/P-ASSERT\/F1 \(kind-not-reported-by-runner: the runner reported no error identity/);
   }, 180_000);
 
   it('the flag is refused on every other command, exit 3', async () => {
