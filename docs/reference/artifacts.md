@@ -58,7 +58,7 @@ it ignores `.testguard/` as a whole, `init` leaves it alone and warns that
 |---|---|---|---|
 | `evidence.json` | `probe` (complete run, `--confirm` 3 or more) | [`evidence`](../../spec/schemas/evidence.schema.json) | ignore |
 | `evidence-provisional.json` | `probe --confirm` below 3 | [`evidence`](../../spec/schemas/evidence.schema.json) | ignore |
-| `evidence-partial.json` | `probe --claim`, `probe --changed`, `admit` | [`evidence`](../../spec/schemas/evidence.schema.json) | ignore |
+| `evidence-partial.json` | `probe --claim`, `probe --changed`, `admit`, and an exhausted `probe --partial-on-budget` | [`evidence`](../../spec/schemas/evidence.schema.json) | ignore |
 | `baseline.json` | `baseline` | [`baseline`](../../spec/schemas/baseline.schema.json) | **commit** |
 | `brief.json` | `brief` (not with `--text` or `--markdown`) | [`brief`](../../spec/schemas/brief.schema.json) | ignore |
 | `gate.json` | `gate` | [`gate`](../../spec/schemas/gate.schema.json) | ignore |
@@ -122,6 +122,12 @@ file. The project's own claims file has no `claimsSource`.
 `probe --confirm 1` or `2` writes the provisional file; `baseline` refuses it
 unless you pass `--allow-provisional`. `probe --claim <ID>`, `probe --changed <ref>` and `admit` write
 the partial file. Neither ever replaces `evidence.json`.
+
+A `probe --partial-on-budget` whose command budget ran out also writes the partial
+file (or `--out`), never the canonical one. It records `run.budget`
+(`{limitMs, exhausted, reached, notReached}`), and every fault the budget did not reach is an
+`unverifiable` record with reason `not-reached-within-budget`. `baseline` refuses such a document, and
+a later probe never reuses one of those records.
 
 ### baseline.json
 

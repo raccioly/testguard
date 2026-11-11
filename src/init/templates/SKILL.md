@@ -89,6 +89,8 @@ which files exist. `state` is one of:
 
 Exit codes: `0` clean · `1` unproven claims (or drift, or unclaimed changes) · `2` precondition failed / nothing to do yet · `3` usage.
 
+Time-boxed run: `testguard probe --command-budget <ms> --partial-on-budget --json` never throws away what it proved. If `run.budget.exhausted` is true the run is **incomplete**: every fault with reason `not-reached-within-budget` was not measured (a claim with one is `could-not-verify`, not proven). `run.failureKind` is `unproven+incomplete` (exit 1, `run.unprovenAtLeast` is a floor, fix those survivors first) or `incomplete` (exit 2, nothing gating yet). The document is `evidence-partial.json`: it is never a baseline. Re-run, in the order you care about (`--claim` order), with a larger budget.
+
 ## Every change needs a claim
 
 Scaffold proposes mechanical faults, not intended behavior. New drafts declare

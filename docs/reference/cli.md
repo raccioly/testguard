@@ -186,7 +186,8 @@ spec before it is written.
 | `--claims <path>` | `<dir>/testguard.claims.json` | Claims file. May live outside the project (also for `claims`, `admit`, `status`): fault `file` and `defendedBy` stay project-relative, the evidence records `run.claimsSource: {external, sha256}` and never the path, and nothing is written beside the file. |
 | `--confirm <n>` | `3` | Runs per verdict. Below 3 the run is **provisional**: verdicts print with `?` and the evidence goes to `evidence-provisional.json`. |
 | `--budget <ms>` | `120000` | Wall clock for each runner invocation. At least `1000`. |
-| `--command-budget <ms>` | none | Cooperative deadline for the whole probe. Caps asynchronous children; expiry exits `2` and writes no partial result. At least `1000`. |
+| `--command-budget <ms>` | none | Cooperative deadline for the whole probe. Caps asynchronous children; expiry exits `2` and writes no partial result unless `--partial-on-budget` is given. At least `1000`. |
+| `--partial-on-budget` | off | Needs `--command-budget` (exit `3` without it; also refused with `--require-origin`). When the budget runs out, stop starting work, restore every tree, and write the document anyway: faults fully measured keep their record, and the ones in flight or not started become `unverifiable` with reason `not-reached-within-budget` (they gate and are never reused). Written to `--out` or `.testguard/evidence-partial.json`, never the canonical file or a baseline. `run.budget` is `{limitMs, exhausted, reached, notReached}`. Exit `1` when the measured part already holds a gating finding (`--json`: `run.failureKind` `unproven+incomplete`, `run.unprovenAtLeast` a floor), otherwise `2` (`incomplete`). Claims are probed in `--claim` order, so the caller decides what the budget buys first. `probe` only. |
 | `--out <path>` | see below | Evidence file. |
 | `--baseline <path>` | `<dir>/.testguard/baseline.json` if present | Baseline to gate against. |
 | `--severity <level>` | `low` | Gate only findings whose claim severity is at or above this level. Findings below are still reported and written. |
@@ -245,15 +246,17 @@ least one new finding, a failed `--require-origin` policy, or a failed
 `--require-assertion-kill` policy (which baseline debt and severity floors
 cannot hide); `2` precondition (an empty claims file
 without `--allow-empty`, a runner that does not resolve, a dirty defender or
-target with the implicit HEAD, an exhausted command budget, an unavailable
+target with the implicit HEAD, an exhausted command budget (without `--partial-on-budget`), an unavailable
 origin policy, a `--changed` change git could not measure, an empty `--changed` selection under `--fail-on-empty-selection`); `3` usage (`--confirm` not a positive integer, `--budget` or
 `--command-budget` below 1000, `--workers` or `--fault-workers` not a positive
 integer, `--fault-workers` above 1 with `--in-place`, an unknown
-`--progress` mode, an empty `--claim`, `--fail-on-empty-selection` without `--changed`).
+`--progress` mode, an empty `--claim`, `--fail-on-empty-selection` without `--changed`, `--partial-on-budget` without `--command-budget` or with `--require-origin`).
+
+With `--partial-on-budget` an exhausted command budget writes a document instead of refusing: exit `1` when the measured part already holds a gating finding, otherwise `2` (see the flag above). It is never `0`.
 
 **`--json` schema:** [`status.schema.json`](../../spec/schemas/status.schema.json),
-with `run` = `{id, evidence, provisional, records, newSinceBaseline, exitCode, claims, originPolicy?, scope?}`
-and `cost` when `--cost` is given. `run.claims[]` is `{id, result: "proven" | "unproven" | "could-not-verify", faults: {total, killed, survived, nocover, unverifiable, faultInvalid, timeout, flakyDefender}, reasons: [{faultId, verdict, reason?}]}` per claim measured, keyed by claim id ([per-claim results](../../spec/GATE-SEMANTICS.md#per-claim-results)). With `--changed`, `run.scope` adds `selectedCount` and `changed` = `{ref, outcome: "determined" | "undetermined", base, head, includeDirty, files, matchedClaims, unmatchedFiles, note}` (or `{ref, outcome: "undetermined", reason: {kind, message}}`); when the selection is empty or undetermined no probe ran and `run` is only `{exitCode, scope}`. The evidence file itself conforms to
+with `run` = `{id, evidence, provisional, records, newSinceBaseline, exitCode, claims, originPolicy?, scope?, budget?, failureKind?, unprovenAtLeast?}`
+and `cost` when `--cost` is given. `budget` = `{limitMs, exhausted, reached, notReached}` is present with `--partial-on-budget`; `failureKind` (`unproven+incomplete`, `policy+incomplete` or `incomplete`) and `unprovenAtLeast` (a floor) only when the budget ran out. `run.claims[]` is `{id, result: "proven" | "unproven" | "could-not-verify", faults: {total, killed, survived, nocover, unverifiable, faultInvalid, timeout, flakyDefender}, reasons: [{faultId, verdict, reason?}]}` per claim measured, keyed by claim id ([per-claim results](../../spec/GATE-SEMANTICS.md#per-claim-results)). With `--changed`, `run.scope` adds `selectedCount` and `changed` = `{ref, outcome: "determined" | "undetermined", base, head, includeDirty, files, matchedClaims, unmatchedFiles, note}` (or `{ref, outcome: "undetermined", reason: {kind, message}}`); when the selection is empty or undetermined no probe ran and `run` is only `{exitCode, scope}`. The evidence file itself conforms to
 [`evidence.schema.json`](../../spec/schemas/evidence.schema.json).
 
 ## baseline
