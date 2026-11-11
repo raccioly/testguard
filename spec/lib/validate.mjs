@@ -395,6 +395,9 @@ const semantic = {
       // describes a run that cannot have happened.
       // A serial re-measure exists only because a fan-out measured the record
       // first; a document without one describes a run that cannot have happened.
+      if (r.detail.baselineRemeasuredSerially && !(doc.run.faultWorkers > 1)) {
+        errors.push({ path: `${p}/detail/baselineRemeasuredSerially`, message: 'baselineRemeasuredSerially requires run.faultWorkers above one' });
+      }
       if (r.detail.remeasuredSerially && !(doc.run.faultWorkers > 1)) {
         errors.push({ path: `${p}/detail/remeasuredSerially`, message: 'remeasuredSerially requires run.faultWorkers above one' });
       }

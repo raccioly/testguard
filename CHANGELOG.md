@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`--fault-workers` also fans out baselines (#237 follow-up).** Baselines of
+  independent defender sets, about half of all runs, now run side by side, one
+  set per scratch tree, each set's runs in the order a serial probe asks for
+  them, so run counts and records are the serial ones. A baseline that is not
+  green N/N while another set was running is measured again alone, in a fresh
+  tree, before any verdict uses it (`detail.baselineRemeasuredSerially: true`).
+  Everything a fault decides before its baseline (hashes, anchor, reuse
+  eligibility, `--typecheck`) is still decided first, in order, on the first
+  tree.
+
 ### Changed
 
 - **`probe --changed <ref>` now selects claims (#234).** It used to run every claim and only add

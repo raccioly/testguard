@@ -1296,26 +1296,35 @@ run exactly: the same invocations in the same order, and evidence without
 
 1. **Plan, then measure.** Every fault is first planned in claim/fault order
    on the first scratch tree with no fault applied anywhere: defender
-   resolution and discovery, every input hash, the anchor, verdict reuse, the
-   `--typecheck` check (so its incremental build-info lives in one tree only),
-   and the defender set's shared baseline (topped up in the order a serial run
-   would ask for it, so `runnerInvocations` and `reuseBaselineRuns` match). A
-   fault that never mutates (reused, no defenders, a bad anchor, a baseline
-   that is not green N/N) is finished there. Baselines are therefore measured
-   once per defender set, one at a time, never beside another suite, and are
-   frozen before the fan-out: a fault measured in another tree reads them, it
-   never runs them.
-2. **Fan-out.** The remaining faults are handed, in order, to at most n trees.
+   resolution and discovery, every input hash, the anchor, reuse eligibility
+   and the `--typecheck` check (so its incremental build-info lives in one
+   tree only). None of this depends on a baseline.
+2. **Baselines.** Each defender set's baseline asks (one live run that
+   licenses reuse, then N runs unless reuse held) are replayed in the order a
+   serial run makes them, so `runnerInvocations` and `reuseBaselineRuns`
+   match. Different defender sets are independent and are measured side by
+   side, at most n at once, one set per scratch tree. A set measured while
+   another was in flight whose runs are anything but green N/N is not
+   believed: it is measured again with nothing else in flight, in a fresh
+   scratch tree, and the records that use it report those runs with
+   `detail.baselineRemeasuredSerially: true`. Baselines are then frozen. The
+   rest of planning (the reuse decision, the baseline a record reports) runs
+   in claim/fault order against them, and a fault that never mutates (reused,
+   no defenders, a bad anchor, a refused type check, a baseline that is not
+   green N/N) is finished there. A fault measured in another tree reads the
+   baselines, it never runs them.
+3. **Fan-out.** The remaining faults are handed, in order, to at most n trees.
    A fault's probe runs, its negative control and its escalation all run in
    the tree that holds it. A negative control shared by two faults (same
    target, same defenders) is paid once, by whichever asks first.
-3. **Order.** Records and the per-record progress stream (`onProgress`,
+4. **Order.** Records and the per-record progress stream (`onProgress`,
    `--progress ndjson` verdicts) follow claim/fault order whatever order the
    trees finish in. Apart from timings (`durationMs`, `run.measurements`),
-   `run.faultWorkers` and `detail.remeasuredSerially`, the evidence has the
+   `run.faultWorkers`, `detail.remeasuredSerially` and
+   `detail.baselineRemeasuredSerially`, the evidence has the
    content a serial run of the same commit would have. Per-stage progress lines
    from different trees interleave.
-4. **Contention is not a verdict.** Per-run budgets (`--budget`) do not scale
+5. **Contention is not a verdict.** Per-run budgets (`--budget`) do not scale
    with the fan-out. A record measured while another fault was in flight whose
    verdict is `timeout`, or `flaky-defender` with reason `inconsistent-probe`,
    is not reported from that measurement: after the fan-out it is measured
@@ -1323,23 +1332,24 @@ run exactly: the same invocations in the same order, and evidence without
    run may have left state in its own), reusing its frozen baseline, and the
    serial measurement is what the record reports, whatever its verdict, with
    `detail.remeasuredSerially: true`. Records after it in order wait for it.
-   `defenders-not-green` is never re-measured: its baseline was never
-   contended. Validators reject `remeasuredSerially` on a document without
+   `defenders-not-green` is never re-measured as a fault: a contended
+   baseline was already re-measured alone (rule 2). Validators reject
+   `remeasuredSerially` and `baselineRemeasuredSerially` on a document without
    `run.faultWorkers` above one, and `run.faultWorkers` together with
    `mode: "in-place"`.
-5. **Reuse.** `run.faultWorkers` is recorded only above one. A measurement
+6. **Reuse.** `run.faultWorkers` is recorded only above one. A measurement
    under a fan-out never stands in for a serial run or for a different
    fan-out; a serial measurement (no `run.faultWorkers`) may stand in for any.
-6. **Contention advice.** The contention warning names `--fault-workers` when
+7. **Contention advice.** The contention warning names `--fault-workers` when
    the probe fans out, and the probe warns before the first run when n times
    the runner's worker count exceeds the CPUs available to the process.
-7. **Lifecycle.** `--command-budget` is one deadline for every tree and is
+8. **Lifecycle.** `--command-budget` is one deadline for every tree and is
    checked before each fault is dispatched. On a failure no further fault is
    dispatched, every fault in flight finishes and restores, every tree is
    removed, and the failure of the lowest fault index is raised (the one a
    serial run would have met first). Cancellation stops every tree's runners
    and removes every tree. Interrupted runs leave no scratch worktree.
-8. **Shared worktree registry.** Scratch-worktree allocation and removal (add,
+9. **Shared worktree registry.** Scratch-worktree allocation and removal (add,
    remove, prune) hold one lock file, `testguard-worktrees.lock`, keyed by the
    git common directory and kept under TestGuard's scratch root (never inside
    the repository), so two probes of one repository, or of its linked
@@ -1350,7 +1360,7 @@ run exactly: the same invocations in the same order, and evidence without
    proceed unlocked. Every git call that creates, removes or prunes a scratch
    tree runs with inherited `GIT_*` variables removed, `GIT_TERMINAL_PROMPT=0`,
    `core.hooksPath` set to the null device and `core.fsmonitor=false`.
-9. **Isolation is per tree, not per machine.** Python, `--runner-cmd` and every
+10. **Isolation is per tree, not per machine.** Python, `--runner-cmd` and every
    built-in runner are supported; each tree has its own files and its own
    working directory. `node_modules` is linked into every tree as for one, so
    the disk cost is one checkout per tree. Tests that bind a fixed port, share

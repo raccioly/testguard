@@ -174,9 +174,11 @@ scratch worktree, so it is the flag that shortens a cold probe:
 testguard probe --fault-workers 4
 ```
 
-- Baselines are still measured once per defender set, one at a time, before
-  any fault is applied; only the faulted runs, negative controls and
-  escalations run side by side.
+- Baselines are still measured once per defender set, before any fault is
+  applied; the baselines of different defender sets run side by side, and a
+  baseline that is not green while another set was running is measured again
+  alone before any verdict uses it (`detail.baselineRemeasuredSerially`).
+  Then the faulted runs, negative controls and escalations run side by side.
 - Verdicts and record order are those of a serial run. A `TIMEOUT` or an
   inconsistent probe measured while other faults were running is measured again
   alone before it is reported, and says so (`detail.remeasuredSerially`). A
