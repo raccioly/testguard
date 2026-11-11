@@ -116,6 +116,7 @@ jobs:
         # project does not take.
         run: |
           npm ci
+          npm ci --prefix fixtures/known-answer-typescript
           npm test
           node cli/testguard.mjs probe . --budget 180000 --quiet --include-dirty --out "$RUNNER_TEMP/self.json"
 

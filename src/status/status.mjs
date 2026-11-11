@@ -287,7 +287,7 @@ export function computeStatus({ projectDir, toolVersion, generatedAt = new Date(
       survived: `${top.claimId}/${top.subjectId} (${top.severity}) survived: "${cur.claim.statement}" can be false with the suite green.`,
       nocover: `${top.claimId}/${top.subjectId} (${top.severity}) has no defender: no test file imports ${cur.fault.file}.`,
       unverifiable: `${top.claimId}/${top.subjectId} cannot be probed (${top.reason ?? 'anchor'}); fix the fault definition in testguard.claims.json, not the code.`,
-      'fault-invalid': `${top.claimId}/${top.subjectId}'s replacement does not load; fix the fault definition.`,
+      'fault-invalid': `${top.claimId}/${top.subjectId}'s replacement does not load or type-check${top.reason ? ` (${top.reason})` : ''}; fix the fault definition.`,
       timeout: `${top.claimId}/${top.subjectId} makes the defenders hang; a hang is not a detection — write an assertion that fails on it.`,
       'flaky-defender': `${top.claimId}/${top.subjectId}'s defenders are not reliably green (${top.reason ?? ''}); fix the flake before any verdict can be trusted.`,
     };
