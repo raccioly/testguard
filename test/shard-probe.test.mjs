@@ -12,7 +12,7 @@ import { ROOT } from './helpers/release-project.mjs';
 
 const claim = (id, n) => ({ id, faults: Array.from({ length: n }, (_, i) => ({ id: `F${i + 1}` })) });
 const claimsDoc = { claims: [claim('A', 3), claim('B', 1), claim('C', 2), claim('D', 4), claim('E', 1)] };
-const rec = (c, f, verdict = 'killed', ms = 1000) => ({ claim: { id: c }, subject: { id: f }, verdict, detail: { baselineRuns: [], probeRuns: [{ durationMs: ms }] } });
+const rec = (c, f, verdict = 'killed', ms = 1000) => ({ claim: { id: c, source: { kind: 'manual' } }, subject: { id: f }, verdict, detail: { baselineRuns: [], probeRuns: [{ durationMs: ms }] } });
 const recordsFor = (ids) => claimsDoc.claims.filter((c) => ids.includes(c.id)).flatMap((c) => c.faults.map((f) => rec(c.id, f.id)));
 const shardDoc = (ids, over = {}) => ({ schemaVersion: 1, run: { startedAt: '2026-11-12T10:00:00.000Z', finishedAt: '2026-11-12T10:10:00.000Z', repo: { head: 'a'.repeat(40) }, measurements: { elapsedMs: 100, runnerInvocations: 4 }, reuse: { reused: 0, measured: ids.length }, ...over.run }, records: recordsFor(ids), ...over.top });
 
