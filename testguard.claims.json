@@ -17283,6 +17283,114 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-PRE-PUSH-HOOK-SURVIVES-VERSION-SKEW",
+      "statement": "The managed pre-push hook, run with sh, never hands its flags to an installed TestGuard older than the template needs, refuses the push only on exit 1 or 2, lets exit 3 and a missing install through with one line, and honors TESTGUARD_SKIP_HOOK=1.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (review B of PR #298)"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/pre-push-hook.run.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The probe command is passed to any installed version.",
+          "faultClass": "condition-forced",
+          "file": "src/init/managed.mjs",
+          "find": "  if [ -z \"$have\" ] || ! printf",
+          "replace": "  if false && ! printf",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A usage error refuses the push.",
+          "faultClass": "return-altered",
+          "file": "src/init/managed.mjs",
+          "find": "so this push was not probed\" >&2; exit 0 ;;",
+          "replace": "so this push was not probed\" >&2; exit 1 ;;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Exit 2 lets the push through.",
+          "faultClass": "return-altered",
+          "file": "src/init/managed.mjs",
+          "find": "    0|1|2) exit $status ;;",
+          "replace": "    0|2) exit 0 ;;\n    1) exit 1 ;;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "TESTGUARD_SKIP_HOOK is ignored.",
+          "faultClass": "statement-deleted",
+          "file": "src/init/managed.mjs",
+          "find": "  if [ \"\\${TESTGUARD_SKIP_HOOK:-}\" = 1 ]; then echo \"testguard: TESTGUARD_SKIP_HOOK=1, so this push was not probed\" >&2; exit 0; fi\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-USAGE-ERROR-IS-ONE-LINE",
+      "statement": "A usage error (an unknown option or command) prints the error and \"Run 'testguard --help' for usage.\", never the whole help.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (review of PR #298)"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/cli-surface.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An unknown option prints the whole help.",
+          "faultClass": "other",
+          "file": "src/cli.mjs",
+          "find": "    io.err(e.message);\n    io.err(\"Run 'testguard --help' for usage.\");",
+          "replace": "    io.err(e.message);\n    io.err(USAGE);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An unknown command prints the whole help.",
+          "faultClass": "other",
+          "file": "src/cli.mjs",
+          "find": "    io.err(`unknown command: ${command}`);\n    io.err(\"Run 'testguard --help' for usage.\");",
+          "replace": "    io.err(`unknown command: ${command}`);\n    io.err(USAGE);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
     }
   ]
 }

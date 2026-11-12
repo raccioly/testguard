@@ -332,8 +332,10 @@ async function dispatch(argv, io, seen) {
       },
     });
   } catch (e) {
+    // One line and where to read more, never the whole help (#293 review):
+    // a hook that passes a flag an older binary lacks must say so legibly.
     io.err(e.message);
-    io.err(USAGE);
+    io.err("Run 'testguard --help' for usage.");
     return 3;
   }
   const { values, positionals } = parsed;
@@ -350,7 +352,7 @@ async function dispatch(argv, io, seen) {
   const handler = COMMANDS[command];
   if (!handler) {
     io.err(`unknown command: ${command}`);
-    io.err(USAGE);
+    io.err("Run 'testguard --help' for usage.");
     return 3;
   }
   if (values.help) {

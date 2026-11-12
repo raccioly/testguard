@@ -39,13 +39,13 @@ describe('the templates are fast and pinned', () => {
       mkdirSync(join(dir, '.githooks'), { recursive: true });
       writeFileSync(join(dir, '.githooks/pre-push'), prePushScript('.', { version: '0.23.0' }));
       mkdirSync(join(dir, 'node_modules/.bin'), { recursive: true });
-      writeFileSync(join(dir, 'node_modules/.bin/testguard'), '#!/bin/sh\necho "args: $*"\nexit 0\n');
+      writeFileSync(join(dir, 'node_modules/.bin/testguard'), '#!/bin/sh\nif [ "$1" = --version ]; then echo 99.0.0; exit 0; fi\necho "args: $*"\nexit 0\n');
       chmodSync(join(dir, 'node_modules/.bin/testguard'), 0o755);
       const r = spawnSync('sh', ['.githooks/pre-push'], { cwd: dir, encoding: 'utf8' });
       expect(r.status).toBe(0);
       expect(r.stdout.trim()).toBe("args: probe --changed auto --when-no-base skip --quiet");
       // A probe that fails blocks the push.
-      writeFileSync(join(dir, 'node_modules/.bin/testguard'), '#!/bin/sh\nexit 1\n');
+      writeFileSync(join(dir, 'node_modules/.bin/testguard'), '#!/bin/sh\nif [ "$1" = --version ]; then echo 99.0.0; exit 0; fi\nexit 1\n');
       expect(spawnSync('sh', ['.githooks/pre-push'], { cwd: dir }).status).toBe(1);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });

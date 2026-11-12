@@ -1608,6 +1608,22 @@ Renovate config, otherwise a Dependabot `npm` entry limited to
 one (the lines to add are reported instead). Template 3 is the first with these
 pins, so `init --upgrade` rewrites an unedited block from template 2.
 
+**The pre-push block under version skew (#293 review).** The block asks the
+resolved binary for `--version` before passing it anything, and passes its
+probe command only when that version is at least `HOOK_MIN_VERSION` (the
+release that added the newest flag the block uses, `--when-no-base`; bumped
+only when the block starts using a newer flag). An older or unreadable
+version prints one line naming both versions and how to install, and lets the
+push through unprobed. Of the probe's exit codes, only 1 (unproven) and 2
+(could not evaluate) refuse the push; 3 (a usage error: an edited flag, or a
+binary the version check could not catch) prints one line and lets it
+through. `TESTGUARD_SKIP_HOOK=1` skips the block with a one-line notice. The
+CI templates pass only `probe --changed auto` and `probe`, which every release
+since 0.24.0 accepts, so an installed binary older than the template that
+wrote them needs no guard there; one older than 0.24.0 fails the CI job with
+exit 3, visibly, and the exact-pinned devDependency `init` adds keeps the
+installed version at the one that wrote the template.
+
 ## Thin claims
 
 `claims` and `status` flag a claim with fewer than two faults (`fewer-than-two-faults`),

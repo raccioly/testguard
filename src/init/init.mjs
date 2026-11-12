@@ -413,7 +413,7 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
     catch (e) { warnings.push(`${rel(pkgPath)} could not be read as JSON (${e.message}); add "${PACKAGE}": "${toolVersion}" to devDependencies yourself`); }
     if (pinned?.action === 'added') {
       write(pkgPath, pinned.text, { checkIgnored: false });
-      done.push(`${rel(pkgPath)}: devDependency ${PACKAGE} pinned to exactly ${toolVersion} — run your package manager's install (npm install, pnpm install, …) so the lockfile records it before you commit`);
+      done.push(`${rel(pkgPath)}: devDependency ${PACKAGE} pinned to exactly ${toolVersion}. The lockfile is now out of date, and npm ci / --frozen-lockfile will fail until you run your package manager's install (npm install, pnpm install, …) and commit the updated lockfile with it. Where npm enforces min-release-age, installing a release that new needs that setting overridden for one install, or a wait until the release is old enough`);
     } else if (pinned?.action === 'exact') skipped.push(`${rel(pkgPath)} already pins ${PACKAGE} ${pinned.spec}`);
     else if (pinned?.action === 'floating') outdated.push(`${rel(pkgPath)}: ${PACKAGE} "${pinned.spec}" is a floating version, so a new release runs here unreviewed — pin an exact version ("${toolVersion}") and let Dependabot/Renovate raise it`);
     else if (pinned?.action === 'range') notes.push(`${rel(pkgPath)} asks for ${PACKAGE} "${pinned.spec}", a range: the lockfile pins it, a fresh install does not. An exact version ("${toolVersion}") makes every install run the same TestGuard.`);
