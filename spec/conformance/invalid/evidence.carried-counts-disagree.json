@@ -22,9 +22,8 @@
       "digest": "0a08ceec7a899282dfcf0a2c7c406a2970b676792349edb44d78b9ef19afaf76"
     },
     "reuse": {
-      "reused": 4,
-      "measured": 2,
-      "carried": 3,
+      "measured": 3,
+      "reused": 2,
       "stale": 1
     },
     "confirmRuns": 3,

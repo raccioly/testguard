@@ -1377,8 +1377,26 @@ next full probe (#293). The written document holds, in claims-file order:
   `status` does not (the test universe, discovery, the type check), and
   `status` and `baseline` must give the same answer about one document.
 
+A kept-stale record is **never reuse and never current**. Its `reusedFrom` is
+provenance only. Wherever it is reported, the output says why an unselected
+record can have changed inputs when the selection was sound: its inputs changed
+outside the change that was probed, either before that change's base (the
+evidence is older than the base) or in an input the selection does not follow
+(the test universe, defender discovery). Where the record is used:
+
+- `status` lists it stale by name;
+- per-claim results count it `unverifiable` with reason `inputs-changed`, so
+  its claim reads `could-not-verify` unless a current fault makes it
+  `unproven`;
+- `baseline` refuses the document and names it;
+- `--require-assertion-kill` is `unavailable` while one is present (state
+  `unavailable`, `staleRecords`; exit 2), never `passed`;
+- the origin policy is `unavailable` (`stale-inputs`).
+
 A fault with no earlier record stays absent, so `status` still says it was
-never probed. `run.reuse` counts `carried` and `stale` (both part of `reused`).
+never probed. `run.reuse` is `{ measured, reused, stale }`: carried records
+count as `reused`, kept-stale records as `stale` (absent when zero), and the
+validator requires the three to add up to the record count.
 `run.scope` names `selectedClaims`, `requestedClaims` for `--claim`, the
 `changed` ref, base and head for `--changed`, and `carriedFrom`: the run whose
 document the other records came from. A carried record keeps the verdict it
@@ -1411,7 +1429,8 @@ write the evidence file must not trust a record it did not measure.
 only the measured records, so a scoped run's exit code keeps meaning "the
 selection". The written document carries no origin or assertion policy from
 the document it replaced. `--require-assertion-kill` is evaluated over every
-record written, so a carried kill without a recorded `killKind` fails it.
+record written, so a carried kill without a recorded `killKind` fails it, and a
+kept-stale record makes it unavailable.
 `--require-origin` still refuses `--claim` and `--changed`, so a carried
 record never contributes to an origin-policy pass.
 
@@ -1426,7 +1445,9 @@ Validators reject:
 - a carried record whose claim was selected;
 - a record without `carried` whose claim was not selected;
 - `run.scope` on a provisional or budget-cut run;
-- `run.reuse` counts that disagree with the records.
+- `run.reuse` counts that do not add up to the records;
+- an assertion policy whose `staleRecords` are not exactly the kept-stale
+  records, or whose state is not `unavailable` while there is one.
 
 Run ids name their start time to the millisecond (`run-20261112T153612123`;
 earlier releases wrote seconds). A converging run checks that nobody else
@@ -1456,6 +1477,10 @@ counts, in this order, rounding toward unproven:
 2. otherwise at least one fault was measured and every one is `killed` → `proven`;
 3. anything else (`unverifiable`, `timeout`, `fault-invalid`, `flaky-defender`, or
    no fault measured at all) → `could-not-verify`.
+
+A record a converging probe kept stale (`carried: "inputs-changed"`, see
+[Convergence](#convergence)) is counted as `unverifiable` with reason
+`inputs-changed`, whatever verdict it carries.
 
 `could-not-verify` is neither a pass nor a finding about the code: the
 measurement did not happen, so the remedy is to repair the claim or the suite's

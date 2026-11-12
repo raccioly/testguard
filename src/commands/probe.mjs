@@ -25,7 +25,7 @@ import { repoRoot, headSha } from '../git.mjs';
 import { selectByChange, measuredScope, renderNoSelection, renderUnmatched, scopedView, renderScopedView } from './probe-scope.mjs';
 import { claimResults } from '../probe/claim-results.mjs';
 import { partialExit, partialEvidencePath, isNotReached } from '../probe/partial-budget.mjs';
-import { convergeRequest, mergeEvidence, staleCarried } from '../evidence/carry.mjs';
+import { convergeRequest, mergeEvidence, staleCarried, STALE_WHY } from '../evidence/carry.mjs';
 export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
@@ -90,7 +90,7 @@ function probeAdvice({ projectDir, claims, evidence, scoped, version, cpus }) {
 
 /** The evidence line of a scoped run that updated the canonical evidence (#293). */
 export function renderConverged({ outPath, measured, selection, converged }) {
-  const stale = converged.stale.length ? `; ${converged.stale.length} kept unchanged with inputs that no longer match, still stale: ${converged.stale.slice(0, 5).join(', ')}${converged.stale.length > 5 ? ', …' : ''}` : '';
+  const stale = converged.stale.length ? `; ${converged.stale.length} kept unchanged and still stale, because ${STALE_WHY}: ${converged.stale.slice(0, 5).join(', ')}${converged.stale.length > 5 ? ', …' : ''}` : '';
   return `evidence: ${outPath} (converged: ${measured} measured, ${selection}; ${converged.carried} carried from ${converged.from} with unchanged inputs and no run, so the environment was not re-checked for them${stale})`;
 }
 
@@ -347,7 +347,7 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     else {
       evidence = mergeEvidence({ measured: probed, canonical: carryFrom, decisions: carryResult.decisions, claims, scope: { selectedClaims: [...new Set(measured.map((r) => r.claim.id))], ...(requested ? { requestedClaims: requested } : {}), ...(changedScope ? { changed: { ref: changedScope.ref, base: changedScope.base, head: changedScope.head, ...(changedScope.includeDirty ? { includeDirty: true } : {}) } } : {}) } });
       outPath = canonicalPath;
-      converged = { from: carryFrom.run.id, carried: evidence.run.reuse.carried ?? 0, stale: staleCarried(evidence) };
+      converged = { from: carryFrom.run.id, carried: evidence.records.filter((r) => r.carried === 'inputs-match').length, stale: staleCarried(evidence) };
     }
   } else if (carryFrom && exhausted) convergeReason = 'the command budget ran out';
   if (partialOnBudget) commandBudget = undefined;
@@ -403,7 +403,7 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   const policy = evidence.originPolicy;
   const weak = evidence.assertionPolicy;
   const incomplete = exhausted ? partialExit({ newGating: g.new.length, policyFailed: weak?.state === 'failed' }) : undefined;
-  const exitCode = incomplete ? incomplete.exitCode : policy?.state === 'unavailable' ? 2 : policy?.state === 'failed' || weak?.state === 'failed' || g.new.length > 0 ? 1 : 0;
+  const exitCode = incomplete ? incomplete.exitCode : policy?.state === 'unavailable' || weak?.state === 'unavailable' ? 2 : policy?.state === 'failed' || weak?.state === 'failed' || g.new.length > 0 ? 1 : 0;
   const scope = measuredScope({ requested, changed: changedScope, records: measured });
   const statusPaths = {
     claims: values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir),

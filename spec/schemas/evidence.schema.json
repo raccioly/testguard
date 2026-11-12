@@ -223,16 +223,14 @@
           "additionalProperties": false
         },
         "reuse": {
-          "description": "How many records this run carried forward from earlier evidence (`reused`, each with `reusedFrom`) and how many it measured. Of the reused, a converging scoped run (#293) also counts the records it carried without running their defenders: `carried` (inputs matched the probed tree) and `stale` (kept unchanged because they did not); both or neither, and both are part of `reused`. A gate over authors who can write the evidence file must run with --no-reuse (GATE-SEMANTICS rule 8).",
+          "description": "How this run's records came to be: `measured` by it, `reused` from earlier evidence (each with `reusedFrom`: after one live baseline, or carried by a converging scoped run with unchanged inputs, `carried: \"inputs-match\"`), and `stale` (#293): kept unchanged by a converging run because its inputs no longer match (`carried: \"inputs-changed\"`), never reuse and never current. The three add up to the record count; `stale` is absent when zero. A gate over authors who can write the evidence file must run with --no-reuse (GATE-SEMANTICS rule 8).",
           "type": "object",
           "required": ["reused", "measured"],
           "properties": {
             "reused": { "type": "integer", "minimum": 0 },
             "measured": { "type": "integer", "minimum": 0 },
-            "carried": { "type": "integer", "minimum": 0 },
-            "stale": { "type": "integer", "minimum": 0 }
+            "stale": { "type": "integer", "minimum": 1 }
           },
-          "dependentRequired": { "carried": ["stale"], "stale": ["carried"] },
           "additionalProperties": false
         },
         "scope": {

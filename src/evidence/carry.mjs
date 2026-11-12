@@ -38,13 +38,23 @@ export function convergeRequest({ scoped, provisional, refExplicit, noReuse, out
   return { converge: true };
 }
 
-/** The `run.reuse` tally of a document's records. */
+/**
+ * The `run.reuse` tally of a document's records: `measured + reused + stale`
+ * is the record count. A record kept stale is never reuse (#293): it is not a
+ * statement about this tree, so it is counted apart.
+ */
 export function reuseTally(records) {
-  const reused = records.filter((r) => r.reusedFrom).length;
-  const carried = records.filter((r) => r.carried === CARRIED.match).length;
   const stale = records.filter((r) => r.carried === CARRIED.changed).length;
-  return { reused, measured: records.length - reused, ...(carried || stale ? { carried, stale } : {}) };
+  const reused = records.filter((r) => r.reusedFrom && r.carried !== CARRIED.changed).length;
+  return { measured: records.length - reused - stale, reused, ...(stale ? { stale } : {}) };
 }
+
+/**
+ * Why a record the selection did not cover can have inputs that no longer
+ * match (#293), said wherever it is reported, so nobody reads it as a bad
+ * selection: the selection follows only the change since its base.
+ */
+export const STALE_WHY = 'its inputs changed outside the change that was probed, either before that change\'s base or in an input the selection does not follow (the test universe, defender discovery)';
 
 /**
  * The canonical document after a converging run: in claims-file order, the
@@ -65,6 +75,8 @@ export function mergeEvidence({ measured, canonical, decisions, claims, scope })
       const decision = decisions.get(id);
       const record = earlier.get(id);
       if (!record || !decision) continue;
+      // `reusedFrom` names the run that measured it: provenance, for a kept
+      // record too, which is never reuse (reuseTally counts it apart).
       records.push({ ...record, reusedFrom: record.reusedFrom ?? canonical.run.id, carried: decision });
     }
   }

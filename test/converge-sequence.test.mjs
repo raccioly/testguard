@@ -61,7 +61,7 @@ describe('a change-scoped probe converges the canonical evidence', () => {
     expect(r.run.converged.stale).toEqual(['PRICE-TOTAL/F1', 'PRICE-TOTAL/F2']);
     const status = await statusOf(p.dir);
     expect(status.state).toBe('evidence-stale');
-    expect(status.stale.join('\n')).toMatch(/PRICE-TOTAL\/F1 was kept by a scoped probe/);
+    expect(status.stale.join('\n')).toMatch(/PRICE-TOTAL\/F1 was kept stale by a scoped probe/);
     expect((await run(['baseline', p.dir])).code).toBe(2);
   });
 
@@ -69,7 +69,7 @@ describe('a change-scoped probe converges the canonical evidence', () => {
     const p = await probedThenEdited();
     touch(p.dir, 'src/price.mjs');
     commit(p.root, 'edit price');
-    expect((await run(['probe', p.dir, ...node, '--changed', 'HEAD~1', '--quiet'])).out).toMatch(/2 kept unchanged with inputs that no longer match, still stale: TAX-DOUBLES\/F1, TAX-DOUBLES\/F2/);
+    expect((await run(['probe', p.dir, ...node, '--changed', 'HEAD~1', '--quiet'])).out).toMatch(/2 kept unchanged and still stale, because .*: TAX-DOUBLES\/F1, TAX-DOUBLES\/F2/);
     const b = await run(['baseline', p.dir]);
     expect(b.code).toBe(2);
     expect(b.err).toMatch(/inputs changed.*TAX-DOUBLES\/F1, TAX-DOUBLES\/F2/);

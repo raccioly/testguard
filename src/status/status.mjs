@@ -21,6 +21,7 @@ import { checkAnchorLocations } from '../claims/anchors.mjs';
 import { computeClaimedSurface, needsClaimExpansion } from './surface.mjs';
 import { projectAnnotationAdvisory } from '../claims/annotations.mjs';
 import { thinClaims, renderThin } from '../claims/thin.mjs';
+import { STALE_WHY } from '../evidence/carry.mjs';
 
 export const faultContentHash = (fault) => sha256(`${fault.find}\n${fault.replace}`);
 
@@ -241,7 +242,7 @@ function computeStatusCore({ projectDir, toolVersion, generatedAt = new Date().t
     // probed (#293), by the full reuse predicate, which sees more than this
     // loop does (the test universe, discovery, the type check): stale, so
     // status and baseline give the same answer.
-    if (r.carried === 'inputs-changed') doc.stale.push(`${key} was kept by a scoped probe whose tree no longer matched its inputs; it describes an earlier tree`);
+    if (r.carried === 'inputs-changed') doc.stale.push(`${key} was kept stale by a scoped probe: ${STALE_WHY}`);
     for (const [file, recordedHash] of Object.entries(r.inputs.discoveryHashes ?? {})) {
       if (!discoveryHashCache.has(file)) {
         let currentHash = null;

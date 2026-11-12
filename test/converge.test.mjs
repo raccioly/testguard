@@ -6,12 +6,15 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { baselineCommand } from '../src/commands/baseline.mjs';
-import { convergeRequest, mergeEvidence, reuseTally, staleCarried, CARRIED } from '../src/evidence/carry.mjs';
+import { convergeRequest, mergeEvidence, reuseTally, staleCarried, CARRIED, STALE_WHY } from '../src/evidence/carry.mjs';
 import { inputsMatch, isReusable } from '../src/probe/attribution.mjs';
 import { carryRefusal, reusableRun, runId } from '../src/probe/probe.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { recordedOriginSummary } from '../spec/lib/origins.mjs';
 import { renderConverged } from '../src/commands/probe.mjs';
+import { claimResults } from '../src/probe/claim-results.mjs';
+import { evaluateAssertionPolicy } from '../src/probe/assertion-policy.mjs';
+import { evaluateOriginPolicy } from '../src/probe/origin-policy.mjs';
 
 // A real converged document (spec/conformance/examples/evidence-converged.json,
 // taken from a probe of test/helpers/scope-project.mjs plus a third claim):
@@ -75,7 +78,7 @@ describe('mergeEvidence: the canonical document after a converging run', () => {
     expect(merged.assertionPolicy).toBeUndefined();
   });
   it('counts what it carried and names the run it carried from; the document conforms', () => {
-    expect(merged.run.reuse).toEqual({ reused: 4, measured: 2, carried: 3, stale: 1 });
+    expect(merged.run.reuse).toEqual({ measured: 2, reused: 3, stale: 1 });
     expect(merged.run.scope).toEqual({ selectedClaims: [A], carriedFrom: 'run-old' });
     expect(validate('evidence', merged).errors).toEqual([]);
   });
@@ -105,7 +108,7 @@ describe('the validator keeps a converged document honest', () => {
     const provisional = good(); provisional.run.confirmRuns = 1; provisional.run.provisional = true;
     expect(errorsOf(provisional)).toMatch(/provisional run never converges/);
     const counts = good(); counts.run.reuse.stale = 2;
-    expect(errorsOf(counts)).toMatch(/count the carried records/);
+    expect(errorsOf(counts)).toMatch(/run\.reuse must count the records: 4 reused, 2 measured, 0 stale/);
   });
 });
 
@@ -202,11 +205,36 @@ describe('status names every record a converging probe kept stale', () => {
       mkdirSync(join(p.dir, '.testguard'));
       writeFileSync(join(p.dir, '.testguard', 'evidence.json'), JSON.stringify(example));
       const status = computeStatus({ projectDir: p.dir, toolVersion: example.tool.version, advice: false });
-      expect(status.stale.filter((s) => /was kept by a scoped probe/.test(s))).toEqual([
-        'TAX-DOUBLES/F1 was kept by a scoped probe whose tree no longer matched its inputs; it describes an earlier tree',
-        'TAX-DOUBLES/F2 was kept by a scoped probe whose tree no longer matched its inputs; it describes an earlier tree',
-      ]);
+      expect(status.stale.filter((s) => /kept stale by a scoped probe/.test(s))).toEqual(['F1', 'F2'].map((f) => `TAX-DOUBLES/${f} was kept stale by a scoped probe: ${STALE_WHY}`));
+      expect(STALE_WHY).toMatch(/before that change's base or in an input the selection does not follow/);
       expect(status.state).toBe('evidence-stale');
     } finally { rmSync(p.root, { recursive: true, force: true }); }
+  });
+});
+
+describe('a record kept stale is never current (#293)', () => {
+  const decisions = new Map([[`${B}/F1`, CARRIED.changed], [`${B}/F2`, CARRIED.match], [`${C}/F1`, CARRIED.match], [`${C}/F2`, CARRIED.match]]);
+  const merged = mergeEvidence({ measured, canonical, decisions, claims, scope: { selectedClaims: [A] } });
+  it('is not reuse: measured + reused + stale add up to the records', () => {
+    expect(merged.run.reuse).toEqual({ measured: 2, reused: 3, stale: 1 });
+    const wrong = structuredClone(merged); wrong.run.reuse = { measured: 2, reused: 4 };
+    expect(validate('evidence', wrong).errors.map((e) => e.message).join('\n')).toMatch(/3 reused, 2 measured, 1 stale/);
+  });
+  it('reads could-not-verify / inputs-changed in claim results, whatever verdict it carries', () => {
+    const [result] = claimResults(merged.records.filter((r) => r.claim.id === B));
+    expect(result.result).toBe('could-not-verify');
+    expect(result.reasons).toEqual([{ faultId: 'F1', verdict: 'unverifiable', reason: 'inputs-changed' }]);
+  });
+  it('makes the assertion policy unavailable, never passed, and the document still conforms', () => {
+    const policy = evaluateAssertionPolicy(merged.records);
+    expect(policy).toEqual({ state: 'unavailable', exceptionOnlyKills: [], staleRecords: [{ claimId: B, faultId: 'F1' }] });
+    expect(validate('evidence', { ...merged, assertionPolicy: policy }).errors).toEqual([]);
+    expect(validate('evidence', { ...merged, assertionPolicy: { state: 'passed', exceptionOnlyKills: [] } }).errors.map((e) => e.path)).toContain('/assertionPolicy/state');
+    expect(evaluateAssertionPolicy(merged.records.filter((r) => !r.carried || r.carried === 'inputs-match')).state).toBe('passed');
+  });
+  it('makes the origin policy unavailable', () => {
+    const claimsFile = { schemaVersion: 1, claims: [] };
+    const result = evaluateOriginPolicy({ claims: claimsFile, evidence: merged, eligibleKinds: ['spec'], fresh: true });
+    expect(result.unavailableReasons).toContain('stale-inputs');
   });
 });

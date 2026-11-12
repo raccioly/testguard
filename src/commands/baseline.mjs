@@ -81,7 +81,7 @@ export async function baselineCommand({ projectDir, values, version }, io) {
     io.out(statusWith(projectDir, version, { path: outPath, frozen: n }));
     return 0;
   }
-  const carried = evidence.run.reuse?.carried ?? 0;
+  const carried = evidence.records.filter((r) => r.carried === 'inputs-match').length;
   if (carried) io.out(`note: ${carried} of the ${evidence.records.length} records were carried from ${evidence.run.scope.carriedFrom} by a scoped run with unchanged inputs and no run of their defenders; the full probe re-verifies them.`);
   io.out(`baseline: ${n} unproven finding${n === 1 ? '' : 's'} frozen at ${baseline.head.slice(0, 12)}${baseline.snapshot ? ` (working-tree snapshot ${baseline.snapshot.slice(0, 7)}; after you commit, a clean probe + \`baseline --restamp\` moves head to that commit)` : baseline.dirty ? ' (working tree was dirty)' : ''}${evidence.run.provisional ? ' — FROM PROVISIONAL EVIDENCE (--allow-provisional)' : ''} → ${outPath}`);
   io.out('Commit this file; from now on only new findings gate.');

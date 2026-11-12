@@ -248,11 +248,12 @@ const semantic = {
     // document, and the reuse tally is the records' own.
     if (doc.run.instrument && doc.run.instrument.toolVersion !== doc.tool?.version) errors.push({ path: '/run/instrument/toolVersion', message: `instrument toolVersion ${doc.run.instrument.toolVersion} is not the tool that wrote this evidence (${doc.tool?.version})` });
     if (doc.run.reuse) {
-      const reused = doc.records.filter((r) => r.reusedFrom).length;
-      if (doc.run.reuse.reused !== reused || doc.run.reuse.measured !== doc.records.length - reused) errors.push({ path: '/run/reuse', message: `run.reuse must count the records: ${reused} reused, ${doc.records.length - reused} measured` });
-      const carried = doc.records.filter((r) => r.carried === 'inputs-match').length;
+      // measured + reused + stale is the record count (#293): a record kept
+      // stale by a converging run is never reuse.
       const stale = doc.records.filter((r) => r.carried === 'inputs-changed').length;
-      if ((doc.run.reuse.carried ?? 0) !== carried || (doc.run.reuse.stale ?? 0) !== stale) errors.push({ path: '/run/reuse', message: `run.reuse must count the carried records: ${carried} carried, ${stale} stale` });
+      const reused = doc.records.filter((r) => r.reusedFrom && r.carried !== 'inputs-changed').length;
+      const measured = doc.records.length - reused - stale;
+      if (doc.run.reuse.reused !== reused || doc.run.reuse.measured !== measured || (doc.run.reuse.stale ?? 0) !== stale) errors.push({ path: '/run/reuse', message: `run.reuse must count the records: ${reused} reused, ${measured} measured, ${stale} stale` });
     }
     // Convergence (#293): a document holding records nobody measured in this
     // run says which run measured the rest and which claims were selected, and
@@ -782,7 +783,8 @@ function assertionPolicyErrors(kind, doc) {
   const p = doc.assertionPolicy;
   if (kind === 'evidence' && p) {
     const key = (claimId, faultId) => JSON.stringify([claimId, faultId]);
-    const weak = new Set(doc.records.filter((r) => r.verdict === 'killed' && r.detail?.killKind !== 'assertion' && r.detail?.killKind !== 'mixed')
+    const stale = new Set(doc.records.filter((r) => r.carried === 'inputs-changed').map((r) => key(r.claim.id, r.subject.id)));
+    const weak = new Set(doc.records.filter((r) => r.carried !== 'inputs-changed' && r.verdict === 'killed' && r.detail?.killKind !== 'assertion' && r.detail?.killKind !== 'mixed')
       .map((r) => key(r.claim.id, r.subject.id)));
     const listed = p.exceptionOnlyKills.map((x) => key(x.claimId, x.faultId));
     const reasons = new Map(doc.records.map((r) => [key(r.claim.id, r.subject.id), r.detail?.killKindReason]));
@@ -790,12 +792,17 @@ function assertionPolicyErrors(kind, doc) {
     if (listed.length !== new Set(listed).size || listed.length !== weak.size || listed.some((k) => !weak.has(k))) {
       errors.push({ path: '/assertionPolicy/exceptionOnlyKills', message: 'must list exactly the killed records whose kill is exception-only or carries no recorded kind' });
     }
-    if ((p.state === 'failed') !== (listed.length > 0)) errors.push({ path: '/assertionPolicy/state', message: 'state is failed exactly when exceptionOnlyKills is non-empty' });
+    // A record kept stale by a converging run (#293) is not current: the policy is unavailable while one is there, never passed.
+    const staleListed = (p.staleRecords ?? []).map((x) => key(x.claimId, x.faultId));
+    if (staleListed.length !== stale.size || staleListed.some((k) => !stale.has(k))) errors.push({ path: '/assertionPolicy/staleRecords', message: 'must list exactly the records kept stale (carried: inputs-changed)' });
+    const want = stale.size ? 'unavailable' : listed.length ? 'failed' : 'passed';
+    if (p.state !== want) errors.push({ path: '/assertionPolicy/state', message: `state must be ${want}: unavailable while a record is kept stale, otherwise failed exactly when exceptionOnlyKills is non-empty` });
   }
   if (kind === 'status' && doc.run?.assertionPolicy) {
     const q = doc.run.assertionPolicy;
-    if ((q.state === 'failed') !== (q.exceptionOnlyKills.length > 0)) errors.push({ path: '/run/assertionPolicy/state', message: 'state is failed exactly when exceptionOnlyKills is non-empty' });
-    if (q.state === 'failed' && doc.run.exitCode === 0) errors.push({ path: '/run/exitCode', message: 'a failed assertion policy cannot exit 0' });
+    if (q.state !== 'unavailable' && (q.state === 'failed') !== (q.exceptionOnlyKills.length > 0)) errors.push({ path: '/run/assertionPolicy/state', message: 'state is failed exactly when exceptionOnlyKills is non-empty' });
+    if ((q.state === 'unavailable') !== Boolean(q.staleRecords?.length)) errors.push({ path: '/run/assertionPolicy/state', message: 'state is unavailable exactly when staleRecords is non-empty' });
+    if ((q.state === 'failed' || q.state === 'unavailable') && doc.run.exitCode === 0) errors.push({ path: '/run/exitCode', message: `a${q.state === 'failed' ? ' failed' : 'n unavailable'} assertion policy cannot exit 0` });
   }
   return errors;
 }

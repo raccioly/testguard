@@ -49,6 +49,8 @@ export function evaluateOriginPolicy({ claims, evidence, eligibleKinds, fresh })
     if (seen.has(identity)) reasons.add('duplicate-record');
     seen.add(identity);
     const pair = expected.get(identity);
+    // Kept stale by a converging probe (#293): not current evidence.
+    if (record.carried === 'inputs-changed') reasons.add('stale-inputs');
     if (!pair) { reasons.add('extra-record'); continue; }
     if (!sameClaimMetadata(record.claim, pair.claim)) reasons.add('claim-metadata-mismatch');
     if (methodOf(pair.fault) !== 'fault-injection') continue;

@@ -21,12 +21,20 @@ export function assertionPolicyRequest(values, command) {
 export const isWeakKill = (record) => record.verdict === 'killed' && record.detail?.killKind !== 'assertion' && record.detail?.killKind !== 'mixed';
 
 export function evaluateAssertionPolicy(records) {
-  const exceptionOnlyKills = records.filter(isWeakKill)
+  // A record a converging run kept stale (#293) is not current evidence: the
+  // policy cannot pass over it, and cannot judge it either. Unavailable.
+  const staleRecords = records.filter((r) => r.carried === 'inputs-changed').map((r) => ({ claimId: r.claim.id, faultId: r.subject.id }))
+    .sort((a, b) => a.claimId.localeCompare(b.claimId) || a.faultId.localeCompare(b.faultId));
+  const current = records.filter((r) => r.carried !== 'inputs-changed');
+  const exceptionOnlyKills = current.filter(isWeakKill)
     .map((r) => ({ claimId: r.claim.id, faultId: r.subject.id, ...(r.detail.killKindReason ? { reason: r.detail.killKindReason } : {}) }))
     .sort((a, b) => a.claimId.localeCompare(b.claimId) || a.faultId.localeCompare(b.faultId));
+  if (staleRecords.length) return { state: 'unavailable', exceptionOnlyKills, staleRecords };
   return { state: exceptionOnlyKills.length ? 'failed' : 'passed', exceptionOnlyKills };
 }
 
-export const renderAssertionPolicy = (policy) => policy.state === 'passed'
+export const renderAssertionPolicy = (policy) => policy.state === 'unavailable'
+  ? `assertion policy: unavailable; ${policy.staleRecords.length} record${policy.staleRecords.length === 1 ? ' was' : 's were'} kept stale by a converging probe and ${policy.staleRecords.length === 1 ? 'is' : 'are'} not current evidence: ${policy.staleRecords.map((k) => `${k.claimId}/${k.faultId}`).join(', ')}. Probe them (or run the full probe) and ask again`
+  : policy.state === 'passed'
   ? 'assertion policy: passed; every kill was made by at least one assertion'
   : `assertion policy: failed; ${policy.exceptionOnlyKills.length} kill${policy.exceptionOnlyKills.length === 1 ? ' was' : 's were'} by exception only, not by assertion: ${policy.exceptionOnlyKills.map((k) => `${k.claimId}/${k.faultId}${k.reason ? ` (${k.reason}: the runner reported no error identity, so nothing could be read; the suite may not be hollow)` : ''}`).join(', ')}. Where the runner did report, the suite reached the code but never checked a value; add an assertion on the behavior`;
