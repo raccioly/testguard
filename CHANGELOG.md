@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A dotted stem resolves (#301).** `./auth.config` is `auth.config.ts`: the
+  import closure tried no candidates for a specifier whose last segment holds a
+  dot, so it reported `unreadable-module` and every `--changed` run selected
+  each claim through that file. With no exact file and no script fallback it now
+  tries name plus each source extension and `name/index` plus each. An exact
+  file still wins, `./x.js` still falls back to `x.ts`, a missing module is
+  still unreadable.
+
 ### Added
 
 - **The corpus gains seven subjects, a subject-untouched check and six tool

@@ -14483,6 +14483,77 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-DOTTED-STEM-IMPORT-RESOLVES",
+      "statement": "An import whose last segment contains a dot (`./auth.config`) resolves to the file whose name contains it, while an exact file still wins, `./x.js` still falls back to `x.ts`, and a missing module is still unreadable.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#probing-a-change"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/dotted-stem-imports.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A specifier with a non-script extension gets no candidates again.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/imports.mjs",
+          "find": "  return [...SOURCE_EXTENSIONS.map((ext) => candidateFile(base + ext))",
+          "replace": "  if (extension) return [];\n  return [...SOURCE_EXTENSIONS.map((ext) => candidateFile(base + ext))",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A dotted directory with an index file is no longer tried.",
+          "faultClass": "call-removed",
+          "file": "src/probe/imports.mjs",
+          "find": ", ...SOURCE_EXTENSIONS.map((ext) => candidateFile(join(base, `index${ext}`)))",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An exact file no longer wins over name-plus-extension candidates.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/imports.mjs",
+          "find": "  if (exact) return [exact];\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A `.js` specifier no longer falls back to its TypeScript source.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/imports.mjs",
+          "find": "  if (SCRIPT_FALLBACKS[extension]) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }
