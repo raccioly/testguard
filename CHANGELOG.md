@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-12
+
+Automated weekly release — everything merged since `v0.24.0`.
+
+### Changed
+
+- feat: the fast path converges; templates pin what they run (#293) (#298)
+- ci: shard the unit suite three ways inside each Node leg (#304)
+- fix: a dotted stem resolves in the import closure (Refs #301) (#303)
+- fix: runner errors carry their message, foreign webServer note, slow-defender advice (#291) (#302)
+- ci: scoped PR probe, one probe per release, release PR mergeability, AGENTS.md from the code (#294) (#299)
+- chore(homebrew): sha256 for v0.24.0 (#292)
+- test(corpus): PR 2 — seven subjects, subject-untouched, six mutants (#258) (#285)
+
+
 ### Changed
 
 - **The corpus CI runs one Playwright mode per shard (#305, repository only).** The shard list is `corpus/shards.json`; the workflow builds its matrix from it and the scorecard fails when a planned shard delivered no scorecard. Per-shard timeouts come from measurements. No subject, mode or mutant was dropped.
