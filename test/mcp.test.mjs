@@ -2,7 +2,7 @@
 // @req FR-14
 // Requirements live in docs-canonical/REQUIREMENTS.md; the matrix there must agree with these.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { cpSync, mkdtempSync, rmSync, symlinkSync, writeFileSync, readFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, rmSync, symlinkSync, writeFileSync, readFileSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -148,8 +148,10 @@ describe('the tools agree with the CLI, on a real project', () => {
 
   it('after a probe, brief and evidence carry the findings, and evidence filters by claim', async () => {
     const { io } = capture();
-    // A full probe: a --claim run reaches the canonical file only by converging into evidence already there (#293).
-    await main(['probe', scratch, '--budget', '30000', '--no-escalate', '--quiet', '--out', join(scratch, '.testguard', 'evidence.json')], io);
+    // One claim's evidence, put where the tools read it. (A --claim run reaches
+    // the canonical file only by converging into evidence already there, #293.)
+    await main(['probe', scratch, '--claim', 'REDACT-001', '--budget', '30000', '--no-escalate', '--quiet', '--out', join(scratch, '.testguard', 'one-claim.json')], io);
+    copyFileSync(join(scratch, '.testguard', 'one-claim.json'), join(scratch, '.testguard', 'evidence.json'));
     const brief = await call('testguard_brief', { max: 3 });
     expect(validate('brief', brief).errors).toEqual([]);
     expect(brief.items.length).toBeGreaterThan(0);

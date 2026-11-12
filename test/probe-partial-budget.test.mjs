@@ -3,7 +3,7 @@
 // deterministic with an injected clock advanced from a stage callback, never
 // with a sleep, and the scratch trees are sampled at the moment it happens.
 import { describe, it, expect } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { probe } from '../src/probe/probe.mjs';
@@ -244,10 +244,12 @@ describe('probe --partial-on-budget through the command', () => {
     const project = partialBudgetProject();
     try {
       const canonical = join(project.dir, '.testguard', 'evidence.json');
-      // A real evidence document at the canonical path, from a full probe. (A
-      // --claim run names the canonical file only by converging into existing
-      // evidence, #293; with none there it writes the partial file.)
-      const first = await run(project, { 'command-budget': undefined, 'partial-on-budget': false, out: canonical }, 99);
+      // A real evidence document at the canonical path, from one claim: how much
+      // it holds is not what is under test. (A --claim run names the canonical
+      // file only by converging into existing evidence, #293, so it is written
+      // beside it and copied into place.)
+      const first = await run(project, { 'command-budget': undefined, 'partial-on-budget': false, claim: ['C1'], out: `${canonical}.one-claim` }, 99);
+      copyFileSync(`${canonical}.one-claim`, canonical);
       expect(first.code).toBe(0);
       expect(existsSync(canonical)).toBe(true);
       const before = readFileSync(canonical, 'utf8');

@@ -79,23 +79,17 @@ describe('a change-scoped probe converges the canonical evidence', () => {
     expect((await run(['baseline', p.dir])).code).toBe(2);
   });
 
-  it('judges the assertion policy over its selection: a stale record outside it does not fail the run (review A)', async () => {
+  it('names the records it kept stale, judges the assertion policy over its selection only (review A), and baseline refuses the document', async () => {
     const p = await probedThenEdited();
     touch(p.dir, 'src/price.mjs');
     commit(p.root, 'edit price');
     // TAX-DOUBLES changed before HEAD~1: kept stale, outside the selection.
     const r = await run(['probe', p.dir, ...node, '--changed', 'HEAD~1', '--require-assertion-kill']);
     expect(r.code).toBe(0);
+    expect(r.out).toMatch(/2 kept unchanged and still stale, because .*: TAX-DOUBLES\/F1, TAX-DOUBLES\/F2/);
     expect(r.out).toMatch(/assertion policy: passed/);
     expect(r.out).toMatch(/assertion policy: 2 records kept stale outside the selection were not judged; the evidence file's policy is unavailable until they are probed/);
     expect(read(canonical(p.dir)).assertionPolicy.state).toBe('unavailable');
-  });
-
-  it('names the records it kept stale, and baseline refuses the document', async () => {
-    const p = await probedThenEdited();
-    touch(p.dir, 'src/price.mjs');
-    commit(p.root, 'edit price');
-    expect((await run(['probe', p.dir, ...node, '--changed', 'HEAD~1', '--quiet'])).out).toMatch(/2 kept unchanged and still stale, because .*: TAX-DOUBLES\/F1, TAX-DOUBLES\/F2/);
     const b = await run(['baseline', p.dir]);
     expect(b.code).toBe(2);
     expect(b.err).toMatch(/inputs changed.*TAX-DOUBLES\/F1, TAX-DOUBLES\/F2/);
