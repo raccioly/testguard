@@ -235,7 +235,15 @@ export const RUN = {
     }
     const merged = existsSync(canonical) ? JSON.parse(readFileSync(canonical, 'utf8')) : null;
     const stale = (merged?.records ?? []).filter((x) => x.carried === 'inputs-changed').map((x) => `${x.claim.id}/${x.subject.id}`);
-    checks.push(check('nothing-left-stale', merged && stale.length === 0, stale.length ? { stale } : merged?.run?.reuse ?? 'no canonical evidence'));
+    // A record left stale is never carried as fresh (the probe checked), so it
+    // is not wrong; it says the selection did not cover a change it should
+    // have. Only a reviewed entry naming this exact list and its issue excuses it.
+    const staleCheck = check('nothing-left-stale', merged && stale.length === 0, stale.length ? { stale } : merged?.run?.reuse ?? 'no canonical evidence');
+    if (!staleCheck.ok && merged) {
+      const k = ctx.known.find((x) => x.subject === ctx.subject.name && x.check === 'nothing-left-stale' && JSON.stringify([...x.observed.stale].sort()) === JSON.stringify([...stale].sort()));
+      if (k) { staleCheck.ok = true; staleCheck.detail.knownIssue = k.issue; }
+    }
+    checks.push(staleCheck);
     const scratch = await probe({ toolRoot: ctx.toolRoot, subject: ctx.subject, repo, outPath: out(repo, 'converge-scratch'), args: ['--no-reuse'], python: ctx.python });
     runs.push(runSummary('from-scratch', scratch));
     checks.push(exitCheck(scratch));

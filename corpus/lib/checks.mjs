@@ -30,7 +30,9 @@ export function loadKnownFailures(path = join(CORPUS, 'known-failures.json')) {
   const doc = JSON.parse(readFileSync(path, 'utf8'));
   for (const k of doc.entries ?? []) {
     if (!Number.isInteger(k.issue) || k.issue < 1) throw new Error(`known-failures.json: ${k.subject} ${k.fault} names no issue number`);
-    if (k.check && !(k.check.startsWith('selection:') && Array.isArray(k.observed?.selected))) throw new Error(`known-failures.json: ${k.subject} ${k.check}: only a --changed selection can be a known check failure`);
+    const selection = k.check?.startsWith('selection:') && Array.isArray(k.observed?.selected);
+    const stale = k.check === 'nothing-left-stale' && Array.isArray(k.observed?.stale) && k.observed.stale.length > 0;
+    if (k.check && !selection && !stale) throw new Error(`known-failures.json: ${k.subject} ${k.check}: only a --changed selection or a converged record left stale can be a known check failure`);
     if (k.observed?.verdict === 'killed' && k.expected?.verdict !== 'killed') throw new Error(`known-failures.json: ${k.subject} ${k.fault} would excuse a false kill; a critical failure is never known`);
   }
   return doc.entries ?? [];
