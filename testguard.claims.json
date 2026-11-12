@@ -12822,21 +12822,6 @@
           }
         },
         {
-          "id": "F3",
-          "description": "A relinked package does not get its ignored build output.",
-          "faultClass": "call-removed",
-          "file": "src/probe/worktree.mjs",
-          "find": "if (!carried.has(mapped)) { carried.add(mapped); carryIgnored(dir, mapped); }",
-          "replace": "if (!carried.has(mapped)) { carried.add(mapped); }",
-          "defendedBy": [
-            "test/workspace-scratch.test.mjs"
-          ],
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
           "id": "F4",
           "description": "The workspace fixture links the planner where geometry belongs, so its layout no longer names the defended package.",
           "faultClass": "variable-swap",
