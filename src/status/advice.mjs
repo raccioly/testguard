@@ -1,4 +1,5 @@
 import { autoFaultWorkers } from '../probe/fan-out.mjs';
+import { claimCosts, median, runsOf } from '../probe/cost.mjs';
 import { scanInstalled, renderFinding } from '../init/managed.mjs';
 
 /**
@@ -10,7 +11,7 @@ import { scanInstalled, renderFinding } from '../init/managed.mjs';
  * machine's CPU count, the change since a base the caller resolved, and the
  * hook and CI files in the repository.
  */
-export const ADVICE_IDS = ['serial-on-multicore', 'full-probe-where-changed-would-do', 'nothing-reused', 'hook-outdated'];
+export const ADVICE_IDS = ['serial-on-multicore', 'full-probe-where-changed-would-do', 'nothing-reused', 'slow-defenders-dominate', 'hook-outdated'];
 
 /** The last run measured one fault at a time because somebody asked, on a machine where auto would not. */
 export function serialAdvice(run, cpus) {
@@ -39,6 +40,51 @@ export function reuseAdvice(run, records) {
   return { id: 'nothing-reused', message: `The last probe reused no verdict and measured all ${records} faults (${seconds}s). Keep .testguard/evidence.json between runs (in CI, cache it) and the next probe re-measures only what changed.`, command: 'testguard probe' };
 }
 
+/**
+ * Cost concentrated in a few slow defenders (#291). Read from the durations the
+ * last probe recorded; nothing is run. The thresholds come from measured
+ * evidence, both ways: this repository's own (141 claims, 1,651s) has its
+ * costliest claim at 6.2% of the time and its slowest claim at a median 9.9s
+ * per run, so a claim must hold at least 10% and run at least 15s to be named
+ * (silent here, no false alarm); the field run that prompted the rule had
+ * claims at 34% (73s per run) and 18% (32s), the next at 7%. Too little data
+ * says nothing: under 20 claims, under 600s of defender time, under 5 runs.
+ */
+export const COST_RULE = Object.freeze({ minClaims: 20, minTotalSeconds: 600, minShare: 0.10, minMedianSeconds: 15, minRuns: 5, minCombinedShare: 0.25, maxNamed: 3 });
+
+export function costAdvice(evidence) {
+  if (!Array.isArray(evidence?.records)) return undefined;
+  const records = evidence.records.filter((r) => typeof r?.claim?.id === 'string');
+  const claims = claimCosts(records);
+  const total = claims.reduce((a, c) => a + c.ms, 0);
+  if (claims.length < COST_RULE.minClaims || total < COST_RULE.minTotalSeconds * 1000) return undefined;
+  const durations = (rs) => rs.map((r) => r.durationMs).filter((d) => Number.isFinite(d) && d >= 0);
+  const perFile = new Map(); // defender file -> every run that included it
+  const perClaim = new Map();
+  for (const r of records) {
+    const runs = durations(runsOf(r));
+    perClaim.set(r.claim.id, [...(perClaim.get(r.claim.id) ?? []), ...runs]);
+    for (const file of r.defenders?.resolved ?? []) perFile.set(file, [...(perFile.get(file) ?? []), ...runs]);
+  }
+  const offenders = claims
+    .map((c) => ({ ...c, runsMs: perClaim.get(c.claimId) ?? [] }))
+    .filter((c) => c.ms / total >= COST_RULE.minShare && c.runsMs.length >= COST_RULE.minRuns && median(c.runsMs) >= COST_RULE.minMedianSeconds * 1000)
+    .slice(0, COST_RULE.maxNamed);
+  if (!offenders.length || offenders.reduce((a, c) => a + c.ms, 0) / total < COST_RULE.minCombinedShare) return undefined;
+  const line = (c) => {
+    // Runs execute a claim's defenders together, so a file's time is the time of every run that included it: the slowest such file is the one to speed up.
+    const file = c.defenders.map((f) => ({ f, m: median(perFile.get(f) ?? []), n: (perFile.get(f) ?? []).length })).sort((a, b) => b.m - a.m || a.f.localeCompare(b.f))[0];
+    return `${c.claimId} costs ${Math.round(c.ms / 1000)}s: ${file.f} takes a median ${Math.round(file.m / 1000)}s per run and runs ${file.n} times`;
+  };
+  for (let n = offenders.length; n >= 1; n--) {
+    const shown = offenders.slice(0, n);
+    const share = Math.round((100 * shown.reduce((a, c) => a + c.ms, 0)) / total);
+    const message = `${n} of ${claims.length} claims account for ${share}% of defender time: ${shown.map(line).join('; ')}. Give the claim a faster defender or split the file.`;
+    if (message.length <= 512) return { id: 'slow-defenders-dominate', message, command: 'testguard claims --cost' };
+  }
+  return undefined;
+}
+
 /** Installed hooks and CI files that run TestGuard the slow or stale way. */
 export function hookAdvice({ root, toolVersion }) {
   let findings;
@@ -57,6 +103,7 @@ export function computeAdvice({ evidence, cpus, changed, root, toolVersion }) {
     serialAdvice(run, cpus),
     changed ? changedAdvice(changed) : undefined,
     reuseAdvice(run, evidence?.records?.length),
+    costAdvice(evidence),
     ...hookAdvice({ root, toolVersion }),
   ].filter(Boolean);
 }

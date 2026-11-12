@@ -250,7 +250,7 @@ export function parseReport(report, durationMs) {
 
   const loadMessage = outcome === 'error'
     ? (collectionErrors.length
-      ? firstInformativeLine(collectionErrors.map((e) => e.message ?? '').join('\n'))
+      ? (firstInformativeLine(collectionErrors.map((e) => e.message ?? '').join('\n')) || `python could not collect ${collectionErrors.length} test module(s) and gave no message`)
       : 'python collected no tests')
     : undefined;
 

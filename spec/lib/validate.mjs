@@ -747,6 +747,7 @@ function adviceErrors(advice, nextAction) {
     seen.add(a.id);
     if (a.id === 'full-probe-where-changed-would-do' && nextAction !== 'probe') errors.push({ path: `/advice/${i}/id`, message: 'full-probe-where-changed-would-do is advice about a probe the next step makes: it requires next.action = probe' });
     if (a.id === 'full-probe-where-changed-would-do' && !/^testguard probe --changed /.test(a.command)) errors.push({ path: `/advice/${i}/command`, message: 'full-probe-where-changed-would-do names a probe --changed command' });
+    if (a.id === 'slow-defenders-dominate' && a.command !== 'testguard claims --cost') errors.push({ path: `/advice/${i}/command`, message: 'slow-defenders-dominate points at the per-claim cost report: testguard claims --cost' });
     if (a.id === 'hook-outdated' && a.command !== 'testguard init --upgrade') errors.push({ path: `/advice/${i}/command`, message: 'hook-outdated is fixed by testguard init --upgrade' });
   });
   return errors;
