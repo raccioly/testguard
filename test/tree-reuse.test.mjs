@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fillSlots, treeState } from '../src/probe/tree-reuse.mjs';
+import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const tree = (worker, state) => ({ worker, stateAtCreation: 'clean', iso: { root: `/t${worker}` }, now: state });
 const run = (kept, count) => {
@@ -41,7 +42,7 @@ describe('treeState', () => {
   it('changes when a tracked file is edited or a file is left behind', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-tree-state-'));
     try {
-      const git = (...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', ...a], { cwd: dir });
+      const git = (...a) => execFileSync('git', [...FIXTURE_GIT, '-c', 'user.name=t', '-c', 'user.email=t@example.invalid', ...a], { cwd: dir });
       writeFileSync(join(dir, 'a.txt'), 'a\n');
       git('init', '-q'); git('add', '-A'); git('commit', '-qm', 'a');
       const created = treeState(dir);
