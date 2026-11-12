@@ -182,12 +182,21 @@ const MANAGERS = [
   { pm: 'pnpm', install: [...PNPM, 'install', '--prefer-offline'], runnerCmd: `${PNPM.join(' ')} vitest run {files} --reporter=json --outputFile={out}`, skip: !HAS_PNPM && !FULL },
 ];
 
+// The package manager and the probes run outside any outer `npm test`: its
+// npm_* variables (prefix, workspace, lifecycle) would point the nested npm at
+// the testguard repository (CI: "Cannot read properties of null (reading 'edgesOut')").
+const CLEAN_ENV = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^npm_/i.test(key) && key !== 'INIT_CWD'));
+// A tool's own cache directory in the caller's tree (`node_modules/.vitest-cache`, `.vite`) is not the install: test
+// discovery over a dirty tree runs in the caller's tree, which GATE-SEMANTICS documents as not redirectable. What #279
+// protects is the install itself: every package entry, link, bin and metadata file.
+const TOOL_CACHE = /\/node_modules\/\.(?:vite|vite-temp|vitest|vitest-cache|cache)(?:\/|$)/;
+
 describe.each(MANAGERS)('write boundary: a worktree whose node_modules are symlinks into the main checkout\'s $pm workspace install (#279)', ({ pm, install, runnerCmd, skip }) => {
   let base; let main; let wt; let installListing; let runs = [];
   const mainInstalls = () => {
     const all = new Map();
     for (const dir of [join(main, 'node_modules'), join(main, 'packages', 'a', 'node_modules'), join(main, 'packages', 'b', 'node_modules')]) {
-      if (existsSync(dir)) for (const [k, v] of listing(dir)) all.set(`${dir}/${k}`, v);
+      if (existsSync(dir)) for (const [k, v] of listing(dir)) if (!TOOL_CACHE.test(`${dir}/${k}`)) all.set(`${dir}/${k}`, v);
     }
     return all;
   };
@@ -207,7 +216,7 @@ describe.each(MANAGERS)('write boundary: a worktree whose node_modules are symli
       'testguard.claims.json': JSON.stringify({ schemaVersion: 1, claims: [{ id: 'AREA', statement: 'Area multiplies.', source: { kind: 'spec', ref: 'README.md' }, severity: 'high', producedBy: { producer: 'agent', by: 'fixture' }, defendedBy: ['packages/a/test/area.test.js'], faults: [{ id: 'F1', description: 'Add instead.', faultClass: 'return-altered', file: 'packages/b/src/mul.js', find: 'a * b', replace: 'a + b', producedBy: { producer: 'agent', by: 'fixture' } }] }] }),
     };
     for (const [name, text] of Object.entries(files)) { makeDir(dirname(join(main, name))); writeFileSync(join(main, name), text); }
-    const installed = spawnSync(install[0], install.slice(1), { cwd: main, encoding: 'utf8', timeout: 600_000 });
+    const installed = spawnSync(install[0], install.slice(1), { cwd: main, encoding: 'utf8', timeout: 600_000, env: CLEAN_ENV });
     if (installed.status !== 0) throw new Error(`${install.join(' ')} failed: ${installed.stderr || installed.stdout}`);
     git(main, 'init', '-q'); git(main, 'add', '-A'); git(main, 'commit', '-q', '-m', 'workspace');
     wt = join(base, 'wt');
@@ -217,7 +226,7 @@ describe.each(MANAGERS)('write boundary: a worktree whose node_modules are symli
     const probe = (label, extra) => {
       const out = join(base, `${label}.evidence.json`);
       const scratch = makeDir(join(base, `scratch-${label}`));
-      const r = spawnSync('node', [CLI, 'probe', wt, '--scratch-dir', scratch, '--out', out, '--confirm', '1', '--no-reuse', '--no-escalate', '--quiet', ...extra], { encoding: 'utf8', timeout: 900_000 });
+      const r = spawnSync('node', [CLI, 'probe', wt, '--scratch-dir', scratch, '--out', out, '--confirm', '1', '--no-reuse', '--no-escalate', '--quiet', ...extra], { encoding: 'utf8', timeout: 900_000, env: CLEAN_ENV });
       runs.push({ label, status: r.status, stderr: r.stderr, evidence: existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : undefined, after: mainInstalls(), scratchLeft: readdirSync(scratch).filter((name) => name !== 'testguard-locks') });
     };
     probe('builtin', ['--runner', 'vitest']);
