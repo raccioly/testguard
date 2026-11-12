@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { createRequire } from 'node:module';
+import { connect } from 'node:net';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { runProcess, listTestFiles, firstInformativeLine, runnerArgv } from './shared.mjs';
 import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs, normalizeDiscoveredFiles, runDiscoveryReportProcess } from './discovery.mjs';
@@ -192,9 +193,12 @@ export function parseReport(report, durationMs, kinds) {
   let outcome;
   if (total === 0) outcome = 'error';
   else if (unexpected.length > 0 || flaky > 0) outcome = 'fail';
+  // Every test passed but the run itself reported errors (global setup or teardown, webServer, reporter):
+  // the run is not green, and the runner said why (#291).
+  else if (globalErrors.length > 0) outcome = 'error';
   else outcome = 'pass';
   const loadMessage = outcome === 'error'
-    ? (globalErrors.length ? firstInformativeLine(globalErrors.map((e) => e.message ?? '').join('\n')) : 'playwright found no tests')
+    ? (globalErrors.length ? (firstInformativeLine(globalErrors.map((e) => e.message ?? '').join('\n')) || `playwright reported ${globalErrors.length} error(s) with no message`) : 'playwright found no tests')
     : undefined;
   return { run: { outcome, tests: summary, assertionFailures, exceptionFailures, ...(kindNotReported ? { kindNotReported } : {}), durationMs }, timeouts, loadMessage, failedTests, flaky };
 }
@@ -225,3 +229,40 @@ export const fatalEdit = () => '/* testguard negative control: this file must no
 /** Run the project-pinned CLI directly, avoiding an npm subprocess per confirmation. */
 export const argvFor = (projectDir, files, { serial = false, workers = 1 } = {}) =>
   [...runnerArgv(projectDir, '@playwright/test', 'playwright'), 'test', `--reporter=${KINDS_REPORTER.includes(',') ? 'json' : `json,${KINDS_REPORTER}`}`, `--workers=${serial ? 1 : workers}`, ...files];
+
+/** The first port the config's `webServer` names as a literal (`port: 3000`, or a `url` with a port); null when it is computed. */
+export function webServerPort(configText) {
+  const at = configText.search(/\bwebServer\b/);
+  if (at < 0) return undefined;
+  const block = configText.slice(at);
+  const m = /\bport\s*:\s*(\d{2,5})\b/.exec(block) ?? /\burl\s*:\s*(['"`])https?:\/\/[^/'"`:]+:(\d{2,5})/.exec(block);
+  return m ? Number(m[m.length - 1]) : null;
+}
+
+const listening = (port) => new Promise((done) => {
+  const socket = connect({ port, host: '127.0.0.1' });
+  const end = (up) => { socket.destroy(); done(up); };
+  socket.setTimeout(500, () => end(false));
+  socket.once('connect', () => end(true));
+  socket.once('error', () => end(false));
+});
+
+/**
+ * Why defenders that run under Playwright may never have reached the subject
+ * (the negative control stayed green): a `webServer` the run did not start.
+ * A server that is still listening on the config's literal port AFTER the run
+ * was not started by it (Playwright stops its own), so the specs talked to
+ * a server from another tree. Only said when the config declares a `webServer`
+ * and a defender is Playwright's; otherwise undefined.
+ */
+export async function foreignServerNote(projectDir, defenders) {
+  const cfg = loadConfig(projectDir);
+  if (!cfg || !defenders.some((file) => owns(projectDir, file))) return undefined;
+  const port = webServerPort(readFileSync(join(projectDir, cfg.path), 'utf8'));
+  if (port === undefined) return undefined;
+  const advice = 'Derive the port from TESTGUARD_WORKER and never reuse an existing server under probe (docs/reference/languages-and-runners.md).';
+  if (port && await listening(port)) {
+    return `a server is still listening on port ${port} after the run, so this config's webServer reused one started from another tree (reuseExistingServer): the specs ran against it, not against the probed source. ${advice}`;
+  }
+  return `the specs stayed green with the subject broken and this config declares a webServer: it may have reused a server started from another tree (reuseExistingServer). ${advice}`;
+}

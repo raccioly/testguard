@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { serialAdvice, changedAdvice, reuseAdvice, hookAdvice, computeAdvice, renderAdvice } from '../src/status/advice.mjs';
+import { serialAdvice, changedAdvice, reuseAdvice, costAdvice, hookAdvice, computeAdvice, renderAdvice } from '../src/status/advice.mjs';
 
 describe('serial-on-multicore', () => {
   it('names how the last run was made serial, and the width auto would use', () => {
@@ -109,5 +109,62 @@ describe('the status document carries the advice', () => {
       // A selection's view gets none, and so does a caller that asked for none.
       expect(computeStatus({ projectDir: dir, toolVersion: '0.24.0', cpus: 8, advice: false }).advice).toBeUndefined();
     } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+/**
+ * Evidence shaped like the field run of #291 (a shard of 54 claims; names are synthetic): two claims hold
+ * half of the defender time. Runs carry only `durationMs`, as the recorded ones do.
+ */
+const recordsFor = (claimId, defenders, faults, runsPerFault, seconds) => Array.from({ length: faults }, (_, i) => ({
+  claim: { id: claimId },
+  subject: { id: `F${i + 1}` },
+  defenders: { resolved: defenders },
+  detail: { baselineRuns: [], probeRuns: Array.from({ length: runsPerFault }, () => ({ outcome: 'pass', durationMs: seconds * 1000 })) },
+}));
+const fieldShaped = () => [
+  ...recordsFor('SLOW-A', ['test/a-session.test.js', 'test/b-session.test.js'], 14, 6, 73),
+  ...recordsFor('SLOW-B', ['test/c-preflight.test.js'], 16, 6, 32),
+  ...Array.from({ length: 52 }, (_, i) => recordsFor(`FAST-${i}`, [`test/f${i}.test.js`], 6, 6, 5)).flat(),
+];
+
+describe('slow-defenders-dominate', () => {
+  it('names the few claims that hold a large share of defender time, with the file, its median per run and its run count', () => {
+    const a = costAdvice({ records: fieldShaped() });
+    expect(a.id).toBe('slow-defenders-dominate');
+    expect(a.command).toBe('testguard claims --cost');
+    expect(a.message).toMatch(/2 of 54 claims account for \d+% of defender time/);
+    expect(a.message).toMatch(/SLOW-A costs 6132s: test\/[ab]-session\.test\.js takes a median 73s per run and runs 84 times/);
+    expect(a.message).toMatch(/SLOW-B costs 3072s: test\/c-preflight\.test\.js takes a median 32s per run and runs 96 times/);
+    expect(a.message).toMatch(/Give the claim a faster defender or split the file\./);
+    expect(a.message.length).toBeLessThanOrEqual(512);
+  });
+
+  it('is silent when the data is too thin to say: few claims, little total time, no dominant claim, or fast runs', () => {
+    expect(costAdvice(undefined)).toBeUndefined();
+    expect(costAdvice({ records: fieldShaped().filter((r) => /SLOW|FAST-[0-9]$/.test(r.claim.id)).slice(0, 60) })).toBeUndefined(); // 12 claims
+    expect(costAdvice({ records: [...recordsFor('SLOW-A', ['a.test.js'], 14, 6, 1), ...Array.from({ length: 30 }, (_, i) => recordsFor(`C${i}`, ['b.test.js'], 2, 3, 1)).flat()] })).toBeUndefined(); // under 600s
+    expect(costAdvice({ records: Array.from({ length: 60 }, (_, i) => recordsFor(`EVEN-${i}`, [`t${i}.test.js`], 6, 6, 20)).flat() })).toBeUndefined(); // slow but evenly spread: no claim holds 10%
+    expect(costAdvice({ records: [...recordsFor('MANY', ['m.test.js'], 40, 6, 4), ...Array.from({ length: 30 }, (_, i) => recordsFor(`C${i}`, [`c${i}.test.js`], 4, 6, 4)).flat()] })).toBeUndefined(); // big share, fast runs (< 15s): more faults, not a slow file
+  });
+
+  it('three claims that each hold under 10% say nothing even when together they pass 25% (the share is per claim)', () => {
+    const records = [
+      ...['X', 'Y', 'Z'].flatMap((id) => recordsFor(`SPREAD-${id}`, [`t/${id}.test.js`], 6, 10, 20)), // 1200s each = 9.5% of 12600s
+      ...Array.from({ length: 45 }, (_, i) => recordsFor(`REST-${i}`, [`t/r${i}.test.js`], 2, 5, 20)).flat(), // 200s each
+    ];
+    expect(costAdvice({ records })).toBeUndefined();
+  });
+
+  it('this repository\'s own evidence stays silent: its costliest claim holds 6.2% at a median under 10s', () => {
+    // The thresholds were chosen from this repository's measured evidence (largest share 6.2%, largest per-run median 9.9s),
+    // so the rule says nothing here and fires on the field run (largest share 34%, median 73s).
+    const own = fieldShaped().map((r) => ({ ...r, detail: { ...r.detail, probeRuns: r.detail.probeRuns.map((x) => ({ ...x, durationMs: Math.min(x.durationMs, 9_900) })) } }));
+    expect(costAdvice({ records: own })).toBeUndefined();
+  });
+
+  it('is part of the advice set, after nothing-reused', () => {
+    const advice = computeAdvice({ evidence: { run: { faultWorkersSource: 'auto', faultWorkers: 4 }, records: fieldShaped() }, cpus: 8, root: undefined, toolVersion: '0.24.0' });
+    expect(advice.map((a) => a.id)).toEqual(['slow-defenders-dominate']);
   });
 });

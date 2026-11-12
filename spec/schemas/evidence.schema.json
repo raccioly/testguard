@@ -648,7 +648,7 @@
               "const": true
             },
             "message": {
-              "description": "Human-readable detail for a reason that carries one \u2014 today `probe-error`, whose first line names what threw. Never parsed; a reader should not have to reproduce the run to learn what happened.",
+              "description": "Human-readable detail for a reason that carries one: `probe-error` (the first line names what threw), `defenders-failed-to-load` (the runner's own first informative error line) and `subject-not-executed` (why the defenders may not have reached the subject). Never parsed; a reader should not have to reproduce the run to learn what happened.",
               "type": "string",
               "maxLength": 1024
             },

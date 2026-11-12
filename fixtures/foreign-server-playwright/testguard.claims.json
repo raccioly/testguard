@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "GREETING-001",
+      "statement": "The server greets with 'hello'.",
+      "source": { "kind": "spec", "ref": "README.md#claims" },
+      "severity": "high",
+      "producedBy": { "producer": "human", "by": "fixture author" },
+      "defendedBy": ["e2e/greeting.spec.mjs"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The greeting changes. A server started from the faulted tree says 'hullo'; a server started from any other tree still says 'hello'.",
+          "faultClass": "literal-changed",
+          "file": "src/greeting.mjs",
+          "find": "'hello'",
+          "replace": "'hullo'",
+          "producedBy": { "producer": "human", "by": "fixture author" }
+        }
+      ]
+    }
+  ]
+}

@@ -88,6 +88,13 @@
     },
     {
       "kind": "path",
+      "pattern": "test/probe.foreign-server.test.mjs",
+      "reason": "Acceptance test for the foreign-server fixture (#291): three probes with a real Playwright webServer, skipped unless the fixture's dependencies are installed (the CI playwright job). As a self-claim defender it would make a claim a false survivor in the main job and cost three probes per run. Its unit-level defenders are test/foreign-server-note.test.mjs and test/probe-load-message.test.mjs.",
+      "by": "maintainer",
+      "at": "2026-11-12T00:00:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/probe.playwright.test.mjs",
       "reason": "Acceptance test for the Playwright fixture; it runs only where the fixture's own dependencies are installed (the CI playwright job) and is skipped elsewhere. Naming it as a self-claim defender would make that claim a false survivor in the main job. The fixture's expected.json is its oracle.",
       "by": "maintainer",

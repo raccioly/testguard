@@ -1,4 +1,5 @@
 import { resetInterpreterCache } from './runners/python.mjs';
+import { foreignServerNote } from './runners/playwright.mjs';
 import { assertNotCancelled } from './runners/lifecycle.mjs';
 import { performance } from 'node:perf_hooks';
 import { existsSync, readFileSync, realpathSync as fsRealpathSync } from 'node:fs';
@@ -1363,6 +1364,8 @@ async function planFault(args, pre) {
         // The defenders did not load. That is not flakiness and not a verdict
         // about the fault; the claim cannot be probed until they do.
         anchor = { status: 'defenders-failed-to-load', hits: anchor.hits, expected: anchor.expected, message: baseline.loadMessage };
+        // The runner's own words belong in the record, not only in `anchor` (#291).
+        if (baseline.loadMessage) detail.message = String(baseline.loadMessage).split('\n')[0].slice(0, 1024);
       }
     }
   }
@@ -1425,6 +1428,8 @@ async function measureFault(state, tree, { priorRuns = [], overlap, allAlone = f
         subjectReached = await negativeControl({ file: fault.file, defenders, iso, runDefenders, fatalEditFor, cache: controlCache, stage });
         if (subjectReached !== undefined) detail.negativeControl = subjectReached ? 'reached' : 'not-reached';
         if (subjectReached === false) {
+          const note = await foreignServerNote(iso.projectDir, defenders);
+          if (note) detail.message = note.slice(0, 1024);
           onWarn(`${claim.id}/${fault.id}: the defenders stayed green with ${fault.file} replaced by something that cannot compile, so they never execute it. Every verdict about this file would be about their reach, not their assertions — reported as unverifiable rather than as a survivor.`);
         }
       }

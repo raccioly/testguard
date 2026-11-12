@@ -284,9 +284,12 @@ export function parseReport(report, durationMs, kinds) {
   // jest opens a load failure with "● Test suite failed to run" and puts the
   // cause lines below; vitest puts it on the first line. Take the first line
   // that names an error, else the first non-empty one.
+  // An `error` run always says why (#291): the runner's own line when it gave one, else a fixed sentence.
+  const failedFile = files.find((f) => f.status === 'failed' && (f.assertionResults?.length ?? 0) === 0);
   const loadMessage = unknownShape
     ? 'the runner produced a report with no `testResults` array: this parser reads the jest-compatible JSON report, so a --runner-cmd must emit that shape (vitest --reporter=json, jest --json)'
-    : loadFailed ? firstInformativeLine(files.find((f) => f.message)?.message ?? '') : undefined;
+    : loadFailed ? (firstInformativeLine(files.find((f) => f.message)?.message ?? '') || `a test file failed to load and the runner gave no message: ${failedFile?.name ?? 'unknown file'}`)
+      : outcome === 'error' ? 'the runner collected no tests: an empty selection, a filter or project that matched nothing, or a test file the runner does not read' : undefined;
   return { run, timeouts, loadMessage, failedTests };
 }
 
@@ -320,12 +323,14 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
     child.stderr.on('data', (d) => (stderr = (stderr + String(d).split('\n').filter((l) => !NODE_NOISE.test(l)).join('\n')).slice(-65536)));
     child.on('error', (e) => (stderr += e.message));
     let killed = false;
+    let exit = '';
     const timer = setTimeout(() => {
       killed = true;
       terminateProcessTree(child);
     }, budgetMs);
 
-    child.on('close', () => {
+    child.on('close', (code, signal) => {
+      exit = signal ? `signal ${signal}` : `code ${code}`;
       clearTimeout(timer);
       if (cleanupOnClose) terminateProcessTree(child);
       const durationMs = Date.now() - started;
@@ -333,7 +338,7 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
       if (killed) {
         result = { run: { outcome: 'timeout', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, exceptionFailures: 0, durationMs }, timeouts: 1, loadMessage: `budget of ${budgetMs}ms exceeded; ${TIMEOUT_CLEANUP_WARNING}`, failedTests: [] };
       } else if (!existsSync(outFile)) {
-        result = { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, exceptionFailures: 0, durationMs }, timeouts: 0, loadMessage: stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? 'runner produced no report', failedTests: [] };
+        result = { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, exceptionFailures: 0, durationMs }, timeouts: 0, loadMessage: stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? `runner produced no report (exited with ${exit})`, failedTests: [] };
       } else {
         try {
           result = parse(readBoundedJsonFile(outFile), durationMs);
@@ -342,6 +347,10 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
         }
       }
       rmSync(outFile, { force: true });
+      // The net under every parser: an `error` run that arrived without words gets the runner's last stderr line, else its exit status.
+      if (result.run.outcome === 'error' && !String(result.loadMessage ?? '').trim()) {
+        result.loadMessage = stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? `the runner reported an error without a message (exited with ${exit})`;
+      }
       resolve(result);
     });
   });
@@ -364,7 +373,8 @@ export function mergeRuns(parts) {
   return {
     run: { outcome, tests: { total: sum('total'), passed: sum('passed'), failed: sum('failed') }, assertionFailures: runs.reduce((n, r) => n + r.assertionFailures, 0), exceptionFailures: runs.reduce((n, r) => n + (r.exceptionFailures ?? 0), 0), ...(kindNotReported ? { kindNotReported } : {}), durationMs: runs.reduce((n, r) => n + r.durationMs, 0) },
     timeouts: parts.reduce((n, p) => n + (p.timeouts ?? 0), 0),
-    loadMessage: parts.find((p) => p.loadMessage)?.loadMessage,
+    loadMessage: parts.find((p) => p.run.outcome === 'error' && String(p.loadMessage ?? '').trim())?.loadMessage
+      ?? (outcome === 'error' ? 'a runner reported an error without a message' : parts.find((p) => p.loadMessage)?.loadMessage),
     failedTests: parts.flatMap((p) => p.failedTests ?? []),
     provenance,
   };
