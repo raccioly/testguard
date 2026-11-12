@@ -1,6 +1,6 @@
 {
   "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine. Since #284 (PR #275) the ceiling is on the self-probe's NORMALIZED ELAPSED time at one fault-worker count (`unit`, `faultWorkers`): summed defender seconds rise when faults run side by side while the job gets faster, so the sum is printed and never gated.",
-  "seconds": 2290,
+  "seconds": 2270,
   "measured": {
     "seconds": 816,
     "at": "2026-09-18",
@@ -93,6 +93,13 @@
       "faultWorkers": 2,
       "at": "2026-11-12",
       "why": "The series resets: the unit changed from summed defender seconds to normalized ELAPSED seconds at 2 fault workers (#284, PR #275). PR #275 makes the CI self-probe fan out by default (2 at a time on the 4-CPU runner, every kill confirmed by a run alone), and from then on summed seconds rose while the job got faster: from-scratch runs on its heads summed 4243, 4215 and 4812 normalized seconds while their elapsed time was 1807, 1803 and 2041 normalized seconds. Growth since the last entry: 666 to 723 faults; claims new on main since the branch started cost 232 s summed and this PR's 302 s; elapsed per fault 2.71, 2.71 and 2.82 normalized seconds. The ceiling comes from the one from-scratch run on the final code (2041 s normalized elapsed, head a5039ec, 723/723 killed, 1823 s wall-clock, factor 0.89) plus 12% because fewer than three runs exist on it: 2286, rounded to 2290. Tighten it from main's next three from-scratch runs by the headroom rule. A run at another fault-worker count fails closed (fault-workers-mismatch), like the runner-class check."
+    },
+    {
+      "seconds": 2270,
+      "unit": "normalized-elapsed-seconds",
+      "faultWorkers": 2,
+      "at": "2026-11-12",
+      "why": "Two from-scratch runs on the final code of PR #275 now exist: 2041 normalized elapsed seconds (head a5039ec, 723 faults, factor 0.89) and 2000 (head f94bea0, 726 faults, factor 1.01; summed 4675, not gated), every fault killed. Median 2020.5 plus 12% (the two-sample rule this series started with) is 2263, rounded to 2270. Tighten it from main's next three from-scratch runs by the file's headroom rule."
     }
   ],
   "measuredInCI": {

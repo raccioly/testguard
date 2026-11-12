@@ -96,7 +96,7 @@ Automated weekly release — everything merged since `v0.23.0`.
 - **The GitHub Action has a `changed` input** for `probe` (`auto` or a ref),
   and its `evidence` output also names `evidence-partial.json`.
 - **The self-probe cost gate is on elapsed time** (#284, repository CI only):
-  normalized elapsed seconds at a recorded fault-worker count, ceiling 2290.
+  normalized elapsed seconds at a recorded fault-worker count, ceiling 2270.
   Summed defender seconds rise under the default fan-out while the job gets
   faster, so they are printed and no longer gated; a run at another width, or
   with no elapsed time, fails closed. The per-claim ceiling is unchanged.
