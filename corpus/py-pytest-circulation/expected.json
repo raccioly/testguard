@@ -12,7 +12,7 @@
         },
         "observed": "baseline GGG; probe RRR",
         "outputHash": "c607e335bc3ee17e15e3f09891c6cc80f1beaaee0e8d025211d31d878a8d0444",
-        "derivedAt": "2026-11-11T23:16:53.492Z"
+        "derivedAt": "2026-11-12T00:52:49.115Z"
       }
     },
     "LOAN-DUE-DATE/F2": {
@@ -25,7 +25,7 @@
         },
         "observed": "baseline GGG; probe RRR",
         "outputHash": "386c68e738be7e53b617abce7825125784ec8ef0806b2785bc51a4394a60f3a6",
-        "derivedAt": "2026-11-11T23:16:54.395Z"
+        "derivedAt": "2026-11-12T00:52:51.934Z"
       }
     },
     "LATE-FEE-GRACE/F1": {
@@ -38,7 +38,7 @@
         },
         "observed": "baseline GGG; probe GRG",
         "outputHash": "6fb845e0d8bebdf2519f6984dbb323184cc05670b08619a0847832a0e6a5dac2",
-        "derivedAt": "2026-11-11T23:16:55.161Z"
+        "derivedAt": "2026-11-12T00:52:54.357Z"
       }
     },
     "LATE-FEE-GRACE/F2": {
@@ -51,7 +51,7 @@
         },
         "observed": "baseline GGG; probe RGR",
         "outputHash": "af98f3703f1048cf71080c0e4c0785cf93f2eb64db851e72808f7ce6778eb7a9",
-        "derivedAt": "2026-11-11T23:16:55.929Z"
+        "derivedAt": "2026-11-12T00:52:56.500Z"
       }
     },
     "LATE-FEE-GRACE/F3": {
@@ -62,7 +62,7 @@
         "commands": null,
         "observed": "anchor: 0 hits, expected 1",
         "outputHash": "266b10d1856181e1e8dc4d4d8b10ae708fd07aa21abd3c3608821fb3acf7fb4a",
-        "derivedAt": "2026-11-11T23:16:55.934Z"
+        "derivedAt": "2026-11-12T00:52:56.517Z"
       }
     },
     "LATE-FEE-RATE/F1": {
@@ -75,7 +75,7 @@
         },
         "observed": "baseline GGG; probe RGR",
         "outputHash": "af98f3703f1048cf71080c0e4c0785cf93f2eb64db851e72808f7ce6778eb7a9",
-        "derivedAt": "2026-11-11T23:16:56.707Z"
+        "derivedAt": "2026-11-12T00:52:58.648Z"
       }
     },
     "LATE-FEE-RATE/F2": {
@@ -88,7 +88,7 @@
         },
         "observed": "baseline GGG; probe RRR",
         "outputHash": "73f84d9cb2f4f5e9b5ea0d69cf182fb3e407f81d626213d2482ea5bbe3a6a465",
-        "derivedAt": "2026-11-11T23:16:57.453Z"
+        "derivedAt": "2026-11-12T00:53:00.759Z"
       }
     },
     "LATE-FEE-RATE/F3": {
@@ -101,7 +101,7 @@
         },
         "observed": "baseline GGG; probe GRG",
         "outputHash": "5faebdeb0effb5c9aec587c6643ff0e16787f7fdf091d6757130ba9ba8aea7ba",
-        "derivedAt": "2026-11-11T23:16:58.226Z"
+        "derivedAt": "2026-11-12T00:53:03.180Z"
       }
     },
     "LATE-FEE-CAP/F1": {
@@ -114,7 +114,7 @@
         },
         "observed": "baseline GGG; probe RGR",
         "outputHash": "23bc4ee259ae1b536db93d0031abb55e991e5f397288999fa1d976094069cf20",
-        "derivedAt": "2026-11-11T23:16:58.992Z"
+        "derivedAt": "2026-11-12T00:53:05.510Z"
       }
     },
     "LATE-FEE-CAP/F2": {
@@ -127,7 +127,7 @@
         },
         "observed": "baseline GGG; probe RRR",
         "outputHash": "d7d5da814a5d443fead277de05505d003384621b134884a70d7de26d51154d68",
-        "derivedAt": "2026-11-11T23:16:59.817Z"
+        "derivedAt": "2026-11-12T00:53:08.277Z"
       }
     },
     "LATE-FEE-CAP/F3": {
@@ -140,7 +140,7 @@
         },
         "observed": "baseline GGG; probe RRR",
         "outputHash": "0486291bfd2194774e1297671c7690f99da9d18376771f3143e3206f5a8c0add",
-        "derivedAt": "2026-11-11T23:17:00.833Z"
+        "derivedAt": "2026-11-12T00:53:10.821Z"
       }
     },
     "HOLD-QUEUE-ORDER/F1": {
@@ -153,7 +153,7 @@
         },
         "observed": "baseline GRG; probe RRR",
         "outputHash": "7456adfbd0b0d924d9806058144d94156597344fddb08b119b36dcc7f6c9b1bb",
-        "derivedAt": "2026-11-11T23:17:01.779Z"
+        "derivedAt": "2026-11-12T00:53:13.219Z"
       }
     },
     "HOLD-QUEUE-ORDER/F2": {
@@ -166,7 +166,7 @@
         },
         "observed": "baseline GRG; probe RRR",
         "outputHash": "089724489e3a4de9ffc69d70c57fcd655947d99ca0cd42e77f06fa7eb513719b",
-        "derivedAt": "2026-11-11T23:17:02.677Z"
+        "derivedAt": "2026-11-12T00:53:15.542Z"
       }
     },
     "HOLD-DUPLICATE-AND-PRIORITY/F1": {
@@ -177,7 +177,7 @@
         "commands": null,
         "observed": "anchor: 2 hits, expected 1",
         "outputHash": "446a52738cf6b241227abfade4ad0b97a0a265c043a66649043ae55fe86b5161",
-        "derivedAt": "2026-11-11T23:17:02.683Z"
+        "derivedAt": "2026-11-12T00:53:15.564Z"
       }
     },
     "HOLD-DUPLICATE-AND-PRIORITY/F2": {
@@ -190,7 +190,7 @@
         },
         "observed": "baseline GRG; probe RRR",
         "outputHash": "6827df8471dd9e222c0a580d844a098a2469058c18659475cc70384d2d59d86b",
-        "derivedAt": "2026-11-11T23:17:03.599Z"
+        "derivedAt": "2026-11-12T00:53:18.245Z"
       }
     },
     "MEMBERSHIP-NEW-EXPIRY/F1": {
@@ -203,7 +203,7 @@
         },
         "observed": "baseline GGG; probe RRR",
         "outputHash": "523b9a2845ee9878b94b241dab7f5d7e175e6044985ba7adce3b12146d5bd404",
-        "derivedAt": "2026-11-11T23:17:04.458Z"
+        "derivedAt": "2026-11-12T00:53:20.459Z"
       }
     },
     "MEMBERSHIP-NEW-EXPIRY/F2": {
@@ -216,7 +216,7 @@
         },
         "observed": "baseline GGG; probe RRR",
         "outputHash": "33c94aefc85358fd7d2994c2e1e211174a477456b8fab0b78bf189b5b3cd4dcf",
-        "derivedAt": "2026-11-11T23:17:05.261Z"
+        "derivedAt": "2026-11-12T00:53:22.731Z"
       }
     },
     "MEMBERSHIP-EARLY-DISCOUNT/F1": {
@@ -229,7 +229,7 @@
         },
         "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
         "outputHash": "8c520b02a6561880c42e06e846c62dd0c5dee32f8f3f9e1c71d90d02b1e17d23",
-        "derivedAt": "2026-11-11T23:17:06.703Z"
+        "derivedAt": "2026-11-12T00:53:26.794Z"
       }
     },
     "MEMBERSHIP-EARLY-DISCOUNT/F2": {
@@ -242,7 +242,7 @@
         },
         "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
         "outputHash": "8c520b02a6561880c42e06e846c62dd0c5dee32f8f3f9e1c71d90d02b1e17d23",
-        "derivedAt": "2026-11-11T23:17:08.389Z"
+        "derivedAt": "2026-11-12T00:53:30.582Z"
       }
     },
     "MEMBERSHIP-EARLY-DISCOUNT/F3": {
@@ -255,7 +255,7 @@
         },
         "observed": "baseline GGG; probe LLL",
         "outputHash": "2dc83c49b2c8771fc9955f6e82971796c8f02b8af35a2cce1e8e56f3a16fd6e5",
-        "derivedAt": "2026-11-11T23:17:09.538Z"
+        "derivedAt": "2026-11-12T00:53:33.762Z"
       }
     }
   },

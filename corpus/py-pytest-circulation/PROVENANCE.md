@@ -11,7 +11,7 @@ Every author was a separate subagent (model `claude-sonnet-5-5`, chosen as the c
 | Claim author | a sandbox holding only SPEC.md and the source (no tests existed anywhere), plus fault-kind quotas | provenance/claims.author.json | `625bf51d1eabb81e…` | 15 |
 | Test author | a sandbox holding only SPEC.md, the source and the runner configuration, plus per-file quality instructions; no claims or faults existed anywhere | tests/test_*.py | `4c274e5622694887…` | 15 |
 
-Written by the orchestrator (infrastructure, not behavior): pyproject.toml (pytest pythonpath), requirements.txt (pytest==8.4.2), subject.json; the venv is created per machine (corpus/run.mjs --install). `claims.json` is `provenance/claims.author.json` (verbatim) plus `source`, `producedBy` and `defendedBy`, assembled by `node corpus/assemble.mjs` from the requirement-to-test rule in `provenance/defenders.json`, which was fixed before the claim and test authors ran.
+Written by the orchestrator (infrastructure, not behavior): pyproject.toml (pytest pythonpath), requirements.txt (pytest==9.2.0, pygments==2.21.0), subject.json; the venv is created per machine (corpus/run.mjs --install). `claims.json` is `provenance/claims.author.json` (verbatim) plus `source`, `producedBy` and `defendedBy`, assembled by `node corpus/assemble.mjs` from the requirement-to-test rule in `provenance/defenders.json`, which was fixed before the claim and test authors ran.
 
 ## Planted test quality (the test author's per-file instructions)
 

@@ -1,1 +1,2 @@
-pytest==8.4.2
+pytest==9.2.0
+pygments==2.21.0
