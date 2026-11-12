@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-12
+
+Automated weekly release — everything merged since `v0.23.1`.
+
+### Changed
+
+- Fast by default: auto fault workers with a solo-confirmation guard, the fast path in hooks, CI and agent docs (#275)
+- chore(homebrew): sha256 for v0.23.1 (#288)
+- fix: workspace links run the probed tree and reach the import closure; TS/CJS export forms; verdict order (#276)
+
+
 ### Changed
 
 - **Fast by default (#270).** `probe` now runs `--fault-workers auto`: half
