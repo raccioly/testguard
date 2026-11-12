@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A vitest config that imports `vite` is probed again (#278).** Hashing the
+  configuration that decides the test universe followed a bare package import
+  into `node_modules`, read the package's module files and refused the run at
+  1 MiB (`module config dependency vite exceeded 1048576 bytes`). An installed
+  package (plain, hoisted, nested, pnpm's store, or a scratch tree's link to
+  the source install) is now recorded by its name and the version in its
+  `package.json`, never by reading its modules, and can never fail the run for
+  size; the lockfile and manifests bind it as well. A package found where Node
+  finds it, so an ESM-only package without a `require` export no longer reads
+  as unresolved. A workspace package linked into `node_modules` from inside the
+  project is followed like a relative import. Project files keep their size and
+  count caps, and a cap refusal now names the file, the limit and what to do. A
+  large data file a configuration names (a lockfile, a JSON list, a claims
+  file) is hashed in chunks and not scanned, under its own bound, and a string
+  literal longer than any path no longer refuses the run.
+- **Symbolic links inside the repository are followed (#199).** A configuration
+  file or directory reached through a link is read when its real path stays
+  inside the project, and refused by name when the link, a linked directory or
+  a dangling link leaves it, or when links form a cycle. Containment is now
+  decided on the real path, so a linked directory can no longer carry a plain
+  file name out of the project either.
+- **A vitest project with `test.projects` is probed again (#277).** `vitest list`
+  prefixes each file with its project (`[ui] tests/ui/a.test.mjs`), which
+  discovery read as a path. The listing is read as JSON (`--json=<file>`, vitest
+  3 and later) or as text with the prefix parsed, and the project of every file
+  is kept. A defender runs under each project that lists it, each run selected
+  with `--project`, and the runs merge pessimistically: without it, vitest's
+  path filter also runs another project's file whose path contains the
+  defender's, and that file's failure would read as a kill. Project membership
+  is part of the test universe hash; a universe without projects hashes as
+  before.
+
 ## [0.23.0] - 2026-11-12
 
 Automated weekly release — everything merged since `v0.22.1`.

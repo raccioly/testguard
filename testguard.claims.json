@@ -1756,8 +1756,8 @@
       "producedBy": { "producer": "human", "by": "maintainer" },
       "defendedBy": ["test/runner-discovery.test.mjs"],
       "faults": [
-        { "id": "F1", "description": "Every absolute-looking string is rejected before determining whether it names a file.", "faultClass": "condition-forced", "file": "src/probe/runners/discovery.mjs", "find": "const existingConfigCandidate = (root, path) => {\n  let stat;", "replace": "const existingConfigCandidate = (root, path) => {\n  if (!inside(root, path)) throw new DiscoveryError('absolute literal rejected');\n  let stat;", "producedBy": { "producer": "human" }, "defendedBy": ["test/discovery-config.test.mjs"] },
-        { "id": "F2", "description": "Existing config dependencies may escape the project root.", "faultClass": "condition-forced", "file": "src/probe/runners/discovery.mjs", "find": "  if (!inside(root, path)) throw new DiscoveryError(`discovery config dependency resolves outside the project: ${path}`);", "replace": "  if (false) throw new DiscoveryError(`discovery config dependency resolves outside the project: ${path}`);", "producedBy": { "producer": "human" }, "defendedBy": ["test/discovery-config.test.mjs"] }
+        { "id": "F1", "description": "Every absolute-looking string is rejected before determining whether it names a file.", "faultClass": "condition-forced", "file": "src/probe/runners/discovery.mjs", "find": "  if (!stat.isFile()) return null;\n  if (!inside(root, real)) throw new DiscoveryError(`${label} resolves outside the project: ", "replace": "  if (!inside(root, real)) throw new DiscoveryError('absolute literal rejected');\n  if (!stat.isFile()) return null;\n  if (!inside(root, real)) throw new DiscoveryError(`${label} resolves outside the project: ", "producedBy": { "producer": "human" }, "defendedBy": ["test/discovery-config.test.mjs"] },
+        { "id": "F2", "description": "Existing config dependencies may escape the project root.", "faultClass": "condition-forced", "file": "src/probe/runners/discovery.mjs", "find": "  if (!inside(root, real)) throw new DiscoveryError(`${label} resolves outside the project: ${displayPath(root, path)}${real === path ? '' : ` -> ${real}`}`);", "replace": "  if (false) throw new DiscoveryError(`${label} resolves outside the project: ${displayPath(root, path)}${real === path ? '' : ` -> ${real}`}`);", "producedBy": { "producer": "human" }, "defendedBy": ["test/discovery-config.test.mjs"] }
       ]
     },
     {
@@ -6974,8 +6974,8 @@
           "description": "A runner-reported symlink or absolute path may escape the project and still enter the test universe.",
           "faultClass": "condition-forced",
           "file": "src/probe/runners/discovery.mjs",
-          "find": "    if (outside(realRoot, real)) throw new DiscoveryError(`native test discovery path resolves outside the project: ${reported}`);",
-          "replace": "    if (false) throw new DiscoveryError(`native test discovery path resolves outside the project: ${reported}`);",
+          "find": "  if (outside(realRoot, real)) throw new DiscoveryError(`native test discovery path resolves outside the project: ${reported}`);",
+          "replace": "  if (false) throw new DiscoveryError(`native test discovery path resolves outside the project: ${reported}`);",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",

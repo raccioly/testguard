@@ -37,6 +37,7 @@ const immutableManifest = (manifest) => Object.freeze({
   runner: Object.freeze({ ...manifest.runner }),
   files: Object.freeze([...manifest.files]),
   configFiles: Object.freeze(manifest.configFiles.map((entry) => Object.freeze({ ...entry }))),
+  ...(manifest.projects ? { projects: Object.freeze(Object.fromEntries(Object.entries(manifest.projects).map(([file, names]) => [file, Object.freeze([...names])]))) } : {}),
 });
 
 export async function discoverRunnerManifest(runner, check, projectDir, budgetMs) {

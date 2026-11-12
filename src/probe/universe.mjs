@@ -11,7 +11,7 @@ export function hashNativeTestUniverse(manifests) {
   const bound = entries.map(([runner, manifest]) => {
     if (!runner?.name || names.has(runner.name) || !manifest?.runner) throw new DiscoveryError('native universe runner identities must be unique');
     names.add(runner.name);
-    const canonical = createDiscoveryManifest({ runner: manifest.runner.name, version: manifest.runner.version, files: manifest.files, configFiles: manifest.configFiles, source: manifest.source });
+    const canonical = createDiscoveryManifest({ runner: manifest.runner.name, version: manifest.runner.version, files: manifest.files, configFiles: manifest.configFiles, source: manifest.source, projects: manifest.projects });
     if (canonical.testUniverseHash !== manifest.testUniverseHash || runner.name !== manifest.runner.name) throw new DiscoveryError('native universe manifest binding is inconsistent');
     return { runner: runner.name, hash: manifest.testUniverseHash };
   }).sort((a, b) => a.runner.localeCompare(b.runner));
