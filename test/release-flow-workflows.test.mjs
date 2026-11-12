@@ -73,22 +73,57 @@ describe('ci.yml: pull requests probe what changed, everything else probes in fu
     expect(ci.jobs.test.name).toContain("format('test ({0})', matrix.node-version)");
   });
 
+  it('shards the unit suite three ways inside each Node leg; `checks (22)`, `test (20)` and `test (24)` gather them and are red when any shard is', () => {
+    const unit = ci.jobs.unit;
+    expect(unit.strategy.matrix['node-version']).toEqual([20, 22, 24]);
+    expect(unit.strategy.matrix.shard).toEqual([1, 2, 3]);
+    expect(unit.strategy['fail-fast']).toBe(false);
+    expect(unit.name).toBe('unit (${{ matrix.node-version }}, ${{ matrix.shard }}/3)');
+    const run = step(ci, 'unit', "Run this shard's tests (with runtime budget)");
+    expect(run.run).toContain('vitest run --shard="$SHARD/3"');
+    expect(run.env.TEST_BUDGET_MS).toBe('${{ matrix.budget-ms }}');
+    // every shard has its own budget, and none is the old whole-suite 300 s ceiling gone slack
+    const budgets = Object.fromEntries(unit.strategy.matrix.include.map((i) => [i.shard, i['budget-ms']]));
+    expect(Object.keys(budgets).sort()).toEqual(['1', '2', '3']);
+    for (const ms of Object.values(budgets)) expect(ms).toBeGreaterThan(0);
+    // a shard that runs zero test files fails, whatever vitest's own exit code says
+    expect(run.run).toContain('r.testResults?.length>0');
+    expect(run.run).toContain('ran zero test files');
+    // the gather reads the run's own job list, per Node version, and every expected job must be there AND green
+    const gather = ci.jobs.test;
+    expect(gather.needs).toEqual(['unit', 'static']);
+    expect(gather.if).toBe('always()');
+    const check = step(ci, 'test', 'Every shard and check of this Node version must have succeeded').run;
+    for (const want of ['unit ($NODE, 1/3)', 'unit ($NODE, 2/3)', 'unit ($NODE, 3/3)', 'static ($NODE)']) expect(check).toContain(want);
+    expect(check).toContain('did not run');
+    expect(check).toContain('[ "$got" = success ]');
+  });
+
+  it('keeps the once-per-Node checks in the static job, not in every shard', () => {
+    for (const name of ['Syntax-check all sources', 'Install smoke (pack → install --omit=dev → run)', 'DocGuard — documentation matches the code']) {
+      expect(index(ci, 'static', name), name).toBeGreaterThan(-1);
+      expect(index(ci, 'unit', name), name).toBe(-1);
+    }
+    expect(index(ci, 'static', "Run this shard's tests (with runtime budget)")).toBe(-1);
+  });
+
   it('gates the cost of a full run and only reports the cost of a scoped one', () => {
     expect(step(ci, 'selfprobe-gate', 'The gate must stay inside its cost budget').if).toContain("env.MODE == 'full'");
     expect(step(ci, 'selfprobe-scoped', 'Cost of the scoped run (reported, not gated)').run).toContain('--report-only');
   });
 
   it('keeps the anchor preflight, the claims diff and the changed-file gate on every pull request', () => {
-    expect(step(ci, 'test', 'claims — fault anchors and replacements are valid').run).toContain('--check-anchors');
-    expect(step(ci, 'test', 'claims — fault anchors and replacements are valid').if).toBe('matrix.node-version == 22');
-    expect(step(ci, 'test', 'gate — every changed source file carries a claim').if).toBe("github.event_name == 'pull_request'");
-    expect(step(ci, 'test', 'claims — no claim or fault removed without a reason').if).toBe("github.event_name == 'pull_request'");
+    expect(step(ci, 'static', 'claims — fault anchors and replacements are valid').run).toContain('--check-anchors');
+    expect(step(ci, 'static', 'claims — fault anchors and replacements are valid').if).toBe('matrix.node-version == 22');
+    expect(step(ci, 'static', 'gate — every changed source file carries a claim').if).toBe("github.event_name == 'pull_request'");
+    expect(step(ci, 'static', 'claims — no claim or fault removed without a reason').if).toBe("github.event_name == 'pull_request'");
   });
 
   it('adds a nightly full run: the test job and the probe, nothing else', () => {
     expect(triggers(ci).schedule).toHaveLength(1);
     for (const job of ['native-node-floor', 'python', 'playwright', 'hermeticity']) expect(ci.jobs[job].if, job).toBe("github.event_name != 'schedule'");
-    expect(ci.jobs.test.if).toBeUndefined();
+    expect(ci.jobs.unit.if).toBeUndefined();
+    expect(ci.jobs.static.if).toBeUndefined();
   });
 
   it('keeps the branch-named evidence for full runs only: a scoped run is partial', () => {
