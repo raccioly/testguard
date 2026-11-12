@@ -26,7 +26,7 @@ jobs:
   # because one job kept hitting the 300 s wall-clock budget as the suite grew
   # (three feature pull requests were blocked by it). Each shard has its own
   # budget, set about 30% above that shard's slowest leg measured in CI (first
-  # run, Node 20/22/24: shard 1 48-64 s, shard 2 58-84 s, shard 3 121-139 s). A shard that
+  # run, Node 20/22/24: shard 1 45-64 s, shard 2 56-84 s, shard 3 94-149 s, over two runs). A shard that
   # runs no test file fails. `npm test` is unchanged for local use.
   unit:
     name: unit (${{ matrix.node-version }}, ${{ matrix.shard }}/3)
@@ -45,7 +45,7 @@ jobs:
           - shard: 2
             budget-ms: 110000
           - shard: 3
-            budget-ms: 180000
+            budget-ms: 195000
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
