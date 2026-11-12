@@ -19,6 +19,11 @@ name: Auto Release — GitHub, npm, PyPI, Homebrew
 
 on:
   workflow_dispatch: # manual recovery
+    inputs:
+      reprobe:
+        description: 'Recovery only: probe the tree here instead of requiring the release pull request evidence (use when its artifact expired or never existed)'
+        type: boolean
+        default: false
   schedule:
     - cron: '17 * * * *' # hourly sweep: publishes any merged version bump the push event missed
   push:
@@ -81,10 +86,38 @@ jobs:
             echo "⏭️ $TAG is fully released everywhere — nothing to do"
           fi
 
+  # The hourly sweep also watches for a release pull request that went stale
+  # AFTER it was opened (v0.23.2 conflicted with a later commit on main and sat
+  # open, auto-merge armed and never firing). Its failure is the alarm.
+  watch-release-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: An open release pull request must still be mergeable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FAILED=0
+          for PR in $(gh pr list --state open --base main --json number,headRefName --jq '.[] | select(.headRefName | startswith("release/v")) | .number'); do
+            node .github/scripts/await-mergeable.mjs "$PR" --wait 60 || FAILED=1
+          done
+          exit "$FAILED"
+
   test:
     needs: detect-version
     if: needs.detect-version.outputs.changed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read # finds the release pull request's evidence artifact
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -97,7 +130,25 @@ jobs:
       - run: npm test
       - name: Install smoke — the tarball must run with production deps only
         run: npm run test:install
-      - name: Self-probe must be fully defended before anything ships
+      # ONE full probe per release, and it already happened: the release pull
+      # request's CI probed the bumped tree in full and stored the evidence as
+      # release-evidence-<git tree hash>. This job must not probe it again; it
+      # must prove that artifact describes the tree it is about to tag, and it
+      # fails closed when the artifact is missing, expired, from anywhere but a
+      # release branch's ci.yml, or for another tree (a merge to main between
+      # the release pull request and this run changes the tree, and that tree
+      # was never probed).
+      - name: The release pull request's full self-probe must describe this exact tree
+        if: ${{ !inputs.reprobe }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TREE=$(git rev-parse 'HEAD^{tree}')
+          node .github/scripts/release-evidence.mjs verify --tree "$TREE" --version "${{ needs.detect-version.outputs.version }}" --repo "$GITHUB_REPOSITORY"
+      # Manual recovery only (workflow_dispatch -f reprobe=true): the old
+      # behavior, for a tree whose evidence no longer exists.
+      - name: Self-probe must be fully defended before anything ships (recovery re-probe)
+        if: ${{ inputs.reprobe }}
         run: node cli/testguard.mjs probe . --budget 180000 --out "$RUNNER_TEMP/self-evidence.json" --quiet --cost
       - name: Version surfaces are in sync
         # Offline on purpose. Before the tag the tarball for this version
@@ -205,6 +256,11 @@ jobs:
           [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ] || { echo "::error::no OIDC token endpoint — job lacks id-token: write"; exit 1; }
       - name: Publish (provenance is automatic under Trusted Publishing)
         run: npm publish --loglevel verbose
+      # `npm publish` returns before the registry serves the file (two to five
+      # minutes on 0.23.0 and 0.23.1). This job reports success, and the
+      # Homebrew checksum job below starts, only once the tarball downloads.
+      - name: Wait until the tarball is downloadable
+        run: node .github/scripts/wait-for-tarball.mjs --wait 900
 
   publish-pypi:
     needs: [detect-version, test, create-release]
