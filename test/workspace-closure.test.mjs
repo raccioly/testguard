@@ -31,6 +31,14 @@ describe('a workspace package reached by its name is in the closure', () => {
     ]));
   });
 
+  it('follows a declared workspace before anything is installed (no link yet)', () => {
+    const { root } = ws();
+    rmSync(join(root, 'node_modules'), { recursive: true, force: true });
+    const result = closure(root, [PLANNER_TEST]);
+    expect(result.status).toBe('complete');
+    expect(result.files).toEqual(expect.arrayContaining(['packages/geometry/src/shapes.js', 'packages/geometry/src/units.js']));
+  });
+
   it('follows a subpath and the package main field when there are no exports', () => {
     const { root } = ws({
       files: {

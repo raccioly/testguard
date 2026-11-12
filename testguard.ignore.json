@@ -4,6 +4,13 @@
   "entries": [
     {
       "kind": "path",
+      "pattern": "test/workspace.acceptance.test.mjs",
+      "reason": "Real-probe acceptance for #263 and #268: a two-package workspace probed under node:test (npm and pnpm layouts, --fault-workers 2, and a reuse run across a workspace-package change), about half a minute of nested probes. Mandatory in npm test and CI. The claims TG-SCRATCH-TREE-RUNS-ITS-OWN-WORKSPACE-PACKAGES and TG-WORKSPACE-PACKAGES-ARE-IN-THE-IMPORT-CLOSURE name the fast defenders test/workspace-scratch.test.mjs and test/workspace-closure.test.mjs; naming this file as a self-probe defender would pay for nested probes on every fault.",
+      "by": "claude",
+      "at": "2026-11-11T22:30:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/write-boundary.acceptance.test.mjs",
       "reason": "Real-runner acceptance for the declared write boundary: four fixtures (vitest, jest, unittest, Playwright), each probed in a sandbox with a read-only and a writable copy of node_modules and a before/after listing, a few minutes in total. Mandatory in npm test and CI. The claims about the boundary (TG-SCRATCH-ROOT-IS-ONE-CALLS-DIRECTORY, TG-NODE-MODULES-IS-NEVER-WRITTEN-THROUGH and the others) are defended by the fast tests in test/scratch-dir.test.mjs and test/write-boundary.helpers.test.mjs; naming this file as a self-probe defender would re-run four runners for every fault.",
       "by": "claude",

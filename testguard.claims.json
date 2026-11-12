@@ -9376,7 +9376,7 @@
           "description": "An unfollowable closure selects the claim even when nothing changed.",
           "faultClass": "condition-forced",
           "file": "src/probe/scope.mjs",
-          "find": "(indeterminate && changed.files.length > 0)",
+          "find": "(indeterminate && (changed.repoChanged ?? changed.files.length) > 0)",
           "replace": "indeterminate",
           "producedBy": {
             "producer": "agent",
@@ -12690,6 +12690,367 @@
           "file": "src/probe/partial-budget.mjs",
           "find": "export const NOT_REACHED = 'not-reached-within-budget';",
           "replace": "export const NOT_REACHED = 'not-reached';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-WORKSPACE-PACKAGES-ARE-IN-THE-IMPORT-CLOSURE",
+      "statement": "A bare specifier that names a workspace package inside the repository is followed into the package like a relative import, so probe --changed selects every claim whose defenders run a changed package and verdict reuse sees the change; a package it cannot follow (outside the project, an unresolvable entry) makes the closure indeterminate, selected whenever anything in the repository changed.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/workspace-closure.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A resolved workspace package contributes no files to the closure.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/imports.mjs",
+          "find": "              targets = pkg.files;",
+          "replace": "              targets = [];",
+          "defendedBy": [
+            "test/workspace-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A workspace package the closure cannot follow is dropped instead of making it indeterminate.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/imports.mjs",
+          "find": "              if (pkg.unreadable || [...pkg.files, ...pkg.manifests].some((path) => !inside(root, path))) addIssue(ctx, 'unreadable-module', file, specifier);",
+          "replace": "              if (false) addIssue(ctx, 'unreadable-module', file, specifier);",
+          "defendedBy": [
+            "test/workspace-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An indeterminate closure is selected only when a project file changed.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/scope.mjs",
+          "find": "(changed.repoChanged ?? changed.files.length) > 0",
+          "replace": "changed.files.length > 0",
+          "defendedBy": [
+            "test/workspace-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A node_modules link that leaves the repository is followed as repository source.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/workspaces.mjs",
+          "find": "  return within(root, path) && !relative(root, path).split(sep).includes('node_modules');",
+          "replace": "  return !relative(root, path).split(sep).includes('node_modules');",
+          "defendedBy": [
+            "test/workspace-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SCRATCH-TREE-RUNS-ITS-OWN-WORKSPACE-PACKAGES",
+      "statement": "In every scratch worktree a node_modules link into repository source (a workspace, file: or link: package) resolves to the scratch tree's own copy of the package, for npm, pnpm and link-only layouts, a borrowed or read-only install, and every tree of a fan-out, so the defender runs the faulted file; a link the scratch tree cannot contain refuses the run, naming the link.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/workspace-scratch.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Scope directories are linked whole, so @scope/pkg resolves through the shared install to the original checkout.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/node-modules-link.mjs",
+          "find": "    if (redirect && entry.startsWith('@') && isDirectory(from) && !isLink(from)) {",
+          "replace": "    if (false && entry.startsWith('@') && isDirectory(from) && !isLink(from)) {",
+          "defendedBy": [
+            "test/workspace-scratch.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A link to repository source the scratch tree lacks is left pointing at the original checkout.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/worktree.mjs",
+          "find": "  if (outside.length) {",
+          "replace": "  if (false) {",
+          "defendedBy": [
+            "test/workspace-scratch.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A relinked package does not get its ignored build output.",
+          "faultClass": "call-removed",
+          "file": "src/probe/worktree.mjs",
+          "find": "if (!carried.has(mapped)) { carried.add(mapped); carryIgnored(dir, mapped); }",
+          "replace": "if (!carried.has(mapped)) { carried.add(mapped); }",
+          "defendedBy": [
+            "test/workspace-scratch.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The workspace fixture links the planner where geometry belongs, so its layout no longer names the defended package.",
+          "faultClass": "variable-swap",
+          "file": "test/helpers/workspace-project.mjs",
+          "find": "    link('node_modules/@ws/geometry', '../../packages/geometry');",
+          "replace": "    link('node_modules/@ws/geometry', '../../packages/planner');",
+          "defendedBy": [
+            "test/workspace-scratch.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-EXPORT-FORMS-ARE-READ-NOT-REFUSED",
+      "statement": "TypeScript type-only, ambient and declaration exports and CommonJS object-literal exports are read as the bindings they declare, so a module that writes them keeps its importers' closures complete; a spread, computed key, accessor, a member of a named import or a hidden require stays unsupported-syntax, never a smaller closure.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/export-forms.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "export interface falls through to unsupported-syntax again.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/imports.mjs",
+          "find": "  if (identifier(tokens[i], 'interface') && identifier(tokens[i + 1])) return end;\n",
+          "replace": "",
+          "defendedBy": [
+            "test/export-forms.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An object-literal export whose value is require(x) is read as a value defined in the module.",
+          "faultClass": "return-altered",
+          "file": "src/probe/imports.mjs",
+          "find": "  if (call && call.end === e) return { kind: 'namespace', specifier: call.specifier };",
+          "replace": "  if (call && call.end === e) return { kind: 'terminal', symbol: key };",
+          "defendedBy": [
+            "test/export-forms.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "import type from 'x' (a default import named type) is read as type-only and drops x from the closure.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/imports.mjs",
+          "find": "  const typeIsBinding = identifier(tokens[start + 2], 'from') || punct(tokens[start + 2], ',');",
+          "replace": "  const typeIsBinding = false;",
+          "defendedBy": [
+            "test/export-forms.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A member of a named import is read as a terminal instead of staying uncertain.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/imports.mjs",
+          "find": "        if (module.localImports.has(origin.local)) module.uncertain.push('unsupported-syntax');\n",
+          "replace": "",
+          "defendedBy": [
+            "test/export-forms.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-ALIAS-VALUES-ARE-EVALUATED-OR-INDETERMINATE",
+      "statement": "A vite/vitest alias written as a common path expression (new URL, fileURLToPath, path.resolve/join/dirname, a top-level const) resolves to its directory, a string naming a directory is never read as a module by discovery, and an alias the reader cannot evaluate or read makes the closure of the files that use it indeterminate instead of refusing the run or dropping the alias.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/alias-forms.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Discovery reads a directory string as a module through its index file again.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    const directoryString = !module && isDirectoryPath(base);",
+          "replace": "    const directoryString = false;",
+          "defendedBy": [
+            "test/alias-forms.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An alias whose value cannot be evaluated is dropped, so its specifiers read as packages.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/rank.mjs",
+          "find": "      if (!key || target === undefined) continue;",
+          "replace": "      if (!key || !target) continue;",
+          "defendedBy": [
+            "test/alias-forms.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An alias map that cannot be read adds no catch-all rule.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/rank.mjs",
+          "find": "    if (opaque) rules.push({ prefix: '', suffix: '', wildcard: true, targets: [], opaque: true });",
+          "replace": "",
+          "defendedBy": [
+            "test/alias-forms.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "new URL(a, import.meta.url) is not evaluated.",
+          "faultClass": "return-altered",
+          "file": "src/probe/alias-config.mjs",
+          "find": "      try { return { kind: 'url', value: new URL(args[0].value, args[1].value) }; } catch { return null; }",
+          "replace": "      return null;",
+          "defendedBy": [
+            "test/alias-forms.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-NOCOVER-PRECEDES-AN-INVALID-ANCHOR",
+      "statement": "A fault with no defender is nocover whatever its anchor does: classify() checks for defenders before the anchor, and the validator rejects a record that reports anchor-missing or anchor-ambiguous for a fault with no resolved defender.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/classify.test.mjs",
+        "spec/conformance/verdict-order.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The anchor is checked before the defenders.",
+          "faultClass": "other",
+          "file": "src/probe/classify.mjs",
+          "find": "  if (defenders.length === 0) return { verdict: 'nocover' };\n  if (anchor && anchor.status !== 'ok') return { verdict: 'unverifiable', reason: anchor.status };",
+          "replace": "  if (anchor && anchor.status !== 'ok') return { verdict: 'unverifiable', reason: anchor.status };\n  if (defenders.length === 0) return { verdict: 'nocover' };",
+          "defendedBy": [
+            "test/classify.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The validator only rejects an anchor reason when the record says nocover, not when no defender resolved.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "(r.defenders.nocover || (Array.isArray(r.defenders.resolved) && r.defenders.resolved.length === 0))",
+          "replace": "r.defenders.nocover",
+          "defendedBy": [
+            "spec/conformance/verdict-order.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
