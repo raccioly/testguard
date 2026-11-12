@@ -1,5 +1,5 @@
 {
-  "$comment": "The corpus shards: the one place the matrix and the scorecard's expected-shard list come from (.github/workflows/corpus.yml plan job). One Playwright mode per gallery shard (#305). timeout is minutes, about 2x the measured shard time. test/corpus-shards.test.mjs checks that every subject, mode and mutant is in exactly one shard.",
+  "$comment": "The corpus shards: the one place the matrix and the scorecard's expected-shard list come from (.github/workflows/corpus.yml plan job). The Playwright gallery's reference is its own shard; every other mode runs with --reference-later and the scorecard job compares it with the reference's answers; `twice` runs as two claim halves (--slice). A mode that does not apply to the subject has no shard: the scorecard records it as not applicable (corpus/lib/deferred.mjs). timeout is minutes, about 2x the measured shard time. test/corpus-shards.test.mjs checks that every subject, mode and mutant is in exactly one shard.",
   "shards": [
     {
       "name": "ts-vitest-stock",
@@ -22,63 +22,75 @@
       "timeout": 15
     },
     {
-      "name": "js-playwright-gallery-twice",
-      "args": "--subject js-playwright-gallery --mode twice",
-      "timeout": 32,
+      "name": "js-playwright-gallery-reference",
+      "args": "--subject js-playwright-gallery --mode reference",
+      "timeout": 20,
+      "browser": true
+    },
+    {
+      "name": "js-playwright-gallery-twice-1",
+      "args": "--subject js-playwright-gallery --mode twice --reference-later --slice 1/2",
+      "timeout": 20,
+      "browser": true
+    },
+    {
+      "name": "js-playwright-gallery-twice-2",
+      "args": "--subject js-playwright-gallery --mode twice --reference-later --slice 2/2",
+      "timeout": 20,
       "browser": true
     },
     {
       "name": "js-playwright-gallery-reuse",
-      "args": "--subject js-playwright-gallery --mode reuse",
-      "timeout": 40,
+      "args": "--subject js-playwright-gallery --mode reuse --reference-later",
+      "timeout": 25,
       "browser": true
     },
     {
       "name": "js-playwright-gallery-default",
-      "args": "--subject js-playwright-gallery --mode default",
-      "timeout": 32,
+      "args": "--subject js-playwright-gallery --mode default --reference-later",
+      "timeout": 20,
       "browser": true
     },
     {
       "name": "js-playwright-gallery-workers-2",
-      "args": "--subject js-playwright-gallery --mode workers-2",
-      "timeout": 32,
+      "args": "--subject js-playwright-gallery --mode workers-2 --reference-later",
+      "timeout": 20,
       "browser": true
     },
     {
       "name": "js-playwright-gallery-workers-4",
-      "args": "--subject js-playwright-gallery --mode workers-4",
-      "timeout": 32,
+      "args": "--subject js-playwright-gallery --mode workers-4 --reference-later",
+      "timeout": 20,
       "browser": true
     },
     {
       "name": "js-playwright-gallery-scratch",
-      "args": "--subject js-playwright-gallery --mode scratch",
-      "timeout": 32,
+      "args": "--subject js-playwright-gallery --mode scratch --reference-later",
+      "timeout": 20,
       "browser": true
     },
     {
       "name": "js-playwright-gallery-assertion-kill",
-      "args": "--subject js-playwright-gallery --mode assertion-kill",
-      "timeout": 32,
+      "args": "--subject js-playwright-gallery --mode assertion-kill --reference-later",
+      "timeout": 20,
       "browser": true
     },
     {
       "name": "js-playwright-gallery-reorder",
-      "args": "--subject js-playwright-gallery --mode reorder",
-      "timeout": 32,
+      "args": "--subject js-playwright-gallery --mode reorder --reference-later",
+      "timeout": 20,
       "browser": true
     },
     {
       "name": "js-playwright-gallery-noise",
-      "args": "--subject js-playwright-gallery --mode noise",
-      "timeout": 32,
+      "args": "--subject js-playwright-gallery --mode noise --reference-later",
+      "timeout": 20,
       "browser": true
     },
     {
       "name": "js-playwright-gallery-partial",
-      "args": "--subject js-playwright-gallery --mode partial --mode typecheck --mode changed",
-      "timeout": 20,
+      "args": "--subject js-playwright-gallery --mode partial --reference-later",
+      "timeout": 15,
       "browser": true
     },
     {

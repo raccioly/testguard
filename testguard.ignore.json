@@ -280,6 +280,13 @@
     },
     {
       "kind": "path",
+      "pattern": "test/corpus-deferred.test.mjs",
+      "reason": "Checks the corpus scorecard's merge-time judgments (deferred comparisons with the reference, claim-slice coverage, modes without a shard, #305). It asserts nothing about TestGuard's behavior; it protects the corpus, the instrument, which is proven by its own CI job going red on a wrong verdict.",
+      "by": "maintainer",
+      "at": "2026-11-12T00:00:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/corpus-shards.test.mjs",
       "reason": "Checks the corpus CI plan (corpus/shards.json and .github/workflows/corpus.yml): every subject, Playwright mode and tool mutant is in exactly one shard, and the scorecard's expected-shard list comes from the same file. It asserts nothing about TestGuard's behavior; the corpus itself is the instrument it protects (#305).",
       "by": "maintainer",

@@ -13,6 +13,9 @@ TestGuard.
 npm run corpus -- --install                # once: each subject's pinned dependencies
 npm run corpus                             # every subject, every mode
 npm run corpus -- --subject js-jest-newsletter --mode reference
+npm run corpus -- --subject <name> --mode <m> --reference-later   # CI: the reference runs in another job; this mode hands its answers to the scorecard
+npm run corpus -- --subject <name> --mode twice --reference-later --slice 1/2   # one claim half (CI); the scorecard checks the halves cover every fault once
+npm run corpus -- --merge a.json b.json --complete   # CI: also every mode that applies must have a shard; the rest are recorded as not applicable
 npm run corpus -- --tool-mutants           # every deliberately broken build must go red
 npm run corpus -- --check-mutants          # every mutant patch still applies (also in npm test)
 npm run corpus -- --json out.json --markdown out.md

@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { CORPUS } from './subject.mjs';
 import { measureReference, WORKLOAD } from '../../.github/scripts/measure-reference.mjs';
+import { completeness, resolveDeferred } from './deferred.mjs';
 
 export const SCHEMA_PATH = join(CORPUS, 'scorecard.schema.json');
 
@@ -53,6 +54,9 @@ export function buildScorecard({ toolRoot, results, mutants, machine }) {
       speedup: ref && r.mode !== 'reference' && r.runs.length === 1 ? Math.round((ref / ms) * 100) / 100 : null,
       noEvidence: r.runs.filter((x) => x.noEvidence && !x.expectNoEvidence).map((x) => ({ run: x.label, ...x.noEvidence })),
       ...(r.partial ? { partial: r.partial } : {}),
+      ...(r.observed ? { observed: r.observed } : {}),
+      ...(r.pending ? { pending: r.pending } : {}),
+      ...(r.slice ? { slice: r.slice } : {}),
     };
   });
   const totals = rows.reduce((t, r) => {
@@ -81,7 +85,7 @@ export function buildScorecard({ toolRoot, results, mutants, machine }) {
  * seconds stay as that shard measured them on its own runner. An empty input,
  * or two shards from different tool builds, is refused.
  */
-export function mergeScorecards(docs) {
+export function mergeScorecards(docs, { subjects = null } = {}) {
   if (docs.length === 0) throw new Error('mergeScorecards: nothing to merge');
   const heads = new Set(docs.map((d) => d.tool.head));
   if (heads.size > 1) throw new Error(`mergeScorecards: shards measured different builds (${[...heads].join(', ')})`);
@@ -98,6 +102,11 @@ export function mergeScorecards(docs) {
     if (!first) seen.set(k, r);
     rows.push(r);
   }
+  // Deferred comparisons, slice coverage and (under --complete) which modes have a shard (#305): judged here, never skipped.
+  const judged = resolveDeferred(rows);
+  const finalRows = subjects ? completeness(judged, subjects) : judged;
+  rows.length = 0;
+  rows.push(...finalRows);
   const mutantResults = docs.flatMap((d) => d.mutants?.results ?? []);
   const totals = rows.reduce((t, r) => {
     if (r.faults) { t.right += r.faults.right; t.wrong += r.faults.wrong; t.critical += r.faults.critical; t.known += r.faults.known; }
@@ -112,7 +121,7 @@ export function mergeScorecards(docs) {
     schemaVersion: 1,
     tool: docs[0].tool,
     machine: { before: docs[0].machine.before, after: docs[docs.length - 1].machine.after, speedFactor: factors.length ? mid(factors) : null },
-    ok: docs.every((d) => d.ok),
+    ok: docs.every((d) => d.ok) && rows.every((r) => r.ok),
     totals,
     rows,
     ...(mutantResults.length || docs.some((d) => d.mutants) ? { mutants: { total: mutantResults.length, caught: mutantResults.filter((m) => m.caught).length, results: mutantResults } } : {}),

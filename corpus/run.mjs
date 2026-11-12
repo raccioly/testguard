@@ -27,7 +27,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { excuseKnownNoEvidence, loadKnownFailures } from './lib/checks.mjs';
-import { MODES, RUN, applies } from './lib/modes.mjs';
+import { MODES, RUN, applies, sliceOf } from './lib/modes.mjs';
 import { checkMutants, loadManifest, runMutants } from './lib/mutants.mjs';
 import { buildScorecard, measureMachine, mergeScorecards, renderMarkdown, validateScorecard } from './lib/scorecard.mjs';
 import { join as pjoin } from 'node:path';
@@ -36,9 +36,10 @@ import { CORPUS, SubjectError, install, installCheckScope, installDigest, listSu
 const TOOL_ROOT = resolve(CORPUS, '..');
 
 /** Runs the selected modes of one subject; the reference always runs first because the others compare with it. */
-export async function runSubject(subject, { modes, toolRoot = TOOL_ROOT, python, known, log = () => {}, stopOnRed = false }) {
+export async function runSubject(subject, { modes, toolRoot = TOOL_ROOT, python, known, log = () => {}, stopOnRed = false, referenceLater = false, slice = null }) {
   const work = mkdtempSync(join(tmpdir(), `corpus-run-${subject.name}-`));
-  const ctx = { subject, toolRoot, python, known, work };
+  // `referenceLater` (#305): the reference runs in another job. Modes that only compare hand their answers to the scorecard.
+  const ctx = { subject, toolRoot, python, known, work, deferDifferential: referenceLater, pending: [], ...(slice ? { slice: sliceOf(subject, slice.index, slice.of) } : {}) };
   const results = [];
   // Every mode runs against links into the subject's own install (a developer
   // whose node_modules are another checkout's, #279). Nothing the tool does may
@@ -48,7 +49,7 @@ export async function runSubject(subject, { modes, toolRoot = TOOL_ROOT, python,
   const scope = installCheckScope(subject);
   const before = existsSync(installDir) ? installDigest(installDir, scope) : null;
   try {
-    const wanted = ['reference', ...modes.filter((m) => m !== 'reference')];
+    const wanted = referenceLater ? modes : ['reference', ...modes.filter((m) => m !== 'reference')];
     for (const mode of wanted) {
       if (!applies(mode, subject)) continue;
       log(`  ${subject.name} ${mode} ...`);
@@ -58,6 +59,9 @@ export async function runSubject(subject, { modes, toolRoot = TOOL_ROOT, python,
       } catch (error) {
         r = { subject: subject.name, mode, ok: false, error: error.stack ?? String(error), runs: [], key: null, differential: null, checks: [] };
       }
+      if (mode === 'reference' && ctx.reference) r.observed = { subject: subject.name, faultCount: subject.faultIds.length, order: ctx.reference.order, map: ctx.reference.map };
+      if (ctx.pending.length) r.pending = ctx.pending.splice(0).map((p) => ({ ...p, faultCount: subject.faultIds.length }));
+      if (ctx.slice) r.slice = { index: ctx.slice.index, of: ctx.slice.of, faults: ctx.slice.ids };
       excuseKnownNoEvidence(r, known);
       if (before) {
         const after = installDigest(installDir, scope);
@@ -81,6 +85,9 @@ async function main() {
     allowPositionals: true,
     options: {
       merge: { type: 'boolean' },
+      complete: { type: 'boolean' },
+      'reference-later': { type: 'boolean' },
+      slice: { type: 'string' },
       base: { type: 'string' },
       subject: { type: 'string', multiple: true },
       mode: { type: 'string', multiple: true },
@@ -114,7 +121,9 @@ async function main() {
 
   if (values.merge) {
     if (positionals.length === 0) { console.error('corpus: --merge needs scorecard files'); process.exit(3); }
-    emit(mergeScorecards(positionals.map((p) => validateScorecard(JSON.parse(readFileSync(p, 'utf8'))))));
+    // --complete (CI): every subject, and every mode that applies to it, must have a row; the rest are recorded as not applicable.
+    const subjects = values.complete ? listSubjects().map((n) => { const { dir, variant } = subjectRef(n); return loadSubject(dir, { variant }); }) : null;
+    emit(mergeScorecards(positionals.map((p) => validateScorecard(JSON.parse(readFileSync(p, 'utf8')))), { subjects }));
   }
 
   if (values['check-mutants']) {
@@ -149,6 +158,13 @@ async function main() {
   }
   const modes = values.mode ?? MODES;
   for (const m of modes) if (!MODES.includes(m)) { console.error(`corpus: unknown mode ${m} (one of ${MODES.join(', ')})`); process.exit(3); }
+  let slice = null;
+  if (values.slice) {
+    const m = /^(\d+)\/(\d+)$/.exec(values.slice);
+    if (!m || Number(m[1]) < 1 || Number(m[1]) > Number(m[2])) { console.error('corpus: --slice must be i/n with 1 <= i <= n'); process.exit(3); }
+    if (modes.length !== 1 || modes[0] !== 'twice' || subjects.length !== 1 || values['tool-mutants']) { console.error('corpus: --slice applies to exactly one subject and --mode twice'); process.exit(3); }
+    slice = { index: Number(m[1]), of: Number(m[2]) };
+  }
   const known = loadKnownFailures();
 
   const machineBefore = measureMachine();
@@ -157,7 +173,7 @@ async function main() {
   if (values['tool-mutants']) {
     mutants = await runMutants({ toolRoot, subjects, only: values.mutant, python: values.python, known, log, runSubject });
   } else {
-    for (const s of subjects) results.push(...await runSubject(s, { modes, toolRoot, python: values.python, known, log }));
+    for (const s of subjects) results.push(...await runSubject(s, { modes, toolRoot, python: values.python, known, log, referenceLater: Boolean(values['reference-later']), slice }));
   }
   const machineAfter = measureMachine();
   emit(buildScorecard({ toolRoot, results, mutants, machine: { before: machineBefore, after: machineAfter } }));

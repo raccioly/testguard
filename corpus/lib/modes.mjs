@@ -61,16 +61,32 @@ async function freshProbe(ctx, label, args, { edits, prepare, env } = {}) {
   const repo = prepareRepo(ctx.subject, { scratchRoot: ctx.work });
   if (prepare) prepare(repo);
   if (edits) commitEdits(repo, edits.edits, edits.message);
-  const r = await probe({ toolRoot: ctx.toolRoot, subject: ctx.subject, repo, outPath: out(repo, label), args, python: ctx.python, env });
+  const r = await probe({ toolRoot: ctx.toolRoot, subject: ctx.subject, repo, outPath: out(repo, label), args: [...args, ...sliceArgs(ctx)], python: ctx.python, env });
   return { repo, r };
 }
 
-function keyAndDiff(ctx, mode, r, { ids, deltas, expected } = {}) {
+/**
+ * A mode run on half the claims (`--slice 1/2`, #305): the probe names its
+ * claims, and the key and the comparison are judged over those faults only.
+ * The scorecard checks that the slices together cover every fault once.
+ */
+const sliceArgs = (ctx) => (ctx.slice ? ['--claim', ctx.slice.claims.join(',')] : []);
+
+export function sliceOf(subject, index, of) {
+  const claims = [...new Set(subject.faultIds.map((id) => id.split('/')[0]))];
+  const mine = claims.filter((_, i) => i % of === index - 1);
+  return { index, of, claims: mine, ids: subject.faultIds.filter((id) => mine.includes(id.split('/')[0])) };
+}
+
+function keyAndDiff(ctx, mode, r, { ids = ctx.slice?.ids, deltas, expected } = {}) {
   const observed = verdictMap(r.evidence);
   // No evidence is its own outcome (tool-wrote-evidence), not a key comparison.
   if (!r.evidence) return { observed, key: null, diff: null };
   const key = checkKey({ subject: ctx.subject, mode, map: observed.map, expected: expected ?? expectedFor(ctx.subject, mode), ids, known: ctx.known });
-  const diff = ctx.reference ? differential({ reference: ctx.reference, observed, ids, deltas }) : null;
+  let diff = null;
+  if (ctx.reference) diff = differential({ reference: ctx.reference, observed, ids, deltas });
+  // The reference runs in another job (#305): hand the answers to the scorecard, which judges them.
+  else if (ctx.deferDifferential) ctx.pending.push({ observed, ids, deltas });
   return { observed, key, diff };
 }
 
@@ -80,7 +96,7 @@ export const RUN = {
   /** Serial (--serial and an explicit --fault-workers 1: one fault at a time, since #270 made a fan-out the default), --no-reuse, a fresh process and a fresh repository: the oracle for every other mode. */
   async reference(ctx) {
     const { repo, r } = await freshProbe(ctx, 'reference', ['--no-reuse', '--serial', '--fault-workers', '1']);
-    const { observed, key } = keyAndDiff({ ...ctx, reference: null }, 'reference', r);
+    const { observed, key } = keyAndDiff({ ...ctx, reference: null, deferDifferential: false }, 'reference', r);
     if (r.evidence) ctx.reference = observed;
     ctx.referenceRepo = repo;
     ctx.referenceElapsedMs = r.elapsedMs;
@@ -89,9 +105,19 @@ export const RUN = {
 
   /** Metamorphic: the same probe again, in the same repository: nothing may change. */
   async twice(ctx) {
-    const r = await probe({ toolRoot: ctx.toolRoot, subject: ctx.subject, repo: ctx.referenceRepo, outPath: out(ctx.referenceRepo, 'twice'), args: ['--no-reuse'], python: ctx.python });
-    const { key, diff } = keyAndDiff(ctx, 'twice', r);
-    return result('twice', ctx.subject, { runs: [runSummary('twice', r)], key, diff, checks: [exitCheck(r)] });
+    const runs = [];
+    const checks = [];
+    // The reference ran in another job: this mode takes its own first probe, as serial as the reference, so there is a repository to probe again.
+    if (!ctx.referenceRepo) {
+      const first = await freshProbe(ctx, 'twice-first', ['--no-reuse', '--serial', '--fault-workers', '1']);
+      ctx.referenceRepo = first.repo;
+      runs.push(runSummary('first', first.r));
+      checks.push({ ...exitCheck(first.r), check: 'first-run-exit-code' });
+    }
+    const r = await probe({ toolRoot: ctx.toolRoot, subject: ctx.subject, repo: ctx.referenceRepo, outPath: out(ctx.referenceRepo, 'twice'), args: ['--no-reuse', ...sliceArgs(ctx)], python: ctx.python });
+    const { observed, key, diff } = keyAndDiff(ctx, 'twice', r);
+    if (ctx.slice) checks.push(check('slice-faults-reported', JSON.stringify([...observed.order].sort()) === JSON.stringify([...ctx.slice.ids].sort()), { expected: ctx.slice.ids, reported: observed.order }));
+    return result('twice', ctx.subject, { runs: [...runs, runSummary('twice', r)], key, diff, checks: [...checks, exitCheck(r)] });
   },
 
   /**
@@ -141,7 +167,7 @@ export const RUN = {
       const edited = await p([]);
       runs.push(runSummary('after-edit', edited));
       checks.push(exitCheck(edited));
-      const b = keyAndDiff({ ...ctx, reference: null }, 'reuse-edit', edited);
+      const b = keyAndDiff({ ...ctx, reference: null, deferDifferential: false }, 'reuse-edit', edited);
       const notRemeasured = spec.mustRemeasure.filter((id) => b.observed.map[id]?.reused !== false);
       checks.push(check('edit-remeasures-importers', notRemeasured.length === 0, notRemeasured.length ? { reusedAfterTheirImportChanged: notRemeasured } : `${spec.mustRemeasure.length} measured again`));
       key = mergeKey(key, b.key);
@@ -150,7 +176,7 @@ export const RUN = {
         const version = await p([], bumped);
         runs.push(runSummary('after-version-change', version));
         checks.push(exitCheck(version));
-        const c = keyAndDiff({ ...ctx, reference: null }, 'reuse-edit', version);
+        const c = keyAndDiff({ ...ctx, reference: null, deferDifferential: false }, 'reuse-edit', version);
         checks.push(check('version-change-reuses-nothing', (version.evidence?.run?.reuse?.reused ?? -1) === 0, version.evidence?.run?.reuse));
         key = mergeKey(key, c.key);
       } finally { rmSync(bumped, { recursive: true, force: true }); }
@@ -313,7 +339,9 @@ export const RUN = {
     });
     const observed = verdictMap(r.evidence);
     const key = checkKey({ subject: ctx.subject, mode: 'reorder', map: observed.map, expected: expectedFor(ctx.subject, 'reorder'), known: ctx.known });
-    const diff = differential({ reference: { map: ctx.reference.map, order: reordered }, observed });
+    let diff = null;
+    if (ctx.reference) diff = differential({ reference: { map: ctx.reference.map, order: reordered }, observed });
+    else if (ctx.deferDifferential) ctx.pending.push({ observed, referenceOrder: reordered });
     return result('reorder', ctx.subject, { runs: [runSummary('reorder', r)], key, diff, checks: [exitCheck(r)] });
   },
 
