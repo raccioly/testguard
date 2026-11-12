@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+<<<<<<< HEAD
+- **A dotted stem resolves (#301).** `./auth.config` is `auth.config.ts`: the
+  import closure tried no candidates for a specifier whose last segment holds a
+  dot, so it reported `unreadable-module` and every `--changed` run selected
+  each claim through that file. With no exact file and no script fallback it now
+  tries name plus each source extension and `name/index` plus each. An exact
+  file still wins, `./x.js` still falls back to `x.ts`, a missing module is
+  still unreadable.
+=======
 - **`defenders-failed-to-load` carries the runner's words (#291).** The first
   informative error line reached `anchor.message` and stopped there, so 71
   records of a 6,613-fault field run said only `defenders-failed-to-load`. It is
@@ -26,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `subject-not-executed` with a `detail.message` that names the reused server
   (the port still listening after the run). The supported setup is in
   `docs/reference/languages-and-runners.md`; a fixture proves all three cases.
+>>>>>>> origin/main
 
 ### Added
 

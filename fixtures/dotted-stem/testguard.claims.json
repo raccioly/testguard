@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "SESSION-001",
+      "statement": "A session expires one hour after it starts.",
+      "source": { "kind": "spec", "ref": "README.md" },
+      "severity": "high",
+      "producedBy": { "producer": "human", "by": "fixture author" },
+      "defendedBy": ["test/session.test.ts"],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The session lasts a second instead of an hour.",
+          "faultClass": "literal-changed",
+          "file": "src/auth.config.ts",
+          "find": "3600",
+          "replace": "1",
+          "producedBy": { "producer": "human", "by": "fixture author" }
+        }
+      ]
+    }
+  ]
+}
