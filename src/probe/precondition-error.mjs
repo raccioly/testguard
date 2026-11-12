@@ -16,6 +16,7 @@ export const PRECONDITION_KINDS = Object.freeze([
   'dirty-tree',            // uncommitted changes in files a verdict would depend on
   'discovery-failed',      // the runner could not list its tests
   'fault-unknown',         // admit --fault names a fault the claim does not have
+  'install-changed',       // the user's node_modules changed during the run (#279): its verdicts are not reported
   'file-missing',          // a named file does not exist
   'init-settings',         // a hook settings file init would edit is unusable
   'module-shadowed',       // Python imported a different copy of the faulted module

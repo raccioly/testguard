@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A probe no longer writes into the user's `node_modules` (#279).** From a git
+  worktree whose `node_modules` (root and per package) were symlinks to the
+  main checkout's pnpm install, a `--runner-cmd` that ran pnpm in the scratch
+  tree relinked through the levels the scratch tree borrowed (`.bin`, `.pnpm`,
+  scopes, install metadata) and through a `node_modules` symlink an
+  `--include-dirty` snapshot had captured, rewriting the main checkout's links
+  to point into a scratch directory that was then deleted. Reproduced with a
+  generated pnpm workspace (32 entries changed). Now no level a package
+  manager may write is a link into the install: those directories are real in
+  the scratch tree, their files are copies (pnpm's workspace state rewritten to
+  name the scratch tree), links are recreated to their resolved targets, and a
+  checked-out `node_modules` symlink is replaced. Each borrowed install is
+  fingerprinted before and after the run; a difference refuses the run with
+  the new precondition `install-changed`, naming the paths, and writes no
+  evidence. `run.writeBoundary.installUnchanged` records the check. If an
+  install was damaged by an earlier version, reinstall it (`pnpm install`,
+  `npm ci`).
 - **`probe --changed` no longer misses a claim that reaches a changed
   workspace package through its `node_modules` link (#268).** It was
   unsound: a change to `packages/geometry` selected only geometry's own claims,

@@ -1,12 +1,14 @@
 import { registerCleanup } from './runners/lifecycle.mjs';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, mkdirSync, statSync, realpathSync, symlinkSync } from 'node:fs';
+import { existsSync, lstatSync, mkdtempSync, readdirSync, mkdirSync, statSync, realpathSync, symlinkSync, unlinkSync } from 'node:fs';
+
+const isSymlink = (path) => { try { return lstatSync(path).isSymbolicLink(); } catch { return false; } };
 import { join, relative, dirname, sep } from 'node:path';
 import { addWorktree, removeWorktree, headSha, gitCommonDir } from '../git.mjs';
 import { linkedSourceDirs, within, workspacePackages } from './workspaces.mjs';
 import { withWorktreeLock, worktreeLockDir } from './worktree-lock.mjs';
 import { PreconditionError } from './precondition-error.mjs';
-import { linkNodeModules, writable } from './node-modules-link.mjs';
+import { installChanges, installFingerprint, linkNodeModules, writable } from './node-modules-link.mjs';
 import { scratchConfigured, scratchRoot } from '../scratch-dir.mjs';
 
 export { PreconditionError };
@@ -98,7 +100,8 @@ export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase 
  * ignored or uncommitted package) cannot be pointed anywhere honest: the run
  * is refused, naming the link. GATE-SEMANTICS rule 9.
  */
-function layOutNodeModules({ repoRoot, projectDir, dest, nodeModules }) {
+/** Every install a scratch tree borrows from: the main tree's node_modules, each workspace package's, and --node-modules. */
+function borrowedInstalls({ repoRoot, projectDir, nodeModules }) {
   const repoReal = realpathSync(repoRoot);
   const links = findNodeModules(repoRoot);
   // Workspace packages deeper than findNodeModules looks still have their own node_modules.
@@ -112,18 +115,46 @@ function layOutNodeModules({ repoRoot, projectDir, dest, nodeModules }) {
     const rel = join(relative(repoRoot, projectDir), 'node_modules');
     links.unshift({ rel, target: realpathSync(nodeModules) });
   }
+  return links;
+}
+
+/**
+ * A fingerprint of every install a scratch tree borrows, taken before a run
+ * and compared after it (#279). `installsChangedSince` names each path whose
+ * entry changed: something wrote into the user's install, and the run's
+ * verdicts cannot be reported.
+ */
+export function installsFingerprint({ repoRoot, projectDir = repoRoot, nodeModules }) {
+  const all = new Map();
+  for (const { target } of borrowedInstalls({ repoRoot, projectDir, nodeModules })) for (const [path, sig] of installFingerprint(target)) all.set(path, sig);
+  return all;
+}
+export function installsChangedSince(before, { repoRoot, projectDir = repoRoot, nodeModules }) {
+  return installChanges(before, installsFingerprint({ repoRoot, projectDir, nodeModules }));
+}
+
+function layOutNodeModules({ repoRoot, projectDir, dest, nodeModules }) {
+  const repoReal = realpathSync(repoRoot);
+  const links = borrowedInstalls({ repoRoot, projectDir, nodeModules });
   const destReal = realpathSync(dest);
   const carried = new Set();
   const outside = [];
   for (const { rel, target } of links) {
     const at = join(dest, rel);
-    if (existsSync(at)) continue;
+    // A node_modules the checkout itself holds as a SYMLINK (committed, or
+    // captured by an --include-dirty snapshot of a worktree whose
+    // node_modules links to the main checkout's) is a level a package manager
+    // writes through, into the user's install (#279). It is replaced by the
+    // scratch tree's own layout. A real committed directory is left alone.
+    if (isSymlink(at)) unlinkSync(at);
+    else if (existsSync(at)) continue;
     mkdirSync(dirname(at), { recursive: true });
     // The checkout this install's links were written for: the main tree, or
     // another checkout whose node_modules the main tree borrows.
     const suffix = `${sep}${rel}`;
     const sources = [...new Set([target.endsWith(suffix) ? target.slice(0, -suffix.length) : null, repoReal].filter(Boolean))];
     linkNodeModules(target, at, {
+      rewrite: sources.map((source) => ({ from: source, to: destReal })),
       redirect: (from) => {
         for (const source of sources) {
           const dirs = linkedSourceDirs(from, source);

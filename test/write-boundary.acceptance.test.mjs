@@ -166,3 +166,75 @@ describe.each(FIXTURES)('write boundary: $name', (fixture) => {
     expect(ro.scratchLeft).toEqual([]);
   });
 });
+
+// #279: a git worktree whose node_modules (root and per package) are SYMLINKS
+// to the main checkout's install, probed with the built-in runner and with a
+// runner command that runs the package manager (`pnpm vitest`, `npx vitest`).
+// The install is WRITABLE: a read-only one would have hidden the write. 0.22.1
+// rewrote the main checkout's links to point into a scratch directory that it
+// then deleted. Every entry under the main checkout's node_modules trees is
+// listed before and after; the listing must be non-empty and unchanged.
+const VITEST_VERSION = JSON.parse(readFileSync(join(ROOT, 'node_modules', 'vitest', 'package.json'), 'utf8')).version;
+const HAS_PNPM = spawnSync('pnpm', ['--version'], { encoding: 'utf8' }).status === 0;
+const PNPM = HAS_PNPM ? ['pnpm'] : ['npx', '--yes', 'pnpm@11.11.0'];
+const MANAGERS = [
+  { pm: 'npm', install: ['npm', 'install', '--no-audit', '--no-fund', '--prefer-offline'], runnerCmd: 'npx vitest run {files} --reporter=json --outputFile={out}' },
+  { pm: 'pnpm', install: [...PNPM, 'install', '--prefer-offline'], runnerCmd: `${PNPM.join(' ')} vitest run {files} --reporter=json --outputFile={out}`, skip: !HAS_PNPM && !FULL },
+];
+
+describe.each(MANAGERS)('write boundary: a worktree whose node_modules are symlinks into the main checkout\'s $pm workspace install (#279)', ({ pm, install, runnerCmd, skip }) => {
+  let base; let main; let wt; let installListing; let runs = [];
+  const mainInstalls = () => {
+    const all = new Map();
+    for (const dir of [join(main, 'node_modules'), join(main, 'packages', 'a', 'node_modules'), join(main, 'packages', 'b', 'node_modules')]) {
+      if (existsSync(dir)) for (const [k, v] of listing(dir)) all.set(`${dir}/${k}`, v);
+    }
+    return all;
+  };
+  beforeAll(() => {
+    if (skip) return;
+    base = mkdtempSync(join(tmpdir(), `tg-279-${pm}-`));
+    main = join(base, 'main');
+    const files = {
+      'package.json': JSON.stringify({ name: 'ws279', private: true, type: 'module', ...(pm === 'npm' ? { workspaces: ['packages/*'] } : {}), devDependencies: { vitest: VITEST_VERSION } }),
+      ...(pm === 'pnpm' ? { 'pnpm-workspace.yaml': "packages:\n  - 'packages/*'\n" } : {}),
+      '.gitignore': 'node_modules/\n.testguard/\n',
+      'packages/a/package.json': JSON.stringify({ name: '@ws/a', version: '1.0.0', type: 'module', exports: './src/area.js', dependencies: { '@ws/b': pm === 'pnpm' ? 'workspace:*' : '1.0.0' }, devDependencies: { vitest: VITEST_VERSION } }),
+      'packages/a/src/area.js': "import { mul } from '@ws/b';\nexport const area = (w, h) => mul(w, h);\n",
+      'packages/a/test/area.test.js': "import { test, expect } from 'vitest';\nimport { area } from '../src/area.js';\ntest('area', () => { expect(area(3, 4)).toBe(12); });\n",
+      'packages/b/package.json': JSON.stringify({ name: '@ws/b', version: '1.0.0', type: 'module', exports: './src/mul.js' }),
+      'packages/b/src/mul.js': 'export const mul = (a, b) => a * b;\n',
+      'testguard.claims.json': JSON.stringify({ schemaVersion: 1, claims: [{ id: 'AREA', statement: 'Area multiplies.', source: { kind: 'spec', ref: 'README.md' }, severity: 'high', producedBy: { producer: 'agent', by: 'fixture' }, defendedBy: ['packages/a/test/area.test.js'], faults: [{ id: 'F1', description: 'Add instead.', faultClass: 'return-altered', file: 'packages/b/src/mul.js', find: 'a * b', replace: 'a + b', producedBy: { producer: 'agent', by: 'fixture' } }] }] }),
+    };
+    for (const [name, text] of Object.entries(files)) { makeDir(dirname(join(main, name))); writeFileSync(join(main, name), text); }
+    const installed = spawnSync(install[0], install.slice(1), { cwd: main, encoding: 'utf8', timeout: 600_000 });
+    if (installed.status !== 0) throw new Error(`${install.join(' ')} failed: ${installed.stderr || installed.stdout}`);
+    git(main, 'init', '-q'); git(main, 'add', '-A'); git(main, 'commit', '-q', '-m', 'workspace');
+    wt = join(base, 'wt');
+    git(main, 'worktree', 'add', '-q', '--detach', wt, 'HEAD');
+    for (const rel of ['node_modules', 'packages/a/node_modules', 'packages/b/node_modules']) if (existsSync(join(main, rel))) symlinkSync(join(main, rel), join(wt, rel), 'dir');
+    installListing = mainInstalls();
+    const probe = (label, extra) => {
+      const out = join(base, `${label}.evidence.json`);
+      const scratch = makeDir(join(base, `scratch-${label}`));
+      const r = spawnSync('node', [CLI, 'probe', wt, '--scratch-dir', scratch, '--out', out, '--confirm', '1', '--no-reuse', '--no-escalate', '--quiet', ...extra], { encoding: 'utf8', timeout: 900_000 });
+      runs.push({ label, status: r.status, stderr: r.stderr, evidence: existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : undefined, after: mainInstalls(), scratchLeft: readdirSync(scratch).filter((name) => name !== 'testguard-locks') });
+    };
+    probe('builtin', ['--runner', 'vitest']);
+    probe('runner-cmd', ['--runner-cmd', runnerCmd]);
+    probe('runner-cmd-dirty', ['--runner-cmd', runnerCmd, '--include-dirty']);
+  }, 1_800_000);
+  afterAll(() => { if (base) rmSync(base, { recursive: true, force: true }); });
+
+  it.skipIf(skip)('measures the fault and leaves every entry of the main checkout\'s install as it was', () => {
+    expect(installListing.size).toBeGreaterThan(100);
+    expect(runs.map((run) => run.label)).toEqual(['builtin', 'runner-cmd', 'runner-cmd-dirty']);
+    for (const run of runs) {
+      expect(run.evidence, `${run.label}: ${run.stderr}`).toBeDefined();
+      expect(verdicts(run.evidence), run.label).toEqual({ 'AREA/F1': 'killed' });
+      expect(run.evidence.run.writeBoundary.installUnchanged, run.label).toBe(true);
+      expect(changes(installListing, run.after), run.label).toEqual({ created: [], removed: [], modified: [] });
+      expect(run.scratchLeft, run.label).toEqual([]);
+    }
+  });
+});

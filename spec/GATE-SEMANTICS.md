@@ -1149,10 +1149,32 @@ a `TMPDIR` inside it. Unset, it is the operating system's temp directory, as
 before. A directory that does not exist or cannot be written is a precondition
 error (exit 2) reported before anything is written; it is never created.
 
-The scratch worktree gets its own `node_modules` directory whose entries link
-to the shared install, so a tool that writes `node_modules/.vite-temp`,
-`.vite` or `.cache` writes into the scratch tree and never into the install.
-Dot-entries that are not part of an install are not carried across. The
+The scratch worktree gets its own `node_modules`, and **no level a package
+manager may write is a link into the user's install** (#279). A runner
+command can run a package manager in the scratch tree (`pnpm vitest …`
+verifies the install and relinks it), so every node_modules-level directory —
+the root, each scope, `.bin`, `.pnpm`, `.pnpm/<id>`, its `node_modules`, a
+package's own nested `node_modules`, and the same in every workspace
+package's `node_modules` — is a real directory in the scratch tree; every
+file at such a level (bin shims, install metadata) is a copy; every symlink is
+a new symlink to its resolved target, never a link to the user's link; and a
+package directory is a read-only leaf. Install metadata that names the
+user's checkout by absolute path (pnpm's workspace state) is rewritten to
+name the scratch tree. A `node_modules` the checked-out tree itself holds as
+a symlink (committed, or captured by an `--include-dirty` snapshot of a
+worktree whose `node_modules` links to the main checkout's) is replaced by
+this layout. So a tool that writes `node_modules/.vite-temp`, `.vite` or
+`.cache`, and a package manager that relinks, write into the scratch tree and
+never into the install. Tool cache directories are not carried across.
+
+**The install is checked, not trusted.** Before a scratch-tree run and again
+after every scratch tree is removed, each borrowed install is fingerprinted at
+the levels a package manager writes (entry names, kinds, link targets, file
+sizes and times). A difference refuses the run with the precondition
+`install-changed`, naming the paths and telling the user to reinstall; no
+evidence is written, because verdicts measured while the install changed
+under them describe nothing. Something else changing the install during the
+run (the user reinstalling) is refused the same way. The
 per-run temp directory also sets `XDG_DATA_HOME` (vitest keeps an API token
 there on Linux). Runs against the caller's own tree (the dirty-tree test
 discovery, `--in-place`) cannot be redirected: discovery asks vitest 4 and
@@ -1162,8 +1184,11 @@ later for `--configLoader runner` when the install is not writable, and
 `run.writeBoundary` records signals, never paths: `scratchDir` is `default` or
 `configured`; `nodeModulesWritable` is true when any linked install (or
 `--node-modules`) could be written as the run started, false when none could,
-and absent when none is linked. It does not enter reuse: it is a statement
-about where the run could write, and no verdict depends on it.
+and absent when none is linked. `installUnchanged` is `true` when the
+install fingerprints were compared and agreed; it is never `false` (that run
+is refused) and absent when nothing was borrowed or the run was in place. It
+does not enter reuse: it is a statement about where the run could write, and
+no verdict depends on it.
 
 What is not promised: the tests under probe run the project's own code with the
 caller's privileges. The boundary says where TestGuard and the built-in runners

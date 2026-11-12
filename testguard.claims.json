@@ -11415,8 +11415,8 @@
           "description": "Tool cache directories of the install are linked into the scratch tree, so writes go through to the install.",
           "faultClass": "guard-removed",
           "file": "src/probe/node-modules-link.mjs",
-          "find": "if (entry.startsWith('.') && !INSTALL_DOT_ENTRIES.has(entry)) continue;",
-          "replace": "",
+          "find": "    if (entry.startsWith('.') && !INSTALL_DOT_DIRS.has(entry) && isDirectory(from) && !lstatSync(from).isSymbolicLink()) continue; // a tool's cache",
+          "replace": "    if (entry.startsWith('.') && !INSTALL_DOT_DIRS.has(entry) && isDirectory(from) && !lstatSync(from).isSymbolicLink()) { symlinkSync(from, join(dst, entry), 'dir'); continue; } // a tool's cache",
           "defendedBy": [
             "test/scratch-dir.test.mjs"
           ],
@@ -11430,8 +11430,8 @@
           "description": "The install's own dot-entries (.bin) are not linked.",
           "faultClass": "literal-changed",
           "file": "src/probe/node-modules-link.mjs",
-          "find": "new Set(['.bin', '.pnpm',",
-          "replace": "new Set(['.pnpm',",
+          "find": "const INSTALL_DOT_DIRS = new Set(['.bin', '.pnpm']);",
+          "replace": "const INSTALL_DOT_DIRS = new Set(['.pnpm']);",
           "defendedBy": [
             "test/scratch-dir.test.mjs"
           ],
@@ -11572,8 +11572,8 @@
           "description": "The schema accepts any key in the write boundary.",
           "faultClass": "literal-changed",
           "file": "spec/schemas/evidence.schema.json",
-          "find": "            \"nodeModulesWritable\": {\n              \"type\": \"boolean\"\n            }\n          },\n          \"additionalProperties\": false",
-          "replace": "            \"nodeModulesWritable\": {\n              \"type\": \"boolean\"\n            }\n          },\n          \"additionalProperties\": true",
+          "find": "              \"const\": true\n            }\n          },\n          \"additionalProperties\": false",
+          "replace": "              \"const\": true\n            }\n          },\n          \"additionalProperties\": true",
           "defendedBy": [
             "spec/conformance/schemas.test.mjs"
           ],
@@ -12796,8 +12796,8 @@
           "description": "Scope directories are linked whole, so @scope/pkg resolves through the shared install to the original checkout.",
           "faultClass": "condition-forced",
           "file": "src/probe/node-modules-link.mjs",
-          "find": "    if (redirect && entry.startsWith('@') && isDirectory(from) && !isLink(from)) {",
-          "replace": "    if (false && entry.startsWith('@') && isDirectory(from) && !isLink(from)) {",
+          "find": "  if (!isPackage) { mirrorLevel(from, to, options, depth + 1); return; }",
+          "replace": "  if (!isPackage) { symlinkSync(from, to, 'dir'); return; }",
           "defendedBy": [
             "test/workspace-scratch.test.mjs"
           ],
@@ -13128,6 +13128,84 @@
           "replace": "...(untracked ? ['--others'] : [])",
           "defendedBy": [
             "test/visible-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SCRATCH-LAYOUT-NEVER-WRITES-INTO-THE-USERS-INSTALL",
+      "statement": "No level of a scratch tree's node_modules that a package manager may write is a link into the user's install: mirrored levels are real directories, their files are copies with the user's checkout path rewritten to the scratch tree, a node_modules symlink the checkout carries is replaced, and a before/after fingerprint of every borrowed install names any path that changed.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/install-untouched.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Files at mirrored levels (bin shims, install metadata) are linked to the user's, so a rewrite goes through.",
+          "faultClass": "other",
+          "file": "src/probe/node-modules-link.mjs",
+          "find": "  if (stat.isFile()) { copyMetadata(from, to, options.rewrite); return; }",
+          "replace": "  if (stat.isFile()) { symlinkSync(from, to, 'file'); return; }",
+          "defendedBy": [
+            "test/install-untouched.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A node_modules symlink the checked-out tree carries is kept.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/worktree.mjs",
+          "find": "    if (isSymlink(at)) unlinkSync(at);\n    else if (existsSync(at)) continue;",
+          "replace": "    if (existsSync(at)) continue;",
+          "defendedBy": [
+            "test/install-untouched.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The install fingerprint ignores where a link points.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/node-modules-link.mjs",
+          "find": "        if (stat.isSymbolicLink()) sig = `l:${readlinkSync(path)}`;",
+          "replace": "        if (stat.isSymbolicLink()) sig = 'l';",
+          "defendedBy": [
+            "test/install-untouched.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Install metadata keeps naming the user's checkout.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/node-modules-link.mjs",
+          "find": "  for (const { from: root, to: dest } of [...rewrite].sort((a, b) => b.from.length - a.from.length)) text = text.split(root).join(dest);\n",
+          "replace": "",
+          "defendedBy": [
+            "test/install-untouched.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",
