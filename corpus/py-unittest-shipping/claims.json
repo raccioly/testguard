@@ -1,0 +1,323 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "DIM-WEIGHT-ROUNDS-UP",
+      "statement": "Dimensional weight is length x width x height divided by 5000 and rounded up to the next whole gram, so 101 x 101 x 101 gives 207 g.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-unittest-shipping#R2"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_parcel.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Rounds the dimensional weight down instead of up, so 101 x 101 x 101 gives 206 g instead of 207 g.",
+          "faultClass": "return-altered",
+          "file": "shipping/parcel.py",
+          "find": "-(-(length * width * height) // 5000)",
+          "replace": "(length * width * height) // 5000",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Uses width twice and ignores height in the volume, so 300 x 200 x 100 gives 2400 g instead of 1200 g.",
+          "faultClass": "variable-swap",
+          "file": "shipping/parcel.py",
+          "find": "length * width * height",
+          "replace": "length * width * width",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "STANDARD-BASE-RATE",
+      "statement": "The standard rate is 450 cents for the first 500 g step plus the zone's per-extra-step charge for each further step, so 1500 g in zone 3 costs 730 cents.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-unittest-shipping#R5"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_rates.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Charges the per-step rate for every step, including the first, so 1500 g in zone 3 costs 870 cents instead of 730.",
+          "faultClass": "return-altered",
+          "file": "shipping/rates.py",
+          "find": "450 + (steps - 1) * _EXTRA_STEP[zone]",
+          "replace": "450 + steps * _EXTRA_STEP[zone]",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Changes the zone 3 per-extra-step charge from 140 to 150 cents, so 1500 g in zone 3 costs 750 cents instead of 730.",
+          "faultClass": "literal-changed",
+          "file": "shipping/rates.py",
+          "find": "3: 140",
+          "replace": "3: 150",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "EXPRESS-RATE-AND-LIMIT",
+      "statement": "Express costs the standard base times 1.75 rounded half up to the cent plus 300 cents, and billable weight above 20000 g is rejected for express with ExpressWeightLimit.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-unittest-shipping#R6"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_rates.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Drops the half-up rounding step, so a standard base of 730 cents gives 1277 + 300 = 1577 instead of 1578.",
+          "faultClass": "return-altered",
+          "file": "shipping/rates.py",
+          "find": "(base * 175 + 50) // 100",
+          "replace": "(base * 175) // 100",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Forces the express weight guard to never fire, so a 25000 g express parcel is priced instead of raising ExpressWeightLimit.",
+          "faultClass": "condition-forced",
+          "file": "shipping/rates.py",
+          "find": "if billable > 20000:",
+          "replace": "if False:",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "REMOTE-SURCHARGE",
+      "statement": "Codes beginning with 99 or from 80000 to 80499 inclusive are remote and add 275 cents on standard and 400 cents on express, and a postal code that is not exactly five digits is rejected with InvalidPostalCode.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-unittest-shipping#R7"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_surcharges.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Shrinks the remote range to end at 80400, so code 80450 is wrongly treated as non-remote.",
+          "faultClass": "literal-changed",
+          "file": "shipping/surcharges.py",
+          "find": "<= 80499",
+          "replace": "<= 80400",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Charges the standard 275-cent remote surcharge on express as well, so a remote express parcel is charged 275 instead of 400.",
+          "faultClass": "return-altered",
+          "file": "shipping/surcharges.py",
+          "find": "return 400 if service == \"express\" else 275",
+          "replace": "return 275",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "OVERSIZE-SURCHARGE-CLASSES",
+      "statement": "The oversize surcharge is decided by the longest side alone: 500 cents from 600 to 999 mm, 1500 cents from 1000 mm, nothing below 600 mm, and only one charge ever applies.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-unittest-shipping#R8"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_surcharges.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Takes the length as the longest side, so a parcel with width 1100 and length 100 is not charged for being oversize.",
+          "faultClass": "variable-swap",
+          "file": "shipping/surcharges.py",
+          "find": "longest = max(length, width, height)",
+          "replace": "longest = length",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Charges the giant class on top of the large class (2000 cents), so a longest side of 1000 mm costs 2000 instead of 1500.",
+          "faultClass": "return-altered",
+          "file": "shipping/surcharges.py",
+          "find": "return 1500",
+          "replace": "return 2000",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "QUOTE-ITEMIZED-TOTAL",
+      "statement": "quote returns an itemized breakdown of base, remote, oversize and total in cents, where total is base plus remote plus oversize, so a standard zone 2 1000 g parcel to 99120 with a 650 mm longest side totals 1315 cents.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-unittest-shipping#R9"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_quote.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Passes the service and postal code to remote_surcharge in the wrong order, so quote raises InvalidPostalCode for an ordinary parcel.",
+          "faultClass": "argument-swapped",
+          "file": "shipping/rates.py",
+          "find": "remote_surcharge(postal_code, service)",
+          "replace": "remote_surcharge(service, postal_code)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Leaves the oversize surcharge out of the total without raising, so the 650 mm example totals 815 instead of 1315.",
+          "faultClass": "field-dropped",
+          "file": "shipping/rates.py",
+          "find": "\"total\": base + remote + oversize,",
+          "replace": "\"total\": base + remote,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Reports the remote surcharge under the oversize item, so the breakdown shows oversize 275 instead of 500.",
+          "faultClass": "variable-swap",
+          "file": "shipping/rates.py",
+          "find": "\"oversize\": oversize,",
+          "replace": "\"oversize\": remote,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TRACKING-NUMBER-FORMAT",
+      "statement": "tracking_number returns the prefix BP, the nine-digit zero-padded sequence and one check digit computed modulo 10, and rejects a sequence below 0 or above 999999999 with InvalidSequence.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:py-unittest-shipping#R10"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "tests/test_labels.py"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Lowers the accepted maximum to 99999999, so sequence 500000000 is wrongly rejected with InvalidSequence.",
+          "faultClass": "literal-changed",
+          "file": "shipping/labels.py",
+          "find": "sequence <= 999999999",
+          "replace": "sequence <= 99999999",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Omits the check digit from the returned tracking number, so only BP and nine digits are returned.",
+          "faultClass": "field-dropped",
+          "file": "shipping/labels.py",
+          "find": "return f\"BP{digits}{_check_digit(digits)}\"",
+          "replace": "return f\"BP{digits}\"",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Leaves the check digit computation as a dangling modulo operator, which is a syntax error.",
+          "faultClass": "return-altered",
+          "file": "shipping/labels.py",
+          "find": "return total % 10",
+          "replace": "return total %",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    }
+  ]
+}

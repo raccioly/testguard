@@ -1,0 +1,29 @@
+{
+  "rule": "Fixed before the claim and test authors ran: a claim tied to a requirement is defended by the test file the test author was told to write for that requirement.",
+  "byRequirement": {
+    "R1": [
+      "test/split.test.js"
+    ],
+    "R2": [
+      "test/split.test.js"
+    ],
+    "R3": [
+      "test/split.test.js"
+    ],
+    "R4": [
+      "test/split.test.js"
+    ],
+    "R5": [
+      "test/balances.test.js"
+    ],
+    "R6": [
+      "test/balances.test.js"
+    ],
+    "R7": [
+      "test/settle.test.js"
+    ],
+    "R8": [
+      "test/settle.test.js"
+    ]
+  }
+}

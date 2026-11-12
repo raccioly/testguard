@@ -1,0 +1,35 @@
+{
+  "rule": "Fixed before the claim and test authors ran: a claim tied to a requirement is defended by the test file the test author was told to write for that requirement.",
+  "byRequirement": {
+    "R1": [
+      "e2e/search.spec.mjs"
+    ],
+    "R3": [
+      "e2e/search.spec.mjs"
+    ],
+    "R2": [
+      "e2e/tags.spec.mjs"
+    ],
+    "R4": [
+      "e2e/sort.spec.mjs"
+    ],
+    "R5": [
+      "e2e/sort.spec.mjs"
+    ],
+    "R6": [
+      "e2e/favorites.spec.mjs"
+    ],
+    "R7": [
+      "e2e/favorites.spec.mjs"
+    ],
+    "R8": [
+      "e2e/cards.spec.mjs"
+    ],
+    "R9": [
+      "e2e/cards.spec.mjs"
+    ],
+    "R10": [
+      "e2e/render.spec.mjs"
+    ]
+  }
+}

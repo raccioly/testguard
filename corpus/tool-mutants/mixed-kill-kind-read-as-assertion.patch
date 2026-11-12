@@ -1,0 +1,9 @@
+diff --git a/src/probe/runners/vitest/kinds-reporter.mjs b/src/probe/runners/vitest/kinds-reporter.mjs
+--- a/src/probe/runners/vitest/kinds-reporter.mjs
++++ b/src/probe/runners/vitest/kinds-reporter.mjs
+@@ -13,4 +13,3 @@
+ 
+-const isAssertion = (e) => e != null && typeof e === 'object'
+-  && (e.code === 'ERR_ASSERTION' || e.name === 'AssertionError' || typeof e.operator === 'string');
++const isAssertion = (e) => e != null && typeof e === 'object';
+ 

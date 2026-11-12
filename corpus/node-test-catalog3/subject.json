@@ -1,0 +1,41 @@
+{
+  "runner": "node-test",
+  "install": "npm-workspace",
+  "workspaceLinks": [
+    "@shelf/core",
+    "@shelf/search",
+    "@shelf/report"
+  ],
+  "testFiles": "^packages/[^/]+/test/.*\\.test\\.js$",
+  "budgetMs": 60000,
+  "probeArgs": [
+    "--runner",
+    "node-test"
+  ],
+  "variants": {
+    "npm": {
+      "layout": "npm"
+    },
+    "pnpm": {
+      "layout": "pnpm"
+    }
+  },
+  "ignoredCopies": [
+    {
+      "from": "packages/core",
+      "to": ".build/vendor/@shelf/core"
+    }
+  ],
+  "noise": [
+    {
+      "add": "packages/core/src/unused-banner.js",
+      "content": "// corpus metamorphic noise: an unrelated module nothing imports\nexport const BANNER = 'corpus';\n"
+    },
+    {
+      "rename": [
+        "SPEC.md",
+        "docs/SPEC.md"
+      ]
+    }
+  ]
+}

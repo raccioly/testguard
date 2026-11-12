@@ -186,6 +186,84 @@
           ]
         }
       ]
+    },
+    {
+      "name": "mixed-kill-kind-read-as-assertion",
+      "patch": "mixed-kill-kind-read-as-assertion.patch",
+      "description": "vitest's kinds reporter reads every error object as an assertion, so a kill that fails only by exception in some runs (mixed) or in every run (exception-only) is recorded as an assertion kill (rule 3). The evidence stays valid; the key for ts-vitest-converter's rotating plugin checks catches it.",
+      "targets": [
+        {
+          "subject": "ts-vitest-converter",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "defenders-load-error-read-as-flaky",
+      "patch": "defenders-load-error-read-as-flaky.patch",
+      "description": "A test file that fails to load is read as an ordinary failing run, so a declared defender that cannot load reads as flaky-defender/defenders-not-green instead of unverifiable/defenders-failed-to-load: a broken test file reads as an unstable one. The evidence stays valid; the key catches it.",
+      "targets": [
+        {
+          "subject": "js-vitest-booking",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vitest-error-classes-ignored",
+      "patch": "vitest-error-classes-ignored.patch",
+      "description": "vitest's error classes (the kinds sidecar) are dropped and kinds are read from the JSON report's text alone, where a failed expect(...).rejects prints as 'Error: ...': an assertion kill reads as exception-only (rule 3).",
+      "targets": [
+        {
+          "subject": "ts-vitest-converter",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "playwright-timeout-read-as-failure",
+      "patch": "playwright-timeout-read-as-failure.patch",
+      "description": "A Playwright test that timed out is counted as an ordinary failure, so a fault the page hangs on reads as a kill (rule 3: a timeout is never a kill). A false kill: critical.",
+      "targets": [
+        {
+          "subject": "js-playwright-gallery",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "unittest-error-read-as-assertion",
+      "patch": "unittest-error-read-as-assertion.patch",
+      "description": "unittest's addError channel (the test raised) is recorded as an assertion failure, so an exception-only kill reads as an assertion kill (rule 3).",
+      "targets": [
+        {
+          "subject": "py-unittest-shipping",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "discovery-writes-into-project",
+      "patch": "discovery-writes-into-project.patch",
+      "description": "Discovery runs in the user's project instead of the scratch tree, and vitest's JSON listing is written into the project and left there: the shape of a field report where a tracked test file was found overwritten with a vitest listing. Every verdict stays right; only the harness's subject-untouched check (a critical failure) catches it.",
+      "targets": [
+        {
+          "subject": "ts-vitest-stock",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
     }
   ]
 }

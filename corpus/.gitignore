@@ -6,3 +6,6 @@ node_modules/
 .holds_counter
 # Harness output.
 .out/
+.verify_rotation
+test-results/
+playwright-report/

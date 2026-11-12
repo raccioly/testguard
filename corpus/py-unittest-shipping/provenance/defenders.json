@@ -1,0 +1,41 @@
+{
+  "rule": "Fixed before the claim and test authors ran: a claim tied to a requirement is defended by the test file the test author was told to write for that requirement.",
+  "byRequirement": {
+    "R1": [
+      "tests/test_parcel.py"
+    ],
+    "R2": [
+      "tests/test_parcel.py"
+    ],
+    "R3": [
+      "tests/test_parcel.py"
+    ],
+    "R4": [
+      "tests/test_rates.py"
+    ],
+    "R5": [
+      "tests/test_rates.py"
+    ],
+    "R6": [
+      "tests/test_rates.py"
+    ],
+    "R7": [
+      "tests/test_surcharges.py"
+    ],
+    "R8": [
+      "tests/test_surcharges.py"
+    ],
+    "R9": [
+      "tests/test_quote.py"
+    ],
+    "R10": [
+      "tests/test_labels.py"
+    ],
+    "R11": [
+      "tests/test_labels.py"
+    ],
+    "R12": [
+      "tests/test_labels.py"
+    ]
+  }
+}

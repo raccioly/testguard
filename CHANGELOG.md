@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The corpus gains seven subjects, a subject-untouched check and six tool
+  mutants (#258, repository only).** Playwright, unittest, a symlinked source
+  directory, a computed dynamic import with a mocked collaborator, a
+  three-package workspace in npm and pnpm layouts, vitest `test.projects`, a
+  vitest config that imports `vite`, ignored build directories holding
+  package copies, and a worktree whose `node_modules` entries link into
+  another checkout's install. Every probe is now bracketed by a snapshot of
+  the measured repository (git status, tracked-file hashes, every
+  `node_modules` level), and any difference is a critical failure; every
+  mode also checks the subject's install is unchanged. New keyed cases: the
+  `mixed` kill kind, `defenders-failed-to-load`, Playwright timeouts,
+  `--changed` over a docs-only commit, and the automatic fan-out width
+  compared with a serial reference. `bench/README.md` documents running a
+  project outside the repository through the same harness. It found #282.
+
 ### Changed
 
 - The fast path converges (#293). A `probe --claim` or `probe --changed` run whose selection is determined now updates `.testguard/evidence.json`. The records it measured replace the old ones. Every other record is carried forward only when the probe finds its recorded inputs unchanged in the tree it probed, and it is marked `carried: "inputs-match"`. A record whose inputs changed is kept as it was, marked `carried: "inputs-changed"`, and `status` still names it stale. So after `probe --changed` covers a change, `status` is fresh and `next` no longer asks for the full probe. Provisional runs (`--confirm` below 3), runs cut by their budget, `--ref` and `--no-reuse` runs, and runs with an `--out` elsewhere still write `evidence-partial.json`, and each says why. A tool-version or configuration change carries nothing. `--no-reuse` also disables carrying.

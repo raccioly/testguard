@@ -1,0 +1,41 @@
+{
+  "rule": "Fixed before the claim and test authors ran: a claim tied to a requirement is defended by the test file the test author was told to write for that requirement.",
+  "byRequirement": {
+    "R1": [
+      "packages/core/test/isbn.test.js"
+    ],
+    "R2": [
+      "packages/core/test/isbn.test.js"
+    ],
+    "R3": [
+      "packages/core/test/names.test.js"
+    ],
+    "R4": [
+      "packages/core/test/names.test.js"
+    ],
+    "R5": [
+      "packages/core/test/names.test.js"
+    ],
+    "R6": [
+      "packages/search/test/search.test.js"
+    ],
+    "R7": [
+      "packages/search/test/search.test.js"
+    ],
+    "R8": [
+      "packages/search/test/search.test.js"
+    ],
+    "R9": [
+      "packages/search/test/search.test.js"
+    ],
+    "R10": [
+      "packages/report/test/report.test.js"
+    ],
+    "R11": [
+      "packages/report/test/report.test.js"
+    ],
+    "R12": [
+      "packages/report/test/report.test.js"
+    ]
+  }
+}

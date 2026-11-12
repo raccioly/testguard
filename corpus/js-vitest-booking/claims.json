@@ -1,0 +1,353 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "SLOT-TIME-RANGE-REJECTED",
+      "statement": "A slot whose hours exceed 23 or whose minutes exceed 59 is rejected with InvalidTimeError.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-vitest-booking#R2"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/slots.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Minute limit loosened to 60, so a start minute of 60 passes the time check and is reported as a different error.",
+          "faultClass": "literal-changed",
+          "file": "src/slots.js",
+          "find": "sm > 59",
+          "replace": "sm > 60",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The time-range check is removed, so 24:00-25:00 is no longer rejected with InvalidTimeError.",
+          "faultClass": "guard-removed",
+          "file": "src/slots.js",
+          "find": "  if (sh > 23 || eh > 23 || sm > 59 || em > 59) {\n    throw new InvalidTimeError(`Invalid time in slot: ${text}`);\n  }\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SLOT-QUARTER-HOUR-MIN-LENGTH",
+      "statement": "A slot must start and end on a quarter hour and last at least 15 minutes, otherwise it is rejected with InvalidRangeError.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-vitest-booking#R3"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/slots.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The end-on-quarter-hour check is disabled, so 10:00-10:20 is accepted.",
+          "faultClass": "condition-forced",
+          "file": "src/slots.js",
+          "find": "start % 15 !== 0 || end % 15 !== 0",
+          "replace": "start % 15 !== 0 || false",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The minimum duration is raised to 30 minutes, so a valid 15-minute slot such as 10:00-10:15 is rejected.",
+          "faultClass": "literal-changed",
+          "file": "src/slots.js",
+          "find": "const MIN_DURATION = 15;",
+          "replace": "const MIN_DURATION = 30;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "CONFLICT-OVERLAP-ONLY",
+      "statement": "Two slots conflict only when they overlap for at least one minute, and slots that merely touch do not conflict.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-vitest-booking#R4"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/conflicts.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The comparison becomes inclusive, so touching slots 09:00-10:00 and 10:00-11:00 are reported as conflicting.",
+          "faultClass": "literal-changed",
+          "file": "src/conflicts.js",
+          "find": "a.start < b.end",
+          "replace": "a.start <= b.end",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The second bound compares b.start to b.end instead of a.end, so any slot that starts before b ends is treated as a conflict, including disjoint later ones.",
+          "faultClass": "variable-swap",
+          "file": "src/conflicts.js",
+          "find": "b.start < a.end",
+          "replace": "b.start < b.end",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "GAPS-MERGED-AND-CLIPPED",
+      "statement": "Free gaps between 08:00 and 20:00 are returned in ascending order after merging overlapping or touching bookings, including the trailing gap up to 20:00.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-vitest-booking#R6"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/conflicts.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The cursor is set to the booking end instead of the furthest end seen, so a booking nested inside an earlier longer one reopens an already-booked period as a gap.",
+          "faultClass": "variable-swap",
+          "file": "src/conflicts.js",
+          "find": "cursor = Math.max(cursor, end);",
+          "replace": "cursor = end;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The trailing gap up to 20:00 is never emitted, so no bookings yields no gap instead of 08:00-20:00.",
+          "faultClass": "statement-deleted",
+          "file": "src/conflicts.js",
+          "find": "if (cursor < DAY_END) gaps.push(formatSlot(cursor, DAY_END));",
+          "replace": "// removed",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "RATES-AND-PEAK-WINDOW",
+      "statement": "Members and drop-in visitors pay their specified off-peak and peak hourly rates, and an unrecognized customer type is rejected with UnknownCustomerError.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-vitest-booking#R7"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/pricing.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The drop-in peak rate is raised to 6500 cents per hour, which changes the price only for drop-in visitors in peak hours.",
+          "faultClass": "literal-changed",
+          "file": "src/pricing.js",
+          "find": "dropin: { offPeak: 4000, peak: 6000 },",
+          "replace": "dropin: { offPeak: 4000, peak: 6500 },",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The unknown-customer guard is removed, so an unrecognized type fails with a TypeError instead of UnknownCustomerError.",
+          "faultClass": "guard-removed",
+          "file": "src/pricing.js",
+          "find": "  if (!Object.hasOwn(RATES, customerType)) {\n    throw new UnknownCustomerError(`Unknown customer type: ${String(customerType)}`);\n  }\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PRICE-PER-MINUTE-SPLIT",
+      "statement": "A slot's price is its off-peak minutes at the off-peak rate plus its peak minutes at the peak rate, each prorated per minute.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-vitest-booking#R8"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/legacy-rates.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The peak window start is no longer applied, so a slot like 10:30-11:00 counts every minute from 10:00 to its end as peak.",
+          "faultClass": "call-removed",
+          "file": "src/pricing.js",
+          "find": "Math.max(start, PEAK_START)",
+          "replace": "PEAK_START",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The off-peak and peak rates are swapped, so off-peak minutes are charged at the peak rate and vice versa.",
+          "faultClass": "variable-swap",
+          "file": "src/pricing.js",
+          "find": "rates.offPeak * offPeakMinutes + rates.peak * peakMinutes",
+          "replace": "rates.peak * offPeakMinutes + rates.offPeak * peakMinutes",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MONEY-FORMAT-DOLLARS-CENTS",
+      "statement": "Money formatting renders whole cents as a dollar sign, dollars with thousands separators, a period and exactly two cent digits.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-vitest-booking#R11"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/format.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The thousands separator is replaced with an empty string, so 123456 renders as $1234.56 instead of $1,234.56.",
+          "faultClass": "literal-changed",
+          "file": "lib/format/money.js",
+          "find": "/g, ',')",
+          "replace": "/g, '')",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The cents are no longer zero-padded, so 5 renders as $0.5 instead of $0.05.",
+          "faultClass": "call-removed",
+          "file": "lib/format/money.js",
+          "find": ".padStart(2, '0')",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SUMMARY-LINE-COMPOSITION",
+      "statement": "A slot summary is a single line holding the slot text, its formatted duration in parentheses, and the formatted price.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-vitest-booking#R12"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/summary.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Whole-hour durations lose their hour part (the hour is only shown above 1), so a 60-minute slot summarizes as (0m) instead of (1h).",
+          "faultClass": "literal-changed",
+          "file": "src/format/duration.js",
+          "find": "if (h > 0) parts.push(",
+          "replace": "if (h > 1) parts.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The duration is computed from the end minute instead of end minus start, so the displayed duration is wrong.",
+          "faultClass": "variable-swap",
+          "file": "src/summary.js",
+          "find": "formatDuration(end - start)",
+          "replace": "formatDuration(end)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The parenthesized duration is dropped from the summary line.",
+          "faultClass": "field-dropped",
+          "file": "src/summary.js",
+          "find": " (${formatDuration(end - start)})",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    }
+  ]
+}

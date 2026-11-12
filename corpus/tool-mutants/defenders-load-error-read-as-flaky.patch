@@ -1,0 +1,8 @@
+diff --git a/src/probe/runners/shared.mjs b/src/probe/runners/shared.mjs
+--- a/src/probe/runners/shared.mjs
++++ b/src/probe/runners/shared.mjs
+@@ -277,3 +277,3 @@
+   let outcome;
+-  if (loadFailed || tests.total === 0) outcome = 'error';
++  if (tests.total === 0 && !loadFailed) outcome = 'error';
+   else if (report.success) outcome = 'pass';

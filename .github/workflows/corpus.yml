@@ -26,7 +26,7 @@ jobs:
   shard:
     name: corpus (${{ matrix.name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: ${{ matrix.timeout || 30 }}
     strategy:
       fail-fast: false
       matrix:
@@ -39,6 +39,37 @@ jobs:
             args: --subject py-pytest-circulation
           - name: node-test-floorplan
             args: --subject node-test-floorplan
+          # Every Playwright mode takes ~8 minutes (hung faults wait out the
+          # per-test timeout), and each shard runs the reference first: four
+          # shards keep each under half an hour.
+          - name: js-playwright-gallery-1
+            args: --subject js-playwright-gallery --mode twice --mode reuse
+            browser: true
+            timeout: 60
+          - name: js-playwright-gallery-2
+            args: --subject js-playwright-gallery --mode default --mode workers-4 --mode partial
+            browser: true
+            timeout: 60
+          - name: js-playwright-gallery-3
+            args: --subject js-playwright-gallery --mode scratch --mode assertion-kill
+            browser: true
+            timeout: 60
+          - name: js-playwright-gallery-4
+            args: --subject js-playwright-gallery --mode workers-2 --mode reorder --mode noise --mode typecheck --mode changed
+            browser: true
+            timeout: 60
+          - name: py-unittest-shipping
+            args: --subject py-unittest-shipping
+          - name: js-vitest-booking
+            args: --subject js-vitest-booking
+          - name: ts-vitest-converter
+            args: --subject ts-vitest-converter
+          - name: node-test-catalog3
+            args: --subject node-test-catalog3@npm --subject node-test-catalog3@pnpm
+          - name: js-vitest-projects-habits
+            args: --subject js-vitest-projects-habits
+          - name: js-vitest-mergeconfig-ledger
+            args: --subject js-vitest-mergeconfig-ledger
           - name: mutants-classify
             args: --tool-mutants --mutant timeout-counted-as-kill --mutant mixed-result-counted-as-kill --mutant baseline-not-required-green --mutant negative-control-skipped
           - name: mutants-reuse
@@ -47,6 +78,11 @@ jobs:
             args: --tool-mutants --mutant fault-not-restored --mutant typecheck-skipped --mutant fan-out-shares-one-tree
           - name: mutants-scope
             args: --tool-mutants --mutant not-reached-fault-dropped --mutant changed-git-failure-is-empty
+          - name: mutants-kinds
+            args: --tool-mutants --mutant mixed-kill-kind-read-as-assertion --mutant discovery-writes-into-project --mutant defenders-load-error-read-as-flaky --mutant vitest-error-classes-ignored --mutant unittest-error-read-as-assertion
+          - name: mutants-browser
+            args: --tool-mutants --mutant playwright-timeout-read-as-failure
+            browser: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -59,6 +95,11 @@ jobs:
       # requirements.txt. The harness refuses to run (exit 2) without them.
       - name: Install the subjects this shard runs
         run: node corpus/run.mjs --install ${{ matrix.args }}
+      # Chromium's system libraries; the browser itself is installed by the
+      # subject's installExtra (npx playwright install chromium).
+      - name: Browser system libraries
+        if: matrix.browser
+        run: npx --prefix corpus/js-playwright-gallery playwright install-deps chromium
       - name: Every mutant patch still applies
         run: node corpus/run.mjs --check-mutants
       - name: Run the corpus

@@ -1,0 +1,8 @@
+diff --git a/src/probe/runners/python/_testguard_unittest_main.py b/src/probe/runners/python/_testguard_unittest_main.py
+--- a/src/probe/runners/python/_testguard_unittest_main.py
++++ b/src/probe/runners/python/_testguard_unittest_main.py
+@@ -108,3 +108,3 @@
+         # (a subtest, say) is still one.
+-        record["failureKind"] = tg.merge_kind(record.get("failureKind"), tg.kind_of(err[0] if err else None))
++        record["failureKind"] = tg.merge_kind(record.get("failureKind"), "assertion")
+         record["message"] = tg.clip("".join(traceback.format_exception(*err))) if err else None

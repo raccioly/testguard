@@ -7,9 +7,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { pythonFor } from './subject.mjs';
+import { compareSnapshots, snapshotIsEmpty, snapshotSubject } from './untouched.mjs';
 
 /**
- * @returns {{exit, json, evidence, elapsedMs, stderr, args}} `evidence` is the
+ * @returns {{exit, json, evidence, elapsedMs, stderr, args, untouched}} `evidence` is the
  * parsed evidence file when one was written; `json` the parsed --json stdout.
  */
 export function probe({ toolRoot, subject, repo, outPath, args = [], python, env = {}, timeoutMs = 30 * 60_000 }) {
@@ -21,6 +22,7 @@ export function probe({ toolRoot, subject, repo, outPath, args = [], python, env
   const py = subject.config.runner === 'pytest' || subject.config.runner === 'unittest' ? ['--python', pythonFor(subject, python)] : [];
   const argv = [cli, 'probe', repo, '--claims', join(repo, 'claims.json'), ...(outPath ? ['--out', outPath] : []), '--json', '--progress', 'none',
     '--confirm', String(subject.key.confirmRuns ?? 3), '--budget', String(subject.config.budgetMs ?? 30_000), ...runnerArgs, ...py, ...args];
+  const before = snapshotSubject(repo);
   return new Promise((resolve) => {
     const started = performance.now();
     const child = spawn(process.execPath, argv, { cwd: repo, env: { ...process.env, CI: '1', NO_COLOR: '1', ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -38,7 +40,12 @@ export function probe({ toolRoot, subject, repo, outPath, args = [], python, env
       // A partial run is redirected away from --out only when --out names the
       // canonical file; it never is here, so the evidence is where we said.
       if (existsSync(evidencePath)) { try { evidence = JSON.parse(readFileSync(evidencePath, 'utf8')); } catch {} }
-      resolve({ exit: code, json, evidence, elapsedMs, stderr, args: argv.slice(1) });
+      // Whatever the exit code, a refusal included: the project is as it was.
+      // A run with no --out writes the tool's own documented output directory
+      // (.testguard/, untracked) and nothing else; every other change counts.
+      const changes = compareSnapshots(before, snapshotSubject(repo)).filter((c) => outPath || !(c.kind === 'status' && c.path.startsWith('.testguard/')));
+      const untouched = { emptySnapshot: snapshotIsEmpty(before), changes };
+      resolve({ exit: code, json, evidence, elapsedMs, stderr, args: argv.slice(1), untouched });
     });
   });
 }

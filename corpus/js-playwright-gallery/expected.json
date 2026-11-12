@@ -1,0 +1,216 @@
+{
+  "confirmRuns": 3,
+  "derivedWith": "node corpus/derive.mjs (applies each fault by hand to a scratch copy and runs the subject's own runner; never TestGuard). Verdicts written by hand in provenance/judgments.json.",
+  "expected": {
+    "SEARCH-TRIMMED-CASE-INSENSITIVE/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Queries keep their surrounding spaces; e2e/search.spec.mjs's failed expect steps (Playwright reports the expect step) fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/search.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "19fd764fa9eca9b9c0a21e4c08f817230a9f947b426da4d5f5cb6b097794b4b4",
+        "derivedAt": "2026-11-12T05:28:59.405Z"
+      }
+    },
+    "SEARCH-TRIMMED-CASE-INSENSITIVE/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Title matching becomes case-sensitive; the search assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/search.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "e0ffc657bae9e4d59e84c99a121c4df2d6be8684dc1ff4ff1d5ac44322d9e58b",
+        "derivedAt": "2026-11-12T05:29:48.826Z"
+      }
+    },
+    "TAG-FILTER-AND-SEMANTICS/F1": {
+      "verdict": "timeout",
+      "reason": "test-timed-out",
+      "why": "Tags combine with OR instead of AND, so the tag test waits for a card count the page never shows: Playwright reports the test timedOut (15 s test timeout) in all three runs. Rule 3: a timed-out test is a timeout, never an assertion failure, and a timeout is not a kill.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/tags.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "a55a58365ab63250f8dea7306b02eff112b6120ea885c363a30759a2e73c0cc3",
+        "derivedAt": "2026-11-12T05:30:43.055Z"
+      }
+    },
+    "TAG-FILTER-AND-SEMANTICS/F2": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "The partial e2e/tags.spec.mjs never combines a search with a tag: green 3/3. Control (filter.js unparseable: the page never renders, the test times out) red, so it reaches the module. The whole suite fails in all three runs, by assertion, in e2e/search.spec.mjs and e2e/sort.spec.mjs, which are not declared; no run had a load error or a timeout.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/tags.spec.mjs --reporter=json --workers=1 --retries=0",
+          "wholeSuite": "node_modules/.bin/playwright test e2e/cards.spec.mjs e2e/favorites.spec.mjs e2e/render.spec.mjs e2e/search.spec.mjs e2e/sort.spec.mjs e2e/tags.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 8 test(s) fail every run",
+        "outputHash": "a50b99fba9bd6f6bdd916c19ec519a3b0c93ec4d79d68bf549d72506496305f2",
+        "derivedAt": "2026-11-12T05:32:24.318Z"
+      }
+    },
+    "SORT-ORDER-AND-TIEBREAKS/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Same-title cards lose their year tiebreak; sort assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/sort.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "01c9829708fb8b7824ab006da353fe49c32a8185a83a002cb6addb4250fc99d9",
+        "derivedAt": "2026-11-12T05:32:37.360Z"
+      }
+    },
+    "SORT-ORDER-AND-TIEBREAKS/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Newest-first becomes oldest-first; sort assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/sort.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "6804a41c8024e069aa49748e25d1bcfa7923e131070902814c088db45c98d2e6",
+        "derivedAt": "2026-11-12T05:32:52.016Z"
+      }
+    },
+    "FAVORITE-TOGGLE-AND-COUNT/F1": {
+      "verdict": "survived",
+      "why": "The hollow e2e/favorites.spec.mjs only checks that the page renders: green 3/3. Control red (the page never renders without the module). Whole suite 3/3: no test fails in every run.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/favorites.spec.mjs --reporter=json --workers=1 --retries=0",
+          "wholeSuite": "node_modules/.bin/playwright test e2e/cards.spec.mjs e2e/favorites.spec.mjs e2e/render.spec.mjs e2e/search.spec.mjs e2e/sort.spec.mjs e2e/tags.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "629013e0e7eb60d7707e55f7af52128e1fecdbd5f4ab8c3dd2146286bc22c15b",
+        "derivedAt": "2026-11-12T05:33:27.084Z"
+      }
+    },
+    "FAVORITE-TOGGLE-AND-COUNT/F2": {
+      "verdict": "survived",
+      "why": "As F1: the favorites count is never read.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/favorites.spec.mjs --reporter=json --workers=1 --retries=0",
+          "wholeSuite": "node_modules/.bin/playwright test e2e/cards.spec.mjs e2e/favorites.spec.mjs e2e/render.spec.mjs e2e/search.spec.mjs e2e/sort.spec.mjs e2e/tags.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "629013e0e7eb60d7707e55f7af52128e1fecdbd5f4ab8c3dd2146286bc22c15b",
+        "derivedAt": "2026-11-12T05:34:02.795Z"
+      }
+    },
+    "FAVORITE-TOGGLE-AND-COUNT/F3": {
+      "verdict": "survived",
+      "why": "As F1: aria-pressed is never read.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/favorites.spec.mjs --reporter=json --workers=1 --retries=0",
+          "wholeSuite": "node_modules/.bin/playwright test e2e/cards.spec.mjs e2e/favorites.spec.mjs e2e/render.spec.mjs e2e/search.spec.mjs e2e/sort.spec.mjs e2e/tags.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "629013e0e7eb60d7707e55f7af52128e1fecdbd5f4ab8c3dd2146286bc22c15b",
+        "derivedAt": "2026-11-12T05:34:44.338Z"
+      }
+    },
+    "TOGGLE-REJECTS-UNKNOWN-NO-MUTATION/F1": {
+      "verdict": "survived",
+      "why": "The hollow favorites test never toggles an unknown id: green 3/3, control red, no whole-suite killer.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/favorites.spec.mjs --reporter=json --workers=1 --retries=0",
+          "wholeSuite": "node_modules/.bin/playwright test e2e/cards.spec.mjs e2e/favorites.spec.mjs e2e/render.spec.mjs e2e/search.spec.mjs e2e/sort.spec.mjs e2e/tags.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "629013e0e7eb60d7707e55f7af52128e1fecdbd5f4ab8c3dd2146286bc22c15b",
+        "derivedAt": "2026-11-12T05:35:23.570Z"
+      }
+    },
+    "TOGGLE-REJECTS-UNKNOWN-NO-MUTATION/F2": {
+      "verdict": "survived",
+      "why": "As F1: mutation of the input set is never checked.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/favorites.spec.mjs --reporter=json --workers=1 --retries=0",
+          "wholeSuite": "node_modules/.bin/playwright test e2e/cards.spec.mjs e2e/favorites.spec.mjs e2e/render.spec.mjs e2e/search.spec.mjs e2e/sort.spec.mjs e2e/tags.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "629013e0e7eb60d7707e55f7af52128e1fecdbd5f4ab8c3dd2146286bc22c15b",
+        "derivedAt": "2026-11-12T05:36:00.969Z"
+      }
+    },
+    "CARD-VALIDATION-BOUNDS/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Year 2026 is rejected; the node-side e2e/cards.spec.mjs has assertion failures (and one exception) in every run.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/cards.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "4c1ad714945bec48f49e95cc303335819a6bc325aa23fa0f3e4d7f5b32950b06",
+        "derivedAt": "2026-11-12T05:36:09.316Z"
+      }
+    },
+    "CARD-VALIDATION-BOUNDS/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Whitespace-only fields are accepted; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/cards.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "c51d874ba60a683ad3939217b980d781305b0e94c9efe05dbad8ec1098133c7b",
+        "derivedAt": "2026-11-12T05:36:18.828Z"
+      }
+    },
+    "CARD-RENDER-AND-UNIQUE-IDS/F1": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "Duplicate ids are no longer rejected; the browser render test never builds duplicates: green 3/3, control red. The node-side e2e/cards.spec.mjs fails by assertion in all three whole-suite runs and is not declared for this claim.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/render.spec.mjs --reporter=json --workers=1 --retries=0",
+          "wholeSuite": "node_modules/.bin/playwright test e2e/cards.spec.mjs e2e/favorites.spec.mjs e2e/render.spec.mjs e2e/search.spec.mjs e2e/sort.spec.mjs e2e/tags.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 1 test(s) fail every run",
+        "outputHash": "395f9ff797841e416ae12ab95b97eaaf9b00d1246f46634d3c250ddb5c85210d",
+        "derivedAt": "2026-11-12T05:37:59.775Z"
+      }
+    },
+    "CARD-RENDER-AND-UNIQUE-IDS/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The rendered year is off by one; render assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/render.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "a9fad95598bcf8542f16fda8d85cdfbad082aa743fcbc3a9fb11effa2381faf6",
+        "derivedAt": "2026-11-12T05:38:25.711Z"
+      }
+    },
+    "CARD-RENDER-AND-UNIQUE-IDS/F3": {
+      "verdict": "timeout",
+      "reason": "test-timed-out",
+      "why": "`by ${card.photographer` does not parse, but it is a browser module: the test files load, the page never renders, and every render test times out waiting for the grid in all three runs. Playwright reports a timeout, not a parse or transform error, so by docs/reference/verdicts.md this is timeout/test-timed-out, not fault-invalid/replacement-does-not-compile (which needs the runner to report a parse error).",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/playwright test e2e/render.spec.mjs --reporter=json --workers=1 --retries=0"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "7440d6d8b37f6f83982bf5fc3e14d7770b1659b439f5f154c2214cecb76169e9",
+        "derivedAt": "2026-11-12T05:42:28.705Z"
+      }
+    }
+  }
+}

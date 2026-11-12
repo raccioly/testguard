@@ -45,7 +45,7 @@ export function buildScorecard({ toolRoot, results, mutants, machine }) {
       faults: r.key ? { total: r.key.total, right: r.key.right, wrong: r.key.wrong, critical: r.key.critical, known: r.key.known } : null,
       mismatches: r.key?.mismatches ?? [],
       differential: r.differential ? { equal: r.differential.equal, compared: r.differential.compared, orderEqual: r.differential.orderEqual, mismatches: r.differential.mismatches } : null,
-      checks: r.checks.map((c) => ({ check: c.check, ok: c.ok, detail: c.detail ?? null })),
+      checks: r.checks.map((c) => ({ check: c.check, ok: c.ok, detail: c.detail ?? null, ...(c.critical ? { critical: true, summary: c.summary } : {}) })),
       runs: r.runs,
       runnerInvocations: inv,
       seconds: Math.round(ms / 100) / 10,
@@ -57,6 +57,7 @@ export function buildScorecard({ toolRoot, results, mutants, machine }) {
   });
   const totals = rows.reduce((t, r) => {
     if (r.faults) { t.right += r.faults.right; t.wrong += r.faults.wrong; t.critical += r.faults.critical; t.known += r.faults.known; }
+    t.critical += r.checks.filter((c) => c.critical && !c.ok).length;
     if (r.differential && !r.differential.equal) t.differentialMismatches++;
     t.noEvidence += r.noEvidence.length;
     return t;
@@ -84,10 +85,27 @@ export function mergeScorecards(docs) {
   if (docs.length === 0) throw new Error('mergeScorecards: nothing to merge');
   const heads = new Set(docs.map((d) => d.tool.head));
   if (heads.size > 1) throw new Error(`mergeScorecards: shards measured different builds (${[...heads].join(', ')})`);
-  const rows = docs.flatMap((d) => d.rows);
+  // A subject split across shards by mode runs its reference in every shard
+  // (the other modes compare with it). Each extra reference row is kept only
+  // if it disagrees with the first one, so totals count a mode once and a
+  // reference that answered differently on another runner is not hidden.
+  const seen = new Map();
+  const rows = [];
+  for (const r of docs.flatMap((d) => d.rows)) {
+    const k = `${r.subject}\u0000${r.mode}`;
+    const first = seen.get(k);
+    if (first && r.mode === 'reference' && first.ok === r.ok && JSON.stringify(first.mismatches) === JSON.stringify(r.mismatches)) continue;
+    if (!first) seen.set(k, r);
+    rows.push(r);
+  }
   const mutantResults = docs.flatMap((d) => d.mutants?.results ?? []);
-  const totals = { right: 0, wrong: 0, critical: 0, known: 0, differentialMismatches: 0, noEvidence: 0 };
-  for (const d of docs) for (const k of Object.keys(totals)) totals[k] += d.totals[k] ?? 0;
+  const totals = rows.reduce((t, r) => {
+    if (r.faults) { t.right += r.faults.right; t.wrong += r.faults.wrong; t.critical += r.faults.critical; t.known += r.faults.known; }
+    t.critical += r.checks.filter((c) => c.critical && !c.ok).length;
+    if (r.differential && !r.differential.equal) t.differentialMismatches++;
+    t.noEvidence += (r.noEvidence ?? []).length;
+    return t;
+  }, { right: 0, wrong: 0, critical: 0, known: 0, differentialMismatches: 0, noEvidence: 0 });
   const factors = docs.map((d) => d.machine.speedFactor).filter((f) => f);
   const mid = (a) => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
   return {
@@ -138,21 +156,28 @@ export function renderMarkdown(doc, { base = null } = {}) {
       for (const m of mism) lines.push(`| ${m.subject} | ${m.mode} | ${m.fault} | ${fmt(m.expected)} | ${fmt(m.observed)} | ${m.critical ? '**CRITICAL**' : m.knownIssue ? `known: #${m.knownIssue}` : '**wrong**'} |`);
     }
   }
+  const modified = doc.rows.flatMap((r) => r.checks.filter((c) => c.critical && !c.ok).map((c) => ({ ...c, subject: r.subject, mode: r.mode })));
+  if (modified.length) {
+    lines.push('');
+    lines.push('**CRITICAL: the tool modified the subject it measured**');
+    lines.push('');
+    for (const c of modified) lines.push(`- ${c.subject} / ${c.mode} (${c.detail?.run}): ${String(c.summary).replace(/\|/g, '\\|').slice(0, 400)}`);
+  }
   const refused = doc.rows.flatMap((r) => (r.noEvidence ?? []).map((n) => ({ ...n, subject: r.subject, mode: r.mode })));
   if (refused.length) {
     lines.push('');
     lines.push('**The tool wrote no evidence** (a refusal or a crash, not a verdict):');
     lines.push('');
-    lines.push('| subject | mode | run | exit | kind | reason |');
-    lines.push('|---|---|---|---|---|---|');
-    for (const n of refused) lines.push(`| ${n.subject} | ${n.mode} | ${n.run} | ${n.exit} | ${n.kind ?? '–'} | ${String(n.reason).replace(/\|/g, '\\|').slice(0, 200)} |`);
+    lines.push('| subject | mode | run | exit | kind | reason | |');
+    lines.push('|---|---|---|---|---|---|---|');
+    for (const n of refused) lines.push(`| ${n.subject} | ${n.mode} | ${n.run} | ${n.exit} | ${n.kind ?? '–'} | ${String(n.reason).replace(/\|/g, '\\|').slice(0, 200)} | ${n.knownIssue ? `known: #${n.knownIssue}` : '**unexplained**'} |`);
   }
   const knownChecks = doc.rows.flatMap((r) => r.checks.filter((c) => c.detail && c.detail.knownIssue).map((c) => ({ ...c, subject: r.subject, mode: r.mode })));
   if (knownChecks.length) {
     lines.push('');
     lines.push('| subject | mode | check | known | |');
     lines.push('|---|---|---|---|---|');
-    for (const c of knownChecks) lines.push(`| ${c.subject} | ${c.mode} | ${c.check} | #${c.detail.knownIssue} | ${c.detail.unsound ? '**UNSOUND: misses claims the change can affect**' : 'superset (imprecise, safe)'} |`);
+    for (const c of knownChecks) lines.push(`| ${c.subject} | ${c.mode} | ${c.check} | #${c.detail.knownIssue} | ${c.detail.noEvidence ? 'no evidence written (see above)' : c.detail.unsound ? '**UNSOUND: misses claims the change can affect**' : 'superset (imprecise, safe)'} |`);
   }
   if (doc.mutants) {
     lines.push('');

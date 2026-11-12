@@ -1,0 +1,254 @@
+{
+  "confirmRuns": 3,
+  "derivedWith": "node corpus/derive.mjs (applies each fault by hand to a scratch copy and runs the subject's own runner; never TestGuard). Verdicts written by hand in provenance/judgments.json.",
+  "expected": {
+    "DIM-WEIGHT-ROUNDS-UP/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Dimensional weight rounds down; tests/test_parcel.py fails by assertion (unittest failure) in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_parcel.py"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "7b15d644ec5a4e696dc4f355efd1b6f8e466ed633f25f74a9312e30992679971",
+        "derivedAt": "2026-11-12T05:28:20.139Z"
+      }
+    },
+    "DIM-WEIGHT-ROUNDS-UP/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Height is replaced by width; the dimensional-weight assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_parcel.py"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "2b5c998fd86b4257f4d0b252403735aa062c6f507a7dff37b09fcc06fdcfee40",
+        "derivedAt": "2026-11-12T05:28:26.266Z"
+      }
+    },
+    "STANDARD-BASE-RATE/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Every rate gains one extra step; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_rates.py"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "2338dcc2a06dad8a03893bffcf6795e7baf2973bea789d1a7901b072789776aa",
+        "derivedAt": "2026-11-12T05:28:34.508Z"
+      }
+    },
+    "STANDARD-BASE-RATE/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Zone 3's step price changes; the zone-3 assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_rates.py"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "0d44e9d26f46020111d044c2bfcee77a77e6868e2df957b22e543cd6a60e40ca",
+        "derivedAt": "2026-11-12T05:28:43.447Z"
+      }
+    },
+    "EXPRESS-RATE-AND-LIMIT/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The half-cent rounding is dropped; the express assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_rates.py"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "8187e1a9755cc31aa32cb498dc2e740b9517d7309e091795ccf7fd852c695cd5",
+        "derivedAt": "2026-11-12T05:28:53.244Z"
+      }
+    },
+    "EXPRESS-RATE-AND-LIMIT/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Parcels over the express limit are accepted; the assertRaises checks fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_rates.py"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "86167cc688fffd3a75c6813f44dd8c349849e347fbd01693f9c521eebb97ae59",
+        "derivedAt": "2026-11-12T05:28:59.872Z"
+      }
+    },
+    "REMOTE-SURCHARGE/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Part of the remote postal range is lost; the boundary assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_surcharges.py"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "c233212065c4a8b58b9e55fab8cd4858a5bdb31221159e2e3c89824149f99857",
+        "derivedAt": "2026-11-12T05:29:08.508Z"
+      }
+    },
+    "REMOTE-SURCHARGE/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Express remote deliveries are charged the standard surcharge; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_surcharges.py"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "910b77558f18c31d5659df57d8742ac7e9c437204b7d5a4de49c8eae497cbe2a",
+        "derivedAt": "2026-11-12T05:29:19.379Z"
+      }
+    },
+    "OVERSIZE-SURCHARGE-CLASSES/F1": {
+      "verdict": "survived",
+      "why": "tests/test_surcharges.py never tests oversize (partial): green 3/3. Control (surcharges.py unparseable) fails to load, so the defender imports the module. The whole suite 3/3: no test fails in every run (oversize is not checked anywhere).",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_surcharges.py",
+          "wholeSuite": "python corpus/lib/unittest_runner.py <report> tests/test_labels.py tests/test_parcel.py tests/test_quote.py tests/test_rates.py tests/test_surcharges.py"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "e09a5e76b877f7fd6257f3165ecd2ac9da44fb626e5a78997d1d364a3f8337e6",
+        "derivedAt": "2026-11-12T05:29:30.708Z"
+      }
+    },
+    "OVERSIZE-SURCHARGE-CLASSES/F2": {
+      "verdict": "survived",
+      "why": "As F1.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_surcharges.py",
+          "wholeSuite": "python corpus/lib/unittest_runner.py <report> tests/test_labels.py tests/test_parcel.py tests/test_quote.py tests/test_rates.py tests/test_surcharges.py"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "e09a5e76b877f7fd6257f3165ecd2ac9da44fb626e5a78997d1d364a3f8337e6",
+        "derivedAt": "2026-11-12T05:29:40.424Z"
+      }
+    },
+    "QUOTE-ITEMIZED-TOTAL/F1": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "Swapped arguments make remote_surcharge raise inside quote(); tests/test_quote.py (hollow: it only checks that a quote is returned) fails by exception, never by assertion, in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_quote.py"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "5349a9242ad4e9801b1ba5656c432a89153aea6ab13dd414042ff2a71dc4a83b",
+        "derivedAt": "2026-11-12T05:29:45.212Z"
+      }
+    },
+    "QUOTE-ITEMIZED-TOTAL/F2": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "The hollow tests/test_quote.py stays green 3/3 with the oversize line left out of the total; control red. tests/test_rates.py (QuoteBreakdownTests, ExpressRateTests) fails in all three runs and is not declared.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_quote.py",
+          "wholeSuite": "python corpus/lib/unittest_runner.py <report> tests/test_labels.py tests/test_parcel.py tests/test_quote.py tests/test_rates.py tests/test_surcharges.py"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 2 test(s) fail every run",
+        "outputHash": "1b3e202584a8b64fc786c882672a226269d124e88e932d49f9619077364cbde4",
+        "derivedAt": "2026-11-12T05:29:49.003Z"
+      }
+    },
+    "QUOTE-ITEMIZED-TOTAL/F3": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "As F2: the hollow defender stays green, the undeclared tests/test_rates.py breakdown tests fail every run.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_quote.py",
+          "wholeSuite": "python corpus/lib/unittest_runner.py <report> tests/test_labels.py tests/test_parcel.py tests/test_quote.py tests/test_rates.py tests/test_surcharges.py"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 2 test(s) fail every run",
+        "outputHash": "1b3e202584a8b64fc786c882672a226269d124e88e932d49f9619077364cbde4",
+        "derivedAt": "2026-11-12T05:29:57.923Z"
+      }
+    },
+    "TRACKING-NUMBER-FORMAT/F1": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "The sequence upper bound drops a digit; the tests that build the largest valid tracking number now get ValueError raised outside assertRaises, an error (exception) in all three runs and no assertion failure.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_labels.py"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "b9f9b0a4c04d423a374c7cf86a41ad022ea32ecf09ecc9b00b5a0f59a58e353c",
+        "derivedAt": "2026-11-12T05:30:00.580Z"
+      }
+    },
+    "TRACKING-NUMBER-FORMAT/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The check digit is omitted; the format assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_labels.py"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "30ca4e2113664505c8d5a990a4cefdf6f34840eaae527a3663df63b4c27effa5",
+        "derivedAt": "2026-11-12T05:30:02.311Z"
+      }
+    },
+    "TRACKING-NUMBER-FORMAT/F3": {
+      "verdict": "fault-invalid",
+      "reason": "replacement-does-not-compile",
+      "why": "`return total %` is a SyntaxError: unittest cannot import shipping.labels and reports a load failure (_FailedTest) in all three runs. A load failure is never a kill.",
+      "derivation": {
+        "commands": {
+          "defenders": "python corpus/lib/unittest_runner.py <report> tests/test_labels.py"
+        },
+        "observed": "baseline GGG; probe LLL",
+        "outputHash": "0a030b683d3a01e7dc76a026aacff322a6d0f1826c0c3fd24948ef91ac536043",
+        "derivedAt": "2026-11-12T05:30:03.754Z"
+      }
+    }
+  },
+  "modes": {
+    "changed": {
+      "why": "Selections derived by reading the imports (spec: a changed path selects a claim when it is a fault target, a defender, or in the import closure of either). Every test imports the shipping package, whose __init__ imports every module, so any change under shipping/ reaches every claim. The working tree also holds build/lib/shipping and build/lib/fieldkit, untracked and git-ignored copies (a build directory, #272; fieldkit resolves its submodules by computed import): no test imports them and no change to them can be committed.",
+      "steps": [
+        {
+          "name": "docs-only",
+          "edits": [
+            {
+              "file": "SPEC.md",
+              "find": "# Regional Parcel Rate Library",
+              "replace": "<!-- corpus: a docs-only change -->\n# Regional Parcel Rate Library"
+            }
+          ],
+          "expectedClaims": [],
+          "why": "SPEC.md is no claim's target, defender or import: the change is determined and selects nothing (exit 0, no evidence written)."
+        },
+        {
+          "name": "labels-test-only",
+          "edits": [
+            {
+              "file": "tests/test_labels.py",
+              "find": "import unittest\n",
+              "replace": "# corpus: a scripted change, behavior-neutral\nimport unittest\n"
+            }
+          ],
+          "expectedClaims": [
+            "TRACKING-NUMBER-FORMAT"
+          ],
+          "why": "tests/test_labels.py is the declared defender of TRACKING-NUMBER-FORMAT only, and no other test imports it."
+        }
+      ],
+      "badRef": {
+        "ref": "refs/heads/corpus-no-such-branch",
+        "exit": 2,
+        "why": "An unresolvable reference is a precondition failure."
+      }
+    }
+  }
+}

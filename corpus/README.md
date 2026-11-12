@@ -60,7 +60,8 @@ corpus/
   derive.mjs              the hand procedure behind every key (no TestGuard)
   key.mjs                 judgments + observations → expected.json (--check)
   assemble.mjs            author claims + defender rule → claims.json (--check)
-  lib/                    subject.mjs, tool.mjs, checks.mjs, modes.mjs, mutants.mjs, scorecard.mjs
+  lib/                    subject.mjs, layout.mjs, tool.mjs, checks.mjs, modes.mjs, mutants.mjs, scorecard.mjs;
+                          unittest_runner.py and vitest-errors-reporter.mjs (derive.mjs only)
   scorecard.schema.json   the scorecard document
   known-failures.json     reviewed, filed TestGuard defects the corpus exposes
   tool-mutants/           deliberately broken builds (*.patch + manifest.json)
@@ -71,10 +72,47 @@ corpus/
 ```
 
 `subject.json` says how to run a subject: `runner`, `install`
-(`npm`, `npm-workspace`, `python-venv`), `testFiles` (the whole-suite pattern
-for derivation), `budgetMs` (the per-run budget the key assumes), `typecheck`,
+(`npm`, `npm-workspace`, `python-venv`, `none`), `installExtra` (commands run
+after the install, such as the Playwright browser), `python` (the interpreter
+for a subject with no venv), `testFiles` (the whole-suite pattern for
+derivation), `budgetMs` (the per-run budget the key assumes), `typecheck`,
 `probeArgs`, `counters` (files the planted flaky tests write), `noise` (the
-metamorphic edits) and, for a workspace, `workspaceLinks`.
+metamorphic edits) and, for a workspace, `workspaceLinks`. Layout keys, shared
+by the derivation and the harness through `lib/layout.mjs` so a key and the run
+it judges see the same tree:
+
+- `variants`: one subject measured under several layouts, each listed as
+  `name@variant` (`node-test-catalog3@npm`, `@pnpm`). The `layout` of a
+  workspace is `npm` (root `node_modules/@scope/*` links) or `pnpm` (each
+  package's own `node_modules/@scope/*` links), built from one npm install;
+  pnpm never runs. One key serves every variant, and `key.mjs` refuses to build
+  it unless each variant's derivation observed the same thing.
+- `ignoredCopies`: `{from, to}` copies placed in every scratch repository as
+  untracked, git-ignored build output (#272): a `build/lib` or `.build/vendor`
+  holding a copy of a package. `untrackedSources` names source directories
+  that exist only as such copies.
+- `nodeModulesLayout: "linked-entries"`: each copy gets a real `node_modules`
+  whose entries are symlinks into the subject's install, as a worktree whose
+  install belongs to another checkout has (#279). Runner caches (`.vite`,
+  `.vite-temp`, `.vitest-cache`) are never linked: vitest writes into them on
+  every run, and through a link that write would land in the other checkout.
+
+Every probe the harness runs, in every mode, refusals and exit-2 runs
+included, also checks **subject-untouched** (`lib/untouched.mjs`): before and
+after the probe it snapshots the repository the tool was pointed at
+(`git status --porcelain --ignored`, a content hash of every tracked file, and
+the names and link targets of every `node_modules` level), and any difference
+is a **critical** failure the scorecard names as "tool modified the subject:
+<path>". No known-failure entry can excuse it, and an empty snapshot is a
+failure too. vite and vitest's own caches inside a real `node_modules`
+directory are the only entries left out.
+
+Every mode also checks **install-unchanged**: the subject's own install is
+hashed (file bytes and link targets) before the subject's first mode and after
+each one. For `linked-entries` the hash is byte for byte. Where a copy's
+`node_modules` is a single link to the install, vite and vitest write their own
+caches into it (`.vite`, `.vite-temp`, `.vitest-cache`) with no tool involved,
+so those three entries are left out and everything else must be unchanged.
 
 ## Subjects
 
@@ -84,15 +122,23 @@ metamorphic edits) and, for a workspace, `workspaceLinks`.
 | `js-jest-newsletter` | jest | CommonJS | hollow test (exception-only kill and survivor), fault that never returns (timeout), declared defender that never imports its target, mocked module, no test at all |
 | `py-pytest-circulation` | pytest | package layout | rotating test (inconsistent probe), alternating test (defenders not green), partial |
 | `node-test-floorplan` | node:test | two-package npm workspace | hollow test, partial, a defender that reaches its target through the workspace link |
+| `js-playwright-gallery` | Playwright | browser ES modules served through `page.route` (no port), plus node-side tests | hollow and partial browser tests, a fault the page hangs on (timeout), a browser module that does not parse (timeout, not fault-invalid: the runner reports no parse error), undeclared killers |
+| `py-unittest-shipping` | unittest | stdlib only; an ignored `build/lib` holding copies of the package and of a vendored package with computed imports (#272) | hollow test (exception-only kill, undeclared killer), partial, `--changed` over a docs-only commit (selects nothing) and a one-test-file commit |
+| `js-vitest-booking` | vitest | `src/format` is a symlink to `lib/format`; one fault is written through the link | a declared defender that cannot load (`defenders-failed-to-load`), a partial defender with undeclared killers |
+| `ts-vitest-converter` | vitest | strict TypeScript; plugins loaded by a computed `import()`; `vi.mock` of a collaborator | a check helper that alternates `expect`/`throw` per run (the `mixed` kill kind), exception-only kills, a type-check-only fault, a reuse edit reachable only through the computed import (rule 8: never reused) |
+| `node-test-catalog3` | node:test | three-package workspace in npm and pnpm layouts; tests reach `@shelf/core` through the link and through a relative path; an ignored `.build/vendor` copy of core (#272) | faults in core defended only by sibling packages' tests, partial, `--changed` over docs-only and one-file commits |
+| `js-vitest-projects-habits` | vitest | `test.projects` with two projects and a file in both (#277, fixed by #280) | every fault keyed as derived by hand; partial with undeclared killers |
+| `js-vitest-mergeconfig-ledger` | vitest | `vitest.config.js` built with `mergeConfig` from `vite` (#278, fixed by #280); `linked-entries` install (#279) | partial |
 
-Every subject also carries a fault that does not parse, a missing anchor and
-an ambiguous anchor.
+Every PR 1 subject also carries a fault that does not parse, a missing anchor
+and an ambiguous anchor; the PR 2 subjects carry a fault that does not parse
+where the runner can report one.
 
 ## Modes and checks
 
 | Mode | What runs | Checked against |
 |---|---|---|
-| `reference` | serial (`--serial`), `--no-reuse`, fresh process, fresh repository | the key |
+| `reference` | serial (`--serial --fault-workers 1`, recorded as one worker), `--no-reuse`, fresh process, fresh repository | the key |
 | `twice` | the same probe again in the same repository | key, reference |
 | `reuse` | seed; unchanged; after the keyed edit to an imported file; after a simulated tool-version change | key (with the edit's overrides); unchanged run reuses something; the edit re-measures every fault that imports the file; the version change reuses nothing |
 | `default` | no width flag and `TESTGUARD_FAULT_WORKERS` unset: the CLI's automatic width (#270) | key, reference (map and order), `run.faultWorkersSource: auto` with `run.cpus` |
@@ -117,7 +163,10 @@ as a kill, a mixed result counted as a kill, a fault not restored, reuse
 ignoring the import closure or the tool version, the type check skipped, a
 not-reached fault dropped, the fan-out sharing one tree, the negative control
 skipped, a git failure read as an empty change, an exception-only kill
-reported as an assertion, a baseline that need not be green). `--tool-mutants`
+reported as an assertion, a baseline that need not be green, a mixed kill
+kind read as assertion, a defender that cannot load read as flaky, vitest's
+error classes dropped, a Playwright timeout read as a failure, unittest's
+error channel read as an assertion, discovery writing into the project). `--tool-mutants`
 applies each to a scratch copy of the tool and runs the subjects and modes its
 manifest entry names, stopping at the first red check. The scorecard reports
 N of M caught; a mutant nothing catches is a gap in the corpus. A mutant must be
@@ -145,11 +194,12 @@ summary, with the base branch's numbers beside it when the base has one.
 
 | Issue | Subject | What |
 |---|---|---|
-| #263 | `node-test-floorplan` | A fault in a workspace package, defended by a sibling package's test through the `node_modules` link, reads `unverifiable`/`subject-not-executed`: the scratch worktree's link resolves to the original checkout. Known failure for `LSHAPE-ESTIMATE-USES-CORE-AREA/F1`, `/F2`. |
-| #264 | `ts-vitest-stock` | A vitest alias written `fileURLToPath(new URL('./src', import.meta.url))` makes `probe` refuse the whole project (exit 2). The subject uses the equivalent `join()` form so it measures everything else. |
-| #266 | `js-jest-newsletter` | `module.exports = { X: call() }` in `src/errors.js` makes every closure indeterminate: nothing is reused and `--changed` selects every claim (a safe superset). Known failure for the `footer-source` selection. |
-| #267 | `ts-vitest-stock` | `export interface` marks a module `unsupported-syntax`, so every closure is indeterminate: nothing is reused and `--changed` selects every claim (a safe superset). Known failure for the `adjustments-test` selection. |
-| #268 | `node-test-floorplan` | `--changed` after an edit to `packages/geometry/src/units.js` selects only the 4 geometry claims and misses the 4 planner claims that import it through `@floorplan/geometry`: an **unsound** selection (stale verdicts stand). Known failure for the `geometry-source` selection. |
+| #263 | `node-test-floorplan` | A fault in a workspace package, defended by a sibling package's test through the `node_modules` link, reads `unverifiable`/`subject-not-executed`: the scratch worktree's link resolves to the original checkout. Known failure for `LSHAPE-ESTIMATE-USES-CORE-AREA/F1`, `/F2`. **Fixed by #276**; the subject now matches its key. |
+| #264 | `ts-vitest-stock` | A vitest alias written `fileURLToPath(new URL('./src', import.meta.url))` makes `probe` refuse the whole project (exit 2). The subject uses the equivalent `join()` form so it measures everything else. **Fixed by #276**; the subject now matches its key. |
+| #266 | `js-jest-newsletter` | `module.exports = { X: call() }` in `src/errors.js` makes every closure indeterminate: nothing is reused and `--changed` selects every claim (a safe superset). Known failure for the `footer-source` selection. **Fixed by #276**; the subject now matches its key. |
+| #267 | `ts-vitest-stock` | `export interface` marks a module `unsupported-syntax`, so every closure is indeterminate: nothing is reused and `--changed` selects every claim (a safe superset). Known failure for the `adjustments-test` selection. **Fixed by #276**; the subject now matches its key. |
+| #268 | `node-test-floorplan` | `--changed` after an edit to `packages/geometry/src/units.js` selects only the 4 geometry claims and misses the 4 planner claims that import it through `@floorplan/geometry`: an **unsound** selection (stale verdicts stand). Known failure for the `geometry-source` selection. **Fixed by #276**; the subject now matches its key. |
+| #282 | `js-vitest-booking` | Escalation names no undeclared killer when an unrelated test file fails to load: three tests fail by assertion in every whole-suite run, but the run's outcome is `error`. Known for `RATES-AND-PEAK-WINDOW/F1`, `/F2`. |
 | #265 | `js-jest-newsletter` | GATE-SEMANTICS does not order `nocover` against an invalid anchor; the tool says `nocover`, the key says `anchor-ambiguous`. Known failure for `SCHEDULE-VALIDATION/F1` until the spec settles it. |
 
 ## A project outside the repository

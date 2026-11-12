@@ -1,0 +1,63 @@
+{
+  "expected": {
+    "INVALID-DATE-REJECTED/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Malformed dates parse to a value instead of NaN; test/shared.test.js (in both vitest projects, so it runs once per project) fails by assertion in all three runs."
+    },
+    "INVALID-DATE-REJECTED/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "checkIn stops validating its date; the InvalidDateError assertions in shared.test.js fail in all three runs."
+    },
+    "CURRENT-STREAK-TODAY-OR-YESTERDAY/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "A streak ending yesterday counts as 0; test/streaks/streak.test.js (project 'streaks') fails by assertion in all three runs."
+    },
+    "CURRENT-STREAK-TODAY-OR-YESTERDAY/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "'Yesterday' becomes two days ago; streak assertions fail in all three runs."
+    },
+    "FREEZE-BRIDGES-ONE-GAP/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "A freeze bridges a gap with no check-in before it; streak assertions fail in all three runs."
+    },
+    "FREEZE-BRIDGES-ONE-GAP/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Every missing day is bridged; streak assertions fail in all three runs."
+    },
+    "FREEZE-BRIDGES-ONE-GAP/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The bridge checks the frozen day instead of the day before; assertions fail in all three runs."
+    },
+    "WEEKLY-PERCENT-ROUNDED/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Percentages truncate instead of rounding half up; test/weekly/weekly.test.js (project 'weekly') fails by assertion in all three runs."
+    },
+    "WEEKLY-PERCENT-ROUNDED/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Sunday is never counted; assertions fail in all three runs."
+    },
+    "WEEKLY-PERCENT-ROUNDED/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The week starts on the given date instead of its Monday; assertions fail in all three runs."
+    },
+    "FREEZE-NOT-A-CHECKIN/F1": {
+      "verdict": "survived",
+      "why": "shared.test.js never freezes a day that already has a check-in (partial on R4: no ConflictError check): green 3/3. Control (tracker.js unparseable) fails to load, so it executes the module. Whole suite 3/3: no test fails in every run."
+    },
+    "FREEZE-NOT-A-CHECKIN/F2": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "A freeze recorded as a check-in passes the declared shared.test.js 3/3; test/streaks/streak.test.js and test/weekly/weekly.test.js fail in all three runs and are not declared for this claim."
+    }
+  }
+}
