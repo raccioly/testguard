@@ -1,9 +1,17 @@
 name: Scheduled Release
 
 # Weekly: if anything releasable merged since the last tag, bump the patch
-# version, write the CHANGELOG entry, sync every version surface, verify the
-# tree is green, and open a release PR with auto-merge armed. Once merged, the
-# hourly sweep in release.yml tags and publishes.
+# version, write the CHANGELOG entry, sync every version surface, run the unit
+# tests, and open a release PR with auto-merge armed. Once merged, the hourly
+# sweep in release.yml tags and publishes.
+#
+# The release tree is probed in full ONCE, by the release PR's own CI (ci.yml
+# on a release/ branch, which stores the evidence as an artifact keyed by the
+# git tree hash); release.yml verifies that artifact instead of probing again.
+# This workflow therefore does not probe. It also (a) refuses to cut a branch
+# while the previous release's Homebrew checksum has not landed on main, since
+# merging main into the branch afterwards would change the tree the evidence
+# is keyed by, and (b) fails visibly if the PR it opens cannot merge.
 #
 # GITHUB_TOKEN-created PRs do not trigger `pull_request` workflows, so nothing
 # would ever start the required checks and auto-merge would wait forever. This
@@ -75,6 +83,15 @@ jobs:
             echo "$COMMITS" > /tmp/commits.txt
           fi
 
+      # The previous release's Homebrew checksum lands on main as its own PR
+      # after each publish. A branch cut before it merges conflicts with it
+      # (v0.23.2 sat open and unmergeable). Wait for it, bounded, else fail.
+      - name: The previous release's Homebrew checksum must be on main first
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node .github/scripts/release-preflight.mjs --wait 1800
+
       - name: Bump version and write changelog
         if: steps.check.outputs.changed == 'true'
         run: |
@@ -99,26 +116,16 @@ jobs:
           node .github/scripts/build-one-pager.mjs --require-chrome
           echo "NEW_VERSION=$NEW" >> "$GITHUB_ENV"
 
-      - name: Verify the tree is still green
+      - name: Verify the tree is still green (unit tests; the full self-probe runs once, on the release PR)
         if: steps.check.outputs.changed == 'true'
-        # --include-dirty is REQUIRED here, not a convenience. The step above
-        # bumped the version and synced every surface, and those writes are
-        # still uncommitted: the commit happens later, in the PR step. One of
-        # those surfaces, packaging/gitlab/testguard.gitlab-ci.yml, is the
-        # fault target of TG-GITLAB-PROBE-EXIT-PRESERVED, so the default
-        # worktree mode refuses to run at all — "1 defender/target file has
-        # uncommitted changes … worktree mode probes HEAD, so those changes
-        # would be silently ignored" (exit 2). That refusal is correct; the
-        # answer is to probe the tree we are about to release, which is what
-        # --include-dirty does (it snapshots the working tree into a scratch
-        # commit). --ignore-dirty would probe HEAD and quietly verify the
-        # PREVIOUS version instead, which is the optimistic reading this
-        # project does not take.
+        # No probe here. The bumped tree is committed in the next step and the
+        # release PR's CI probes exactly that tree in full, then release.yml
+        # verifies the stored evidence. Probing it here as well was the first of
+        # three identical full probes per release.
         run: |
           npm ci
           npm ci --prefix fixtures/known-answer-typescript
           npm test
-          node cli/testguard.mjs probe . --budget 180000 --quiet --include-dirty --out "$RUNNER_TEMP/self.json"
 
       - name: Open release PR with auto-merge armed
         if: steps.check.outputs.changed == 'true'
@@ -175,6 +182,11 @@ jobs:
             # workflow runs. The Homebrew PR path uses the same helper so the
             # two release automations cannot drift again.
             .github/scripts/approve-held-runs.sh "$HEAD_SHA" "$PR"
+
+            # A PR that cannot merge must fail THIS workflow, loudly: v0.23.2's
+            # conflicted with main and sat open, auto-merge armed and never
+            # firing, until someone looked. Bounded; CI still running is fine.
+            node .github/scripts/await-mergeable.mjs "$PR" --wait 300
           else
             cat /tmp/pr-err
             if grep -q 'not permitted to create or approve pull requests' /tmp/pr-err; then

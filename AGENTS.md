@@ -1,6 +1,6 @@
 # AI Agent Instructions — TestGuard
 
-<!-- docguard:last-reviewed 2026-09-22 -->
+<!-- docguard:last-reviewed 2026-11-12 -->
 
 Read this before changing anything. It is short on purpose.
 
@@ -16,37 +16,63 @@ their first consumer.
 ## Commands you will use
 
 ```bash
-npm test               # unit + fixture acceptance (~15s)
-npm ci --prefix fixtures/known-answer-playwright   # once; without it the Playwright fixture acceptance silently skips
 npm ci --prefix fixtures/known-answer-typescript   # once; without it the type-check suites fail loudly (they never skip)
+npm ci --prefix fixtures/known-answer-playwright   # once; without it the Playwright fixture acceptance silently skips
+npm test               # unit + fixture acceptance
 npm run test:spec      # conformance suite only
-npm run self:probe     # TestGuard probes its own claims; must exit 0
+node cli/testguard.mjs gate --changed origin/main   # every changed source file, tests included, needs a claim
+node cli/testguard.mjs claims --check-anchors       # every fault anchor and replacement is valid (50 ms; a stale one costs a CI probe)
+node cli/testguard.mjs probe . --changed origin/main   # only the claims your change can reach (what a pull request runs)
+npm run self:probe     # every claim of this repository; must exit 0
 npm run test:install   # the packed tarball must run with production deps only
-node cli/testguard.mjs claims fixtures/known-answer
+npm run corpus                      # the benchmark corpus: every subject, every mode, against hand-derived keys
+npm run corpus -- --tool-mutants    # deliberately broken builds of the tool must each turn the corpus red
+npm run corpus -- --check-mutants   # every mutant patch still applies (no runs)
 node cli/testguard.mjs scaffold src/probe/classify.mjs --json   # what the producers propose for a file
 ```
 
+Run `npm run corpus` before any change to `src/probe/`.
+
 ## Key files
 
-- `spec/schemas/common.schema.json` — verdicts, fault classes, provenance. The closed sets.
-- `spec/lib/validate.mjs` — semantic rules (green baseline, N/N agreement, assertion-only kills, fingerprint derivation).
-- `src/probe/classify.mjs` — the verdict function. Pure. Its check order *is* `GATE-SEMANTICS.md`.
-- `src/probe/mocks.mjs` — mock-awareness: which candidate tests mock the target (never defenders), and the `mocked-never-asserted` signal. `src/probe/rank.mjs` resolves aliases (tsconfig `paths` through `extends`/`references`, vite/vitest `resolve.alias`, package.json `imports`).
-- `src/probe/probe.mjs` — orchestrator: isolation → baseline (cached per defender set) → apply → probe → escalate → restore → classify → rank.
-- `fixtures/known-answer/expected.json` — the oracle. Never edit it to match output.
+`src/probe/probe.mjs` is the orchestrator; the other `src/probe/` modules are
+its pieces. A probe runs in phases:
+
+1. **Plan** every fault in claim/fault order on one tree: defenders, input
+   hashes, the anchor, reuse, and the `--typecheck` check. No test runs.
+2. **Baselines**, one per defender set, side by side; a set measured under
+   contention that is not green N/N is measured again alone.
+3. **Fan-out**: the remaining faults go to up to `auto` trees at once
+   (`min(4, cpus/2)`), each in its own scratch worktree.
+4. **Solo confirmation**: a kill is never believed from a fan-out run alone;
+   at least one probe run is repeated with nothing else in flight.
+5. **Serial lane and re-measure**: a defender set that is not parallel-safe,
+   or any outcome contention can manufacture, runs alone in a fresh tree.
+   Records are published in claim/fault order whatever order trees finish in.
+
+- `src/probe/classify.mjs` — the verdict function. Pure. Its check order *is* `spec/GATE-SEMANTICS.md`.
+- `src/probe/scope.mjs` — `probe --changed`: which claims a change can reach (target, defenders, or their import closure). It errs toward probing.
+- `src/probe/dependencies.mjs` — what a verdict depends on beyond target and defenders; reuse, the origin policy and `status` staleness all compare through it.
+- `src/probe/fan-out.mjs` — the pure rules of the fan-out: width, order, what must be re-measured alone.
+- `src/probe/worktree.mjs`, `src/probe/node-modules-link.mjs`, `src/probe/worker-env.mjs`, `src/probe/typecheck.mjs` — scratch trees; how a tree borrows the project's `node_modules` without writing through it; `TESTGUARD_WORKER` (the tree's index, so a suite can stay parallel); the project's own compiler refusing a fault that does not type-check.
+- `src/probe/cost.mjs` — what a probe costs and the cost gate: a ceiling in normalized elapsed seconds, valid for one fan-out width. `testguard.cost-budget.json` holds it.
+- `src/probe/mocks.mjs`, `src/probe/rank.mjs` — which tests mock the target (so never defend it); alias resolution.
+- `src/probe/runners/` — one module per runner over `src/probe/runners/shared.mjs`. A new runner needs its own fixture copy with its own expected-verdicts file, verified by hand.
+- `src/gate/changed.mjs` — claim coverage of a change (`gate --changed`). File-level, delta-only; an uncovered file exits 1.
+- `src/status/status.mjs` — the state machine every rendering derives from. A new state or action is a spec change (`spec/schemas/status.schema.json`) and a skill-template change (`src/init/templates/SKILL.md`) in the same PR.
+- `src/init/managed.mjs` — the hooks, CI files and agent instructions `init` writes, and the hashed markers that let `init --upgrade` tell an edited block from an untouched one.
+- `src/scaffold/producers.mjs`, `src/scaffold/producers.python.mjs` — the fault shapes. Deterministic line heuristics; no AST, no LLM. A new shape needs a synthetic-file test and a README row.
+- `spec/schemas/common.schema.json`, `spec/lib/validate.mjs` — the closed sets (verdicts, fault classes, provenance) and the semantic rules.
+- `corpus/` — the benchmark corpus (`corpus/README.md`): subjects, keys derived by hand, and `corpus/tool-mutants/`.
+- `fixtures/known-answer/expected.json` — the oracle for the fixture probe. Never edit it to match output.
 - `testguard.claims.json` — claims about this codebase, probed in CI.
-- `src/scaffold/producers.mjs` — the nine fault shapes. Deterministic line heuristics; no AST, no LLM. A new shape needs a synthetic-file test and a README row.
-- `src/probe/runners/` — one module per runner (`name`, `testGlobs`, `check`, `tests`, `run`, optionally `owns` for a per-file runner) over `shared.mjs` (jest-compatible report parsing, budgeted process runner, pluggable `parse`/`env`). `check`/`run` also receive `sourceDir` (the real project directory, for a toolchain the scratch worktree does not contain) and `targets` (the fault's files); `check` may return `engine`, and the engine is what the evidence records as `runner.name`. `playwright.mjs` and `python.mjs` are per-file runners: Playwright owns the files under its `testDir`, Python owns every `.py`; `index.mjs` partitions defenders by runner and merges their runs pessimistically. A new runner needs its own fixture copy with its own `expected.json`, verified by hand.
-- `src/probe/runners/python/` — the injected Python reporters (`_testguard_report.py`, a pytest plugin, a stdlib `unittest` main). They reach the interpreter through `PYTHONPATH`, never through an install into the project under test; changing their report shape is a change to `python.mjs`'s `parseReport` in the same PR. They also report **import provenance**, which `probe.mjs` checks once the fault is live — see `checkProvenance` and `GATE-SEMANTICS.md` rule 9.
-- `src/probe/pyimports.mjs` — Python defender discovery, patch-awareness and blast radius, matched by module name. A `patch("pkg.mod.fn")` is NOT a `vi.mock`: it leaves the file a defender. Only a patch of the module itself removes one.
-- `src/scaffold/producers.python.mjs` — the Python fault shapes. A statement is removed with `pass`, never by deleting the line, and a line that leaves a bracket open is never removed: a fault that cannot compile is a probe run that says nothing.
-- `src/gate/changed.mjs` — claim coverage of a change (`gate --changed`). File-level, delta-only; an uncovered file exits 1; every ignore reliance is reported. Its rules are a section of `GATE-SEMANTICS.md`.
-- `src/status/status.mjs` — the state machine every rendering derives from. A new state or action is a spec change (`status.schema.json`) and a skill-template change (`src/init/templates/SKILL.md`) in the same PR.
+- `.github/workflows/ci.yml` — a pull request probes only what it can reach (`.github/scripts/self-probe-scope.mjs`); `main`, the nightly run and release branches probe everything. A scoped run does **not** prove the claims it left out; the full run on `main` after the merge does.
+- `.github/workflows/scheduled-release.yml`, `.github/workflows/release.yml` — the release probes the bumped tree in full **once**, on the release pull request; `.github/workflows/release.yml` verifies that evidence by tree hash (`.github/scripts/release-evidence.mjs`) and never probes again.
 
 ## Rules
 
 1. **Spec first.** A behaviour change that alters what the tool emits is a
-   spec change: schema + `GATE-SEMANTICS.md` + validator + conformance case,
+   spec change: schema + `spec/GATE-SEMANTICS.md` + validator + conformance case,
    in the same PR.
 2. **Never bypass `writeSpecDoc`/`readSpecDoc`.** Output that does not
    conform is a bug, not an inconvenience.
@@ -60,6 +86,16 @@ node cli/testguard.mjs scaffold src/probe/classify.mjs --json   # what the produ
 6. **Keep `classify()` pure** and every branch unit-tested.
 7. **`CHANGELOG.md` `[Unreleased]`** gets an entry for anything user-visible.
 8. Do not add dependencies. Do not add telemetry. Do not add network calls.
+9. **The corpus keys are never edited to match the tool.** A red corpus is a
+   defect in the tool or a key someone must justify, never a number to adjust.
+   A deliberately broken build (`--tool-mutants`) must go red.
+10. **Merge, never rebase or force-push.** Update a branch with `git merge origin/main`.
+11. **Never `pkill` by name.** Other agents and sessions run the same binaries; kill the process you started, by id.
+12. **A test must not run a package manager or use the network.** Fixtures carry their own installs; CI installs them once.
+13. **Every new claim has a unit-level defender**: a fast test of the function that holds the rule, not an acceptance run that stands in for it. A claim pays for its whole defender file on every fault.
+14. **No ceiling is raised without the maintainer**: not the cost budget, not a test-duration budget, not a per-claim limit. Fix the cost.
+15. **Parallel is the default.** The probe fans out and tests run side by side: no test may assume one tree, one port, one working directory or one `TESTGUARD_WORKER`.
+16. **Every changed source file needs a claim**, tests included (`gate --changed origin/main`).
 
 ## Bots
 

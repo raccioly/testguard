@@ -14483,6 +14483,536 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-RELEASE-EVIDENCE-DESCRIBES-THE-TREE-AND-FAILS-CLOSED",
+      "statement": "A release ships only a tree that a complete, clean full probe vouched for: the evidence artifact is named by the git tree hash, comes from a ci.yml run on a release branch of this repository, is unexpired, covers every fault the tree's claims declare and killed every one. Anything else (missing, expired, from elsewhere, for another tree or version, partial, with a survivor) refuses the release instead of probing again.",
+      "source": {
+        "kind": "manual",
+        "ref": "GitHub issue #294"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/release-evidence.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The manifest's tree is not compared with the tree about to be tagged, so evidence of another tree is accepted.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/release-evidence.mjs",
+          "find": "if (manifest?.tree !== tree) problems.push(",
+          "replace": "if (false) problems.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Only a survivor is refused; a timeout, a missing cover or an unverifiable fault passes as if it were killed.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/release-evidence.mjs",
+          "find": "const notKilled = records.filter((r) => r.verdict !== 'killed');",
+          "replace": "const notKilled = records.filter((r) => r.verdict === 'survived');",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Evidence that does not cover every declared fault (a scoped or older probe) is accepted as a full one.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/release-evidence.mjs",
+          "find": "if (missing.length) problems.push(",
+          "replace": "if (false) problems.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "An artifact from a fork's run is trusted.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/release-evidence.mjs",
+          "find": "run.head_repository_id === undefined || run.head_repository_id !== run.repository_id",
+          "replace": "false",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "An expired artifact is still believed.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/release-evidence.mjs",
+          "find": "if (a.expired) {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "An artifact from any workflow, not only ci.yml, is believed.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/release-evidence.mjs",
+          "find": "runs?.[run.id]?.path !== CI_WORKFLOW_PATH",
+          "replace": "false",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "An artifact from any branch, not only a release branch, is believed.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/release-evidence.mjs",
+          "find": "!RELEASE_BRANCH.test(run.head_branch ?? '')",
+          "replace": "false",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F8",
+          "description": "A dirty-tree probe is accepted as evidence of the committed tree.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/release-evidence.mjs",
+          "find": "if (evidence.run?.repo?.dirty === true) problems.push(",
+          "replace": "if (false) problems.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SELF-PROBE-SCOPE-NARROWS-ONLY-ORDINARY-PULL-REQUESTS",
+      "statement": "Only an ordinary pull request that cannot change every verdict runs the scoped self-probe. Pushes to main, the nightly run, dispatches, release branches, a change to the probe, the spec, the CLI, the claims file or the workflow, and any change whose files are unknown run the full probe.",
+      "source": {
+        "kind": "manual",
+        "ref": "GitHub issue #294"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/release-flow-scripts.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every event is treated as a pull request, so a push to main is probed only for what changed.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/self-probe-scope.mjs",
+          "find": "if (event !== 'pull_request') return",
+          "replace": "if (false) return",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A release branch is scoped, so the release's one probe is partial.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/self-probe-scope.mjs",
+          "find": "if (RELEASE_BRANCH.test(branch)) return",
+          "replace": "if (false) return",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Unknown changed files are read as no relevant change and the run is narrowed.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/self-probe-scope.mjs",
+          "find": "if (!Array.isArray(changedFiles)) return",
+          "replace": "if (false) return",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A change under src/probe, spec or cli no longer forces the full probe.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/self-probe-scope.mjs",
+          "find": "if (hits.length) return",
+          "replace": "if (false) return",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A directory prefix matches any path that merely starts with it (a lookalike file), widening or confusing the list.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/self-probe-scope.mjs",
+          "find": "(p.endsWith('/') ? f.startsWith(p) : f === p)",
+          "replace": "f.startsWith(p)",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RELEASE-WAITS-ARE-BOUNDED-AND-FAIL-LOUDLY",
+      "statement": "The release waits for the npm tarball to download as gzip, for the previous Homebrew checksum to land before a release branch is cut, and for its own pull request to be mergeable, each for a bounded time; a conflict, a timeout or a check that could not be made fails the workflow instead of reading as success.",
+      "source": {
+        "kind": "manual",
+        "ref": "GitHub issue #294"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/release-flow-scripts.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A 200 response that is not a gzip tarball (an error page) counts as downloadable.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/wait-for-tarball.mjs",
+          "find": "if (bytes[0] !== 0x1f || bytes[1] !== 0x8b)",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The tarball wait runs one attempt past its deadline.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/wait-for-tarball.mjs",
+          "find": "if (now() >= deadline) return { ok: false, attempts, why: result.why };",
+          "replace": "if (now() > deadline) return { ok: false, attempts, why: result.why };",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A conflicting pull request is not recognized as unmergeable and is waited on.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/await-mergeable.mjs",
+          "find": "view.mergeable === 'CONFLICTING' || view.mergeStateStatus === 'DIRTY'",
+          "replace": "view.mergeStateStatus === 'DIRTY'",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A mergeable pull request is accepted whether or not auto-merge is armed.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/await-mergeable.mjs",
+          "find": "return view.autoMergeRequest ? {",
+          "replace": "return true ? {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "An open Homebrew checksum pull request no longer blocks cutting the next release.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/release-preflight.mjs",
+          "find": ".filter((p) => p.headRefName?.startsWith(HOMEBREW_BRANCH_PREFIX))",
+          "replace": ".filter(() => false)",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "A formula that does not match the published tarball no longer blocks the cut.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/release-preflight.mjs",
+          "find": "if (!formulaOk) out.push(",
+          "replace": "if (false) out.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "A check that could not be made is read as clear.",
+          "faultClass": "statement-deleted",
+          "file": ".github/scripts/release-preflight.mjs",
+          "find": "found = [`could not check: ${error.message}`];",
+          "replace": "found = [];",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RELEASE-WORKFLOWS-PROBE-ONCE-AND-VERIFY",
+      "statement": "ci.yml probes a pull request in scope and a release branch in full, once per commit, storing the evidence by tree hash; release.yml verifies that evidence instead of probing, waits for the tarball after publishing, and the scheduled release waits for the previous checksum and checks its pull request merges.",
+      "source": {
+        "kind": "manual",
+        "ref": "GitHub issue #294"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/release-flow-workflows.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The scoped pull-request probe runs the full probe again.",
+          "faultClass": "statement-deleted",
+          "file": ".github/workflows/ci.yml",
+          "find": "probe . --changed \"origin/${{ github.base_ref }}\"",
+          "replace": "probe .",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Two runs of one release commit no longer serialize, so both probe it.",
+          "faultClass": "return-altered",
+          "file": ".github/workflows/ci.yml",
+          "find": "cancel-in-progress: false\n    strategy:",
+          "replace": "cancel-in-progress: true\n    strategy:",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The release evidence is packaged even when the reuse check was skipped or an earlier probe already stored it.",
+          "faultClass": "condition-forced",
+          "file": ".github/workflows/ci.yml",
+          "find": "&& steps.reuse.outputs.reuse == 'false' ",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "release.yml verifies the evidence only on the recovery path, and probes nothing otherwise.",
+          "faultClass": "condition-forced",
+          "file": ".github/workflows/release.yml",
+          "find": "if: ${{ !inputs.reprobe }}",
+          "replace": "if: ${{ inputs.reprobe }}",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The publish job reports success without waiting for the tarball.",
+          "faultClass": "statement-deleted",
+          "file": ".github/workflows/release.yml",
+          "find": "        run: node .github/scripts/wait-for-tarball.mjs --wait 900",
+          "replace": "        run: echo skipped",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "The scheduled release cuts a branch without waiting for the previous Homebrew checksum.",
+          "faultClass": "statement-deleted",
+          "file": ".github/workflows/scheduled-release.yml",
+          "find": "        run: node .github/scripts/release-preflight.mjs --wait 1800",
+          "replace": "        run: echo skipped",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "The scheduled release never checks that its pull request can merge.",
+          "faultClass": "statement-deleted",
+          "file": ".github/workflows/scheduled-release.yml",
+          "find": "            node .github/scripts/await-mergeable.mjs \"$PR\" --wait 300",
+          "replace": "            true",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COST-GATE-REPORTS-ON-SCOPED-RUNS",
+      "statement": "On a scoped pull-request run the cost check reports what the run cost and warns when it would have failed, but never fails the job, and a change that selected no claim is reported, not an error. A full run is gated exactly as before.",
+      "source": {
+        "kind": "manual",
+        "ref": "GitHub issue #294"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/cost-gate-script.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "--report-only is ignored, so a scoped run fails on a ceiling that describes a full one.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/check-cost-budget.mjs",
+          "find": "  if (values['report-only']) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A scoped run that selected no claim leaves no evidence file and the check crashes on it.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/check-cost-budget.mjs",
+          "find": "if (values['report-only'] && !existsSync(resolve(evidencePath))) {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-AGENTS-MD-NAMES-ONLY-WHAT-EXISTS",
+      "statement": "AGENTS.md, which every agent reads first, names only files, directories, npm scripts, corpus flags and CLI commands that exist, carries a DocGuard review date, and states the rules this repository learned.",
+      "source": {
+        "kind": "manual",
+        "ref": "GitHub issue #294"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/agents-md.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A Key files entry points at a module that does not exist.",
+          "faultClass": "literal-changed",
+          "file": "AGENTS.md",
+          "find": "`src/probe/dependencies.mjs`",
+          "replace": "`src/probe/dependency-hasher.mjs`",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A command names an npm script that does not exist.",
+          "faultClass": "literal-changed",
+          "file": "AGENTS.md",
+          "find": "npm run self:probe ",
+          "replace": "npm run self-probe ",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The pkill rule is dropped.",
+          "faultClass": "statement-deleted",
+          "file": "AGENTS.md",
+          "find": "11. **Never `pkill` by name.**",
+          "replace": "11. **Be careful.**",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

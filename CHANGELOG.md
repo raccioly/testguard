@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **This repository's own CI uses the fast path, and a release probes once
+  (#294, repository only).** A pull request probes only the claims its change
+  can reach (`probe --changed`); `main`, the nightly run, release branches and
+  any change to the probe, spec, CLI, claims file or workflow still probe every
+  fault. The release pull request's full probe is stored as
+  `release-evidence-<tree hash>` and `release.yml` verifies it instead of
+  probing again. Publishing waits for the npm tarball to download, the scheduled
+  release waits for the previous Homebrew checksum, and a release pull request
+  that cannot merge now fails its workflow. `AGENTS.md` is rewritten from the
+  code as it is.
 - **The corpus gains seven subjects, a subject-untouched check and six tool
   mutants (#258, repository only).** Playwright, unittest, a symlinked source
   directory, a computed dynamic import with a mocked collaborator, a

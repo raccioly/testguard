@@ -103,6 +103,35 @@ describe('check-cost-budget.mjs fails closed on its reference', () => {
   });
 });
 
+describe('check-cost-budget.mjs --report-only (a scoped pull-request run)', () => {
+  const over = () => evidence(budget.seconds * 2);
+  const ref = () => ['--reference-before', measurement(atBaseline), '--reference-after', measurement(atBaseline)];
+
+  it('reports a run over the ceiling as a warning and exits 0, where the full gate exits 1', () => {
+    const gated = gate(over(), ...ref());
+    expect(gated.status).toBe(1);
+    const reported = gate(over(), ...ref(), '--report-only');
+    expect(reported.status).toBe(0);
+    expect(reported.stdout).toContain('COST BUDGET EXCEEDED');
+    expect(reported.stdout).toMatch(/::warning::scoped run, reported not gated/);
+    expect(reported.stdout).toMatch(/^cost-measurement \{.*"ok":false/m);
+  });
+
+  it('does not excuse a missing reference: that is still reported, and still a warning only', () => {
+    const r = gate(evidence(1), '--report-only');
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('COST REFERENCE MISSING');
+  });
+
+  it('a change that selected no claim leaves no evidence: reported, not an error; a full gate still fails on it', () => {
+    const absent = join(dir, 'never-written.json');
+    const reported = gate(absent, '--report-only');
+    expect(reported.status).toBe(0);
+    expect(reported.stdout).toMatch(/selected no claim/);
+    expect(gate(absent).status).not.toBe(0);
+  });
+});
+
 describe('the budget file records how its reference was taken', () => {
   it('names the workload the script measures and a positive baseline, range and drift limit', () => {
     expect(budget.reference.workload).toBe(WORKLOAD);
