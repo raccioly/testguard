@@ -1,0 +1,79 @@
+{
+  "expected": {
+    "SEARCH-TRIMMED-CASE-INSENSITIVE/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Queries keep their surrounding spaces; e2e/search.spec.mjs's failed expect steps (Playwright reports the expect step) fail in all three runs."
+    },
+    "SEARCH-TRIMMED-CASE-INSENSITIVE/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Title matching becomes case-sensitive; the search assertions fail in all three runs."
+    },
+    "TAG-FILTER-AND-SEMANTICS/F1": {
+      "verdict": "timeout",
+      "reason": "test-timed-out",
+      "why": "Tags combine with OR instead of AND, so the tag test waits for a card count the page never shows: Playwright reports the test timedOut (15 s test timeout) in all three runs. Rule 3: a timed-out test is a timeout, never an assertion failure, and a timeout is not a kill."
+    },
+    "TAG-FILTER-AND-SEMANTICS/F2": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "The partial e2e/tags.spec.mjs never combines a search with a tag: green 3/3. Control (filter.js unparseable: the page never renders, the test times out) red, so it reaches the module. The whole suite fails in all three runs, by assertion, in e2e/search.spec.mjs and e2e/sort.spec.mjs, which are not declared; no run had a load error or a timeout."
+    },
+    "SORT-ORDER-AND-TIEBREAKS/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Same-title cards lose their year tiebreak; sort assertions fail in all three runs."
+    },
+    "SORT-ORDER-AND-TIEBREAKS/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Newest-first becomes oldest-first; sort assertions fail in all three runs."
+    },
+    "FAVORITE-TOGGLE-AND-COUNT/F1": {
+      "verdict": "survived",
+      "why": "The hollow e2e/favorites.spec.mjs only checks that the page renders: green 3/3. Control red (the page never renders without the module). Whole suite 3/3: no test fails in every run."
+    },
+    "FAVORITE-TOGGLE-AND-COUNT/F2": {
+      "verdict": "survived",
+      "why": "As F1: the favorites count is never read."
+    },
+    "FAVORITE-TOGGLE-AND-COUNT/F3": {
+      "verdict": "survived",
+      "why": "As F1: aria-pressed is never read."
+    },
+    "TOGGLE-REJECTS-UNKNOWN-NO-MUTATION/F1": {
+      "verdict": "survived",
+      "why": "The hollow favorites test never toggles an unknown id: green 3/3, control red, no whole-suite killer."
+    },
+    "TOGGLE-REJECTS-UNKNOWN-NO-MUTATION/F2": {
+      "verdict": "survived",
+      "why": "As F1: mutation of the input set is never checked."
+    },
+    "CARD-VALIDATION-BOUNDS/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Year 2026 is rejected; the node-side e2e/cards.spec.mjs has assertion failures (and one exception) in every run."
+    },
+    "CARD-VALIDATION-BOUNDS/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Whitespace-only fields are accepted; assertions fail in all three runs."
+    },
+    "CARD-RENDER-AND-UNIQUE-IDS/F1": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "Duplicate ids are no longer rejected; the browser render test never builds duplicates: green 3/3, control red. The node-side e2e/cards.spec.mjs fails by assertion in all three whole-suite runs and is not declared for this claim."
+    },
+    "CARD-RENDER-AND-UNIQUE-IDS/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The rendered year is off by one; render assertions fail in all three runs."
+    },
+    "CARD-RENDER-AND-UNIQUE-IDS/F3": {
+      "verdict": "timeout",
+      "reason": "test-timed-out",
+      "why": "`by ${card.photographer` does not parse, but it is a browser module: the test files load, the page never renders, and every render test times out waiting for the grid in all three runs. Playwright reports a timeout, not a parse or transform error, so by docs/reference/verdicts.md this is timeout/test-timed-out, not fault-invalid/replacement-does-not-compile (which needs the runner to report a parse error)."
+    }
+  }
+}
