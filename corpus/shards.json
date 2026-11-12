@@ -128,7 +128,7 @@
     },
     {
       "name": "mutants-scope",
-      "args": "--tool-mutants --mutant not-reached-fault-dropped --mutant changed-git-failure-is-empty",
+      "args": "--tool-mutants --mutant not-reached-fault-dropped --mutant changed-git-failure-is-empty --mutant converge-never-converges --mutant converge-drops-carried-records",
       "timeout": 15
     },
     {

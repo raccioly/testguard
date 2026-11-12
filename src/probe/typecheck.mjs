@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
-import { copyFileSync, existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { childScope, scratchRoot } from '../scratch-dir.mjs';
-import { extname, join, relative, sep } from 'node:path';
+import { dirname, extname, join, relative, sep } from 'node:path';
 import { registerChild } from './runners/lifecycle.mjs';
 import { resolveRunner, splitCommandWords, terminateProcessTree } from './runners/shared.mjs';
 import { PreconditionError } from './worktree.mjs';
@@ -98,6 +98,7 @@ export async function createTypechecker({ projectDir, command = '', budgetMs = 1
     let version;
     let checkJs = false;
     let program; // project-relative files tsc reads (the default command only)
+    let programDigest; // what the compiler's answer is a function of (#293), the default command only
     if (custom) {
       argv = words;
       identity = { kind: 'custom', argv: words };
@@ -139,6 +140,7 @@ export async function createTypechecker({ projectDir, command = '', budgetMs = 1
         throw new PreconditionError(`--typecheck: tsc could not list the program's files (${clip(listed.spawnError ?? firstDiagnostic(listed.output) ?? firstLine(listed.output) ?? `exit ${listed.code}`, projectDir)})`, 'typecheck-unavailable');
       }
       program = programFiles(listed.output, projectDir);
+      programDigest = digestProgram({ listed: listed.output, projectDir, config: shown.output, tsconfig: readFileSync(join(projectDir, 'tsconfig.json'), 'utf8') });
       if (program.size === 0) {
         throw new PreconditionError('--typecheck: the tsconfig.json program contains no project file (a solution-style tsconfig with only references, or an include that matches nothing), so a type check could judge no fault. Point a tsconfig at the sources, or pass a command: --typecheck="<cmd>"', 'typecheck-unavailable');
       }
@@ -177,7 +179,7 @@ export async function createTypechecker({ projectDir, command = '', budgetMs = 1
     if (existsSync(info)) copyFileSync(info, snapshot);
 
     return {
-      spec: { commandHash: sha256(JSON.stringify(identity)), version },
+      spec: { commandHash: sha256(JSON.stringify(identity)), version, ...(programDigest ? { programDigest } : {}) },
       stats,
       /** Where the incremental state lives (the default command only), for tests and for anyone reading the scratch area. */
       buildInfoFile: custom ? undefined : info,
@@ -225,9 +227,58 @@ export function programFiles(output, projectDir) {
   return files;
 }
 
-/** Which evidence `run.typecheck` blocks may stand in for one another: the same command and the same checker. */
+/**
+ * `run.typecheck.programDigest` (#293): a type-check answer is a function of
+ * the compiler, its options and the program's files, so a digest of the last
+ * two lets a run carry or reuse a fault's recorded answer without checking the
+ * fault again. Inputs: the project's tsconfig.json and the resolved
+ * configuration `tsc --showConfig` printed (its `extends` chain included), and
+ * every file `tsc --listFilesOnly` reports for the unmodified tree: a file in a
+ * package by the package's name and version (as discovery hashes packages), any
+ * other by its content. An ambient `.d.ts` that nothing imports is in the
+ * program, so changing it changes the digest.
+ */
+export function digestProgram({ listed, projectDir, config = '', tsconfig = '' }) {
+  const entries = new Set([`tsconfig ${sha256(tsconfig)}`, `config ${sha256(config)}`]);
+  const root = realpathSync(projectDir);
+  for (const line of listed.split('\n')) {
+    const path = line.trim();
+    if (!path) continue;
+    const pkg = packageOf(path);
+    if (pkg) { entries.add(`package ${pkg}`); continue; }
+    let hash;
+    try { hash = sha256(readFileSync(path, 'utf8')); } catch { hash = 'unreadable'; }
+    const rel = relative(root, (() => { try { return realpathSync(path); } catch { return path; } })()).split(sep).join('/');
+    entries.add(`file ${rel} ${hash}`);
+  }
+  return sha256([...entries].sort().join('\n'));
+}
+
+/** `name@version` of the package a path under node_modules belongs to, or undefined. */
+function packageOf(path) {
+  const parts = path.split(/[\\/]/);
+  const at = parts.lastIndexOf('node_modules');
+  if (at === -1 || at + 1 >= parts.length) return undefined;
+  const name = parts[at + 1].startsWith('@') ? parts.slice(at + 1, at + 3).join('/') : parts[at + 1];
+  const dir = parts.slice(0, at + 1 + name.split('/').length).join('/');
+  let version = 'unknown';
+  try { version = JSON.parse(readFileSync(join(dir || '/', 'package.json'), 'utf8')).version ?? 'unknown'; } catch { /* no manifest: by name alone */ }
+  return `${name}@${version}`;
+}
+
+/**
+ * Which evidence `run.typecheck` blocks may stand in for one another: the same
+ * command, the same checker and, where both recorded one, the same program
+ * (#293). A record from before the digest (0.24.0) has none: it may stand in,
+ * and each of its faults is checked again once (`needsFaultRecheck`).
+ */
 export function sameTypecheck(recorded, current) {
   if (!recorded && !current) return true;
   if (!recorded || !current) return false;
-  return recorded.commandHash === current.commandHash && recorded.version === current.version;
+  if (recorded.commandHash !== current.commandHash || recorded.version !== current.version) return false;
+  if (recorded.programDigest && current.programDigest) return recorded.programDigest === current.programDigest;
+  return true;
 }
+
+/** Must a recorded type-check answer be checked again, fault by fault? Only when the digest cannot vouch for it. */
+export const needsFaultRecheck = (recorded, current) => !(recorded?.programDigest && current?.programDigest && recorded.programDigest === current.programDigest);

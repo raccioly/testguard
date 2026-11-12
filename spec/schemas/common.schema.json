@@ -30,11 +30,19 @@
       "additionalProperties": false
     },
     "assertionPolicy": {
-      "description": "An explicitly selected policy (`--require-assertion-kill`): every `killed` record must have been killed by at least one assertion-classified failure in some run. `failed` lists the killed faults whose kill was by exception only (or carries no recorded kind). The verdicts themselves are unchanged.",
+      "description": "An explicitly selected policy (`--require-assertion-kill`): every `killed` record must have been killed by at least one assertion-classified failure in some run. `failed` lists the killed faults whose kill was by exception only (or carries no recorded kind). `unavailable` (#293): the document holds records a converging probe kept stale (`staleRecords`), which are not current evidence, so the policy can neither pass nor judge them. The verdicts themselves are unchanged.",
       "type": "object",
       "required": ["state", "exceptionOnlyKills"],
       "properties": {
-        "state": { "enum": ["passed", "failed"] },
+        "state": { "enum": ["passed", "failed", "unavailable"] },
+        "staleRecords": {
+          "type": "array", "uniqueItems": true, "minItems": 1,
+          "items": {
+            "type": "object", "required": ["claimId", "faultId"],
+            "properties": { "claimId": { "$ref": "#/$defs/identifier" }, "faultId": { "$ref": "#/$defs/identifier" } },
+            "additionalProperties": false
+          }
+        },
         "exceptionOnlyKills": {
           "type": "array", "uniqueItems": true,
           "items": {

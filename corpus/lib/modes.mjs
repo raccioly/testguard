@@ -10,12 +10,12 @@ import { check, checkKey, differential, expectedFor } from './checks.mjs';
 import { commitEdits, git, listing, prepareRepo, readOnlyNodeModules, unlockAndRemove } from './subject.mjs';
 import { probe, verdictMap } from './tool.mjs';
 
-export const MODES = ['reference', 'twice', 'reuse', 'default', 'workers-2', 'workers-4', 'typecheck', 'changed', 'partial', 'scratch', 'assertion-kill', 'reorder', 'noise'];
+export const MODES = ['reference', 'twice', 'reuse', 'default', 'workers-2', 'workers-4', 'typecheck', 'changed', 'converge', 'partial', 'scratch', 'assertion-kill', 'reorder', 'noise'];
 
 /** Modes that only apply to some subjects. */
 export function applies(mode, subject) {
   if (mode === 'typecheck') return Boolean(subject.config.typecheck);
-  if (mode === 'changed') return Boolean(subject.key.modes?.changed);
+  if (mode === 'changed' || mode === 'converge') return Boolean(subject.key.modes?.changed);
   if (mode === 'noise') return Boolean(subject.config.noise);
   return true;
 }
@@ -229,6 +229,58 @@ export const RUN = {
       checks.push(check('unmeasurable-change-is-a-precondition-failure', bad.exit === spec.badRef.exit && !bad.evidence, { exit: bad.exit, wroteEvidence: Boolean(bad.evidence), stderr: bad.stderr.trim().split('\n').pop() }));
     }
     return result('changed', ctx.subject, { runs, key, diff, checks });
+  },
+
+  /**
+   * Convergence (#293): a full probe into the canonical file, then the
+   * `changed` mode's scripted commits, each followed by `--changed HEAD~1`
+   * with no --out, as a user runs it. Every scoped run must converge, the
+   * merged document must hold no record left stale (the changes were
+   * covered), and its verdict map must equal a from-scratch probe of the same
+   * commit, and the key.
+   */
+  async converge(ctx) {
+    const spec = ctx.subject.key.modes.changed;
+    const repo = prepareRepo(ctx.subject, { scratchRoot: ctx.work });
+    const canonical = join(repo, '.testguard', 'evidence.json');
+    const p = (args) => probe({ toolRoot: ctx.toolRoot, subject: ctx.subject, repo, outPath: null, args, python: ctx.python });
+    const runs = [];
+    const checks = [];
+    const seed = await p([]);
+    runs.push(runSummary('seed', seed));
+    checks.push(exitCheck(seed));
+    for (const step of spec.steps) {
+      commitEdits(repo, step.edits, `corpus: ${step.name}`);
+      const before = existsSync(canonical) ? JSON.parse(readFileSync(canonical, 'utf8')).run.id : null;
+      const r = await p(['--changed', 'HEAD~1']);
+      runs.push(runSummary(`converge-${step.name}`, r));
+      checks.push(exitCheck(r));
+      const converged = r.json?.run?.converged;
+      // A change that selects no claim probes nothing: there is nothing to
+      // converge, and the canonical evidence must be left as it was.
+      const nothingSelected = r.json?.run?.scope?.selectedCount === 0 && !r.json?.run?.id;
+      checks.push(check(`converged:${step.name}`, nothingSelected ? r.evidence?.run?.id === before : converged?.into === canonical, nothingSelected ? 'nothing selected; canonical evidence unchanged' : converged ?? 'run.converged missing'));
+    }
+    const merged = existsSync(canonical) ? JSON.parse(readFileSync(canonical, 'utf8')) : null;
+    const stale = (merged?.records ?? []).filter((x) => x.carried === 'inputs-changed').map((x) => `${x.claim.id}/${x.subject.id}`);
+    // A record left stale is never carried as fresh (the probe checked), so it
+    // is not wrong; it says the selection did not cover a change it should
+    // have. Only a reviewed entry naming this exact list and its issue excuses it.
+    const staleCheck = check('nothing-left-stale', merged && stale.length === 0, stale.length ? { stale } : merged?.run?.reuse ?? 'no canonical evidence');
+    if (!staleCheck.ok && merged) {
+      const k = ctx.known.find((x) => x.subject === ctx.subject.name && x.check === 'nothing-left-stale' && JSON.stringify([...x.observed.stale].sort()) === JSON.stringify([...stale].sort()));
+      if (k) { staleCheck.ok = true; staleCheck.detail.knownIssue = k.issue; }
+    }
+    checks.push(staleCheck);
+    const scratch = await probe({ toolRoot: ctx.toolRoot, subject: ctx.subject, repo, outPath: out(repo, 'converge-scratch'), args: ['--no-reuse'], python: ctx.python });
+    runs.push(runSummary('from-scratch', scratch));
+    checks.push(exitCheck(scratch));
+    const observed = verdictMap(merged);
+    checks.push(check('every-fault-reported', observed.order.length === ctx.subject.faultIds.length, `${observed.order.length} of ${ctx.subject.faultIds.length}`));
+    const diff = scratch.evidence ? differential({ reference: verdictMap(scratch.evidence), observed }) : null;
+    if (!diff) checks.push(check('from-scratch-wrote-evidence', false, refusalReason(scratch)));
+    const key = merged ? checkKey({ subject: ctx.subject, mode: 'changed', map: observed.map, expected: expectedFor(ctx.subject, 'changed'), known: ctx.known }) : null;
+    return result('converge', ctx.subject, { runs, key, diff, checks });
   },
 
   /**

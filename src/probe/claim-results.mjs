@@ -43,7 +43,11 @@ export function claimResult(faults) {
  */
 export function claimResults(records) {
   const byClaim = new Map();
-  for (const record of records) {
+  for (let record of records) {
+    // A record a converging run kept stale (#293) says nothing about this
+    // tree: it is counted as unverifiable, reason inputs-changed, whatever
+    // verdict it carries, so its claim can never read proven from it.
+    if (record.carried === 'inputs-changed') record = { ...record, verdict: 'unverifiable', detail: { ...record.detail, reason: 'inputs-changed' } };
     const counter = VERDICT_COUNTERS[record.verdict];
     // A verdict outside the closed set is a defect upstream; counting it as a
     // kill would be the optimistic reading, so it is counted as nothing and

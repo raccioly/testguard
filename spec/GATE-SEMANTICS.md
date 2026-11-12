@@ -421,6 +421,8 @@ check order is this rule.
    it. Reuse trusts the previous evidence file: a hand-written record whose
    hashes match is indistinguishable from a measured one. **A gate over
    authors who can write the evidence file must run with `--no-reuse`.**
+   `--no-reuse` also turns off convergence's carrying (see
+   [Convergence](#convergence)).
 
    Evidence is written atomically — an exclusive temporary file in the same
    directory, then a rename — so a run killed mid-write leaves the previous
@@ -711,11 +713,20 @@ check order is this rule.
    different command or checker version. A record carrying `detail.typecheck`
    requires a run that declares `run.typecheck`.
    **Type validity belongs to the whole program**, which no per-fault hash sees
-   (a file added elsewhere can make a clean fault invalid). So when a run that
-   type checks would carry a record forward, it first type checks that fault
-   again — one check, no test run — and carries the record forward only if
-   `detail.typecheck` comes out the same; a `diagnostics` record is carried
-   forward without any test run, since none produced it. A custom command's
+   (a file added elsewhere, or an ambient `.d.ts` nothing imports, can make a
+   clean fault invalid). So the project's own `tsc` records, once per run,
+   `run.typecheck.programDigest` (#293): a hash of tsconfig.json, the resolved
+   configuration (`--showConfig`) and every file `tsc --listFilesOnly` reports
+   for the unmodified tree, a package's files by its name and version and any
+   other file by its content. Reuse and carrying need the same `commandHash`,
+   `version` and `programDigest`, and the run's own clean baseline type check;
+   a fault's recorded `detail.typecheck` then stands with no check of the fault.
+   A different digest reuses and carries nothing. A record from a run that
+   recorded no digest (0.24.0, or a custom command, which cannot list its
+   program) is checked again, fault by fault (one check, no test run), and is
+   carried forward only if `detail.typecheck` comes out the same; after such a
+   run the default command's evidence has a digest. A `diagnostics` record is
+   carried forward without any test run, since none produced it. A custom command's
    `version` is best-effort (the command's own `--version` plus the project's
    `typescript` when it resolves); `--no-reuse` covers a checker that changes
    under neither.
@@ -1280,9 +1291,21 @@ whose difference from HEAD is exactly the commits not pushed yet — the pre-pus
 question. When none is found, or the one found does not resolve to a commit in
 this repository (a shallow CI checkout), the run probes every claim, writes the
 canonical evidence, and says so on stderr even under `--quiet`, naming the fix
-for an unresolvable base. It never probes nothing, and it never exits 2 for a
-base it chose itself; an explicit `--changed <ref>` that does not resolve still
-does. A branch literally named `auto` is written `refs/heads/auto`.
+for an unresolvable base; that line is the run's first. Unless asked otherwise,
+it never probes nothing, and it never exits 2 for a base it chose itself; an
+explicit `--changed <ref>` that does not resolve still does. A branch literally
+named `auto` is written `refs/heads/auto`.
+
+`--when-no-base <full|skip|fail>` says what no resolvable base means (#293);
+it is valid only with `--changed auto`. `full` (the default) is the behavior
+above. `skip` probes nothing, writes nothing, prints one line saying why and
+what to run, and exits 0. `fail` refuses (exit 2, error kind `no-base`). The
+pre-push block passes `--when-no-base skip`: a git hook never starts a full
+probe, which on a large project takes hours; the CI job and the nightly full
+probe are the gate. The option governs only a base that could not be found: a
+base that was found or named but cannot be measured (it does not resolve, no
+merge base, git failed) and any runner failure still exit 2 and fail the push.
+A skipped run has no document, so `skip` is refused with `--json` (exit 3).
 
 A claim is **selected** when any of those paths is one of: a fault's target; a
 defender, whether the claim names it (`defendedBy`, literally or by glob) or
@@ -1303,6 +1326,14 @@ resolved defender or in the closure), `glob` (a changed path only a
 and nothing else. `--claim` intersects: the selection is the requested ids that the
 change reached, in the order requested. An unknown `--claim` id is an error
 whatever the change is.
+
+For a fault whose defenders are **discovered** (no `defendedBy`), the claim is
+also selected when a changed path is one of its discovery inputs (#297): a
+candidate test file, or a file a candidate imports, as discovery finds them now
+or as the claim's evidence recorded them (`inputs.discoveryHashes`; a deleted
+candidate is known only there). An edit to any of them can give the claim a
+defender, which changes its verdict. Discovery that cannot be followed selects
+the claim as an indeterminate closure does. The reason is `discovery`.
 
 Selection has three outcomes, reported in `run.scope.changed.outcome` and
 `run.scope.selectedCount`, and they are never confused:
@@ -1332,8 +1363,127 @@ change whose files are listed there says nothing about those files.
 `--include-dirty`), so it is refused with `--ref` and `--in-place` (exit `3`):
 the selection would describe another tree than the one measured.
 
-A `--changed` run is partial evidence: it writes `evidence-partial.json`, never
-the canonical file, and is never a baseline.
+A `--changed` run's selection is partial evidence. When the run may converge
+(see [Convergence](#convergence)) it updates the canonical file; otherwise it
+writes `evidence-partial.json`, which is never a baseline.
+
+## Convergence
+
+A scoped probe (`--claim`, or `--changed` with a determined selection) updates
+the canonical evidence `.testguard/evidence.json` instead of leaving it to the
+next full probe (#293). The written document holds, in claims-file order:
+
+- **measured**: the records of the selected claims, as this run measured them
+  (a record this run reused under rule 8, after its live baseline, counts as
+  measured here: its claim was selected);
+- **carried** (`carried: "inputs-match"`, with `reusedFrom`): for every other
+  fault with a record in the canonical evidence, that record unchanged, when
+  the probe finds in the tree it probed (HEAD, or the snapshot under
+  `--include-dirty`) exactly the inputs the record was measured with. That
+  check is the input half of rule 8's reuse rule (target, defenders, test
+  universe, discovery, import closure, fault content, claim metadata), plus
+  the same run-level rule (tool version and instrument digest, N, worker
+  policy, runner, type-check command and program digest). Under `--typecheck`
+  with equal digests no fault is checked again; evidence without a digest is
+  checked fault by fault, and a fault is carried only if `detail.typecheck`
+  agrees. What it leaves out is the live baseline: no defender runs for a
+  carried record;
+- **kept stale** (`carried: "inputs-changed"`, with `reusedFrom`): every other
+  record, unchanged. It describes another tree. It is kept so that its verdict
+  is not lost (`changedFaults` and `review-fault-change` depend on it), never
+  as a statement about this tree. `status` names every such record stale by
+  its mark, whatever its own hashing says: the probe's check sees inputs
+  `status` does not (the test universe, discovery, the type check), and
+  `status` and `baseline` must give the same answer about one document.
+
+A kept-stale record is **never reuse and never current**. Its `reusedFrom` is
+provenance only. Wherever it is reported, the output says why an unselected
+record can have changed inputs when the selection was sound: its inputs changed
+outside the change that was probed, either before that change's base (the
+evidence is older than the base) or in an input the selection does not follow
+(the test universe, defender discovery). Where the record is used:
+
+- `status` lists it stale by name;
+- per-claim results count it `unverifiable` with reason `inputs-changed`, so
+  its claim reads `could-not-verify` unless a current fault makes it
+  `unproven`;
+- `baseline` refuses the document and names it;
+- `--require-assertion-kill` is `unavailable` while one is present (state
+  `unavailable`, `staleRecords`; exit 2), never `passed`;
+- the origin policy is `unavailable` (`stale-inputs`).
+
+A fault with no earlier record stays absent, so `status` still says it was
+never probed. `run.reuse` is `{ measured, reused, stale }`: carried records
+count as `reused`, kept-stale records as `stale` (absent when zero), and the
+validator requires the three to add up to the record count.
+`run.scope` names `selectedClaims`, `requestedClaims` for `--claim`, the
+`changed` ref, base and head for `--changed`, and `carriedFrom`: the run whose
+document the other records came from. A carried record keeps the verdict it
+had, and convergence never upgrades one.
+
+**What a carried record vouches for.** Its recorded inputs equal the tree this
+run probed, under the same instrument. It does not vouch for anything no hash
+sees (installed packages, the interpreter, a data file a test reads): that was
+last checked by the run that measured it. **The full probe stays the periodic
+re-verification**, and `status` notes how many records were carried.
+
+**When the canonical file is not touched.** The run writes
+`evidence-partial.json` as before, and says why, when any of these holds:
+
+- it is provisional (`--confirm` below 3);
+- its command budget ran out;
+- it probes `--ref`;
+- it runs with `--no-reuse`;
+- `--out` names another file;
+- there is no canonical evidence yet;
+- the canonical evidence fails the run-level rule (any other TestGuard version
+  or configuration digest carries nothing);
+- another command wrote the canonical file while this one ran.
+
+An undetermined `--changed` writes nothing at all. `--no-reuse` disables
+carrying for the same reason it disables reuse: a gate over authors who can
+write the evidence file must not trust a record it did not measure.
+
+**Exit code and policies.** The findings gate and `run.claims[]` still read
+only the measured records, so a scoped run's exit code keeps meaning "the
+selection". The written document carries no origin or assertion policy from
+the document it replaced. `--require-assertion-kill` gives two answers. The
+document's `assertionPolicy` is evaluated over every record written: a carried
+kill without a recorded `killKind` fails it, and a kept-stale record makes it
+`unavailable`. The run's exit code, `probe --json`'s `run.assertionPolicy` and
+the printed policy line judge only the records this run measured, as a scoped
+run always has; the output says in one line when the document's answer
+differs, naming what outside the selection it did not judge. So a stale record
+from another commit never turns a scoped run red, and never reads as passed in
+the evidence file either. `--require-origin` refuses `--claim` and
+`--changed`, before this change and after it, so the origin policy has no
+scoped answer to split.
+`--require-origin` still refuses `--claim` and `--changed`, so a carried
+record never contributes to an origin-policy pass.
+
+**Baseline.** `baseline` keeps refusing a provisional or budget-cut document,
+and also refuses a document holding any `inputs-changed` record, naming them.
+When it freezes a document with carried records, it says how many.
+
+Validators reject:
+
+- a `carried` record without `reusedFrom`, or with this run's id;
+- carried records in a document without `run.scope`;
+- a carried record whose claim was selected;
+- a record without `carried` whose claim was not selected;
+- `run.scope` on a provisional or budget-cut run;
+- `run.reuse` counts that do not add up to the records;
+- an assertion policy whose `staleRecords` are not exactly the kept-stale
+  records, or whose state is not `unavailable` while there is one.
+
+Run ids name their start time to the millisecond (`run-20261112T153612123`;
+earlier releases wrote seconds). A converging run checks that nobody else
+wrote the canonical file by comparing ids, and it carries from an earlier run,
+so two runs that start in the same second must not share one.
+
+`probe --json` reports `run.converged`: `into` (the canonical file),
+`carriedFrom`, `carried` and the `stale` fault ids, or `into: null` with the
+`reason`.
 
 ## Per-claim results
 
@@ -1354,6 +1504,10 @@ counts, in this order, rounding toward unproven:
 2. otherwise at least one fault was measured and every one is `killed` → `proven`;
 3. anything else (`unverifiable`, `timeout`, `fault-invalid`, `flaky-defender`, or
    no fault measured at all) → `could-not-verify`.
+
+A record a converging probe kept stale (`carried: "inputs-changed"`, see
+[Convergence](#convergence)) is counted as `unverifiable` with reason
+`inputs-changed`, whatever verdict it carries.
 
 `could-not-verify` is neither a pass nor a finding about the code: the
 measurement did not happen, so the remedy is to repair the claim or the suite's
@@ -1393,6 +1547,17 @@ A suite that needs a port, a database or a directory of its own derives it
 from the index (`8787 + TESTGUARD_WORKER`) and stays parallel instead of being
 measured alone. The index is never part of a verdict or of reuse.
 
+Two probe commands on one machine (two agent sessions) must not hand out the
+same index (#293). Each command adds a base: `TESTGUARD_WORKER_BASE` when set
+(a non-negative integer, else a usage error), otherwise its slot times 100.
+The slot is the lowest one no live command holds, recorded as a pid-owned lock
+file under the scratch root's `testguard-locks/worker-slots/`, beside the
+worktree lock, and removed when the command ends. A slot whose owner is
+provably gone (same host, pid not running) is taken over. A lone command holds
+slot 0 and hands out 0, 1, 2… as before. Commands that use different scratch
+roots do not coordinate; with every slot held, or a scratch root that cannot
+hold a lock file, a command starts at 0.
+
 ## Speed advice
 
 `status`, `brief` and the end of a text-mode `probe` carry `advice` (#270):
@@ -1407,7 +1572,7 @@ and local git, and makes no network call. The set is closed:
 | `full-probe-where-changed-would-do` | asked about a change — `status --changed <ref>`, or the end of a full probe with the base `--changed auto` would use — `next.action` is `probe` (status), and the change selects fewer claims than the file holds (the selection rule of [Probing a change](#probing-a-change)). Selecting walks every claim's import closure, so a `brief`, the MCP tools and a `status` without `--changed` do not compute it. | `testguard probe --changed auto` |
 | `nothing-reused` | the last evidence reused no verdict, measured at least one fault, and took a minute or longer | `testguard probe` |
 | `slow-defenders-dominate` | the last evidence holds at least 20 claims and 600 s of recorded defender time, and one to three claims each hold at least 10% of it with at least 5 runs at a median of at least 15 s per run, together at least 25%. The message names each claim, its summed seconds, its slowest defender file with the median seconds per run of every run that included it and that run count (runs execute a claim's defenders together, so a file's time is a ceiling, as in `--cost`), and says to give the claim a faster defender or split the file. Read from recorded `durationMs`; nothing is run. The thresholds are measured: this repository's own evidence peaks at 6.2% and a median 9.9 s, so the rule is silent there; the field run that prompted it had claims at 34% (73 s) and 18% (32 s) | `testguard claims --cost` |
-| `hook-outdated` | a hook or CI file in the repository runs TestGuard with `probe --serial`, probes every claim from a pre-push hook, pins `testguard-cli@<x.y.z>` or the action or pre-commit `rev` below this version, or holds a TestGuard managed block from an older template; one line per file and line, at most five | `testguard init --upgrade` |
+| `hook-outdated` | a hook or CI file in the repository runs TestGuard with `probe --serial`, probes every claim from a pre-push hook, pins `testguard-cli@<x.y.z>` or the action or pre-commit `rev` below this version, runs a floating version (`testguard-cli@latest`, `@next` or `@*`, or `npx testguard-cli` with no version; managed blocks included), or holds a TestGuard managed block from an older template; one line per file and line, at most five | `testguard init --upgrade` |
 
 A selection's view (`--claim`, `--changed`) carries no advice. Validators
 reject an unknown id, a command that is not a `testguard` command, an id other
@@ -1425,6 +1590,40 @@ from an older template and its body still has its recorded hash (or, for a
 skill written before markers, equals a template a release shipped); an edited
 one is reported and left alone unless `--force`. Nothing outside a block is
 touched.
+
+**Pinned versions (#293).** The pre-push block runs an installed TestGuard
+only (the project's, the repository root's, then one on PATH); with none it
+prints how to install exactly the version that wrote it and lets the push
+through, fetching nothing (#301: an npx fetch fails where npm refuses fresh
+releases, and would run unreviewed code from a hook). The CI files run the
+project's installed TestGuard, else exactly the version that wrote them (`npx
+-y testguard-cli@<x.y.z>`). Neither ever runs a floating tag: a floating tag would run every
+new release in an adopter's CI before anyone reviewed it. GitHub Actions in
+the CI template are pinned by commit SHA with the version in a comment. With a
+`package.json`, `init` adds `testguard-cli` at that exact version to
+`devDependencies` (an existing spec is left alone: a floating one is reported,
+a range is noted), and writes a dependency-update rule so releases arrive as
+pull requests: a Renovate `packageRules` entry when the repository has a JSON
+Renovate config, otherwise a Dependabot `npm` entry limited to
+`testguard-cli`, never a second `npm` entry for a directory that already has
+one (the lines to add are reported instead). Template 3 is the first with these
+pins, so `init --upgrade` rewrites an unedited block from template 2.
+
+**The pre-push block under version skew (#293 review).** The block asks the
+resolved binary for `--version` before passing it anything, and passes its
+probe command only when that version is at least `HOOK_MIN_VERSION` (the
+release that added the newest flag the block uses, `--when-no-base`; bumped
+only when the block starts using a newer flag). An older or unreadable
+version prints one line naming both versions and how to install, and lets the
+push through unprobed. Of the probe's exit codes, only 1 (unproven) and 2
+(could not evaluate) refuse the push; 3 (a usage error: an edited flag, or a
+binary the version check could not catch) prints one line and lets it
+through. `TESTGUARD_SKIP_HOOK=1` skips the block with a one-line notice. The
+CI templates pass only `probe --changed auto` and `probe`, which every release
+since 0.24.0 accepts, so an installed binary older than the template that
+wrote them needs no guard there; one older than 0.24.0 fails the CI job with
+exit 3, visibly, and the exact-pinned devDependency `init` adds keeps the
+installed version at the one that wrote the template.
 
 ## Thin claims
 
@@ -1665,6 +1864,11 @@ defaults to one and records no source unless its caller passes one.
    green N/N) is finished there. A fault measured in another tree reads the
    baselines, it never runs them.
 3. **Fan-out.** The remaining faults are handed, in order, to at most n trees.
+   The baseline phase's trees serve as fault trees (#293): a baseline never
+   applies a fault, so its tree is kept, and reused only while `git status`
+   (tracked and untracked files) reads exactly as it did right after the tree
+   was created. A tree that reads otherwise is removed and replaced by a fresh
+   one, and kept trees the fault phase does not need are removed then.
    A fault's probe runs, its negative control and its escalation all run in
    the tree that holds it. A negative control shared by two faults (same
    target, same defenders) is paid once, by whichever asks first.

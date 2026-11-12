@@ -21,6 +21,7 @@ import { checkAnchorLocations } from '../claims/anchors.mjs';
 import { computeClaimedSurface, needsClaimExpansion } from './surface.mjs';
 import { projectAnnotationAdvisory } from '../claims/annotations.mjs';
 import { thinClaims, renderThin } from '../claims/thin.mjs';
+import { STALE_WHY } from '../evidence/carry.mjs';
 
 export const faultContentHash = (fault) => sha256(`${fault.find}\n${fault.replace}`);
 
@@ -205,6 +206,9 @@ function computeStatusCore({ projectDir, toolVersion, generatedAt = new Date().t
   if (!only && evidence.originPolicy) doc.originPolicy = evaluateOriginPolicy({ claims, evidence, eligibleKinds: evidence.originPolicy.eligibleKinds, fresh: false });
   // A verdict is about a commit. When the evidence describes a different one,
   // say both: "looks right and is not" is the failure mode this prevents.
+  // A converged document (#293): say how much of it no defender ran for.
+  const carried = evidence.records.filter((r) => r.carried === 'inputs-match').length;
+  if (carried) doc.notes.push(`${carried} record${carried === 1 ? ' was' : 's were'} carried from ${fullEvidence.run.scope?.carriedFrom ?? 'an earlier run'} by a scoped probe: inputs unchanged, defenders not run, environment not re-checked since; the full probe (testguard probe) re-verifies them`);
   doc.evidenceHead = evidence.run.repo.snapshot ?? evidence.run.repo.head;
   const localHead = (() => { try { return headSha(projectDir); } catch { return null; } })();
   if (localHead) doc.head = localHead;
@@ -234,6 +238,11 @@ function computeStatusCore({ projectDir, toolVersion, generatedAt = new Date().t
     const cur = faultIndex.get(key);
     if (!cur) { doc.stale.push(`fault ${key} was probed but is no longer in the claims file`); continue; }
     if (!sameClaimMetadata(r.claim, cur.claim)) doc.stale.push(`claim metadata for ${key} changed since it was probed`);
+    // A converging probe found this record's inputs did not match the tree it
+    // probed (#293), by the full reuse predicate, which sees more than this
+    // loop does (the test universe, discovery, the type check): stale, so
+    // status and baseline give the same answer.
+    if (r.carried === 'inputs-changed') doc.stale.push(`${key} was kept stale by a scoped probe: ${STALE_WHY}`);
     for (const [file, recordedHash] of Object.entries(r.inputs.discoveryHashes ?? {})) {
       if (!discoveryHashCache.has(file)) {
         let currentHash = null;

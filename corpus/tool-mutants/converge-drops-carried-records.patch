@@ -1,0 +1,9 @@
+diff --git a/src/evidence/carry.mjs b/src/evidence/carry.mjs
+index fe806bc..5cd481c 100644
+--- a/src/evidence/carry.mjs
++++ b/src/evidence/carry.mjs
+@@ -76,3 +76,3 @@ export function mergeEvidence({ measured, canonical, decisions, claims, scope })
+       const record = earlier.get(id);
+-      if (!record || !decision) continue;
++      continue;
+       // `reusedFrom` names the run that measured it: provenance, for a kept
