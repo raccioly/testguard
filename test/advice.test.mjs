@@ -146,6 +146,14 @@ describe('slow-defenders-dominate', () => {
     expect(costAdvice({ records: [...recordsFor('MANY', ['m.test.js'], 40, 6, 4), ...Array.from({ length: 30 }, (_, i) => recordsFor(`C${i}`, [`c${i}.test.js`], 4, 6, 4)).flat()] })).toBeUndefined(); // big share, fast runs (< 15s): more faults, not a slow file
   });
 
+  it('three claims that each hold under 10% say nothing even when together they pass 25% (the share is per claim)', () => {
+    const records = [
+      ...['X', 'Y', 'Z'].flatMap((id) => recordsFor(`SPREAD-${id}`, [`t/${id}.test.js`], 6, 10, 20)), // 1200s each = 9.5% of 12600s
+      ...Array.from({ length: 45 }, (_, i) => recordsFor(`REST-${i}`, [`t/r${i}.test.js`], 2, 5, 20)).flat(), // 200s each
+    ];
+    expect(costAdvice({ records })).toBeUndefined();
+  });
+
   it('this repository\'s own evidence stays silent: its costliest claim holds 6.2% at a median under 10s', () => {
     // The thresholds were chosen from this repository's measured evidence (largest share 6.2%, largest per-run median 9.9s),
     // so the rule says nothing here and fires on the field run (largest share 34%, median 73s).

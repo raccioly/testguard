@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resetConfigCache, webServerPort, foreignServerNote } from '../src/probe/runners/playwright.mjs';
@@ -25,5 +26,24 @@ describe('the note on a webServer the run did not start', () => {
       resetConfigCache();
       expect(await foreignServerNote(dir, ['e2e/a.spec.mjs'])).toBeUndefined();
     } finally { rmSync(dir, { recursive: true, force: true }); resetConfigCache(); }
+  });
+});
+
+describe('a literal port that is still listening after the run', () => {
+  it('is named as the reused server; a free literal port gets the hedged note', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'testguard-note-'));
+    const server = createServer();
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    const { port } = server.address();
+    try {
+      mkdirSync(join(dir, 'e2e'));
+      writeFileSync(join(dir, 'e2e', 'a.spec.mjs'), '');
+      writeFileSync(join(dir, 'playwright.config.mjs'), `export default { testDir: "e2e", webServer: { command: "x", port: ${port}, reuseExistingServer: true } };`);
+      resetConfigCache();
+      expect(await foreignServerNote(dir, ['e2e/a.spec.mjs'])).toMatch(new RegExp(`still listening on port ${port} after the run.*reused one started from another tree`));
+      await new Promise((r) => server.close(r));
+      resetConfigCache();
+      expect(await foreignServerNote(dir, ['e2e/a.spec.mjs'])).toMatch(/may have reused a server/);
+    } finally { server.close(); rmSync(dir, { recursive: true, force: true }); resetConfigCache(); }
   });
 });
