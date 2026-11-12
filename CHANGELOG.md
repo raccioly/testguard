@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-11-12
+
+Automated weekly release — everything merged since `v0.23.0`.
+
+### Changed
+
+- fix(discovery): package imports, in-repo symlinks and vitest projects no longer refuse real projects (#280)
+- chore(homebrew): sha256 for v0.23.0 (#281)
+- test(corpus): benchmark corpus with independent answer keys, harness, scorecard, tool mutants (#258, part 1) (#269)
+
+
 ### Added
 
 - **A benchmark corpus with independent answer keys (#258, repository only, not
