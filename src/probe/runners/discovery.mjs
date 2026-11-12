@@ -8,6 +8,7 @@ import { childScope, scratchRoot } from '../../scratch-dir.mjs';
 import { sha256 } from '../../util/hash.mjs';
 import { globToRegExp, walk } from '../../util/glob.mjs';
 import { parseModuleSource, tokenizeModule } from '../imports.mjs';
+import { resolveAliased } from '../rank.mjs';
 import { terminateProcessTree, TIMEOUT_CLEANUP_WARNING } from './shared.mjs';
 
 export const DISCOVERY_TIMEOUT_MS = 60_000;
@@ -304,7 +305,11 @@ const existingConfigCandidate = (root, path) => {
   return path;
 };
 
-const resolveConfigReference = (root, fromPath, rawReference) => {
+const isDirectoryPath = (path) => {
+  try { return statSync(path).isDirectory(); } catch { return false; }
+};
+
+const resolveConfigReference = (root, fromPath, rawReference, { module = false } = {}) => {
   if (typeof rawReference !== 'string' || rawReference.length === 0 || rawReference.includes('\0')) return [];
   const reference = rawReference.replace(/[?#].*$/, '');
   if (!reference || /[*{}[\]]/.test(reference)) return [];
@@ -324,10 +329,16 @@ const resolveConfigReference = (root, fromPath, rawReference) => {
     // Strings in executable configs also describe URLs and separators. Only
     // existing file candidates are dependencies; the boundary check follows
     // that distinction, while symlinks remain refused even when dangling.
+    // A string that names a directory is a directory, not a module (#264):
+    // `new URL('./src', import.meta.url)` names src/, and reading src/index.ts
+    // as a config dependency followed the application's own imports with none
+    // of its aliases. Only an import specifier resolves to an index file; a
+    // directory string keeps the tsconfig/jsconfig a `references` entry means.
+    const directoryString = !module && isDirectoryPath(base);
     const candidates = extname(base)
       ? [base]
       : [base, ...RESOLVABLE_CONFIG_EXTENSIONS.map((extension) => `${base}${extension}`),
-        ...RESOLVABLE_CONFIG_EXTENSIONS.map((extension) => join(base, `index${extension}`)),
+        ...(directoryString ? [] : RESOLVABLE_CONFIG_EXTENSIONS.map((extension) => join(base, `index${extension}`))),
         join(base, 'tsconfig.json'), join(base, 'jsconfig.json')];
     for (const candidate of candidates) {
       const existing = existingConfigCandidate(root, candidate);
@@ -529,8 +540,22 @@ export function hashDiscoveryConfigs(projectDir, runnerConfigFiles = [], {
     }
     for (const specifier of references.imports) {
       if (specifier.startsWith('.')) {
-        for (const dependency of resolveConfigReference(root, absolute, specifier)) {
+        for (const dependency of resolveConfigReference(root, absolute, specifier, { module: true })) {
           const dependencyName = relativeConfigPath(root, dependency);
+          if (!configPath(dependencyName)) throw new DiscoveryError(`invalid discovery config dependency path: ${dependencyName}`);
+          enqueue(dependencyName);
+        }
+        continue;
+      }
+      // A specifier the project's own alias configuration maps (`@/errors` in
+      // a setup file) is project source, not a package: follow it there. One
+      // the alias maps to nothing is not followed here; the import closure
+      // (rule 8) records it as indeterminate instead of refusing the run.
+      const aliased = resolveAliased(root, absolute, specifier);
+      if (aliased.aliased) {
+        for (const file of aliased.files) {
+          if (!inside(root, file)) continue;
+          const dependencyName = relativeConfigPath(root, file);
           if (!configPath(dependencyName)) throw new DiscoveryError(`invalid discovery config dependency path: ${dependencyName}`);
           enqueue(dependencyName);
         }

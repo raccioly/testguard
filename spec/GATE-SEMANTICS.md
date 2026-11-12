@@ -315,6 +315,21 @@ Rules that follow from the table:
    either makes the closure indeterminate (`unreadable-module`, naming the
    specifier). A link whose target leaves the repository, and a package
    installed as a real directory, stay outside the closure.
+   **An alias is read, or the closure says it could not be.** Aliased
+   specifiers resolve through tsconfig/jsconfig `paths`, package.json
+   `imports` and vite/vitest `alias`. A vite/vitest alias value is read from
+   the config's tokens, never by running the config, over a closed grammar of
+   path expressions: a relative string, `fileURLToPath(new URL('./x',
+   import.meta.url))`, `new URL(…).pathname`, `resolve`/`join`/`dirname` (bare
+   or as `path.…`) over `__dirname`, `__filename`, `import.meta.dirname`,
+   `import.meta.filename`, `process.cwd()` and string literals, and a
+   top-level `const` bound to one of those. An alias whose key is known but
+   whose value is outside that grammar resolves its specifiers to nothing, so
+   a closure that uses it is indeterminate (`unreadable-module`); an alias map
+   that cannot be read at all (a variable, a spread, a computed key, a RegExp
+   `find`) does the same for every bare specifier. Neither refuses the run, and
+   neither is dropped: a dropped alias made its specifiers look like packages,
+   outside the closure.
    **Ordinary export forms are read, not refused.** A module whose exports the
    reader cannot read is `unsupported-syntax`, which makes every importer's
    closure indeterminate, so the reader covers what projects ordinarily write.
@@ -548,8 +563,14 @@ Rules that follow from the table:
 
    Static string literals are conservative dependency candidates, not proof
    of a filesystem dependency. Missing candidates and ordinary directories
-   (including `/` in URL bases and string separators) are ignored. An existing
-   candidate file outside the project, or a candidate symlink, is rejected.
+   (including `/` in URL bases and string separators) are ignored: a string
+   that names a directory (`new URL('./src', import.meta.url)`) is never read
+   as a module through its index file, only a `references` entry's
+   tsconfig/jsconfig is taken from it. An existing candidate file outside the
+   project, or a candidate symlink, is rejected. An import in a config or
+   config dependency that the project's alias configuration maps (rule 8) is
+   followed to the project file it names, never resolved as a package; one the
+   alias maps to nothing is not followed here and never refuses the run.
 
 14. **Barrel resolution follows symbols, not module reachability.** Automatic
    discovery may traverse a re-export chain only for the binding the test

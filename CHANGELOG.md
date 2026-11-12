@@ -35,6 +35,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`dist/`) is linked from the source package. A link to repository source the
   scratch tree does not contain refuses the run with the new precondition
   `workspace-link-outside-tree`, naming the link.
+- **A vitest alias written `fileURLToPath(new URL('./src', import.meta.url))`
+  no longer refuses the whole probe (#264).** Discovery read the string
+  `'./src'` as a module, hashed `src/index.ts` as a config dependency and
+  refused (exit 2) on its first aliased import. A string naming a directory is
+  now never read as a module, and an aliased import in a setup file is followed
+  through the project's alias. The alias reader evaluates the common path
+  expressions (`new URL`, `fileURLToPath`, `path.resolve`/`join`/`dirname`,
+  `__dirname`, `import.meta.dirname`, `process.cwd()`, a top-level `const
+  root = …`) from the config's tokens; an alias it cannot evaluate makes the
+  closure of the files that use it indeterminate instead of being dropped
+  (dropped, its specifiers read as packages, outside the closure), and an alias
+  map it cannot read at all does the same for every bare specifier.
 - **Ordinary TypeScript and CommonJS export forms no longer turn reuse and
   `probe --changed` off (#266, #267).** `export interface` and
   `module.exports = { Name: define() }` marked the module `unsupported-syntax`,

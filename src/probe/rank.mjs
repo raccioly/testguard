@@ -2,6 +2,7 @@ import { readFileSync, existsSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve, extname } from 'node:path';
 import { walk } from '../util/glob.mjs';
 import { createImportResolver } from './imports.mjs';
+import { readConfigAliases } from './alias-config.mjs';
 import { pyBlastRadius } from './pyimports.mjs';
 
 const aliasCache = new Map();
@@ -55,43 +56,23 @@ function loadAliasContext(projectDir) {
     }
   }
 
-  // vite / vitest config: `resolve.alias` as `{ '@': path.resolve(__dirname, './src') }`,
-  // `{ '@': fileURLToPath(new URL('./src', import.meta.url)) }`, `{ '@': './src' }`
-  // or `[{ find: '@', replacement: … }]`. Read as text: the config may be TypeScript.
+  // vite / vitest config `resolve.alias` (and vitest `test.alias`), read from
+  // the config's tokens by a closed path-expression grammar (alias-config.mjs,
+  // #264). An alias whose value is not evaluable keeps its key with no target:
+  // its specifiers resolve to nothing and the closure that uses them is
+  // indeterminate. An alias map that cannot be read at all adds a rule that
+  // matches every bare specifier, with no target, for the same reason.
   for (const f of ['vitest.config.ts', 'vitest.config.mts', 'vitest.config.js', 'vitest.config.mjs', 'vite.config.ts', 'vite.config.mts', 'vite.config.js', 'vite.config.mjs']) {
     const path = join(projectDir, f);
     if (!existsSync(path)) continue;
     configFiles.add(path);
-    const text = readFileSync(path, 'utf8');
-    const start = /\balias\s*:\s*([\[{])/.exec(text);
-    if (!start) continue;
-    // Take the balanced bracket block that follows `alias:`.
-    const open = start.index + start[0].length - 1;
-    const pairs = { '{': '}', '[': ']' };
-    let depth = 0;
-    let end = -1;
-    for (let i = open; i < text.length; i++) {
-      if (text[i] === '{' || text[i] === '[' || text[i] === '(') depth++;
-      else if (text[i] === '}' || text[i] === ']' || text[i] === ')') { depth--; if (depth === 0) { end = i; break; } }
+    const { rules: aliases, opaque } = readConfigAliases(readFileSync(path, 'utf8'), { configFile: path, projectDir });
+    for (const { key, target } of aliases) {
+      if (!key || target === undefined) continue; // a package substitution: outside the project, like any package
+      rules.push({ prefix: key, suffix: '', wildcard: false, targets: target ? [target] : [] });
+      rules.push({ prefix: key.endsWith('/') ? key : key + '/', suffix: '', wildcard: true, targets: target ? [join(target, '*')] : [] });
     }
-    if (end === -1) continue;
-    const block = text.slice(open, end + 1);
-    const PATHLIKE = /(['"])(\.{1,2}\/[^'"]*|src(?:\/[^'"]*)?)\1/;
-    let entries;
-    if (start[1] === '[') {
-      entries = [...block.matchAll(/find\s*:\s*(['"])([^'"]+)\1([\s\S]*?)(?=find\s*:|\]$)/g)].map((m) => [m[2], m[3]]);
-    } else {
-      // key: <value up to the next top-level key>; the value may contain calls with their own commas
-      const keys = [...block.matchAll(/(['"]?)([@#~$\w./-]+)\1\s*:(?!\/)/g)];
-      entries = keys.map((k, i) => [k[2], block.slice(k.index + k[0].length, keys[i + 1]?.index ?? block.length)]);
-    }
-    for (const [key, value] of entries) {
-      const target = PATHLIKE.exec(value)?.[2];
-      if (!key || !target) continue;
-      const abs = resolve(projectDir, target);
-      rules.push({ prefix: key, suffix: '', wildcard: false, targets: [abs] });
-      rules.push({ prefix: key.endsWith('/') ? key : key + '/', suffix: '', wildcard: true, targets: [join(abs, '*')] });
-    }
+    if (opaque) rules.push({ prefix: '', suffix: '', wildcard: true, targets: [], opaque: true });
   }
 
   const pkgPath = join(projectDir, 'package.json');
@@ -229,6 +210,20 @@ const INDEPENDENCE_WEIGHT = { 'separate-change': 1, unknown: 0.95, 'co-authored'
 export function rank({ severity, sourceKind, blast, independence }) {
   const score = SEVERITY_WEIGHT[severity] * (SOURCE_WEIGHT[sourceKind] ?? 0.9) * (1 + Math.log2(1 + blast)) * (INDEPENDENCE_WEIGHT[independence] ?? 1);
   return { score: Number(score.toFixed(3)), blastRadius: blast, tier: severity };
+}
+
+/**
+ * Where an aliased bare specifier written in `fromFile` resolves:
+ * `{ aliased: false }` when no alias rule matches it (a package), else
+ * `{ aliased: true, files }` (empty when the alias names nothing readable).
+ */
+export function resolveAliased(projectDir, fromFile, specifier) {
+  // The catch-all an unreadable alias map adds is not a mapping: it says any
+  // bare specifier MAY be aliased, which the closure honors; it maps nothing.
+  const { rules, configFiles } = loadAliasContext(projectDir);
+  const resolved = createImportResolver(projectDir, { aliases: rules.filter((rule) => !rule.opaque), configFiles }).resolveSpecifier(fromFile, specifier);
+  if (!resolved.usedAlias) return { aliased: false, files: [] };
+  return { aliased: true, files: resolved.status === 'resolved' ? [resolved.file] : resolved.status === 'ambiguous' ? resolved.candidates : [] };
 }
 
 /** The import resolver with this project's alias configuration, for callers that walk many files. */
