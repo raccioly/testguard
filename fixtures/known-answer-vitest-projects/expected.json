@@ -1,0 +1,17 @@
+{
+  "confirmRuns": 3,
+  "expected": {
+    "PROJECT-UI-ADULT-BOUNDARY/F1": {
+      "verdict": "killed",
+      "why": "tests/ui/age.test.mjs runs under its project, ui, and asserts isAdult(18). Verified by hand: with the fault, `vitest run tests/ui/age.test.mjs --project=ui` fails 1 of 1."
+    },
+    "PROJECT-SHARED-NODE-GREETING/F1": {
+      "verdict": "killed",
+      "why": "tests/shared/greet.test.mjs is listed under ui and node and runs under both. Verified by hand: with the fault, --project=ui passes 1 of 1 and --project=node fails 1 of 1. Running it under one project only would let the fault survive."
+    },
+    "PROJECT-UI-ROUNDS-HALF-UP/F1": {
+      "verdict": "survived",
+      "why": "The declared defender never checks which way a half rounds. Verified by hand: with the fault, --project=ui passes 1 of 1. Without --project, vitest's path filter also runs legacy/tests/ui/round.test.mjs, which fails, and the fault would read as killed by a test that is not its defender."
+    }
+  }
+}

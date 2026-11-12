@@ -235,6 +235,21 @@
       "reason": "Checks only that the corpus's tool-mutant patches (corpus/tool-mutants/*.patch) still apply to src/ (git apply --check); it asserts nothing about TestGuard's behavior, so no claim's fault could make it fail except by moving the patched lines, which is exactly what it reports. Runs in npm test so a src/ change that breaks a patch regenerates it in the same pull request.",
       "by": "claude",
       "at": "2026-11-11T23:30:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/probe.vitest-projects.test.mjs",
+      "reason": "Acceptance oracle for vitest test.projects (#277): probes fixtures/known-answer-vitest-projects (hand-verified expected.json) end to end, about 15-35 s a run. Mandatory in npm test and CI. The behavior is claimed by fast defenders: test/vitest-projects.test.mjs (parsing, selection, membership hash; TG-VITEST-*) and test/vitest-projects.run.test.mjs (the real per-project runs; TG-VITEST-RUN-SELECTS-ITS-PROJECTS). Naming this file as a self-probe defender would pay for a nested three-claim probe on every fault.",
+      "by": "claude",
+      "at": "2026-11-12T00:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/runner-discovery.test.mjs",
+      "reason": "Changed only to follow #278, #199 and #277: the same symlink, package-identity and listing-shape assertions are made in test/discovery-config.test.mjs, test/discovery-config-packages.test.mjs and test/vitest-projects.test.mjs, which are the defenders of TG-CONFIG-* and TG-VITEST-*. This file also spawns real vitest and jest listings (about 10 s), so naming it would make each of those cheap claims pay for them. The excuse expires so the next real edit states the claim it defends.",
+      "by": "claude",
+      "at": "2026-11-12T00:00:00Z",
+      "expires": "2027-02-28T00:00:00Z"
     }
   ]
 }

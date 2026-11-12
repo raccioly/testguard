@@ -157,8 +157,19 @@ describe('normalization and the deterministic discovery manifest', () => {
     writeFileSync(join(dir, 'package.json'), 'x'.repeat(33));
     expect(() => hashDiscoveryConfigs(dir, ['vitest.config.mjs'], { maxConfigBytes: 32 })).toThrow(/package\.json.*32 bytes/i);
     rmSync(join(dir, 'package.json'));
-    symlinkSync(join(dir, 'vitest.config.mjs'), join(dir, 'package.json'));
-    expect(() => hashDiscoveryConfigs(dir, ['vitest.config.mjs'])).toThrow(/package\.json.*not readable/i);
+    // A link between two project files is followed (#199); one out of the project is refused by name.
+    writeFileSync(join(dir, 'base.package.json'), '{"type":"module"}');
+    symlinkSync(join(dir, 'base.package.json'), join(dir, 'package.json'));
+    const linked = hashDiscoveryConfigs(dir, ['vitest.config.mjs']);
+    writeFileSync(join(dir, 'base.package.json'), '{"type":"commonjs"}');
+    expect(hashDiscoveryConfigs(dir, ['vitest.config.mjs']).find((entry) => entry.path === 'package.json').sha256)
+      .not.toBe(linked.find((entry) => entry.path === 'package.json').sha256);
+    rmSync(join(dir, 'package.json'));
+    const elsewhere = mkdtempSync(join(tmpdir(), 'testguard-config-elsewhere-'));
+    dirs.push(elsewhere);
+    writeFileSync(join(elsewhere, 'package.json'), '{}');
+    symlinkSync(join(elsewhere, 'package.json'), join(dir, 'package.json'));
+    expect(() => hashDiscoveryConfigs(dir, ['vitest.config.mjs'])).toThrow(/package\.json.*outside the project/i);
   });
 
   it('invalidates absent root configs and follows imported helpers and setup files', () => {
@@ -209,7 +220,7 @@ describe('normalization and the deterministic discovery manifest', () => {
     const link = join(dir, 'linked.mjs');
     symlinkSync(join(outside, 'missing.mjs'), link);
     writeFileSync(join(dir, 'vitest.config.mjs'), "export default { test: { setupFiles: ['./linked.mjs'] } };\n");
-    expect(() => hashDiscoveryConfigs(dir, ['vitest.config.mjs'])).toThrow(/symbolic links/);
+    expect(() => hashDiscoveryConfigs(dir, ['vitest.config.mjs'])).toThrow(/linked\.mjs.*outside the project/);
   });
 
   it('includes nested workspace configs even when the root config does not import them', () => {
@@ -232,19 +243,22 @@ describe('normalization and the deterministic discovery manifest', () => {
     ]));
   });
 
-  it('binds package-imported config helpers and fails closed when one cannot resolve', () => {
+  it('binds package-imported config helpers by name and version and fails closed when one cannot resolve', () => {
     const dir = scratch();
     mkdirSync(join(dir, 'node_modules', '@scope', 'test-config'), { recursive: true });
     writeFileSync(join(dir, 'package.json'), '{"type":"module"}');
     writeFileSync(join(dir, 'vitest.config.mjs'), "import config from '@scope/test-config';\nexport default config;\n");
-    writeFileSync(join(dir, 'node_modules', '@scope', 'test-config', 'package.json'), '{"name":"@scope/test-config","exports":"./index.mjs"}');
+    writeFileSync(join(dir, 'node_modules', '@scope', 'test-config', 'package.json'), '{"name":"@scope/test-config","version":"1.0.0","exports":"./index.mjs"}');
     writeFileSync(join(dir, 'node_modules', '@scope', 'test-config', 'index.mjs'), "export { default } from './helper.mjs';\n");
     writeFileSync(join(dir, 'node_modules', '@scope', 'test-config', 'helper.mjs'), 'export default { test: {} };\n');
 
     const before = hashDiscoveryConfigs(dir, ['vitest.config.mjs']);
     const moduleEntry = before.find((entry) => entry.path.startsWith('@module/'));
     expect(moduleEntry).toBeDefined();
+    // An installed package is its name and version (#278): its module files are never read.
     writeFileSync(join(dir, 'node_modules', '@scope', 'test-config', 'helper.mjs'), 'export default { test: { passWithNoTests: true } };\n');
+    expect(hashDiscoveryConfigs(dir, ['vitest.config.mjs']).find((entry) => entry.path === moduleEntry.path).sha256).toBe(moduleEntry.sha256);
+    writeFileSync(join(dir, 'node_modules', '@scope', 'test-config', 'package.json'), '{"name":"@scope/test-config","version":"1.0.1","exports":"./index.mjs"}');
     const after = hashDiscoveryConfigs(dir, ['vitest.config.mjs']);
     expect(after.find((entry) => entry.path === moduleEntry.path).sha256).not.toBe(moduleEntry.sha256);
 
@@ -286,7 +300,7 @@ describe('runner-specific native listing adapters', () => {
     expect(jest.discoveryArgvFor(ROOT).slice(-3)).toEqual(['--listTests', '--json', '--runInBand']);
     expect(playwright.discoveryArgvFor(ROOT).slice(-3)).toEqual(['test', '--list', '--reporter=json']);
 
-    expect(vitest.parseDiscoveryOutput('/p/b.test.mjs\n/p/a.test.mjs\n')).toEqual(['/p/b.test.mjs', '/p/a.test.mjs']);
+    expect(vitest.parseDiscoveryOutput('/p/b.test.mjs\n/p/a.test.mjs\n')).toEqual([{ file: '/p/b.test.mjs' }, { file: '/p/a.test.mjs' }]);
     expect(jest.parseDiscoveryOutput('["/p/a.test.js"]')).toEqual(['/p/a.test.js']);
     expect(() => jest.parseDiscoveryOutput('{"files":[]}')).toThrow(/array/i);
     expect(playwright.parseDiscoveryReport({
