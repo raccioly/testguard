@@ -125,6 +125,14 @@ describe('release.yml: verifies the release pull request\'s probe instead of pro
     expect(release.jobs['publish-pypi'].needs).toContain('test');
   });
 
+  it('the hourly sweep fails visibly when an open release pull request has gone stale', () => {
+    const watch = step(release, 'watch-release-pr', 'An open release pull request must still be mergeable');
+    expect(watch.run).toContain('await-mergeable.mjs "$PR"');
+    expect(watch.run).toContain('startswith("release/v")');
+    expect(watch.run).toContain('exit "$FAILED"');
+    expect(release.jobs['watch-release-pr'].permissions['pull-requests']).toBe('read');
+  });
+
   it('waits for the tarball right after publishing, before the job can report success, and the checksum job needs that job', () => {
     const publish = index(release, 'publish-npm', 'Publish (provenance is automatic under Trusted Publishing)');
     const wait = index(release, 'publish-npm', 'Wait until the tarball is downloadable');

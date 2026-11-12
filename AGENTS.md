@@ -35,39 +35,28 @@ Run `npm run corpus` before any change to `src/probe/`.
 
 ## Key files
 
-`src/probe/probe.mjs` is the orchestrator; the other `src/probe/` modules are
-its pieces. A probe runs in phases:
+`src/probe/probe.mjs` orchestrates a probe in phases: **plan** every fault (no
+test runs) → **baselines** per defender set → **fan-out** to up to `auto`
+scratch trees (`min(4, cpus/2)`) → **solo confirmation** (a kill rests on a
+run with nothing else in flight) → **serial lane and re-measure** (a set that
+is not parallel-safe, or an outcome contention can fake, runs alone in a fresh
+tree). Records come out in claim/fault order.
 
-1. **Plan** every fault in claim/fault order on one tree: defenders, input
-   hashes, the anchor, reuse, and the `--typecheck` check. No test runs.
-2. **Baselines**, one per defender set, side by side; a set measured under
-   contention that is not green N/N is measured again alone.
-3. **Fan-out**: the remaining faults go to up to `auto` trees at once
-   (`min(4, cpus/2)`), each in its own scratch worktree.
-4. **Solo confirmation**: a kill is never believed from a fan-out run alone;
-   at least one probe run is repeated with nothing else in flight.
-5. **Serial lane and re-measure**: a defender set that is not parallel-safe,
-   or any outcome contention can manufacture, runs alone in a fresh tree.
-   Records are published in claim/fault order whatever order trees finish in.
-
-- `src/probe/classify.mjs` — the verdict function. Pure. Its check order *is* `spec/GATE-SEMANTICS.md`.
-- `src/probe/scope.mjs` — `probe --changed`: which claims a change can reach (target, defenders, or their import closure). It errs toward probing.
-- `src/probe/dependencies.mjs` — what a verdict depends on beyond target and defenders; reuse, the origin policy and `status` staleness all compare through it.
-- `src/probe/fan-out.mjs` — the pure rules of the fan-out: width, order, what must be re-measured alone.
-- `src/probe/worktree.mjs`, `src/probe/node-modules-link.mjs`, `src/probe/worker-env.mjs`, `src/probe/typecheck.mjs` — scratch trees; how a tree borrows the project's `node_modules` without writing through it; `TESTGUARD_WORKER` (the tree's index, so a suite can stay parallel); the project's own compiler refusing a fault that does not type-check.
-- `src/probe/cost.mjs` — what a probe costs and the cost gate: a ceiling in normalized elapsed seconds, valid for one fan-out width. `testguard.cost-budget.json` holds it.
-- `src/probe/mocks.mjs`, `src/probe/rank.mjs` — which tests mock the target (so never defend it); alias resolution.
-- `src/probe/runners/` — one module per runner over `src/probe/runners/shared.mjs`. A new runner needs its own fixture copy with its own expected-verdicts file, verified by hand.
-- `src/gate/changed.mjs` — claim coverage of a change (`gate --changed`). File-level, delta-only; an uncovered file exits 1.
-- `src/status/status.mjs` — the state machine every rendering derives from. A new state or action is a spec change (`spec/schemas/status.schema.json`) and a skill-template change (`src/init/templates/SKILL.md`) in the same PR.
-- `src/init/managed.mjs` — the hooks, CI files and agent instructions `init` writes, and the hashed markers that let `init --upgrade` tell an edited block from an untouched one.
-- `src/scaffold/producers.mjs`, `src/scaffold/producers.python.mjs` — the fault shapes. Deterministic line heuristics; no AST, no LLM. A new shape needs a synthetic-file test and a README row.
-- `spec/schemas/common.schema.json`, `spec/lib/validate.mjs` — the closed sets (verdicts, fault classes, provenance) and the semantic rules.
-- `corpus/` — the benchmark corpus (`corpus/README.md`): subjects, keys derived by hand, and `corpus/tool-mutants/`.
-- `fixtures/known-answer/expected.json` — the oracle for the fixture probe. Never edit it to match output.
-- `testguard.claims.json` — claims about this codebase, probed in CI.
-- `.github/workflows/ci.yml` — a pull request probes only what it can reach (`.github/scripts/self-probe-scope.mjs`); `main`, the nightly run and release branches probe everything. A scoped run does **not** prove the claims it left out; the full run on `main` after the merge does.
-- `.github/workflows/scheduled-release.yml`, `.github/workflows/release.yml` — the release probes the bumped tree in full **once**, on the release pull request; `.github/workflows/release.yml` verifies that evidence by tree hash (`.github/scripts/release-evidence.mjs`) and never probes again.
+- `src/probe/classify.mjs` — the pure verdict function; its check order is `spec/GATE-SEMANTICS.md`.
+- `src/probe/scope.mjs` — `probe --changed`: claims a change reaches (target, defenders, import closure); errs toward probing.
+- `src/probe/dependencies.mjs` — what a verdict depends on; reuse, origin policy and `status` all compare through it.
+- `src/probe/fan-out.mjs` — pure fan-out rules: width, order, what is re-measured alone.
+- `src/probe/worktree.mjs`, `src/probe/node-modules-link.mjs`, `src/probe/worker-env.mjs`, `src/probe/typecheck.mjs` — scratch trees; borrowing `node_modules` without writing through it; `TESTGUARD_WORKER`; the project's own compiler refusing a non-type-checking fault.
+- `src/probe/cost.mjs` — cost report and gate (normalized elapsed seconds, valid for one width); `testguard.cost-budget.json`.
+- `src/probe/runners/` — one module per runner; a new one needs its own fixture with hand-verified expected verdicts.
+- `src/gate/changed.mjs` — `gate --changed`; `src/status/status.mjs` — the state machine (a new state is a spec change plus a template change).
+- `src/init/managed.mjs` — hashed markers for what `init` writes, so `--upgrade` spares edited blocks.
+- `src/scaffold/producers.mjs` — fault shapes; line heuristics, no AST, no LLM.
+- `spec/schemas/common.schema.json`, `spec/lib/validate.mjs` — closed sets and semantic rules.
+- `corpus/` — benchmark subjects with hand-derived keys, plus `corpus/tool-mutants/`.
+- `fixtures/known-answer/expected.json` — the fixture oracle. Never edit it to match output.
+- `.github/workflows/ci.yml` — a pull request probes only what it can reach (`.github/scripts/self-probe-scope.mjs`); `main`, nightly and release branches probe everything. A scoped run does **not** prove the claims it left out; the full run on `main` does.
+- `.github/workflows/release.yml` — the release probes once, on the release pull request; this verifies that evidence by tree hash (`.github/scripts/release-evidence.mjs`).
 
 ## Rules
 

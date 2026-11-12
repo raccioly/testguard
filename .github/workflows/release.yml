@@ -86,6 +86,31 @@ jobs:
             echo "⏭️ $TAG is fully released everywhere — nothing to do"
           fi
 
+  # The hourly sweep also watches for a release pull request that went stale
+  # AFTER it was opened (v0.23.2 conflicted with a later commit on main and sat
+  # open, auto-merge armed and never firing). Its failure is the alarm.
+  watch-release-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: An open release pull request must still be mergeable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FAILED=0
+          for PR in $(gh pr list --state open --base main --json number,headRefName --jq '.[] | select(.headRefName | startswith("release/v")) | .number'); do
+            node .github/scripts/await-mergeable.mjs "$PR" --wait 60 || FAILED=1
+          done
+          exit "$FAILED"
+
   test:
     needs: detect-version
     if: needs.detect-version.outputs.changed == 'true'

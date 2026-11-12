@@ -63,6 +63,8 @@ export function evaluateEvidence({ manifest, evidence, tree, version, claimsDoc 
   if (evidence.run?.budget?.exhausted === true) problems.push('the probe ran out of its command budget; the evidence is incomplete');
   if (evidence.run?.repo?.dirty === true) problems.push('the probe ran on a dirty working tree');
   if (manifest?.commit && evidence.run?.repo?.head && manifest.commit !== evidence.run.repo.head) problems.push(`manifest commit ${manifest.commit} is not the commit the evidence probed (${evidence.run.repo.head})`);
+  const reused = records.filter((r) => r.reusedFrom !== undefined);
+  if (reused.length) problems.push(`${reused.length} record(s) carry a verdict reused from an earlier probe, first: ${reused[0].claim?.id}/${reused[0].subject?.id}; the release's probe must measure this tree`);
   const notKilled = records.filter((r) => r.verdict !== 'killed');
   if (notKilled.length) problems.push(`${notKilled.length} fault(s) not killed, first: ${notKilled[0].claim?.id}/${notKilled[0].subject?.id} (${notKilled[0].verdict})`);
   const have = new Set(records.map((r) => `${r.claim?.id}/${r.subject?.id}`));
@@ -174,10 +176,14 @@ export async function main(argv, { io = ghIo() } = {}) {
     args: rest,
     options: {
       evidence: { type: 'string' }, 'out-dir': { type: 'string' }, claims: { type: 'string', default: 'testguard.claims.json' },
-      tree: { type: 'string' }, version: { type: 'string' }, 'from-dir': { type: 'string' }, repo: { type: 'string' },
+      tree: { type: 'string' }, 'miss-is-notice': { type: 'boolean' }, version: { type: 'string' }, 'from-dir': { type: 'string' }, repo: { type: 'string' },
     },
   });
   const fail = (lines) => {
+    if (values['miss-is-notice']) {
+      for (const line of lines) console.log(`::notice::no usable release evidence yet: ${line}`);
+      return 1;
+    }
     for (const line of lines) console.error(`::error::release evidence: ${line}`);
     console.error('The release will not ship a tree no full probe vouched for. Re-run the release pull request\'s ci.yml (a full probe on the release branch) or, for recovery only, dispatch release.yml with reprobe=true.');
     return 1;

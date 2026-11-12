@@ -57,6 +57,19 @@ describe('release evidence: what a clean full probe of this tree is', () => {
     expect(check({ evidence: evidence({ records: [] }) }).join()).toMatch(/no records/);
   });
 
+  it('refuses records whose verdict was reused from an earlier probe: the release probe must measure this tree', () => {
+    const reused = { ...record('C1', 'F1'), reusedFrom: { runId: 'old' } };
+    expect(check({ evidence: evidence({ records: [reused, record('C1', 'F2'), record('C2', 'F1')] }) }).join()).toMatch(/1 record\(s\) carry a verdict reused.*C1\/F1/);
+  });
+
+  it('with --miss-is-notice a miss is a ::notice:: and still exit 1 (the first run of a release branch expects one)', () => {
+    const bad = artifactDir({ 'manifest.json': manifest({ tree: OTHER_TREE }), 'evidence.json': evidence() });
+    const r = spawnSync(process.execPath, [join(ROOT, '.github/scripts/release-evidence.mjs'), 'verify', '--tree', TREE, '--from-dir', bad.dir, '--claims', bad.claims, '--miss-is-notice'], { encoding: 'utf8' });
+    expect(r.status).toBe(1);
+    expect(r.stdout).toMatch(/::notice::no usable release evidence yet/);
+    expect(r.stderr).not.toContain('::error::');
+  });
+
   it('refuses a manifest whose commit is not the commit the evidence probed', () => {
     expect(check({ manifest: manifest({ commit: 'd'.repeat(40) }) }).join()).toMatch(/is not the commit the evidence probed/);
   });

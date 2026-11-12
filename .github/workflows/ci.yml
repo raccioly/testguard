@@ -253,7 +253,7 @@ jobs:
         run: |
           TREE=$(git rev-parse 'HEAD^{tree}')
           VERSION=$(node -p "require('./package.json').version")
-          if node .github/scripts/release-evidence.mjs verify --tree "$TREE" --version "$VERSION" --repo "$GITHUB_REPOSITORY"; then
+          if node .github/scripts/release-evidence.mjs verify --tree "$TREE" --version "$VERSION" --repo "$GITHUB_REPOSITORY" --miss-is-notice; then
             echo "reuse=true" >> "$GITHUB_OUTPUT"
             echo "::notice::tree $TREE already has a clean full probe for the release; not probing it again."
           else
@@ -282,7 +282,11 @@ jobs:
 
       - name: probe TestGuard's own claims
         if: matrix.node-version == 22 && steps.scope.outputs.mode == 'full' && steps.reuse.outputs.reuse != 'true'
-        run: node cli/testguard.mjs probe . --budget 180000 --no-escalate --cost --out .testguard/ci-self-evidence.json
+        # The nightly run and a release branch measure from scratch: a verdict
+        # reused from the cache would make "probed in full" mean "not probed".
+        env:
+          NO_REUSE: ${{ (github.event_name == 'schedule' || startsWith(github.head_ref || github.ref_name, 'release/')) && '--no-reuse' || '' }}
+        run: node cli/testguard.mjs probe . --budget 180000 --no-escalate --cost $NO_REUSE --out .testguard/ci-self-evidence.json
 
       - name: probe TestGuard's own claims — only what this pull request can affect
         if: matrix.node-version == 22 && steps.scope.outputs.mode == 'scoped'

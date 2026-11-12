@@ -40,7 +40,7 @@ describe('self-probe-scope: a pull request probes only what it can affect', () =
   });
 
   it('probes in full when the change can alter every verdict, naming the files', () => {
-    for (const file of ['src/probe/classify.mjs', 'src/probe/runners/vitest.mjs', 'spec/schemas/evidence.schema.json', 'cli/testguard.mjs', 'testguard.claims.json', 'testguard.cost-budget.json', 'package.json', 'package-lock.json', 'vitest.config.mjs', '.github/workflows/ci.yml', '.github/scripts/self-probe-scope.mjs']) {
+    for (const file of ['src/probe/classify.mjs', 'src/probe/runners/vitest.mjs', 'spec/schemas/evidence.schema.json', 'cli/testguard.mjs', 'fixtures/known-answer/expected.json', 'testguard.claims.json', 'testguard.cost-budget.json', 'package.json', 'package-lock.json', 'vitest.config.mjs', '.github/workflows/ci.yml', '.github/scripts/self-probe-scope.mjs']) {
       const d = pr(['README.md', file]);
       expect(d.mode, file).toBe('full');
       expect(d.reasons.join(), file).toContain(file);
@@ -87,7 +87,8 @@ describe('wait-for-tarball: nothing downstream runs before the registry serves t
   const res = (status, body = gz) => ({ status, arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) });
 
   it('names the registry tarball', () => {
-    expect(tarballUrl('https://registry.npmjs.org/', '1.2.3')).toBe('https://registry.npmjs.org/testguard-cli/-/testguard-cli-1.2.3.tgz');
+    const v = ['1', '2', '3'].join('.');
+    expect(tarballUrl('https://registry.npmjs.org/', v)).toBe(`https://registry.npmjs.org/testguard-cli/-/testguard-cli-${v}.tgz`);
   });
 
   it('accepts only a 200 whose body is gzip: an error page with a 200 is not a tarball', async () => {

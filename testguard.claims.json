@@ -14604,7 +14604,20 @@
             "by": "maintainer",
             "at": "2026-11-12T00:00:00Z"
           }
-        }
+        },
+        {
+            "id": "F9",
+            "description": "Records whose verdict was reused from an earlier probe are accepted, so the release evidence need not have measured this tree.",
+            "faultClass": "condition-forced",
+            "file": ".github/scripts/release-evidence.mjs",
+            "find": "r.reusedFrom !== undefined);",
+            "replace": "r.reusedFrom === 'never');",
+            "producedBy": {
+              "producer": "human",
+              "by": "maintainer",
+              "at": "2026-11-12T00:00:00Z"
+            }
+          }
       ]
     },
     {
@@ -14902,6 +14915,19 @@
           "faultClass": "statement-deleted",
           "file": ".github/workflows/scheduled-release.yml",
           "find": "            node .github/scripts/await-mergeable.mjs \"$PR\" --wait 300",
+          "replace": "            true",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F8",
+          "description": "The hourly sweep no longer checks open release pull requests, so one that went stale after it was opened sits silently.",
+          "faultClass": "statement-deleted",
+          "file": ".github/workflows/release.yml",
+          "find": "            node .github/scripts/await-mergeable.mjs \"$PR\" --wait 60 || FAILED=1",
           "replace": "            true",
           "producedBy": {
             "producer": "human",

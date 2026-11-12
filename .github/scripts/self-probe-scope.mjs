@@ -21,7 +21,7 @@ import { parseArgs } from 'node:util';
 
 /** A path, or a directory prefix ending in `/`, whose change can alter every verdict or how verdicts are produced. */
 export const FULL_PROBE_PATHS = Object.freeze([
-  'src/probe/', 'spec/', 'cli/',
+  'src/probe/', 'spec/', 'cli/', 'fixtures/',
   'testguard.claims.json', 'testguard.cost-budget.json',
   'package.json', 'package-lock.json', 'vitest.config.mjs',
   '.github/workflows/ci.yml', '.github/scripts/self-probe-scope.mjs',
