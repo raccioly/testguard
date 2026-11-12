@@ -70,8 +70,10 @@ export async function runMutants({ toolRoot, subjects, only, python, known, log,
         const red = rows.find((r) => !r.ok);
         if (red) {
           const failed = red.checks.filter((c) => !c.ok);
+          const noEvidence = failed.find((c) => c.check === 'tool-wrote-evidence');
           const refused = failed.find((c) => c.check === 'exit-code');
           const why = red.error ? 'error'
+            : noEvidence ? `tool wrote no evidence (exit ${noEvidence.detail.exit}: ${String(noEvidence.detail.reason).slice(0, 160)})`
             : refused ? `tool refused the run (${String(refused.detail).slice(0, 160)})`
             : red.key && (red.key.critical || red.key.wrong) ? `key (${red.key.critical} critical, ${red.key.wrong} wrong)`
             : red.differential && !red.differential.equal ? 'differential' : failed.map((c) => c.check).join(', ');

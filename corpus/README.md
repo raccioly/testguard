@@ -118,7 +118,14 @@ skipped, a git failure read as an empty change, an exception-only kill
 reported as an assertion, a baseline that need not be green). `--tool-mutants`
 applies each to a scratch copy of the tool and runs the subjects and modes its
 manifest entry names, stopping at the first red check. The scorecard reports
-N of M caught; a mutant nothing catches is a gap in the corpus. Patches drift
+N of M caught; a mutant nothing catches is a gap in the corpus. A mutant must be
+caught by the key or a mode check, not only by TestGuard's own evidence
+validator: when a broken build makes the tool refuse to write evidence, the
+scorecard reports that run as **the tool wrote no evidence** (with the tool's
+reason), never as wrong verdicts. The same regressions written at the verdict
+function (`classify.mjs`: the timeout branch, the N/N agreement, the
+`subjectReached` guard) are refused by that validator; the patches here break
+the layers below it so the evidence stays valid and only the key can tell. Patches drift
 with `src/`: `test/corpus-mutants.test.mjs` (part of `npm test`) fails as soon
 as one no longer applies, and the change that moved the code regenerates it.
 

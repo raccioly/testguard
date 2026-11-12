@@ -51,14 +51,16 @@ export function buildScorecard({ toolRoot, results, mutants, machine }) {
       seconds: Math.round(ms / 100) / 10,
       normalizedSeconds: norm(ms),
       speedup: ref && r.mode !== 'reference' && r.runs.length === 1 ? Math.round((ref / ms) * 100) / 100 : null,
+      noEvidence: r.runs.filter((x) => x.noEvidence && !x.expectNoEvidence).map((x) => ({ run: x.label, ...x.noEvidence })),
       ...(r.partial ? { partial: r.partial } : {}),
     };
   });
   const totals = rows.reduce((t, r) => {
     if (r.faults) { t.right += r.faults.right; t.wrong += r.faults.wrong; t.critical += r.faults.critical; t.known += r.faults.known; }
     if (r.differential && !r.differential.equal) t.differentialMismatches++;
+    t.noEvidence += r.noEvidence.length;
     return t;
-  }, { right: 0, wrong: 0, critical: 0, known: 0, differentialMismatches: 0 });
+  }, { right: 0, wrong: 0, critical: 0, known: 0, differentialMismatches: 0, noEvidence: 0 });
   const mutantSummary = mutants ? { total: mutants.length, caught: mutants.filter((m) => m.caught).length, results: mutants } : null;
   const ok = rows.every((r) => r.ok) && (!mutantSummary || (mutantSummary.caught === mutantSummary.total));
   return {
@@ -84,8 +86,8 @@ export function mergeScorecards(docs) {
   if (heads.size > 1) throw new Error(`mergeScorecards: shards measured different builds (${[...heads].join(', ')})`);
   const rows = docs.flatMap((d) => d.rows);
   const mutantResults = docs.flatMap((d) => d.mutants?.results ?? []);
-  const totals = { right: 0, wrong: 0, critical: 0, known: 0, differentialMismatches: 0 };
-  for (const d of docs) for (const k of Object.keys(totals)) totals[k] += d.totals[k];
+  const totals = { right: 0, wrong: 0, critical: 0, known: 0, differentialMismatches: 0, noEvidence: 0 };
+  for (const d of docs) for (const k of Object.keys(totals)) totals[k] += d.totals[k] ?? 0;
   const factors = docs.map((d) => d.machine.speedFactor).filter((f) => f);
   const mid = (a) => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
   return {
@@ -116,7 +118,7 @@ export function renderMarkdown(doc, { base = null } = {}) {
   lines.push('');
   lines.push(doc.ok ? '**All checks passed.**' : '**RED: at least one check failed.**');
   lines.push('');
-  lines.push(`Totals: ${doc.totals.right} right, ${doc.totals.wrong} wrong, ${doc.totals.critical} critical, ${doc.totals.known} known (filed), ${doc.totals.differentialMismatches} differential mismatches.${doc.machine.speedFactor ? ` Machine speed factor ${doc.machine.speedFactor} (reference workload ${doc.machine.before.medianMs.toFixed(0)} / ${doc.machine.after.medianMs.toFixed(0)} ms).` : ''}`);
+  lines.push(`Totals: ${doc.totals.right} right, ${doc.totals.wrong} wrong, ${doc.totals.critical} critical, ${doc.totals.known} known (filed), ${doc.totals.differentialMismatches} differential mismatches, ${doc.totals.noEvidence ?? 0} runs where the tool wrote no evidence.${doc.machine.speedFactor ? ` Machine speed factor ${doc.machine.speedFactor} (reference workload ${doc.machine.before.medianMs.toFixed(0)} / ${doc.machine.after.medianMs.toFixed(0)} ms).` : ''}`);
   if (doc.rows.length) {
     lines.push('');
     const baseRows = new Map((base?.rows ?? []).map((r) => [`${r.subject}/${r.mode}`, r]));
@@ -135,6 +137,15 @@ export function renderMarkdown(doc, { base = null } = {}) {
       const fmt = (v) => (v ? `${v.verdict}${v.reason ? ` (${v.reason})` : ''}${v.killKind ? ` [${v.killKind}]` : ''}` : 'not reported');
       for (const m of mism) lines.push(`| ${m.subject} | ${m.mode} | ${m.fault} | ${fmt(m.expected)} | ${fmt(m.observed)} | ${m.critical ? '**CRITICAL**' : m.knownIssue ? `known: #${m.knownIssue}` : '**wrong**'} |`);
     }
+  }
+  const refused = doc.rows.flatMap((r) => (r.noEvidence ?? []).map((n) => ({ ...n, subject: r.subject, mode: r.mode })));
+  if (refused.length) {
+    lines.push('');
+    lines.push('**The tool wrote no evidence** (a refusal or a crash, not a verdict):');
+    lines.push('');
+    lines.push('| subject | mode | run | exit | kind | reason |');
+    lines.push('|---|---|---|---|---|---|');
+    for (const n of refused) lines.push(`| ${n.subject} | ${n.mode} | ${n.run} | ${n.exit} | ${n.kind ?? '–'} | ${String(n.reason).replace(/\|/g, '\\|').slice(0, 200)} |`);
   }
   const knownChecks = doc.rows.flatMap((r) => r.checks.filter((c) => c.detail && c.detail.knownIssue).map((c) => ({ ...c, subject: r.subject, mode: r.mode })));
   if (knownChecks.length) {

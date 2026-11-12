@@ -22,12 +22,26 @@ export function applies(mode, subject) {
 
 function runSummary(label, r) {
   const m = r.evidence?.run?.measurements ?? {};
-  return { label, exit: r.exit, elapsedMs: Math.round(r.elapsedMs), runnerInvocations: m.runnerInvocations ?? null, records: r.evidence?.records?.length ?? 0, reuse: r.evidence?.run?.reuse ?? null };
+  const out = { label, exit: r.exit, elapsedMs: Math.round(r.elapsedMs), runnerInvocations: m.runnerInvocations ?? null, records: r.evidence?.records?.length ?? 0, reuse: r.evidence?.run?.reuse ?? null };
+  // The tool wrote no evidence: a refusal (its own validator, a precondition)
+  // or a crash. Reported as that, with the tool's reason, never as N wrong verdicts.
+  if (!r.evidence) out.noEvidence = refusalReason(r);
+  return out;
+}
+
+export function refusalReason(r) {
+  const fromJson = r.json?.error?.message;
+  const lines = String(r.stderr ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const first = lines.find((l) => /^error:|refusing|precondition|does not conform/i.test(l)) ?? lines[lines.length - 1] ?? '';
+  return { exit: r.exit, kind: r.json?.error?.kind ?? null, reason: String(fromJson ?? first).slice(0, 500) };
 }
 
 function result(mode, subject, { runs, key = null, diff = null, checks = [], error = null }) {
   const measured = runs.reduce((n, r) => n + r.records, 0);
   const extra = [...checks];
+  for (const run of runs) {
+    if (run.noEvidence && !run.expectNoEvidence) extra.push(check('tool-wrote-evidence', false, { run: run.label, ...run.noEvidence }));
+  }
   if (!error && measured === 0 && !checks.some((c) => c.allowEmpty)) extra.push(check('measured-something', false, 'the mode produced no records: an empty comparison is a failure'));
   const ok = !error && (!key || (key.wrong === 0 && key.critical === 0)) && (!diff || diff.equal) && extra.every((c) => c.ok);
   return { subject: subject.name, mode, ok, error, runs, key, differential: diff, checks: extra };
@@ -45,6 +59,8 @@ async function freshProbe(ctx, label, args, { edits, prepare } = {}) {
 
 function keyAndDiff(ctx, mode, r, { ids, deltas, expected } = {}) {
   const observed = verdictMap(r.evidence);
+  // No evidence is its own outcome (tool-wrote-evidence), not a key comparison.
+  if (!r.evidence) return { observed, key: null, diff: null };
   const key = checkKey({ subject: ctx.subject, mode, map: observed.map, expected: expected ?? expectedFor(ctx.subject, mode), ids, known: ctx.known });
   const diff = ctx.reference ? differential({ reference: ctx.reference, observed, ids, deltas }) : null;
   return { observed, key, diff };
@@ -57,7 +73,7 @@ export const RUN = {
   async reference(ctx) {
     const { repo, r } = await freshProbe(ctx, 'reference', ['--no-reuse']);
     const { observed, key } = keyAndDiff({ ...ctx, reference: null }, 'reference', r);
-    ctx.reference = observed;
+    if (r.evidence) ctx.reference = observed;
     ctx.referenceRepo = repo;
     ctx.referenceElapsedMs = r.elapsedMs;
     return result('reference', ctx.subject, { runs: [runSummary('reference', r)], key, checks: [exitCheck(r), check('every-fault-reported', observed.order.length === ctx.subject.faultIds.length, `${observed.order.length} of ${ctx.subject.faultIds.length}`)] });
@@ -184,7 +200,7 @@ export const RUN = {
     }
     if (spec.badRef) {
       const bad = await probe({ toolRoot: ctx.toolRoot, subject: ctx.subject, repo, outPath: out(repo, 'changed-bad-ref'), args: ['--no-reuse', '--changed', spec.badRef.ref], python: ctx.python });
-      runs.push(runSummary('bad-ref', bad));
+      runs.push({ ...runSummary('bad-ref', bad), expectNoEvidence: true });
       checks.push(check('unmeasurable-change-is-a-precondition-failure', bad.exit === spec.badRef.exit && !bad.evidence, { exit: bad.exit, wroteEvidence: Boolean(bad.evidence), stderr: bad.stderr.trim().split('\n').pop() }));
     }
     return result('changed', ctx.subject, { runs, key, diff, checks });

@@ -1,9 +1,9 @@
-diff --git a/src/probe/classify.mjs b/src/probe/classify.mjs
-index 4003912..3a05cc0 100644
---- a/src/probe/classify.mjs
-+++ b/src/probe/classify.mjs
-@@ -50,3 +50,3 @@ export function classify({ defenders, anchor, baselineRuns, probeRuns, confirmRu
-     // way and leaves the verdict alone.
--    if (subjectReached === false) return { verdict: 'unverifiable', reason: 'subject-not-executed' };
-+    if (subjectReached === false && false) return { verdict: 'unverifiable', reason: 'subject-not-executed' };
-     return { verdict: 'survived' };
+diff --git a/src/probe/probe.mjs b/src/probe/probe.mjs
+index ca27130..297f4fa 100644
+--- a/src/probe/probe.mjs
++++ b/src/probe/probe.mjs
+@@ -1147,3 +1147,3 @@ async function measureFault(state, tree) {
+       if (provisional.verdict === 'survived') {
+-        subjectReached = await negativeControl({ file: fault.file, defenders, iso, runDefenders, fatalEditFor, cache: controlCache, stage });
++        subjectReached = undefined;
+         if (subjectReached !== undefined) detail.negativeControl = subjectReached ? 'reached' : 'not-reached';

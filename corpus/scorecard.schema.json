@@ -4,44 +4,151 @@
   "title": "Corpus scorecard",
   "description": "One run of the benchmark corpus (corpus/run.mjs): per subject and mode, how many answers matched the hand-derived key, whether the mode agreed with the reference mode, what each mode-specific check found, and what it cost. `ok` is true only when every row is ok and, when mutants ran, every mutant was caught.",
   "type": "object",
-  "required": ["schemaVersion", "tool", "machine", "ok", "totals", "rows"],
+  "required": [
+    "schemaVersion",
+    "tool",
+    "machine",
+    "ok",
+    "totals",
+    "rows"
+  ],
   "additionalProperties": false,
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": {
+      "const": 1
+    },
     "tool": {
-      "type": "object", "required": ["version", "head"], "additionalProperties": false,
-      "properties": { "version": { "type": "string" }, "head": { "type": ["string", "null"] } }
+      "type": "object",
+      "required": [
+        "version",
+        "head"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "head": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
     },
     "machine": {
       "description": "The reference workload of .github/scripts/measure-reference.mjs, timed before and after the run. Normalized seconds are raw seconds divided by speedFactor = mean(before, after) / the baselineMs in testguard.cost-budget.json.",
-      "type": "object", "required": ["before", "after", "speedFactor"], "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "before",
+        "after",
+        "speedFactor"
+      ],
+      "additionalProperties": false,
       "properties": {
-        "before": { "$ref": "#/definitions/sample" },
-        "after": { "$ref": "#/definitions/sample" },
-        "speedFactor": { "type": ["number", "null"], "exclusiveMinimum": 0 }
+        "before": {
+          "$ref": "#/definitions/sample"
+        },
+        "after": {
+          "$ref": "#/definitions/sample"
+        },
+        "speedFactor": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        }
       }
     },
-    "ok": { "type": "boolean" },
+    "ok": {
+      "type": "boolean"
+    },
     "totals": {
-      "type": "object", "required": ["right", "wrong", "critical", "known", "differentialMismatches"], "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "right",
+        "wrong",
+        "critical",
+        "known",
+        "differentialMismatches"
+      ],
+      "additionalProperties": false,
       "properties": {
-        "right": { "$ref": "#/definitions/count" }, "wrong": { "$ref": "#/definitions/count" }, "critical": { "$ref": "#/definitions/count" },
-        "known": { "$ref": "#/definitions/count" }, "differentialMismatches": { "$ref": "#/definitions/count" }
+        "right": {
+          "$ref": "#/definitions/count"
+        },
+        "wrong": {
+          "$ref": "#/definitions/count"
+        },
+        "critical": {
+          "$ref": "#/definitions/count"
+        },
+        "known": {
+          "$ref": "#/definitions/count"
+        },
+        "differentialMismatches": {
+          "$ref": "#/definitions/count"
+        },
+        "noEvidence": {
+          "$ref": "#/definitions/count"
+        }
       }
     },
-    "rows": { "type": "array", "items": { "$ref": "#/definitions/row" } },
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/row"
+      }
+    },
     "mutants": {
-      "type": "object", "required": ["total", "caught", "results"], "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "total",
+        "caught",
+        "results"
+      ],
+      "additionalProperties": false,
       "properties": {
-        "total": { "$ref": "#/definitions/count" },
-        "caught": { "$ref": "#/definitions/count" },
+        "total": {
+          "$ref": "#/definitions/count"
+        },
+        "caught": {
+          "$ref": "#/definitions/count"
+        },
         "results": {
           "type": "array",
           "items": {
-            "type": "object", "required": ["name", "caught", "caughtBy", "error"], "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "name",
+              "caught",
+              "caughtBy",
+              "error"
+            ],
+            "additionalProperties": false,
             "properties": {
-              "name": { "type": "string" }, "description": { "type": "string" }, "caught": { "type": "boolean" },
-              "caughtBy": { "type": ["string", "null"] }, "error": { "type": ["string", "null"] }
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "caught": {
+                "type": "boolean"
+              },
+              "caughtBy": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
             }
           }
         }
@@ -49,60 +156,315 @@
     }
   },
   "definitions": {
-    "count": { "type": "integer", "minimum": 0 },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
     "sample": {
-      "type": "object", "required": ["workload", "medianMs", "samplesMs"], "additionalProperties": false,
-      "properties": { "workload": { "type": "string" }, "medianMs": { "type": "number", "exclusiveMinimum": 0 }, "samplesMs": { "type": "array", "items": { "type": "number" } } }
+      "type": "object",
+      "required": [
+        "workload",
+        "medianMs",
+        "samplesMs"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "workload": {
+          "type": "string"
+        },
+        "medianMs": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "samplesMs": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      }
     },
     "verdict": {
-      "type": ["object", "null"],
-      "properties": { "verdict": { "type": "string" }, "reason": { "type": ["string", "null"] }, "killKind": { "type": ["string", "null"] }, "reused": { "type": "boolean" } }
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "verdict": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "killKind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reused": {
+          "type": "boolean"
+        }
+      }
     },
     "row": {
       "type": "object",
-      "required": ["subject", "mode", "ok", "error", "faults", "mismatches", "differential", "checks", "runs", "runnerInvocations", "seconds", "normalizedSeconds", "speedup"],
+      "required": [
+        "subject",
+        "mode",
+        "ok",
+        "error",
+        "faults",
+        "mismatches",
+        "differential",
+        "checks",
+        "runs",
+        "runnerInvocations",
+        "seconds",
+        "normalizedSeconds",
+        "speedup",
+        "noEvidence"
+      ],
       "additionalProperties": false,
       "properties": {
-        "subject": { "type": "string" },
-        "mode": { "type": "string" },
-        "ok": { "type": "boolean" },
-        "error": { "type": ["string", "null"] },
+        "subject": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "faults": {
-          "type": ["object", "null"], "required": ["total", "right", "wrong", "critical", "known"], "additionalProperties": false,
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "total",
+            "right",
+            "wrong",
+            "critical",
+            "known"
+          ],
+          "additionalProperties": false,
           "properties": {
-            "total": { "$ref": "#/definitions/count" }, "right": { "$ref": "#/definitions/count" }, "wrong": { "$ref": "#/definitions/count" },
-            "critical": { "$ref": "#/definitions/count" }, "known": { "$ref": "#/definitions/count" }
+            "total": {
+              "$ref": "#/definitions/count"
+            },
+            "right": {
+              "$ref": "#/definitions/count"
+            },
+            "wrong": {
+              "$ref": "#/definitions/count"
+            },
+            "critical": {
+              "$ref": "#/definitions/count"
+            },
+            "known": {
+              "$ref": "#/definitions/count"
+            }
           }
         },
         "mismatches": {
           "type": "array",
           "items": {
-            "type": "object", "required": ["fault", "expected", "observed", "critical"],
-            "properties": { "fault": { "type": "string" }, "expected": { "$ref": "#/definitions/verdict" }, "observed": { "$ref": "#/definitions/verdict" }, "critical": { "type": "boolean" }, "knownIssue": { "type": "integer", "minimum": 1 } }
+            "type": "object",
+            "required": [
+              "fault",
+              "expected",
+              "observed",
+              "critical"
+            ],
+            "properties": {
+              "fault": {
+                "type": "string"
+              },
+              "expected": {
+                "$ref": "#/definitions/verdict"
+              },
+              "observed": {
+                "$ref": "#/definitions/verdict"
+              },
+              "critical": {
+                "type": "boolean"
+              },
+              "knownIssue": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
           }
         },
         "differential": {
-          "type": ["object", "null"], "required": ["equal", "compared", "orderEqual", "mismatches"],
-          "properties": { "equal": { "type": "boolean" }, "compared": { "$ref": "#/definitions/count" }, "orderEqual": { "type": "boolean" }, "mismatches": { "type": "array" } }
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "equal",
+            "compared",
+            "orderEqual",
+            "mismatches"
+          ],
+          "properties": {
+            "equal": {
+              "type": "boolean"
+            },
+            "compared": {
+              "$ref": "#/definitions/count"
+            },
+            "orderEqual": {
+              "type": "boolean"
+            },
+            "mismatches": {
+              "type": "array"
+            }
+          }
         },
         "checks": {
           "type": "array",
-          "items": { "type": "object", "required": ["check", "ok", "detail"], "properties": { "check": { "type": "string" }, "ok": { "type": "boolean" }, "detail": {} } }
+          "items": {
+            "type": "object",
+            "required": [
+              "check",
+              "ok",
+              "detail"
+            ],
+            "properties": {
+              "check": {
+                "type": "string"
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "detail": {}
+            }
+          }
         },
         "runs": {
           "type": "array",
           "items": {
-            "type": "object", "required": ["label", "exit", "elapsedMs", "runnerInvocations", "records"],
-            "properties": { "label": { "type": "string" }, "exit": { "type": ["integer", "null"] }, "elapsedMs": { "type": "number", "minimum": 0 }, "runnerInvocations": { "type": ["integer", "null"] }, "records": { "$ref": "#/definitions/count" }, "reuse": {} }
+            "type": "object",
+            "required": [
+              "label",
+              "exit",
+              "elapsedMs",
+              "runnerInvocations",
+              "records"
+            ],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "exit": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "elapsedMs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "runnerInvocations": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "records": {
+                "$ref": "#/definitions/count"
+              },
+              "reuse": {}
+            }
           }
         },
-        "runnerInvocations": { "type": ["integer", "null"], "minimum": 0 },
-        "seconds": { "type": "number", "minimum": 0 },
-        "normalizedSeconds": { "type": ["number", "null"], "minimum": 0 },
-        "speedup": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "runnerInvocations": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "normalizedSeconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "speedup": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
         "partial": {
-          "type": "object", "required": ["budgetMs", "reached", "notReached"],
-          "properties": { "budgetMs": { "type": "integer" }, "reached": { "$ref": "#/definitions/count" }, "notReached": { "$ref": "#/definitions/count" } }
+          "type": "object",
+          "required": [
+            "budgetMs",
+            "reached",
+            "notReached"
+          ],
+          "properties": {
+            "budgetMs": {
+              "type": "integer"
+            },
+            "reached": {
+              "$ref": "#/definitions/count"
+            },
+            "notReached": {
+              "$ref": "#/definitions/count"
+            }
+          }
+        },
+        "noEvidence": {
+          "description": "Runs in which TestGuard wrote no evidence document (its own validator refused it, a precondition, a crash): reported with the tool's reason instead of as wrong verdicts.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "run",
+              "exit",
+              "reason"
+            ],
+            "properties": {
+              "run": {
+                "type": "string"
+              },
+              "exit": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "kind": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     }

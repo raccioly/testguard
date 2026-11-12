@@ -17,7 +17,7 @@
     {
       "name": "mixed-result-counted-as-kill",
       "patch": "mixed-result-counted-as-kill.patch",
-      "description": "Probe runs that disagree (some red, some green) are reported as a kill instead of flaky-defender/inconsistent-probe (rule 4). The evidence validator refuses such a document (N/N agreement), so this mutant is caught by TestGuard's own refusal to write (exit 2), which the corpus reports as red.",
+      "description": "When the probe runs disagree, each passing run is retried (up to twice) until it fails, so a nondeterministic response is recorded as N failing runs and reads as a kill (rule 4). The evidence stays valid; only the key can catch it. The shape a bail-on-first-failure or warm-runner change could take.",
       "targets": [
         {
           "subject": "py-pytest-circulation",
@@ -145,7 +145,7 @@
     {
       "name": "negative-control-skipped",
       "patch": "negative-control-skipped.patch",
-      "description": "The negative control's answer is ignored: a survivor whose defenders never execute the subject stays survived (rule 12). The validator may refuse the inconsistent record; either way the run goes red.",
+      "description": "The negative control is never run on a would-be survivor, so a survivor whose defenders never execute the subject stays survived (rule 12). The record stays valid (no control recorded); only the key can catch it.",
       "targets": [
         {
           "subject": "js-jest-newsletter",
