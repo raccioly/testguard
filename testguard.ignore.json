@@ -294,6 +294,13 @@
     },
     {
       "kind": "path",
+      "pattern": "test/corpus-shards.test.mjs",
+      "reason": "Checks the corpus CI plan (corpus/shards.json and .github/workflows/corpus.yml): every subject, Playwright mode and tool mutant is in exactly one shard, and the scorecard's expected-shard list comes from the same file. It asserts nothing about TestGuard's behavior; the corpus itself is the instrument it protects (#305).",
+      "by": "maintainer",
+      "at": "2026-11-12T00:00:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/corpus-mutants.test.mjs",
       "reason": "Checks only that the corpus's tool-mutant patches (corpus/tool-mutants/*.patch) still apply to src/ (git apply --check); it asserts nothing about TestGuard's behavior, so no claim's fault could make it fail except by moving the patched lines, which is exactly what it reports. Runs in npm test so a src/ change that breaks a patch regenerates it in the same pull request.",
       "by": "claude",
