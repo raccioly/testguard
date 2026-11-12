@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseYaml } from './helpers/yaml.mjs';
 import { median } from '../src/probe/cost.mjs';
 import { measureReference, WORKLOAD } from '../.github/scripts/measure-reference.mjs';
 
@@ -159,28 +160,34 @@ describe('measure-reference.mjs', () => {
   });
 });
 
-describe('ci.yml times the reference around the self-probe, in the same job', () => {
-  const workflow = readFileSync(join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
-  const at = (needle) => {
-    const i = workflow.indexOf(needle);
-    expect(i, needle).toBeGreaterThan(-1);
-    return i;
-  };
-  const step = (name) => workflow.slice(at(`- name: ${name}`)).split(/\n {6}- name: /)[0];
+describe('ci.yml times the reference around every self-probe, in the same job', () => {
+  const workflow = parseYaml(join(ROOT, '.github', 'workflows', 'ci.yml'))[0];
+  const names = (job) => workflow.jobs[job].steps.map((st) => st.name ?? '');
+  const step = (job, name) => workflow.jobs[job].steps.find((st) => st.name === name);
 
-  it('measures before the probe and after it, and the check reads both', () => {
-    const before = at('measure-reference.mjs --out .testguard/reference-before.json');
-    const probe = at("- name: probe TestGuard's own claims");
-    const after = at('measure-reference.mjs --out .testguard/reference-after.json');
-    const check = at('check-cost-budget.mjs');
-    expect(before).toBeLessThan(probe);
-    expect(probe).toBeLessThan(after);
-    expect(after).toBeLessThan(check);
-    expect(step('The gate must stay inside its cost budget')).toMatch(/--reference-before \.testguard\/reference-before\.json --reference-after \.testguard\/reference-after\.json/);
+  it('measures before the probe and after it, on the runner that probed, in each probing job', () => {
+    for (const [job, probe] of [['selfprobe', "probe this shard's claims"], ['selfprobe-scoped', "probe TestGuard's own claims — only what this pull request can affect"]]) {
+      const n = names(job);
+      const before = n.indexOf('Time the reference workload before the probe');
+      const after = n.indexOf('Time the reference workload after the probe');
+      expect(before, job).toBeGreaterThan(-1);
+      expect(before, job).toBeLessThan(n.indexOf(probe));
+      expect(n.indexOf(probe), job).toBeLessThan(after);
+      expect(step(job, 'Time the reference workload before the probe').run).toContain('measure-reference.mjs --out .testguard/reference-before.json');
+      expect(step(job, 'Time the reference workload after the probe').run).toContain('measure-reference.mjs --out .testguard/reference-after.json');
+    }
   });
 
-  it('measures after the probe even when the probe failed, on the same leg as the probe', () => {
-    expect(step('Time the reference workload after the probe')).toMatch(/if: always\(\) && matrix\.node-version == 22/);
-    expect(step('Time the reference workload before the probe')).toMatch(/if: matrix\.node-version == 22/);
+  it('measures after the probe even when the probe failed', () => {
+    expect(step('selfprobe', 'Time the reference workload after the probe').if).toBe('always()');
+    expect(step('selfprobe-scoped', 'Time the reference workload after the probe').if).toBe('always()');
+  });
+
+  it('ships each shard\'s evidence together with its own two reference timings, and the cost gate reads them per shard', () => {
+    expect(step('selfprobe', 'Collect this shard\'s evidence and its reference timings').run).toMatch(/reference-before\.json .testguard\/reference-after\.json .testguard\/shard-out/);
+    const gate = step('selfprobe-gate', 'The gate must stay inside its cost budget');
+    expect(gate.run).toBe('node .github/scripts/check-shard-cost.mjs shards');
+    expect(gate.if).toContain('always()');
+    expect(step('selfprobe-scoped', 'Cost of the scoped run (reported, not gated)').run).toMatch(/--reference-before \.testguard\/reference-before\.json --reference-after \.testguard\/reference-after\.json --report-only/);
   });
 });

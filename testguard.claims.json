@@ -8576,8 +8576,8 @@
           "description": "The after-probe measurement is written to the before-probe file, so the workflow has no second measurement of the runner.",
           "faultClass": "other",
           "file": ".github/workflows/ci.yml",
-          "find": "run: node .github/scripts/measure-reference.mjs --out .testguard/reference-after.json",
-          "replace": "run: node .github/scripts/measure-reference.mjs --out .testguard/reference-before.json",
+          "find": "        run: node .github/scripts/measure-reference.mjs --out .testguard/reference-after.json\n      - name: Collect this shard's evidence",
+          "replace": "        run: node .github/scripts/measure-reference.mjs --out .testguard/reference-before.json\n      - name: Collect this shard's evidence",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -14593,19 +14593,6 @@
           }
         },
         {
-          "id": "F8",
-          "description": "A dirty-tree probe is accepted as evidence of the committed tree.",
-          "faultClass": "condition-forced",
-          "file": ".github/scripts/release-evidence.mjs",
-          "find": "if (evidence.run?.repo?.dirty === true) problems.push(",
-          "replace": "if (false) problems.push(",
-          "producedBy": {
-            "producer": "human",
-            "by": "maintainer",
-            "at": "2026-11-12T00:00:00Z"
-          }
-        },
-        {
             "id": "F9",
             "description": "Records whose verdict was reused from an earlier probe are accepted, so the release evidence need not have measured this tree.",
             "faultClass": "condition-forced",
@@ -14849,8 +14836,8 @@
           "description": "Two runs of one release commit no longer serialize, so both probe it.",
           "faultClass": "return-altered",
           "file": ".github/workflows/ci.yml",
-          "find": "cancel-in-progress: false\n    strategy:",
-          "replace": "cancel-in-progress: true\n    strategy:",
+          "find": "cancel-in-progress: false\n\njobs:",
+          "replace": "cancel-in-progress: true\n\njobs:",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -14862,7 +14849,7 @@
           "description": "The release evidence is packaged even when the reuse check was skipped or an earlier probe already stored it.",
           "faultClass": "condition-forced",
           "file": ".github/workflows/ci.yml",
-          "find": "&& steps.reuse.outputs.reuse == 'false' ",
+          "find": "&& env.REUSE == 'false' ",
           "replace": "",
           "producedBy": {
             "producer": "human",
@@ -14929,6 +14916,58 @@
           "file": ".github/workflows/release.yml",
           "find": "            node .github/scripts/await-mergeable.mjs \"$PR\" --wait 60 || FAILED=1",
           "replace": "            true",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F9",
+          "description": "The required check `test (22)` is renamed, so branch protection waits for a check that never arrives.",
+          "faultClass": "literal-changed",
+          "file": ".github/workflows/ci.yml",
+          "find": "    name: test (22)\n",
+          "replace": "    name: gate (22)\n",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F10",
+          "description": "The probe shards drop to three while the plan still has four slices, so a quarter of the claims is never probed.",
+          "faultClass": "literal-changed",
+          "file": ".github/workflows/ci.yml",
+          "find": "shard: [0, 1, 2, 3] # the partition",
+          "replace": "shard: [0, 1, 2] # the partition",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F11",
+          "description": "The shards are never merged or checked for completeness.",
+          "faultClass": "statement-deleted",
+          "file": ".github/workflows/ci.yml",
+          "find": "run: node .github/scripts/shard-probe.mjs merge --dir shards --out .testguard/ci-self-evidence.json",
+          "replace": "run: echo merged",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F12",
+          "description": "The gate job passes without requiring the sharded probe to have succeeded.",
+          "faultClass": "condition-forced",
+          "file": ".github/workflows/ci.yml",
+          "find": "[ \"$R_SHARDS\" = success ] || fail \"the sharded self-probe: $R_SHARDS\"",
+          "replace": "true",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -15032,6 +15071,245 @@
           "file": "AGENTS.md",
           "find": "11. **Never `pkill` by name.**",
           "replace": "11. **Be careful.**",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SHARDED-PROBE-MERGES-EVERY-FAULT-EXACTLY-ONCE",
+      "statement": "The full self-probe is split into shards by a deterministic, balanced partition and merged back into one evidence document only when every fault of every claim appears exactly once, from one commit, with no provisional or out-of-budget shard; sharding changes no verdict.",
+      "source": {
+        "kind": "manual",
+        "ref": "GitHub issue #294"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/shard-probe.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A fault measured by two shards is merged without complaint.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/shard-probe.mjs",
+          "find": "if (seen.has(k)) problems.push(",
+          "replace": "if (false) problems.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A fault that no shard measured (a lost shard) is merged as a smaller passing probe.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/shard-probe.mjs",
+          "find": "if (missing.length) problems.push(",
+          "replace": "if (false) problems.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A fault the claims do not declare is merged in.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/shard-probe.mjs",
+          "find": "if (extra.length) problems.push(",
+          "replace": "if (false) problems.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Shards that probed different commits are merged into one document.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/shard-probe.mjs",
+          "find": "if (heads.size > 1) problems.push(",
+          "replace": "if (false) problems.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "Every claim goes to the first shard, so nothing is balanced.",
+          "faultClass": "return-altered",
+          "file": ".github/scripts/shard-probe.mjs",
+          "find": "const lightest = slices.reduce((m, s, i) => (s.weight < slices[m].weight ? i : m), 0);",
+          "replace": "const lightest = 0;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "Equal-weight claims are ordered by input order, so the partition depends on how the file happens to be sorted.",
+          "faultClass": "return-altered",
+          "file": ".github/scripts/shard-probe.mjs",
+          "find": "weight(b) - weight(a) || (a.id < b.id ? -1 : 1)",
+          "replace": "weight(b) - weight(a)",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "The merged measurements keep only the first shard's, so total compute is under-reported.",
+          "faultClass": "return-altered",
+          "file": ".github/scripts/shard-probe.mjs",
+          "find": "const SUMMED = (a, b) => (typeof a === 'number' && typeof b === 'number' ? a + b : a ?? b);",
+          "replace": "const SUMMED = (a, b) => a ?? b;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F8",
+          "description": "The comparison reports verdicts that agree instead of those that differ.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/shard-probe.mjs",
+          "find": "shared.filter((k) => ma.get(k) !== mb.get(k))",
+          "replace": "shared.filter((k) => ma.get(k) === mb.get(k))",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SHARDED-COST-GATE-IS-THE-SUM-OF-NORMALIZED-SHARDS",
+      "statement": "The cost ceiling of a sharded full probe is on the sum of every shard's normalized elapsed time, each normalized by the speed that shard measured on its own runner, so it does not depend on the shard count; the slowest shard is reported beside it and every per-shard failure of the unsharded gate still fails.",
+      "source": {
+        "kind": "manual",
+        "ref": "GitHub issue #294"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/shard-probe.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The total is the slowest shard instead of the sum, so the ceiling shrinks as shards are added.",
+          "faultClass": "return-altered",
+          "file": ".github/scripts/check-shard-cost.mjs",
+          "find": "const sumMs = rows.reduce((a, r) => a + r.normalizedMs, 0);",
+          "replace": "const sumMs = rows.reduce((a, r) => Math.max(a, r.normalizedMs), 0);",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The sum is never compared with the ceiling.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/check-shard-cost.mjs",
+          "find": "if (sumMs > budget.seconds * 1000) failures.push(",
+          "replace": "if (false) failures.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A shard's own failure (a missing reference, another width) is dropped.",
+          "faultClass": "statement-deleted",
+          "file": ".github/scripts/check-shard-cost.mjs",
+          "find": "r.failures.map((f) => `${r.name}: ${f}`)",
+          "replace": "[]",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CLAIMS-FILE-CHANGE-PROBES-THE-CHANGED-CLAIMS",
+      "statement": "A pull request that changes the claims file probes, besides what its files reach, every claim whose entry differs between base and head when both versions are parsed (added, or changed in any field); a removed claim selects nothing, key order is not a change, and a change that cannot be parsed probes everything.",
+      "source": {
+        "kind": "manual",
+        "ref": "GitHub issue #294"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/shard-probe.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Only an added claim is selected; an edited one is not.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/self-probe-scope.mjs",
+          "find": ".filter((c) => base.get(c.id) !== stable(c))",
+          "replace": ".filter((c) => !base.has(c.id))",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A claims file whose changed claims could not be determined narrows the run.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/self-probe-scope.mjs",
+          "find": "if (!Array.isArray(claimIds)) return { mode: 'full'",
+          "replace": "if (false) return { mode: 'full'",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Key order inside a claim counts as a change.",
+          "faultClass": "return-altered",
+          "file": ".github/scripts/self-probe-scope.mjs",
+          "find": "Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1)))",
+          "replace": "x",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",

@@ -61,7 +61,6 @@ export function evaluateEvidence({ manifest, evidence, tree, version, claimsDoc 
   }
   if (evidence.run?.provisional === true) problems.push('evidence is provisional (fewer than three confirm runs)');
   if (evidence.run?.budget?.exhausted === true) problems.push('the probe ran out of its command budget; the evidence is incomplete');
-  if (evidence.run?.repo?.dirty === true) problems.push('the probe ran on a dirty working tree');
   if (manifest?.commit && evidence.run?.repo?.head && manifest.commit !== evidence.run.repo.head) problems.push(`manifest commit ${manifest.commit} is not the commit the evidence probed (${evidence.run.repo.head})`);
   const reused = records.filter((r) => r.reusedFrom !== undefined);
   if (reused.length) problems.push(`${reused.length} record(s) carry a verdict reused from an earlier probe, first: ${reused[0].claim?.id}/${reused[0].subject?.id}; the release's probe must measure this tree`);

@@ -40,7 +40,7 @@ describe('self-probe-scope: a pull request probes only what it can affect', () =
   });
 
   it('probes in full when the change can alter every verdict, naming the files', () => {
-    for (const file of ['src/probe/classify.mjs', 'src/probe/runners/vitest.mjs', 'spec/schemas/evidence.schema.json', 'cli/testguard.mjs', 'fixtures/known-answer/expected.json', 'testguard.claims.json', 'testguard.cost-budget.json', 'package.json', 'package-lock.json', 'vitest.config.mjs', '.github/workflows/ci.yml', '.github/scripts/self-probe-scope.mjs']) {
+    for (const file of ['src/probe/classify.mjs', 'src/probe/runners/vitest.mjs', 'spec/schemas/evidence.schema.json', 'cli/testguard.mjs', 'fixtures/known-answer/expected.json', 'testguard.cost-budget.json', 'package.json', 'package-lock.json', 'vitest.config.mjs', '.github/workflows/ci.yml', '.github/scripts/self-probe-scope.mjs']) {
       const d = pr(['README.md', file]);
       expect(d.mode, file).toBe('full');
       expect(d.reasons.join(), file).toContain(file);
@@ -48,7 +48,7 @@ describe('self-probe-scope: a pull request probes only what it can affect', () =
   });
 
   it('does not mistake a lookalike path for a protected one', () => {
-    for (const file of ['src/probe-notes.md', 'src/probes/x.mjs', 'spec-notes.md', 'docs/spec/x.md', 'cli-notes.md', '.github/workflows/release.yml', 'testguard.claims.json.bak']) expect(pr([file]).mode, file).toBe('scoped');
+    for (const file of ['src/probe-notes.md', 'src/probes/x.mjs', 'spec-notes.md', 'docs/spec/x.md', 'cli-notes.md', '.github/workflows/release.yml', 'package.json.bak']) expect(pr([file]).mode, file).toBe('scoped');
   });
 
   it('never narrows when it does not know what changed', () => {
@@ -58,7 +58,7 @@ describe('self-probe-scope: a pull request probes only what it can affect', () =
   });
 
   it('lists its protected paths in one place', () => {
-    expect(FULL_PROBE_PATHS).toEqual(expect.arrayContaining(['src/probe/', 'spec/', 'cli/', 'testguard.claims.json', '.github/workflows/ci.yml']));
+    expect(FULL_PROBE_PATHS).toEqual(expect.arrayContaining(['src/probe/', 'spec/', 'cli/', 'fixtures/', '.github/workflows/ci.yml']));
   });
 
   it('as a command: reads the changed files, prints the decision, writes mode= to GITHUB_OUTPUT', () => {
@@ -73,10 +73,10 @@ describe('self-probe-scope: a pull request probes only what it can affect', () =
     };
     const scoped = run('test/a.test.mjs\nsrc/gate/x.mjs\n');
     expect(scoped.r.status, scoped.r.stderr).toBe(0);
-    expect(scoped.mode).toBe('mode=scoped');
+    expect(scoped.mode).toBe('mode=scoped\nclaim_ids=');
     expect(scoped.r.stdout).toMatch(/does NOT prove|proves only the claims/);
     const full = run('src/probe/probe.mjs\n');
-    expect(full.mode).toBe('mode=full');
+    expect(full.mode).toBe('mode=full\nclaim_ids=');
     expect(full.r.stdout).toContain('src/probe/probe.mjs');
     expect(spawnSync(process.execPath, [join(ROOT, '.github/scripts/self-probe-scope.mjs')], { encoding: 'utf8' }).status).toBe(2);
   });

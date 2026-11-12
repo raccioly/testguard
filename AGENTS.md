@@ -18,7 +18,7 @@ their first consumer.
 ```bash
 npm ci --prefix fixtures/known-answer-typescript   # once; without it the type-check suites fail loudly (they never skip)
 npm ci --prefix fixtures/known-answer-playwright   # once; without it the Playwright fixture acceptance silently skips
-npm test               # unit + fixture acceptance
+npm test               # unit + fixture acceptance; about 200 s here, CI fails it over 300 s
 npm run test:spec      # conformance suite only
 node cli/testguard.mjs gate --changed origin/main   # every changed source file, tests included, needs a claim
 node cli/testguard.mjs claims --check-anchors       # every fault anchor and replacement is valid (50 ms; a stale one costs a CI probe)
@@ -55,7 +55,8 @@ tree). Records come out in claim/fault order.
 - `spec/schemas/common.schema.json`, `spec/lib/validate.mjs` — closed sets and semantic rules.
 - `corpus/` — benchmark subjects with hand-derived keys, plus `corpus/tool-mutants/`.
 - `fixtures/known-answer/expected.json` — the fixture oracle. Never edit it to match output.
-- `.github/workflows/ci.yml` — a pull request probes only what it can reach (`.github/scripts/self-probe-scope.mjs`); `main`, nightly and release branches probe everything. A scoped run does **not** prove the claims it left out; the full run on `main` does.
+- `.github/workflows/ci.yml` — a pull request probes only what it can reach plus the claims whose entry changed in the claims file (`.github/scripts/self-probe-scope.mjs`); `main`, nightly, release branches and any change to the probe, spec, CLI, fixtures or workflow probe everything, in four shards merged back (`.github/scripts/shard-probe.mjs`; the cost ceiling is on the sum of the shards). A scoped run does **not** prove the claims it left out; the full run on `main` does.
+- A probe writes only under its scratch directory, `--out` and git's worktree metadata; the project's `node_modules` is linked, never written (`docs-canonical/SECURITY.md`).
 - `.github/workflows/release.yml` — the release probes once, on the release pull request; this verifies that evidence by tree hash (`.github/scripts/release-evidence.mjs`).
 
 ## Rules

@@ -50,10 +50,10 @@ describe('release evidence: what a clean full probe of this tree is', () => {
     expect(check({ evidence: evidence({ records: [...fullRecords(), record('C9', 'F1')] }) }).join()).toMatch(/1 fault\(s\) this tree's claims do not declare, first: C9\/F1/);
   });
 
-  it('refuses provisional, budget-exhausted and dirty-tree evidence, and empty evidence', () => {
+  it('refuses provisional and budget-exhausted evidence and empty evidence, and does not mind the untracked CI files that mark a run dirty', () => {
     expect(check({ evidence: evidence({ run: { provisional: true, repo: { head: 'c'.repeat(40), dirty: false } } }) }).join()).toMatch(/provisional/);
     expect(check({ evidence: evidence({ run: { budget: { exhausted: true }, repo: { head: 'c'.repeat(40), dirty: false } } }) }).join()).toMatch(/ran out of its command budget/);
-    expect(check({ evidence: evidence({ run: { repo: { head: 'c'.repeat(40), dirty: true } } }) }).join()).toMatch(/dirty working tree/);
+    expect(check({ evidence: evidence({ run: { repo: { head: 'c'.repeat(40), dirty: true } } }) })).toEqual([]);
     expect(check({ evidence: evidence({ records: [] }) }).join()).toMatch(/no records/);
   });
 

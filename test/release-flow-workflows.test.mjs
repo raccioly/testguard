@@ -18,34 +18,64 @@ const index = (workflow, job, name) => steps(workflow, job).findIndex((s) => s.n
 // `on:` parses as the boolean key true under YAML 1.1.
 const triggers = (workflow) => workflow.on ?? workflow[true];
 
-describe('ci.yml: pull requests probe what changed, everything else probes in full', () => {
-  const probeFull = step(ci, 'test', "probe TestGuard's own claims");
-  const probeScoped = step(ci, 'test', "probe TestGuard's own claims — only what this pull request can affect");
+describe('ci.yml: pull requests probe what changed, everything else probes in full, sharded', () => {
+  const scopeStep = step(ci, 'scope', 'Decide how much of its own claims the self-probe measures');
+  const scopedProbe = step(ci, 'selfprobe-scoped', "probe TestGuard's own claims — only what this pull request can affect");
 
-  it('decides the scope first, from the event and the diff, passing branch names through the environment', () => {
-    const scope = step(ci, 'test', 'Decide how much of its own claims the self-probe measures');
-    expect(scope.run).toContain('self-probe-scope.mjs');
-    expect(scope.run).toContain('--base "origin/$BASE_REF"');
-    expect(scope.env).toMatchObject({ HEAD_REF: '${{ github.head_ref }}', EVENT_NAME: '${{ github.event_name }}' });
-    for (const s of steps(ci, 'test')) expect(s.run ?? '', s.name).not.toMatch(/\$\{\{\s*github\.(head_ref|ref_name)/);
-    expect(index(ci, 'test', 'Decide how much of its own claims the self-probe measures')).toBeLessThan(steps(ci, 'test').indexOf(probeFull));
+  it('decides the scope first, in its own job, passing branch names through the environment', () => {
+    expect(scopeStep.run).toContain('self-probe-scope.mjs');
+    expect(scopeStep.run).toContain('--base "origin/$BASE_REF"');
+    expect(scopeStep.env).toMatchObject({ HEAD_REF: '${{ github.head_ref }}', EVENT_NAME: '${{ github.event_name }}' });
+    for (const job of Object.values(ci.jobs)) for (const s of job.steps ?? []) expect(s.run ?? '', s.name).not.toMatch(/\$\{\{\s*github\.(head_ref|ref_name)/);
+    expect(ci.jobs.scope.outputs.mode).toBe('${{ steps.scope.outputs.mode }}');
   });
 
-  it('runs the full probe only in full mode and the scoped probe only in scoped mode, against the pull request base', () => {
-    expect(probeFull.if).toContain("steps.scope.outputs.mode == 'full'");
-    expect(probeFull.run).not.toContain('--changed');
-    expect(probeScoped.if).toContain("steps.scope.outputs.mode == 'scoped'");
-    expect(probeScoped.run).toContain('probe . --changed "origin/${{ github.base_ref }}"');
-    expect(probeScoped.run).toContain('--out .testguard/ci-self-evidence.json');
+  it('runs the sharded probe only in full mode and the scoped probe only in scoped mode, against the pull request base', () => {
+    expect(ci.jobs.selfprobe.needs).toBe('scope');
+    expect(ci.jobs.selfprobe.if).toContain("needs.scope.outputs.mode == 'full'");
+    expect(ci.jobs.selfprobe.if).toContain("needs.scope.outputs.reuse != 'true'");
+    expect(ci.jobs['selfprobe-scoped'].if).toBe("needs.scope.outputs.mode == 'scoped'");
+    expect(scopedProbe.run).toContain('probe . --changed "origin/${{ github.base_ref }}"');
+    const claimsProbe = step(ci, 'selfprobe-scoped', 'probe the claims whose entry changed in the claims file');
+    expect(claimsProbe.if).toBe("needs.scope.outputs.claim_ids != ''");
+    expect(claimsProbe.run).toContain('--claim "$CLAIM_IDS"');
+  });
+
+  it('shards the full probe four ways from one partition computed once, each shard probing exactly its slice', () => {
+    expect(ci.jobs.selfprobe.strategy.matrix.shard).toEqual([0, 1, 2, 3]);
+    expect(ci.jobs.selfprobe.strategy['fail-fast']).toBe(false);
+    expect(step(ci, 'scope', 'Plan the shards of the full probe').run).toContain('shard-probe.mjs plan --shards 4');
+    const probe = step(ci, 'selfprobe', "probe this shard's claims");
+    expect(probe.env.SHARD_CLAIMS).toBe('${{ fromJSON(needs.scope.outputs.shards)[matrix.shard] }}');
+    expect(probe.run).toContain('--claim "$SHARD_CLAIMS"');
+    expect(probe.run).not.toContain('--changed');
+    expect(probe.env.NO_REUSE).toContain("startsWith(github.head_ref || github.ref_name, 'release/')");
+    expect(probe.env.NO_REUSE).toContain("github.event_name == 'schedule'");
+  });
+
+  it('merges the shards, requiring every fault exactly once, and gates the SUM of their cost', () => {
+    const merge = index(ci, 'selfprobe-gate', 'Merge the shards into one evidence document');
+    const cost = index(ci, 'selfprobe-gate', 'The gate must stay inside its cost budget');
+    expect(index(ci, 'selfprobe-gate', 'Collect the shards')).toBeLessThan(merge);
+    expect(merge).toBeLessThan(cost);
+    expect(steps(ci, 'selfprobe-gate')[merge].run).toContain('shard-probe.mjs merge --dir shards');
+    expect(steps(ci, 'selfprobe-gate')[cost].run).toContain('check-shard-cost.mjs shards');
+  });
+
+  it('keeps `test (22)` a required check: the last job carries that name and stands for the unit legs, the scope and the probe pipeline', () => {
+    const gate = ci.jobs['selfprobe-gate'];
+    expect(gate.name).toBe('test (22)');
+    expect(gate.if).toBe('always()');
+    expect(gate.needs).toEqual(['scope', 'test', 'selfprobe', 'selfprobe-scoped']);
+    const check = gate.steps[0].run;
+    for (const must of ['R_SCOPE', 'R_TEST', 'R_SHARDS', 'R_SCOPED']) expect(check).toContain(`[ "$${must}" = success ]`);
+    expect(ci.jobs.test.name).toContain("'checks (22)'");
+    expect(ci.jobs.test.name).toContain("format('test ({0})', matrix.node-version)");
   });
 
   it('gates the cost of a full run and only reports the cost of a scoped one', () => {
-    const gate = step(ci, 'test', 'The gate must stay inside its cost budget');
-    const report = step(ci, 'test', 'Cost of the scoped run (reported, not gated)');
-    expect(gate.if).toContain("steps.scope.outputs.mode == 'full'");
-    expect(gate.run).not.toContain('--report-only');
-    expect(report.if).toContain("steps.scope.outputs.mode == 'scoped'");
-    expect(report.run).toContain('--report-only');
+    expect(step(ci, 'selfprobe-gate', 'The gate must stay inside its cost budget').if).toContain("env.MODE == 'full'");
+    expect(step(ci, 'selfprobe-scoped', 'Cost of the scoped run (reported, not gated)').run).toContain('--report-only');
   });
 
   it('keeps the anchor preflight, the claims diff and the changed-file gate on every pull request', () => {
@@ -55,44 +85,47 @@ describe('ci.yml: pull requests probe what changed, everything else probes in fu
     expect(step(ci, 'test', 'claims — no claim or fault removed without a reason').if).toBe("github.event_name == 'pull_request'");
   });
 
-  it('adds a nightly full run of the test job only', () => {
+  it('adds a nightly full run: the test job and the probe, nothing else', () => {
     expect(triggers(ci).schedule).toHaveLength(1);
     for (const job of ['native-node-floor', 'python', 'playwright', 'hermeticity']) expect(ci.jobs[job].if, job).toBe("github.event_name != 'schedule'");
     expect(ci.jobs.test.if).toBeUndefined();
   });
 
   it('keeps the branch-named evidence for full runs only: a scoped run is partial', () => {
-    expect(step(ci, 'test', 'Upload evidence under a stable, branch-named artifact').if).toContain("steps.scope.outputs.mode == 'full'");
+    expect(step(ci, 'selfprobe-gate', 'Upload evidence under a stable, branch-named artifact').if).toContain("env.MODE == 'full'");
   });
 });
 
 describe('ci.yml: the release tree is probed in full once and the evidence is keyed by its tree', () => {
-  const pkg = step(ci, 'test', 'Release branch — package the full probe, keyed by the tree hash');
-  const upload = step(ci, 'test', 'Release branch — upload the release evidence');
-  const reuse = step(ci, 'test', 'Release branch — is this tree already probed in full?');
+  const pkg = step(ci, 'selfprobe-gate', 'Release branch — package the full probe, keyed by the tree hash');
+  const upload = step(ci, 'selfprobe-gate', 'Release branch — upload the release evidence');
+  const reuse = step(ci, 'scope', 'Release branch — is this tree already probed in full?');
 
   it("looks for an earlier run's evidence of the same tree before probing, and skips the probe when it is there", () => {
     expect(reuse.run).toContain('release-evidence.mjs verify');
     expect(reuse.run).toContain('HEAD^{tree}');
+    expect(reuse.run).toContain('--miss-is-notice');
     expect(reuse.if).toContain("startsWith(github.head_ref || github.ref_name, 'release/')");
-    expect(index(ci, 'test', reuse.name)).toBeLessThan(steps(ci, 'test').indexOf(step(ci, 'test', "probe TestGuard's own claims")));
-    for (const name of ["probe TestGuard's own claims", 'The gate must stay inside its cost budget', 'Time the reference workload before the probe']) expect(step(ci, 'test', name).if, name).toContain("steps.reuse.outputs.reuse != 'true'");
-    expect(ci.jobs.test.permissions.actions).toBe('read');
+    expect(ci.jobs.scope.outputs.reuse).toBe('${{ steps.reuse.outputs.reuse }}');
+    expect(index(ci, 'scope', reuse.name)).toBeLessThan(index(ci, 'scope', 'Plan the shards of the full probe'));
+    expect(ci.jobs.scope.permissions.actions).toBe('read');
   });
 
-  it('serializes the two runs of one release commit so the second can reuse the first', () => {
-    expect(ci.jobs.test.concurrency.group).toBe('ci-test-${{ matrix.node-version }}-${{ github.event.pull_request.head.sha || github.sha }}');
-    expect(ci.jobs.test.concurrency['cancel-in-progress']).toBe(false);
+  it('serializes the two runs of one release commit (the whole workflow) so the second can reuse the first', () => {
+    expect(ci.concurrency.group).toContain("startsWith(github.head_ref || github.ref_name, 'release/')");
+    expect(ci.concurrency.group).toContain('github.event.pull_request.head.sha || github.sha');
+    expect(ci.concurrency.group).toContain('github.run_id');
+    expect(ci.concurrency['cancel-in-progress']).toBe(false);
   });
 
   it('packages and uploads release evidence only from a full, clean, release-branch probe', () => {
-    expect(pkg.if).toContain("steps.scope.outputs.mode == 'full'");
-    expect(pkg.if).toContain("steps.reuse.outputs.reuse == 'false'");
+    expect(pkg.if).toContain("env.MODE == 'full'");
+    expect(pkg.if).toContain("env.REUSE == 'false'");
     expect(pkg.if).toContain("startsWith(github.head_ref || github.ref_name, 'release/')");
     expect(pkg.if).not.toContain('always()');
     expect(pkg.run).toContain('release-evidence.mjs write');
     expect(upload.with.name).toBe('${{ steps.release_evidence.outputs.name }}');
-    expect(index(ci, 'test', pkg.name)).toBeGreaterThan(index(ci, 'test', 'The gate must stay inside its cost budget'));
+    expect(index(ci, 'selfprobe-gate', pkg.name)).toBeGreaterThan(index(ci, 'selfprobe-gate', 'Merge the shards into one evidence document'));
   });
 });
 
