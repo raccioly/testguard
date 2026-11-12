@@ -82,7 +82,8 @@ describe('every mode that applies has a shard; the rest are recorded as not appl
     expect(failed(out, 'mode-has-a-shard').map((r) => r.mode)).toEqual(['scratch']);
     const na = out.filter((r) => r.checks.some((c) => c.check === 'not-applicable')).map((r) => r.mode).sort();
     expect(na).toEqual(MODES.filter((m) => !applies(m, subject)).sort());
-    expect(na).toEqual(['changed', 'noise', 'typecheck']);
+    // for a subject with no typecheck, no `changed` key and no noise config, exactly these modes do not apply
+    expect(na).toEqual(MODES.filter((m) => ['typecheck', 'changed', 'converge', 'noise'].includes(m)).sort());
     expect(out.filter((r) => r.checks.some((c) => c.check === 'not-applicable')).every((r) => r.ok)).toBe(true);
   });
 });
