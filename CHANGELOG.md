@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The corpus CI runs one Playwright mode per shard (#305, repository only).** The shard list is `corpus/shards.json`; the workflow builds its matrix from it and the scorecard fails when a planned shard delivered no scorecard. Per-shard timeouts come from measurements. No subject, mode or mutant was dropped.
+
 ### Fixed
 
 - **`defenders-failed-to-load` carries the runner's words (#291).** The first

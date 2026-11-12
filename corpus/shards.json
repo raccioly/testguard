@@ -1,0 +1,146 @@
+{
+  "$comment": "The corpus shards: the one place the matrix and the scorecard's expected-shard list come from (.github/workflows/corpus.yml plan job). One Playwright mode per gallery shard (#305). timeout is minutes, about 2x the measured shard time. test/corpus-shards.test.mjs checks that every subject, mode and mutant is in exactly one shard.",
+  "shards": [
+    {
+      "name": "ts-vitest-stock",
+      "args": "--subject ts-vitest-stock",
+      "timeout": 20
+    },
+    {
+      "name": "js-jest-newsletter",
+      "args": "--subject js-jest-newsletter",
+      "timeout": 22
+    },
+    {
+      "name": "py-pytest-circulation",
+      "args": "--subject py-pytest-circulation",
+      "timeout": 22
+    },
+    {
+      "name": "node-test-floorplan",
+      "args": "--subject node-test-floorplan",
+      "timeout": 15
+    },
+    {
+      "name": "js-playwright-gallery-twice",
+      "args": "--subject js-playwright-gallery --mode twice",
+      "timeout": 32,
+      "browser": true
+    },
+    {
+      "name": "js-playwright-gallery-reuse",
+      "args": "--subject js-playwright-gallery --mode reuse",
+      "timeout": 40,
+      "browser": true
+    },
+    {
+      "name": "js-playwright-gallery-default",
+      "args": "--subject js-playwright-gallery --mode default",
+      "timeout": 32,
+      "browser": true
+    },
+    {
+      "name": "js-playwright-gallery-workers-2",
+      "args": "--subject js-playwright-gallery --mode workers-2",
+      "timeout": 32,
+      "browser": true
+    },
+    {
+      "name": "js-playwright-gallery-workers-4",
+      "args": "--subject js-playwright-gallery --mode workers-4",
+      "timeout": 32,
+      "browser": true
+    },
+    {
+      "name": "js-playwright-gallery-scratch",
+      "args": "--subject js-playwright-gallery --mode scratch",
+      "timeout": 32,
+      "browser": true
+    },
+    {
+      "name": "js-playwright-gallery-assertion-kill",
+      "args": "--subject js-playwright-gallery --mode assertion-kill",
+      "timeout": 32,
+      "browser": true
+    },
+    {
+      "name": "js-playwright-gallery-reorder",
+      "args": "--subject js-playwright-gallery --mode reorder",
+      "timeout": 32,
+      "browser": true
+    },
+    {
+      "name": "js-playwright-gallery-noise",
+      "args": "--subject js-playwright-gallery --mode noise",
+      "timeout": 32,
+      "browser": true
+    },
+    {
+      "name": "js-playwright-gallery-partial",
+      "args": "--subject js-playwright-gallery --mode partial --mode typecheck --mode changed",
+      "timeout": 20,
+      "browser": true
+    },
+    {
+      "name": "py-unittest-shipping",
+      "args": "--subject py-unittest-shipping",
+      "timeout": 15
+    },
+    {
+      "name": "js-vitest-booking",
+      "args": "--subject js-vitest-booking",
+      "timeout": 15
+    },
+    {
+      "name": "ts-vitest-converter",
+      "args": "--subject ts-vitest-converter",
+      "timeout": 15
+    },
+    {
+      "name": "node-test-catalog3",
+      "args": "--subject node-test-catalog3@npm --subject node-test-catalog3@pnpm",
+      "timeout": 15
+    },
+    {
+      "name": "js-vitest-projects-habits",
+      "args": "--subject js-vitest-projects-habits",
+      "timeout": 15
+    },
+    {
+      "name": "js-vitest-mergeconfig-ledger",
+      "args": "--subject js-vitest-mergeconfig-ledger",
+      "timeout": 15
+    },
+    {
+      "name": "mutants-classify",
+      "args": "--tool-mutants --mutant timeout-counted-as-kill --mutant mixed-result-counted-as-kill --mutant baseline-not-required-green --mutant negative-control-skipped",
+      "timeout": 15
+    },
+    {
+      "name": "mutants-reuse",
+      "args": "--tool-mutants --mutant reuse-ignores-import-closure --mutant reuse-ignores-tool-version --mutant exception-only-reported-as-assertion",
+      "timeout": 15
+    },
+    {
+      "name": "mutants-modes",
+      "args": "--tool-mutants --mutant fault-not-restored --mutant typecheck-skipped --mutant fan-out-shares-one-tree",
+      "timeout": 15
+    },
+    {
+      "name": "mutants-scope",
+      "args": "--tool-mutants --mutant not-reached-fault-dropped --mutant changed-git-failure-is-empty",
+      "timeout": 15
+    },
+    {
+      "name": "mutants-kinds",
+      "args": "--tool-mutants --mutant mixed-kill-kind-read-as-assertion --mutant discovery-writes-into-project --mutant defenders-load-error-read-as-flaky --mutant vitest-error-classes-ignored --mutant unittest-error-read-as-assertion",
+      "timeout": 15
+    },
+    {
+      "name": "mutants-browser",
+      "args": "--tool-mutants --mutant playwright-timeout-read-as-failure",
+      "timeout": 25,
+      "browser": true
+    }
+  ]
+}
