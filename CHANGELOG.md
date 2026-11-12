@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+<<<<<<< HEAD
 - **A dotted stem resolves (#301).** `./auth.config` is `auth.config.ts`: the
   import closure tried no candidates for a specifier whose last segment holds a
   dot, so it reported `unreadable-module` and every `--changed` run selected
@@ -16,9 +17,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tries name plus each source extension and `name/index` plus each. An exact
   file still wins, `./x.js` still falls back to `x.ts`, a missing module is
   still unreadable.
+=======
+- **`defenders-failed-to-load` carries the runner's words (#291).** The first
+  informative error line reached `anchor.message` and stopped there, so 71
+  records of a 6,613-fault field run said only `defenders-failed-to-load`. It is
+  now `detail.message`. Every path that yields an `error` run names its cause: a
+  suite or file that loaded nothing, an empty selection, an unreadable or
+  missing report (with the exit status), a parser that returned no words (the
+  runner's last stderr line), a merged run, pytest collection and node:test
+  load errors. A Playwright run whose tests all pass but which reports an error
+  (global setup or teardown, `webServer`, reporter) is an `error` with that
+  line, not a pass. A ledger test lists every error path and its message source.
+- **A server from another checkout is never evidence (#291).** Under
+  `reuseExistingServer: !process.env.CI` a foreign server on the port makes
+  Playwright refuse (`CI=1` reaches the config), and the record carries its
+  "already used" line. A config that reuses a server regardless gets
+  `subject-not-executed` with a `detail.message` that names the reused server
+  (the port still listening after the run). The supported setup is in
+  `docs/reference/languages-and-runners.md`; a fixture proves all three cases.
+>>>>>>> origin/main
 
 ### Added
 
+- **Speed advice `slow-defenders-dominate` (#291).** When one to three claims
+  hold at least 10% of the recorded defender time at a median of at least 15 s
+  per run (together at least 25%, on at least 20 claims and 600 s), `status`,
+  `brief` and the end of a probe name each: claim, summed seconds, its slowest
+  defender file with the median seconds per run and the run count, and what to
+  do. Computed from recorded durations; thresholds written in
+  `src/status/advice.mjs` and `spec/GATE-SEMANTICS.md`.
+
+- **This repository's own CI uses the fast path, and a release probes once
+  (#294, repository only).** A pull request probes only the claims its change
+  can reach (`probe --changed`); `main`, the nightly run, release branches and
+  any change to the probe, spec, CLI, claims file or workflow still probe every
+  fault. The release pull request's full probe is stored as
+  `release-evidence-<tree hash>` and `release.yml` verifies it instead of
+  probing again. Publishing waits for the npm tarball to download, the scheduled
+  release waits for the previous Homebrew checksum, and a release pull request
+  that cannot merge now fails its workflow. `AGENTS.md` is rewritten from the
+  code as it is.
 - **The corpus gains seven subjects, a subject-untouched check and six tool
   mutants (#258, repository only).** Playwright, unittest, a symlinked source
   directory, a computed dynamic import with a mocked collaborator, a

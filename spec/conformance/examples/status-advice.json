@@ -108,6 +108,11 @@
       "command": "testguard probe"
     },
     {
+      "id": "slow-defenders-dominate",
+      "message": "2 of 54 claims account for 53% of defender time: CLAIM-A costs 6149s: test/a-session.test.js takes a median 73s per run and runs 84 times; CLAIM-B costs 3292s: test/b-preflight.test.js takes a median 32s per run and runs 98 times. Give the claim a faster defender or split the file.",
+      "command": "testguard claims --cost"
+    },
+    {
       "id": "hook-outdated",
       "message": ".husky/pre-push:4: runs probe --serial: one fault at a time — drop --serial (faults now run in parallel safely)",
       "command": "testguard init --upgrade"

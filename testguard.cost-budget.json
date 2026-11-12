@@ -100,7 +100,8 @@
       "faultWorkers": 2,
       "at": "2026-11-12",
       "why": "Two from-scratch runs on the final code of PR #275 now exist: 2041 normalized elapsed seconds (head a5039ec, 723 faults, factor 0.89) and 2000 (head f94bea0, 726 faults, factor 1.01; summed 4675, not gated), every fault killed. Median 2020.5 plus 12% (the two-sample rule this series started with) is 2263, rounded to 2270. Tighten it from main's next three from-scratch runs by the file's headroom rule."
-    }
+    },
+    {"seconds": 2360, "slowestShardSeconds": 610, "shards": 4, "unit": "normalized-elapsed-seconds", "faultWorkers": 2, "at": "2026-11-12", "why": "A NEW CONFIGURATION, not a raise of the unsharded ceiling (2270, unchanged, still what an unsharded probe is judged by): the full self-probe is now 4 shards by defender set, so its ceilings are keyed by the shard count as well as faultWorkers and the sum counts per-shard startup. Two from-scratch sharded runs on the final slicing (PR #299, every fault killed, 780 faults): run 43257268049 sum 2121 normalized s, shard walls 535 / 540 / 540 / 506; run 43259795454 sum 2084, shard walls 500 / 512 / 546 / 527. Medians: sum 2102.5, slowest shard 543. The unsharded runs this configuration replaces measured 2000-2041 normalized s, so sharding costs about 4% in total compute; the growth in this PR is 54 new faults (726 -> 780), about 4.6% of recorded cost (about 97 s of the sum). Slicing by claim id instead measured 2255 s (573 s slowest), which is why the slices follow defender sets. Ceilings are the medians plus the two-sample 12% (2102.5 x 1.12 = 2355 -> 2360; 543 x 1.12 = 608 -> 610). Tighten from main's next three from-scratch sharded runs by the file's headroom rule."}
   ],
   "measuredInCI": {
     "seconds": 1113,
@@ -221,5 +222,13 @@
     ]
   },
   "unit": "normalized-elapsed-seconds",
-  "faultWorkers": 2
+  "faultWorkers": 2,
+  "shards": 1,
+  "sharded": {
+    "shards": 4,
+    "seconds": 2360,
+    "slowestShardSeconds": 610,
+    "unit": "normalized-elapsed-seconds",
+    "how": "The full self-probe split into 4 shards by defender set (shard-probe.mjs), each on its own 4-CPU runner at faultWorkers 2, each normalized by the reference it timed itself. `seconds` bounds the SUM of the shards (total compute); `slowestShardSeconds` bounds the slowest shard (what a person waits for). The configuration is part of the ceiling's validity, like faultWorkers: a run with another number of shards fails closed. Derived 2026-11-12 (#294), see the last history entry."
+  }
 }

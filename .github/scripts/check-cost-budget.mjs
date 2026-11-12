@@ -12,10 +12,15 @@
  * 2876-4159 s raw on four CI runs. A missing or absurd reference fails the
  * check; it never falls back to raw seconds.
  *
+ * `--report-only` is for a scoped pull-request run (`probe --changed`): the
+ * ceilings describe a full probe, so a scoped run reports its cost and warns
+ * when it would have failed, but never fails the job. A missing evidence file
+ * (a change that selected no claim) is then reported, not an error.
+ *
  * usage: check-cost-budget.mjs <evidence.json> [previous-evidence.json]
- *          --reference-before <file> --reference-after <file>
+ *          --reference-before <file> --reference-after <file> [--report-only]
  */
-import { appendFileSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -24,7 +29,7 @@ import { costReport, checkCostBudget, renderCostBudget, referenceFrom } from '..
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const { values, positionals: [evidencePath, previousPath] } = parseArgs({
   allowPositionals: true,
-  options: { 'reference-before': { type: 'string' }, 'reference-after': { type: 'string' } },
+  options: { 'reference-before': { type: 'string' }, 'reference-after': { type: 'string' }, 'report-only': { type: 'boolean' } },
 });
 if (!evidencePath) {
   console.error('usage: check-cost-budget.mjs <evidence.json> [previous-evidence.json] --reference-before <file> --reference-after <file>');
@@ -54,6 +59,10 @@ if (previousPath) {
   }
 }
 
+if (values['report-only'] && !existsSync(resolve(evidencePath))) {
+  console.log(`cost: no evidence at ${evidencePath} — the scoped run selected no claim, so there is no cost to report`);
+  process.exit(0);
+}
 const evidence = read(evidencePath);
 const report = costReport(evidence.records);
 const decision = checkCostBudget(report, {
@@ -116,6 +125,10 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 }
 
 if (!decision.ok) {
+  if (values['report-only']) {
+    console.log(`::warning::scoped run, reported not gated: ${text.split('\n')[0]}`);
+    process.exit(0);
+  }
   console.log(`::error::${text.split('\n')[0]}`);
   process.exit(1);
 }

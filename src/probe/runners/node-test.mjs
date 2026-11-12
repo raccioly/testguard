@@ -101,7 +101,7 @@ export function parseReport(report, durationMs) {
   return {
     run: { outcome: loadErrors.length ? 'error' : report.failed || failed.length ? 'fail' : 'pass', tests: { total: tests.length, passed: tests.length - failed.length, failed: failed.length }, assertionFailures: loadErrors.length ? 0 : assertionFailures, exceptionFailures: loadErrors.length ? 0 : exceptionFailures, ...(!loadErrors.length && kindNotReported ? { kindNotReported } : {}), durationMs },
     timeouts: timeout.length,
-    loadMessage: loadErrors.length ? report.diagnostic?.split(/\r?\n/).find((line) => /(?:\bError:|SyntaxError:|cannot find|unexpected token)/i.test(line))?.trim().slice(0, 1000) ?? loadErrors[0]?.error?.message : undefined,
+    loadMessage: loadErrors.length ? report.diagnostic?.split(/\r?\n/).find((line) => /(?:\bError:|SyntaxError:|cannot find|unexpected token)/i.test(line))?.trim().slice(0, 1000) || loadErrors[0]?.error?.message?.trim() || 'node-test could not load a test file and gave no message' : undefined,
     failedTests,
   };
 }
