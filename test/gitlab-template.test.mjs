@@ -34,7 +34,7 @@ function render(given = {}, scratch) {
 describe('packaging/gitlab/testguard.gitlab-ci.yml — the GitLab component-shaped template', () => {
   it('is two YAML documents: a spec with inputs, then the jobs', () => {
     expect(Object.keys(spec)).toEqual(['spec']);
-    expect(Object.keys(inputs)).toEqual(['version', 'dir', 'image', 'severity', 'confirm', 'budget', 'no_escalate', 'runner', 'python', 'strict', 'post_note', 'stage']);
+    expect(Object.keys(inputs)).toEqual(['version', 'dir', 'image', 'severity', 'confirm', 'budget', 'no_escalate', 'runner', 'python', 'changed', 'strict', 'post_note', 'stage']);
     expect(Object.keys(body)).toEqual(['.testguard', 'testguard:gate', 'testguard:probe']);
   });
 

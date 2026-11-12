@@ -68,7 +68,7 @@ function orderItems(a, b) {
   return (b.isNew - a.isNew) || (ORDER.indexOf(a.verdict) - ORDER.indexOf(b.verdict)) || ((b.rank ?? 0) - (a.rank ?? 0));
 }
 
-export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Date().toISOString(), next, changes, install } = {}) {
+export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Date().toISOString(), next, changes, install, advice } = {}) {
   const g = gate(evidence.records, baseline);
   const toItem = (r, isNew) => ({
     fingerprint: r.fingerprint,
@@ -97,7 +97,7 @@ export function buildBrief(evidence, baseline, { max = 20, generatedAt = new Dat
   const exceptionOnly = kills.filter((r) => r.detail.killKind === 'exception-only').length;
   if (exceptionOnly) summary.killedExceptionOnly = exceptionOnly;
   const unclaimed = changes?.uncovered?.length ? { ref: changes.ref, files: changes.uncovered } : undefined;
-  const doc = { schemaVersion: 1, tool: evidence.tool, generatedAt, head: evidence.run.repo.head, heading: HEADING, summary, origins, ...(next ? { next: { action: next.action, command: next.command, why: next.why } } : {}), ...(unclaimed ? { unclaimed } : {}), items, text: '' };
+  const doc = { schemaVersion: 1, tool: evidence.tool, generatedAt, head: evidence.run.repo.head, heading: HEADING, summary, origins, ...(next ? { next: { action: next.action, command: next.command, why: next.why } } : {}), ...(advice?.length ? { advice: advice.map(({ id, message, command }) => ({ id, message, command })) } : {}), ...(unclaimed ? { unclaimed } : {}), items, text: '' };
   if (evidence.originPolicy) doc.originPolicy = structuredClone(evidence.originPolicy);
   doc.text = renderBriefText({ ...doc, provisional: Boolean(evidence.run.provisional), install }, { hasBaseline: Boolean(baseline), total: evidence.records.length, independence: kills.length ? { coAuthored, kills: kills.length, exceptionOnly } : undefined });
   return doc;
@@ -127,6 +127,8 @@ export function renderBriefText(brief, { hasBaseline, total, independence }) {
   // A crash is not a check: a kill with no assertion in any run proves reach, not behavior.
   if (independence?.exceptionOnly) lines.push('', exceptionOnlyWarning(independence.exceptionOnly, independence.kills));
   if (brief.next) lines.push('', `NEXT [${brief.next.action}]: ${brief.next.command}`, `  why: ${brief.next.why}`);
+  // Speed (#270): where the run leaves time on the table, with the command.
+  if (brief.advice?.length) lines.push('', ...brief.advice.map((a) => `SPEED: ${a.message} → ${a.command}`));
   if (brief.items.length === 0) {
     lines.push('', unproven === 0 ? 'Every probed claim is defended. Keep it that way: new claims need a fault and a test that fails on it.' : `${unproven} unproven faults remain; no items shown at the current cap. See the full evidence file.`);
     return lines.join('\n') + '\n';
@@ -184,6 +186,7 @@ export function renderBriefMarkdown(brief, { hasBaseline, total, install } = {})
     for (const u of brief.unclaimed.files) lines.push(`- \`${u.file}\` (${u.kind}) → \`${u.suggestion}\``);
   }
   if (brief.next) lines.push('', `**Next** \`[${brief.next.action}]\`: \`${brief.next.command}\``, '', `> ${brief.next.why}`);
+  if (brief.advice?.length) lines.push('', '### Go faster', '', ...brief.advice.map((a) => `- ${a.message} → \`${a.command}\``));
   if (brief.items.length === 0) {
     lines.push('', unproven === 0 ? 'Every probed claim is defended. Keep it that way: new claims need a fault and a test that fails on it.' : `${unproven} unproven faults remain; no items shown at the current cap. See the full evidence file.`);
     return lines.join('\n') + '\n';

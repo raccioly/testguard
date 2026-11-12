@@ -73,7 +73,9 @@ probe
                        or anything they import differs (a rename counts through its old and new path). Intersects with --claim and
                        writes .testguard/evidence-partial.json. A change git cannot measure (ref missing, no merge base, git failed
                        or timed out) exits 2 and probes nothing; it is never read as an empty change. Refused with --ref and
-                       --in-place (exit 3). --json: run.scope.changed
+                       --in-place (exit 3). --json: run.scope.changed. --changed auto finds the base offline: the CI base
+                       branch, the remote default branch, a differently named upstream, then the branch's own upstream
+                       (the commits not pushed yet); with none of them it probes every claim. The pre-push form
   --fail-on-empty-selection  with --changed: a change that selects no claim exits 2 instead of 0 (either way it says so and
                        lists the changed source files no claim covers: absence from the results is not a pass)
   --include-dirty      probe the working tree (a snapshot commit) instead of HEAD; uncommitted tests count
@@ -105,14 +107,14 @@ probe
                        Default: $VIRTUAL_ENV, then the project's .venv, venv, .env, then python3, then python on PATH.
                        Resolved against your working tree, never the scratch worktree.
   --workers <n>        maximum built-in runner workers (default: 1); Python remains serial
-  --serial             one worker, even when --workers is higher (vitest --no-file-parallelism, jest --runInBand,
-                       playwright --workers=1; pytest never loads xdist either way). The default --workers 1 is already
-                       serial, so it only changes a run that raised --workers; probe warns and records contention either way
-  --fault-workers <n>  (probe) faults probed at once, each in its own scratch worktree (default: 1, one at a time).
-                       Baselines are measured once per defender set, different sets side by side; a baseline, a TIMEOUT
-                       or an inconsistent probe that is not green beside others is re-measured alone first. Records keep
-                       claim/fault order. Not with --in-place. Tests that bind a fixed port or share an external
-                       resource can collide across trees: that is the project's call, keep the default for them
+  --serial             one test process at a time: one runner worker even when --workers is higher (vitest
+                       --no-file-parallelism, jest --runInBand, playwright --workers=1; pytest never loads xdist) and,
+                       for probe, one fault at a time (--fault-workers 1). Only for a suite that cannot share the machine
+  --fault-workers <n|auto>  (probe) faults probed at once, each in its own scratch worktree. Default auto: half the
+                       CPUs, at most 4 (or TESTGUARD_FAULT_WORKERS); halved when other test runners are already busy.
+                       Every kill rests on at least one run with no other fault in flight, and a suite that shares a
+                       port, a database or a temp path across trees is detected and measured alone, so the default is
+                       sound for any suite. Records keep claim/fault order. --in-place means 1
   --in-place           mutate the working tree instead of a scratch worktree
   --no-escalate        do not re-run survivors against the whole suite
   --no-reuse           re-probe claims whose inputs have not changed
@@ -179,6 +181,11 @@ status     --json (exit 0 clean · 1 unproven/stale/unclaimed/invalid anchors ·
            --evidence <path>  read this evidence instead of .testguard/evidence.json (e.g. CI's, fetched as an artifact); staleness is still computed from the recorded input hashes, and both commits are named
            --changed <ref>   also compute claim coverage of the change; unclaimed-changes then precedes every evidence state
 init       --force (replace an existing skill file)  --here (keep the agent layer in [dir] instead of the git root)  --json
+           writes .testguard/hooks/pre-push (probe --changed auto) and, when .husky/ exists, a block in .husky/pre-push;
+           reports hooks and CI files that run probe --serial, a full probe on every push, an old pin or an old template
+           --upgrade         rewrite TestGuard's own blocks (skill, AGENTS.md section, hooks, CI) to the current template
+                             where nobody edited them; edited ones are reported, and --force replaces them
+           --ci github|gitlab  write the CI file: pull requests probe --changed auto, nightly runs probe every claim
            --ci-evidence github|gitlab   write .testguard/fetch-ci-evidence.sh, an ON-DEMAND helper that downloads CI's evidence artifact and briefs from it; the session-start hook stays offline
            agent layer (skill, SessionStart hook, AGENTS.md section) → git root; project layer (.gitignore lines) → [dir]
            the hook prefers a local install, then a testguard already on PATH, then nothing; it never reaches the network. exit 1 if a written file is gitignored
@@ -292,6 +299,8 @@ async function dispatch(argv, io, seen) {
         force: { type: 'boolean', default: false },
         mcp: { type: 'boolean', default: false },
         'ci-evidence': { type: 'string' },
+        ci: { type: 'string' },
+        upgrade: { type: 'boolean', default: false },
         here: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'runner-cmd': { type: 'string' },

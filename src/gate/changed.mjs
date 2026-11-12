@@ -167,6 +167,26 @@ export function resolveChangedRef({ explicit, env = process.env, projectDir } = 
 }
 
 /**
+ * `probe --changed auto` (#270): the base a pre-push hook or a CI job should
+ * compare against, found offline. The CI variables and the safe local default
+ * of `resolveChangedRef` first; then, where those find nothing — the default
+ * branch itself, or a branch whose upstream has its own name — the branch's
+ * own upstream, which holds exactly what was already pushed, so the change is
+ * the commits about to be pushed. Null when nothing resolves; the caller then
+ * probes everything, which can only be more than the change needs.
+ */
+export function resolveAutoChangedRef({ env = process.env, projectDir } = {}) {
+  const detected = resolveChangedRef({ env, projectDir });
+  if (detected) return detected;
+  if (!projectDir) return null;
+  const root = tryGit(['rev-parse', '--show-toplevel'], projectDir);
+  if (!root) return null;
+  const upstream = tryGit(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'], root);
+  if (upstream && headSha(root, upstream)) return { ref: upstream, from: 'branch upstream (the commits not pushed yet)', required: false };
+  return null;
+}
+
+/**
  * Run `compute(ref)` for a resolved reference. A required reference propagates
  * its error; a detected one that fails yields `undefined` after `warn(message)`.
  */

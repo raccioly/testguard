@@ -6,7 +6,7 @@ import { writeSpecDoc, readSpecDoc } from '../evidence/writer.mjs';
 import { gate } from '../baseline/baseline.mjs';
 import { renderRecord, renderSummary, sortForReport, PROVISIONAL_WARNING, renderOriginPolicy } from '../render.mjs';
 import { computeStatus } from '../status/status.mjs';
-import { resolveChangedRef, withChangedRef } from '../gate/changed.mjs';
+import { resolveChangedRef, resolveAutoChangedRef, withChangedRef } from '../gate/changed.mjs';
 import { costReport, renderCost } from '../probe/cost.mjs';
 import { progressMode, stageReporter, clearStageLine, recordEvent, isProgressMode, progressStream } from '../probe/progress.mjs';
 import { validate } from '../../spec/lib/validate.mjs';
@@ -16,7 +16,11 @@ import { assertionPolicyRequest, evaluateAssertionPolicy, renderAssertionPolicy,
 import { readNativeTestUniverse } from '../probe/universe.mjs';
 import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
 import { runnerOptions } from './runner-options.mjs';
-import { parseFaultWorkers } from '../probe/fan-out.mjs';
+import { resolveFaultWorkers } from '../probe/fan-out.mjs';
+import { availableParallelism } from 'node:os';
+import { computeAdvice, renderAdvice } from '../status/advice.mjs';
+import { resolveProbeScope } from '../probe/scope.mjs';
+import { repoRoot, headSha } from '../git.mjs';
 import { selectByChange, measuredScope, renderNoSelection, renderUnmatched, scopedView, renderScopedView } from './probe-scope.mjs';
 import { claimResults } from '../probe/claim-results.mjs';
 import { partialExit, partialEvidencePath, isNotReached } from '../probe/partial-budget.mjs';
@@ -24,6 +28,52 @@ export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testgu
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
 export const baselinePath = (projectDir) => join(projectDir, '.testguard', 'baseline.json');
+
+/**
+ * What `--changed auto` does with the base it found (#270). A base that
+ * resolves narrows the probe; none, or one that does not resolve here (a
+ * shallow CI checkout), is a full probe — never a skip — and the second says
+ * how to fix it. `warn` lines are printed even under --quiet.
+ */
+export function autoChangedDecision(detected, resolves) {
+  if (detected && resolves) return { changed: detected.ref, message: `--changed auto: comparing against ${detected.ref} (${detected.from})`, warn: false };
+  if (detected) return { changed: undefined, message: `--changed auto: ${detected.ref} (${detected.from}) does not resolve here, so every claim is probed; fetch it (GitHub Actions: actions/checkout with fetch-depth: 0) to probe only the change`, warn: true };
+  return { changed: undefined, message: '--changed auto: no base to compare against (no CI base branch, no remote default branch, no upstream), so every claim is probed', warn: true };
+}
+
+/**
+ * The evidence files a probe may carry verdicts forward from (#270): its own
+ * output file, and for a partial run (--claim, --changed) the canonical
+ * evidence of the last full probe too. None under --no-reuse.
+ */
+export function reuseSources({ outPath, canonical, partial, noReuse }) {
+  if (noReuse) return [];
+  return [...new Set([outPath, ...(partial ? [canonical] : [])])];
+}
+
+/** One line on how wide the run was and what its guard cost, for a fan-out. */
+export function renderFanOut(run) {
+  if (!(run.faultWorkers > 1)) return undefined;
+  const m = run.measurements ?? {};
+  const how = run.faultWorkersSource === 'auto' ? `auto, ${run.cpus} CPUs` : run.faultWorkersSource ?? 'requested';
+  const s = (ms) => `${((ms ?? 0) / 1000).toFixed(1)}s`;
+  return `fan-out: ${run.faultWorkers} faults at a time (${how}); ${m.aloneConfirmRuns ?? 0} kill${m.aloneConfirmRuns === 1 ? '' : 's'} confirmed by a run alone (${s(m.aloneConfirmMs)}), ${m.remeasuredFaults ?? 0} fault${m.remeasuredFaults === 1 ? '' : 's'} measured again alone (${s(m.remeasureMs)}).`;
+}
+
+/** The speed advice for the run that just finished: the status rules, with the change measured from the base `--changed auto` would use. */
+function probeAdvice({ projectDir, claims, evidence, scoped, version, cpus }) {
+  let changed;
+  if (!scoped) {
+    try {
+      const auto = resolveAutoChangedRef({ projectDir });
+      const scope = auto && resolveProbeScope({ projectDir, claims, ref: auto.ref, timeoutMs: 10_000 });
+      if (scope && scope.outcome !== 'undetermined') changed = { selected: scope.selected.length, total: claims.claims.length, ref: auto.ref };
+    } catch { changed = undefined; }
+  }
+  let root;
+  try { root = repoRoot(projectDir); } catch { root = undefined; }
+  return computeAdvice({ evidence, cpus, changed, root, toolVersion: version });
+}
 
 /** Every repeated/comma-separated --claim value, in first-seen order. */
 export function claimSelection(values) {
@@ -62,15 +112,15 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     io.err('--workers must be a positive safe integer');
     return 3;
   }
-  const faultWorkers = parseFaultWorkers(values['fault-workers']);
-  if (faultWorkers === null) {
-    io.err('--fault-workers must be a positive safe integer');
+  // Fast by default (#270): auto from the machine unless the flag, the
+  // environment or the explicit --serial says otherwise. Only the flag the
+  // user typed counts as --serial, never the derived "one runner worker".
+  const fanOut = resolveFaultWorkers({ flag: values['fault-workers'], env: process.env, serial: values.serial === true, inPlace: values['in-place'] === true, cpus: deps.cpus ?? availableParallelism() });
+  if (fanOut.error) {
+    io.err(fanOut.error);
     return 3;
   }
-  if (faultWorkers > 1 && values['in-place']) {
-    io.err('--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place');
-    return 3;
-  }
+  const { faultWorkers } = fanOut;
   // Flag combinations that are wrong whatever the repository holds, refused before the claims file or the repository is read.
   if (values['in-place'] && values.ref !== undefined) {
     io.err('--ref needs a scratch worktree; drop --in-place');
@@ -150,6 +200,14 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   }
   let only = requested;
   let changedScope;
+  // `--changed auto` (#270): the base found offline, as a pre-push hook and a
+  // CI job need it. Nothing to compare against is a full probe, never a skip.
+  if (values.changed === 'auto') {
+    const detected = resolveAutoChangedRef({ projectDir });
+    const decision = autoChangedDecision(detected, Boolean(detected && headSha(repoRoot(projectDir), detected.ref)));
+    if (decision.message && (decision.warn || !values.quiet)) io.err(decision.message);
+    values = { ...values, changed: decision.changed };
+  }
   if (values.changed !== undefined) {
     const selection = selectByChange({ projectDir, claims, ref: values.changed, includeDirty: values['include-dirty'], only: requested, failOnEmpty: values['fail-on-empty-selection'] });
     if (selection.outcome !== 'selected') {
@@ -176,7 +234,11 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   let outPath = values.out ? resolve(values.out) : only ? join(projectDir, '.testguard', 'evidence-partial.json') : provisional ? provisionalEvidencePath(projectDir) : evidencePath(projectDir);
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
   const discoveryNoted = new Set();
-  const previous = !values['no-reuse'] && existsSync(outPath) ? readSpecDoc('evidence', outPath) : undefined;
+  // A partial run (--claim, --changed) also reuses the last full probe's
+  // verdicts: the canonical evidence, under the same reuse rule (#270). That is
+  // what makes the pre-push path cheap.
+  const previousPaths = reuseSources({ outPath, canonical: evidencePath(projectDir), partial: Boolean(only), noReuse: values['no-reuse'] }).filter((path) => existsSync(path));
+  const previous = previousPaths.map((path) => readSpecDoc('evidence', path));
   const basePath = values.baseline ? resolve(values.baseline) : baselinePath(projectDir);
   const baseline = existsSync(basePath) ? readSpecDoc('baseline', basePath) : undefined;
 
@@ -189,6 +251,8 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     workers,
     serial: values.serial || workers === 1,
     faultWorkers,
+    faultWorkersSource: fanOut.source,
+    ...(fanOut.cpus !== undefined ? { cpus: fanOut.cpus } : {}),
     commandBudget,
     partialOnBudget,
     mode: values['in-place'] ? 'in-place' : 'worktree',
@@ -317,6 +381,12 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     io.out('');
   }
   if (changedScope) for (const line of renderUnmatched(changedScope)) io.out(line);
+  if (!values.quiet) {
+    const fanOutLine = renderFanOut(evidence.run);
+    if (fanOutLine) io.out(fanOutLine);
+    // Where this run left speed on the table (#270), with the command.
+    for (const line of renderAdvice(probeAdvice({ projectDir, claims, evidence, scoped: Boolean(scope), version, cpus: deps.cpus ?? availableParallelism() }))) io.out(line);
+  }
   io.out(`evidence: ${outPath}${scope ? ` (partial: ${[scope.requestedClaims ? `${scope.requestedCount} claim${scope.requestedCount === 1 ? '' : 's'} requested` : null, scope.changed ? `${scope.selectedCount} selected by --changed ${scope.changed.ref}` : null, `${scope.probedCount} probed`].filter(Boolean).join(', ')}${scope.requestedClaims ? `: --claim ${scope.requestedClaims.join(',')}` : ''}; not the canonical evidence file)` : exhausted ? ' (incomplete: command budget exhausted; not the canonical evidence file)' : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
   return exitCode;

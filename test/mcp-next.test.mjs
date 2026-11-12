@@ -28,6 +28,14 @@ it('hands back the unprobed status action without executing the proposed probe',
     const next = TOOLS.find((tool) => tool.name === 'testguard_next_command').handler({ dir });
     expect(next).toMatchObject({ state: 'unprobed', action: 'probe', command: 'testguard probe' });
     expect(next.why).toMatch(/never been probed/);
+    // The loop between steps is the fast one, stated as commands (#270).
+    expect(next.loop).toEqual({
+      afterChangingCode: 'testguard probe --changed auto',
+      whileWritingOneTest: 'testguard probe --claim <ID> --confirm 1',
+      beforeCommittingATest: 'testguard admit <test-file> --claim <ID>',
+      full: 'testguard probe',
+      rule: expect.stringMatching(/full probe only when the person asks for it, or in the nightly job.*do not pass --serial/),
+    });
     expect(existsSync(join(dir, '.testguard', 'evidence.json'))).toBe(false);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

@@ -10,7 +10,7 @@ import { check, checkKey, differential, expectedFor } from './checks.mjs';
 import { commitEdits, git, listing, prepareRepo, readOnlyNodeModules, unlockAndRemove } from './subject.mjs';
 import { probe, verdictMap } from './tool.mjs';
 
-export const MODES = ['reference', 'twice', 'reuse', 'workers-2', 'workers-4', 'typecheck', 'changed', 'partial', 'scratch', 'assertion-kill', 'reorder', 'noise'];
+export const MODES = ['reference', 'twice', 'reuse', 'default', 'workers-2', 'workers-4', 'typecheck', 'changed', 'partial', 'scratch', 'assertion-kill', 'reorder', 'noise'];
 
 /** Modes that only apply to some subjects. */
 export function applies(mode, subject) {
@@ -49,11 +49,11 @@ function result(mode, subject, { runs, key = null, diff = null, checks = [], err
 
 const out = (dir, name) => join(dir, '..', `${name}.evidence.json`);
 
-async function freshProbe(ctx, label, args, { edits, prepare } = {}) {
+async function freshProbe(ctx, label, args, { edits, prepare, env } = {}) {
   const repo = prepareRepo(ctx.subject, { scratchRoot: ctx.work });
   if (prepare) prepare(repo);
   if (edits) commitEdits(repo, edits.edits, edits.message);
-  const r = await probe({ toolRoot: ctx.toolRoot, subject: ctx.subject, repo, outPath: out(repo, label), args, python: ctx.python });
+  const r = await probe({ toolRoot: ctx.toolRoot, subject: ctx.subject, repo, outPath: out(repo, label), args, python: ctx.python, env });
   return { repo, r };
 }
 
@@ -69,9 +69,9 @@ function keyAndDiff(ctx, mode, r, { ids, deltas, expected } = {}) {
 const exitCheck = (r) => check('exit-code', r.exit === 0 || r.exit === 1, `exit ${r.exit}${r.exit >= 2 ? `: ${r.stderr.trim().split('\n').slice(-3).join(' | ')}` : ''}`);
 
 export const RUN = {
-  /** Serial, --no-reuse, a fresh process and a fresh repository: the oracle for every other mode. */
+  /** Serial (--serial: one fault at a time since #270 made a fan-out the default), --no-reuse, a fresh process and a fresh repository: the oracle for every other mode. */
   async reference(ctx) {
-    const { repo, r } = await freshProbe(ctx, 'reference', ['--no-reuse']);
+    const { repo, r } = await freshProbe(ctx, 'reference', ['--no-reuse', '--serial']);
     const { observed, key } = keyAndDiff({ ...ctx, reference: null }, 'reference', r);
     if (r.evidence) ctx.reference = observed;
     ctx.referenceRepo = repo;
@@ -151,6 +151,7 @@ export const RUN = {
     return result('reuse', ctx.subject, { runs, key, diff: a.diff, checks });
   },
 
+  default: (ctx) => defaultWidth(ctx),
   'workers-2': (ctx) => workers(ctx, 2),
   'workers-4': (ctx) => workers(ctx, 4),
 
@@ -295,6 +296,18 @@ export const RUN = {
     return result('noise', ctx.subject, { runs: [runSummary('noise', r)], key, diff, checks: [exitCheck(r)] });
   },
 };
+
+/**
+ * The CLI's default width (#270): no flag, no TESTGUARD_FAULT_WORKERS, so the
+ * machine decides. The answers must be the reference's, map and order, and the
+ * evidence must say the width was automatic and from how many CPUs.
+ */
+async function defaultWidth(ctx) {
+  const { r } = await freshProbe(ctx, 'default', ['--no-reuse'], { env: { TESTGUARD_FAULT_WORKERS: '' } });
+  const { key, diff } = keyAndDiff(ctx, 'default', r);
+  const run = r.evidence?.run ?? {};
+  return result('default', ctx.subject, { runs: [runSummary('default', r)], key, diff, checks: [exitCheck(r), check('width-recorded-as-auto', run.faultWorkersSource === 'auto' && Number.isInteger(run.cpus), `faultWorkersSource ${run.faultWorkersSource}, cpus ${run.cpus}, faultWorkers ${run.faultWorkers ?? 1}`)] });
+}
 
 async function workers(ctx, n) {
   const { r } = await freshProbe(ctx, `workers-${n}`, ['--no-reuse', '--fault-workers', String(n)]);

@@ -9,7 +9,7 @@ import { fanOutProject } from './helpers/fan-out-project.mjs';
 
 const strip = (value) => (Array.isArray(value) ? value.map(strip)
   : value && typeof value === 'object'
-    ? Object.fromEntries(Object.entries(value).filter(([k]) => !['durationMs', 'remeasuredSerially', 'baselineRemeasuredSerially'].includes(k)).map(([k, v]) => [k, strip(v)]))
+    ? Object.fromEntries(Object.entries(value).filter(([k]) => !['durationMs', 'remeasuredSerially', 'baselineRemeasuredSerially', 'alone', 'notParallelSafe'].includes(k)).map(([k, v]) => [k, strip(v)]))
     : value);
 
 it('a baseline red only beside another set is re-measured alone, and the records are the serial ones', async () => {
@@ -26,6 +26,11 @@ it('a baseline red only beside another set is re-measured alone, and the records
     // its record carries the serial, green runs and says so.
     expect(byId.TOUCHY.detail.baselineRemeasuredSerially).toBe(true);
     expect(byId.TOUCHY.detail.baselineRuns.map((r) => r.outcome)).toEqual(['pass', 'pass', 'pass']);
+    // Red beside BUSY, green alone: TOUCHY shares something with the other
+    // trees, so its fault is probed alone and says so (#270).
+    expect(byId.TOUCHY.detail.notParallelSafe).toBe(true);
+    expect(byId.TOUCHY.detail.probeRuns.every((r) => r.alone)).toBe(true);
+    expect(byId.BUSY.detail.notParallelSafe).toBeUndefined();
     // Only the set that came out red is re-measured.
     expect(fanned.records.filter((r) => r.detail.baselineRemeasuredSerially).map((r) => r.claim.id)).toEqual(['TOUCHY']);
     expect(serial.records.some((r) => r.detail.baselineRemeasuredSerially)).toBe(false);

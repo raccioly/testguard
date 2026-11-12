@@ -1271,6 +1271,19 @@ Paths are project-relative; a change outside the project directory is not this
 project's change. A deletion is a change. A rename or copy contributes its old
 path and its new path.
 
+**`--changed auto` (#270).** The base is found offline, in this order: the CI
+base (`GITHUB_BASE_REF` as `origin/<branch>`, then
+`CI_MERGE_REQUEST_DIFF_BASE_SHA`, then `CI_MERGE_REQUEST_TARGET_BRANCH_NAME`);
+the remote default branch, unless it is the current branch's own name; a
+differently named upstream; then the branch's own upstream (`@{upstream}`),
+whose difference from HEAD is exactly the commits not pushed yet — the pre-push
+question. When none is found, or the one found does not resolve to a commit in
+this repository (a shallow CI checkout), the run probes every claim, writes the
+canonical evidence, and says so on stderr even under `--quiet`, naming the fix
+for an unresolvable base. It never probes nothing, and it never exits 2 for a
+base it chose itself; an explicit `--changed <ref>` that does not resolve still
+does. A branch literally named `auto` is written `refs/heads/auto`.
+
 A claim is **selected** when any of those paths is one of: a fault's target; a
 defender, whether the claim names it (`defendedBy`, literally or by glob) or
 discovery resolves it; or a file in the import closure of the target and the
@@ -1369,6 +1382,48 @@ a consumer without the claims file can still read the results per claim id. It
 cannot check `claim-changed` (claim metadata against the file) and cannot tell
 whether the file it was measured against is the one a caller holds, except by
 comparing `sha256`.
+
+### The worker index
+
+Every test runner process a probe starts gets `TESTGUARD_WORKER` in its
+environment: the 0-based index of the scratch tree it runs in. Trees that run
+side by side have different indices; a run with nothing else in flight (one
+fault at a time, a confirmation, a re-measure, the serial lane) is worker 0.
+A suite that needs a port, a database or a directory of its own derives it
+from the index (`8787 + TESTGUARD_WORKER`) and stays parallel instead of being
+measured alone. The index is never part of a verdict or of reuse.
+
+## Speed advice
+
+`status`, `brief` and the end of a text-mode `probe` carry `advice` (#270):
+where a run is leaving speed on the table, one line each with the exact
+command. Advice is informational. It never changes `state`, `next`, a verdict
+or an exit code; computing it reads only files on disk, the machine's CPU count
+and local git, and makes no network call. The set is closed:
+
+| id | when | command |
+|---|---|---|
+| `serial-on-multicore` | the last evidence ran one fault at a time (no `run.faultWorkers`) because it was asked for (`faultWorkersSource` `serial`, `flag` or `env`, or absent: evidence from before 0.24), and the automatic width on this machine is above one | `testguard probe` |
+| `full-probe-where-changed-would-do` | asked about a change — `status --changed <ref>`, or the end of a full probe with the base `--changed auto` would use — `next.action` is `probe` (status), and the change selects fewer claims than the file holds (the selection rule of [Probing a change](#probing-a-change)). Selecting walks every claim's import closure, so a `brief`, the MCP tools and a `status` without `--changed` do not compute it. | `testguard probe --changed auto` |
+| `nothing-reused` | the last evidence reused no verdict, measured at least one fault, and took a minute or longer | `testguard probe` |
+| `hook-outdated` | a hook or CI file in the repository runs TestGuard with `probe --serial`, probes every claim from a pre-push hook, pins `testguard-cli@<x.y.z>` or the action or pre-commit `rev` below this version, or holds a TestGuard managed block from an older template; one line per file and line, at most five | `testguard init --upgrade` |
+
+A selection's view (`--claim`, `--changed`) carries no advice. Validators
+reject an unknown id, a command that is not a `testguard` command, an id other
+than `hook-outdated` said twice, `full-probe-where-changed-would-do` where
+`next.action` is not `probe` or whose command is not a `probe --changed`, and
+`hook-outdated` with any command but `testguard init --upgrade`, in a status
+document and in a brief alike.
+
+**Managed blocks.** What `init` writes for the fast path — the pre-push block
+(in `.husky/pre-push` when the repository uses husky, else
+`.githooks/pre-push`; never `.git/hooks`), the `--ci github|gitlab` file, the
+skill and the `AGENTS.md` section — carries `template=<n>` and, for blocks and
+the skill, the sha256 of its body. `init --upgrade` rewrites one only when it is
+from an older template and its body still has its recorded hash (or, for a
+skill written before markers, equals a template a release shipped); an edited
+one is reported and left alone unless `--force`. Nothing outside a block is
+touched.
 
 ## Thin claims
 
@@ -1570,12 +1625,24 @@ therefore uses one. Nested built-in runners retain their one-worker default.
 
 ## Fault fan-out
 
-`probe --fault-workers <n>` (default 1) probes up to n faults at once. Each
+`probe --fault-workers <n|auto>` probes up to n faults at once. Each
 fault in flight has its own scratch worktree at the probed commit; no two
-faults ever share a tree, so it is refused with `--in-place` (a usage error,
-exit 3, at the CLI; a precondition error through the API). n = 1 is the serial
-run exactly: the same invocations in the same order, and evidence without
-`run.faultWorkers`.
+faults ever share a tree, so an explicit n above one is refused with
+`--in-place` (a usage error, exit 3, at the CLI; a precondition error through
+the API). n = 1 is the serial run exactly: the same invocations in the same
+order, and evidence without `run.faultWorkers`.
+
+**The width (#270).** The CLI resolves n in this order: `--serial` (the flag
+as typed, never the derived one-runner-worker default) means one fault at a
+time and is refused beside `--fault-workers` above one; then
+`--fault-workers <n|auto>`; then `TESTGUARD_FAULT_WORKERS` (empty is unset);
+then `auto`. `auto` is `min(4, floor(cpus / 2))`, at least one, where cpus is
+`os.availableParallelism()`; `--in-place` resolves it to one. When other test
+runners are already running as the probe starts (the contention check), an
+automatic n is halved (at least one) and the probe says so; a chosen n is
+kept. The evidence records `run.faultWorkersSource` (`auto`, `flag`, `env`,
+`serial`, `in-place`) and, for `auto` only, `run.cpus`. The library API
+defaults to one and records no source unless its caller passes one.
 
 1. **Plan, then measure.** Every fault is first planned in claim/fault order
    on the first scratch tree with no fault applied anywhere: defender
@@ -1603,14 +1670,21 @@ run exactly: the same invocations in the same order, and evidence without
 4. **Order.** Records and the per-record progress stream (`onProgress`,
    `--progress ndjson` verdicts) follow claim/fault order whatever order the
    trees finish in. Apart from timings (`durationMs`, `run.measurements`),
-   `run.faultWorkers`, `detail.remeasuredSerially` and
-   `detail.baselineRemeasuredSerially`, the evidence has the
-   content a serial run of the same commit would have. Per-stage progress lines
-   from different trees interleave.
+   `run.faultWorkers`, `run.faultWorkersSource`, `run.cpus`,
+   `probeRuns[].alone`, `detail.remeasuredSerially`,
+   `detail.baselineRemeasuredSerially` and `detail.notParallelSafe`, the
+   evidence has the content a serial run of the same commit would have.
+   Per-stage progress lines from different trees interleave.
 5. **Contention is not a verdict.** Per-run budgets (`--budget`) do not scale
    with the fan-out. A record measured while another fault was in flight whose
-   verdict is `timeout`, or `flaky-defender` with reason `inconsistent-probe`,
-   is not reported from that measurement: after the fan-out it is measured
+   verdict is `timeout`, `flaky-defender` with reason `inconsistent-probe`,
+   `fault-invalid` (any reason but `replacement-does-not-typecheck`, which is
+   decided while planning), `unverifiable`, or `survived` with reason
+   `killed-by-undeclared-tests` (the wider suite's run is the one most exposed
+   to neighbours, and its attribution names killers), or with any probe run
+   whose outcome is `error` (a suite that would not load: a neighbour can hold
+   the port its dev server needs, #287), is not reported from that
+   measurement: after the fan-out it is measured
    again with nothing else in flight, in a fresh scratch tree (the contended
    run may have left state in its own), reusing its frozen baseline, and the
    serial measurement is what the record reports, whatever its verdict, with
@@ -1620,9 +1694,20 @@ run exactly: the same invocations in the same order, and evidence without
    `remeasuredSerially` and `baselineRemeasuredSerially` on a document without
    `run.faultWorkers` above one, and `run.faultWorkers` together with
    `mode: "in-place"`.
-6. **Reuse.** `run.faultWorkers` is recorded only above one. A measurement
-   under a fan-out never stands in for a serial run or for a different
-   fan-out; a serial measurement (no `run.faultWorkers`) may stand in for any.
+6. **Reuse.** `run.faultWorkers` is recorded only above one. Every fan-out of
+   one tool version is guarded alike (rule 11), so its width is not part of
+   what was measured: a measurement under a fan-out stands in for a fan-out of
+   any width, and for a run whose one fault at a time was not asked for (an
+   automatic width of one). It never stands in for a run that asked for one
+   fault at a time (`--serial`, or one by `--fault-workers` or
+   `TESTGUARD_FAULT_WORKERS`). A serial measurement (no `run.faultWorkers`)
+   may stand in for any. A reused record keeps the marks of the run that
+   measured it (`alone`, `remeasuredSerially`, `notParallelSafe`), whatever
+   the current run's width; validators judge those marks only on records this
+   run measured. A run probing a selection (`--claim`, `--changed`) reads the
+   canonical evidence as a reuse source beside its own output file; each
+   document must pass the reuse rules on its own, and where both hold a fault
+   the one that finished later is used.
 7. **Contention advice.** The contention warning names `--fault-workers` when
    the probe fans out, and the probe warns before the first run when n times
    the runner's worker count exceeds the CPUs available to the process.
@@ -1648,4 +1733,56 @@ run exactly: the same invocations in the same order, and evidence without
    working directory. `node_modules` is linked into every tree as for one, so
    the disk cost is one checkout per tree. Tests that bind a fixed port, share
    an external database or write outside the project tree can collide across
-   trees; whether to fan out is the project's decision.
+   trees; rule 11 is what keeps such a collision from becoming a verdict.
+11. **Every kill rests on a run alone (#270).** A fan-out is on by default, so
+   it may not depend on the suite being hermetic. A suite that shares a fixed
+   port, a database or a temp path across trees can fail N/N beside another
+   fault although the fault changes nothing it asserts: a kill that did not
+   happen. So:
+   - Every probe run measured in a fan-out records `alone: true` exactly when
+     no other fault's measurement (apply to restore) was in flight at any
+     moment between its start and its end.
+   - Before its last probe run, a fault whose runs so far were all kills,
+     none alone, while another fault is in flight, stops and restores. After
+     the fan-out, in claim/fault order, in one fresh scratch tree with nothing
+     else in flight, the fault is applied again and its last run is taken
+     alone (counted in `run.measurements.aloneConfirmRuns`, timed in
+     `aloneConfirmMs`). A fault whose N kills turned out to have no run alone
+     after all (another fault began during the last) sets the last run aside
+     and is confirmed the same way. `probeRuns` stays N runs long, so the
+     guard costs a hermetic suite no extra run, only the confirmations' lost
+     concurrency.
+   - A run alone that passes while a run beside other faults did not is a
+     **disagreement**: the red was the neighbours'. It never reaches the
+     verdict function as `inconsistent-probe`. The fault is measured again,
+     alone and in full (rule 5's re-measure), and its defender set is **not
+     parallel-safe** for the rest of the run. So is a set whose baseline was
+     red beside other sets and green alone (rule 2). The probe warns once per
+     such set, naming its files.
+   - Every fault of a set already not parallel-safe when the fan-out starts
+     is probed after it, alone, in one scratch tree, as a serial run would.
+     Every kill in a set that became not parallel-safe and does not rest
+     only on runs alone is measured again, alone and in full. Each record
+     of such a set says `detail.notParallelSafe: true`.
+   - Nothing above is published, or survives a command budget that runs
+     out, before it is decided: a deferred kill or a disagreement held when
+     `--partial-on-budget` stops the run is reported `not-reached`.
+   - A negative control or survivor measured beside other faults can only
+     lean towards red, which keeps a survivor a survivor: the pessimistic
+     side, so neither is re-measured.
+   - A claim that declares `serial: true` (claims schema) is probed like a set
+     already not parallel-safe: after the fan-out, alone, every run `alone`,
+     and its records say `detail.serialDeclared: true`. A declaration, not a
+     detection: both may apply to one record.
+   **What a fan-out kill rests on.** N red runs, at least one alone. In a set
+   that never showed interference the other runs count as a serial run's
+   would. If the set does interfere, the run alone disagrees and the set is
+   held to N runs alone — unless every contended run was failed by a
+   neighbour *and* the run alone failed by the defenders' own flakiness on a
+   fault they do not detect, a coincidence that a baseline green N runs out
+   of N bounds. A validator rejects a fan-out document in which a measured
+   `killed` record has no probe run alone, or in which a record with
+   `remeasuredSerially`, or a `killed` record with `notParallelSafe`, has a
+   run that was not alone; `alone`, `notParallelSafe` and the guard's
+   measurements are rejected on records and runs of a document without a
+   fan-out, unless the record is reused.

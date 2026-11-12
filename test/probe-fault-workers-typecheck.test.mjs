@@ -60,7 +60,7 @@ it('--typecheck with --fault-workers 3 gives the serial records, and type-checks
     const serial = await run(1);
     const fanned = await run(3);
     const strip = (value) => (Array.isArray(value) ? value.map(strip)
-      : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).filter(([k]) => k !== 'durationMs').map(([k, v]) => [k, strip(v)])) : value);
+      : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).filter(([k]) => k !== 'durationMs' && k !== 'alone').map(([k, v]) => [k, strip(v)])) : value);
     expect(fanned.evidence.records.map(strip)).toEqual(serial.evidence.records.map(strip));
     const verdicts = Object.fromEntries(fanned.evidence.records.map((r) => [r.claim.id, [r.verdict, r.detail.typecheck, r.detail.reason ?? null]]));
     expect(verdicts.REFUSED).toEqual(['fault-invalid', 'diagnostics', 'replacement-does-not-typecheck']);

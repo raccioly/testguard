@@ -23,7 +23,8 @@ const evidence = (seconds) => {
     claim: { id: `C${i}` }, subject: { id: 'F1' }, defenders: { resolved: ['a.test.mjs'] },
     detail: { baselineRuns: [], probeRuns: [{ durationMs: Math.min(each, seconds - i * each) * 1000 }] },
   }));
-  return write(`evidence-${seconds}.json`, { records });
+  // The run's elapsed time is what the ceiling gates (#284); here it equals the sum.
+  return write(`evidence-${seconds}.json`, { run: { measurements: { elapsedMs: seconds * 1000 }, ...(budget.faultWorkers > 1 ? { faultWorkers: budget.faultWorkers } : {}) }, records });
 };
 // A measurement from the runner class the baseline was taken on, unless the caller says it ran elsewhere.
 const measurement = (medianMs, workload = budget.reference.workload, runner = { cpus: budget.reference.cpus, platform: budget.reference.platform }) => write(`ref-${medianMs}-${workload}-${runner.cpus}-${runner.platform}.json`, { workload, medianMs, ...runner });
@@ -37,7 +38,7 @@ describe('check-cost-budget.mjs fails closed on its reference', () => {
     const r = gate(evidence(SMALL), '--reference-before', measurement(atBaseline), '--reference-after', measurement(atBaseline));
     expect(r.status).toBe(0);
     expect(r.stdout).toMatch(/raw \d+s; reference before .* after .* baseline .* speed factor 1\.00; normalized \d+s/);
-    expect(r.stdout).toMatch(/^cost-measurement \{.*"basis":"normalized".*"ok":true/m);
+    expect(r.stdout).toMatch(/^cost-measurement \{.*"basis":"normalized-elapsed".*"ok":true/m);
   });
 
   it('fails when no reference file is given at all, naming the reference, not the budget', () => {

@@ -43,6 +43,10 @@ inputs:
     description: 'gate only: the reference the change is measured against (default: origin/<base branch> of the pull request). Check out with fetch-depth: 0 so it resolves.'
     required: false
     default: ''
+  changed:
+    description: 'probe only: probe just the claims a change can affect. `auto` finds the base offline (the pull request base branch, then the remote default branch); a ref names it. Empty probes every claim, which is the nightly job. Check out with fetch-depth: 0. Faults run in parallel by default (half the CPUs, at most 4), and every kill is confirmed by a run alone.'
+    required: false
+    default: ''
   strict:
     description: 'gate only: fail a change whose files were all excluded instead of passing with a note'
     required: false
@@ -95,6 +99,7 @@ runs:
         TG_VERSION: ${{ inputs.version }}
         TG_RUNNER: ${{ inputs.runner }}
         TG_PYTHON: ${{ inputs.python }}
+        TG_CHANGED: ${{ inputs.changed }}
       run: |
         set -o pipefail
         ARGS=()
@@ -105,6 +110,7 @@ runs:
           [ "$TG_ALLOW_EMPTY" = "true" ] && ARGS+=(--allow-empty)
           [ "$TG_RUNNER" != "auto" ] && ARGS+=(--runner "$TG_RUNNER")
           [ -n "$TG_PYTHON" ] && ARGS+=(--python "$TG_PYTHON")
+          [ -n "$TG_CHANGED" ] && ARGS+=(--changed "$TG_CHANGED")
         fi
         [ "$TG_COMMAND" = "brief" ] && ARGS+=(--text)
         if [ "$TG_COMMAND" = "gate" ]; then
@@ -117,13 +123,14 @@ runs:
           [ "$TG_STRICT" = "true" ] && ARGS+=(--strict)
         fi
         # `evidence` names the file THIS run wrote: evidence.json for a
-        # confirmed probe, evidence-provisional.json when confirm < 3, and
+        # confirmed probe, evidence-provisional.json when confirm < 3,
+        # evidence-partial.json for a probe narrowed by `changed`, and
         # nothing for a command that writes no evidence or a probe that stopped
         # before writing. A file already there (a restored cache) is compared
         # by inode, size and timestamps before and after, so a stale copy is
         # never reported as this run's result.
         fingerprint() {
-          node -e 'const fs = require("node:fs"); for (const f of [".testguard/evidence.json", ".testguard/evidence-provisional.json"]) { let s; try { s = fs.statSync(f, { bigint: true }); } catch { continue; } console.log([f, s.ino, s.size, s.mtimeNs, s.ctimeNs].join(" ")); }'
+          node -e 'const fs = require("node:fs"); for (const f of [".testguard/evidence.json", ".testguard/evidence-provisional.json", ".testguard/evidence-partial.json"]) { let s; try { s = fs.statSync(f, { bigint: true }); } catch { continue; } console.log([f, s.ino, s.size, s.mtimeNs, s.ctimeNs].join(" ")); }'
         }
         BEFORE="$(fingerprint)"
         status=0

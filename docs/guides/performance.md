@@ -1,10 +1,75 @@
 # Performance
 
-A probe runs real tests many times, so it takes minutes, and a gate nobody
-can tell from a hang is a gate people start killing. This guide is for anyone
-whose probe is slow, whose CI log is silent, or whose laptop stops responding
-during a probe: what a probe spends, how to see it, how to bound it, and how
-to make it cheaper without weakening it.
+A probe runs real tests many times. This page says which command to run, what
+it costs, and what to do when it is slow.
+
+## Which command
+
+| Situation | Command | Why |
+|---|---|---|
+| You changed code and want to know if your tests still defend it | `testguard probe --changed auto` | Probes only the claims the change can affect. The base is found offline: the CI base branch, the remote default branch, a differently named upstream, then the branch's own upstream (the commits not pushed yet). With no base it probes every claim, never nothing. |
+| You are writing one test | `testguard probe --claim <ID> --confirm 1` | One claim, one confirmation run: fast and **provisional** (`?`). Confirm with `testguard admit <test-file> --claim <ID>` before committing. |
+| Pre-push hook | `testguard probe --changed auto` | What `testguard init` writes. The full probe does not belong in a hook. |
+| Pull request in CI | `testguard probe --changed auto`, with `.testguard/evidence.json` cached | Only the change is measured; unchanged verdicts are carried forward. `testguard init --ci github` or `--ci gitlab` writes this. |
+| Nightly, or when asked | `testguard probe` | Every claim. The only run that refreshes everything, for example after a TestGuard upgrade. |
+| A suite that cannot share the machine | `testguard probe --serial` | One test process at a time. Rarely needed: see [parallel safety](#probe-several-faults-at-once). |
+
+What the defaults already do:
+
+- **Faults run in parallel.** `--fault-workers auto` probes `min(4, floor(CPUs / 2))` faults at once (one on a machine with fewer than four CPUs), halved when other test runners are already busy. Override with `--fault-workers <n>` or `TESTGUARD_FAULT_WORKERS`.
+- **Every kill is confirmed by a run alone.** A suite that shares a port, a database or a temp path across trees cannot turn into false kills (see [below](#probe-several-faults-at-once)).
+- **Unchanged verdicts are reused** after one live baseline run per defender set, and a `--claim` or `--changed` run also reuses the last full probe.
+- **`status` and `brief` say when you are leaving speed on the table** (`advice`), each line with the command to run.
+
+## Measured
+
+Measured for the 0.24 change (#270). Fault workers were 2 in every row: the
+CI runner has 4 CPUs, and the 18-CPU workstation had other test runners busy,
+so the automatic width halved itself from 4. "Guard" is the time spent on
+confirmation runs taken alone after the fan-out (`run.measurements.aloneConfirmMs`).
+
+This repository's self-probe (666 faults, almost all killed, unit and acceptance defenders):
+
+| Run | Machine and load | Before (one fault at a time) | Now (default) | Speedup | Guard |
+|---|---|---|---|---|---|
+| From scratch | GitHub-hosted runner, 4 CPUs, idle | ≈ 3640 s (estimated: 3303 normalized s for 604 faults, `testguard.cost-budget.json`, scaled to 666) | 1626 s (1807 normalized) | ≈ 2.0× | 607 s (37%) |
+| From scratch | workstation, 18 CPUs, load average 22–60 | not run | 4597 s | — | 1613 s (35%) |
+| No change since the last probe | workstation, 18 CPUs, load average 40 | — | 454 s: 663 reused after 215 live baselines, measured side by side | — | 0 s |
+
+A project of cheap unit tests (`node bench/cheap-units.mjs`: 24 vitest modules, 72 faults, every fault killed):
+
+| Run | Machine and load | Wall time | Runner invocations | Guard |
+|---|---|---|---|---|
+| From scratch, `--serial` (the 0.23 behavior) | workstation, 18 CPUs, load average 22 | 126.5 s | 288 | — |
+| From scratch, default | same | 79.1 s (1.6×) | 288 | 71 confirmations, 32.0 s |
+| No change since the last probe | same | 6.5 s | 24 | — |
+| `--changed HEAD~1` after touching one module | same | 5.9 s | 12 | 2 confirmations, 0.9 s |
+
+A CPU-bound `node:test` project on the CI runner (the native-performance job,
+3 fault workers, medians of five interleaved rounds against one fault at a
+time): 0.52× the serial time with the guard, 0.40× before it.
+
+What the guard costs: every kill measured beside another fault takes its last
+run alone, one after another, after the fan-out. That run replaces a run, so
+the number of runs does not change, but those runs are not parallel. On a suite
+where almost every fault is killed, they are a third of the wall time. Every
+kill still rests on a run with nothing else in flight, and that is what the
+time buys. For a nightly job the absolute numbers matter less than the
+pre-push and pull-request paths, which `--changed auto` and verdict reuse keep
+to seconds.
+
+## Why is this slow?
+
+Work down this list; each item names how to check it.
+
+1. **An old version.** `testguard --version`. Before 0.24 every fault ran one at a time. Upgrade, then run `testguard init --upgrade` ([upgrading](../upgrade.md)).
+2. **`--serial` in a hook or CI.** It forces one fault at a time. `testguard status` prints an `advice` line when the last probe ran serially on a machine with room; `testguard init` lists every hook and CI line that passes it. Drop it.
+3. **A full probe on every push.** Use `testguard probe --changed auto` in the hook and the pull request job, and keep `testguard probe` for the nightly job. `testguard init --upgrade` rewrites the hooks it wrote.
+4. **No evidence cache in CI.** Without `.testguard/evidence.json` from the last run nothing is reused. Cache it (the CI files `init --ci` writes do).
+5. **Expensive defender files.** `testguard probe --cost` (or `testguard claims --cost` after the fact) lists the slowest claims, faults and defender files. Split a slow file, or point a claim at a unit test; see [fix a shared defender](#fix-a-shared-defender).
+6. **Python import time.** Every run starts an interpreter and imports the project. Move heavy imports out of module scope in tests, and keep `conftest.py` light.
+7. **Many claims on one slow test file.** Every fault of every claim that names it runs the whole file N times. Give each claim the narrowest defender that still kills its faults (fault-level `defendedBy`).
+8. **A suite that is not parallel-safe.** The probe warns `defender set … is not parallel-safe` and names the files. Their faults are then measured one at a time. Make those tests hermetic to get the parallelism back: every runner process gets `TESTGUARD_WORKER` (the 0-based tree index), so a dev server can listen on `8787 + Number(process.env.TESTGUARD_WORKER ?? 0)`. If that cannot be done, declare the claim `"serial": true` in the claims file: its faults are probed alone without the detection having to find out first.
 
 ## What a probe costs
 
@@ -158,44 +223,43 @@ shows a rewritten stage line at a terminal only.
 **Workers.** Built-in runners default to one worker in `probe`, `sweep`,
 `replay` and `admit`, which already means one test file at a time.
 `--workers 2` raises the ceiling for Vitest, Jest, Playwright and Node's test
-runner; `--serial` forces one whatever `--workers` says, so it only changes a
-run that also raised `--workers`. Python is always serial. Faults run one after another unless `--fault-workers`
-says otherwise (below), and the runner groups of a mixed-runner defender set
-always do. [Languages and
+runner; `--serial` forces one whatever `--workers` says and also probes one
+fault at a time. Python is always one worker. Faults run in parallel by default
+(below); the runner groups of a mixed-runner defender set always run one after
+another. [Languages and
 runners](../reference/languages-and-runners.md#runner-summary) shows the flag
 each runner receives.
 
 **Probe several faults at once.** <a id="probe-several-faults-at-once"></a>
-Almost all of a probe's time is spent inside the test runner, one fault after
-another. `--fault-workers <n>` probes up to n faults at once, each in its own
-scratch worktree, so it is the flag that shortens a cold probe:
+Almost all of a probe's time is spent inside the test runner. By default
+(`--fault-workers auto`) a probe runs `min(4, floor(CPUs / 2))` faults at
+once, each in its own scratch worktree. `--fault-workers <n>`,
+`TESTGUARD_FAULT_WORKERS` or `--serial` (one fault at a time) override it, and
+the evidence records which (`run.faultWorkersSource`, and `run.cpus` for auto).
 
-```bash
-testguard probe --fault-workers 4
-```
-
-- Baselines are still measured once per defender set, before any fault is
-  applied; the baselines of different defender sets run side by side, and a
-  baseline that is not green while another set was running is measured again
-  alone before any verdict uses it (`detail.baselineRemeasuredSerially`).
-  Then the faulted runs, negative controls and escalations run side by side.
-- Verdicts and record order are those of a serial run. A `TIMEOUT` or an
-  inconsistent probe measured while other faults were running is measured again
-  alone before it is reported, and says so (`detail.remeasuredSerially`). A
-  fan-out that keeps hitting that path is costing time, not honesty: lower n.
-  A defender that hangs until `--budget` is paid twice that way (once under
-  the fan-out, once alone); measured on the Python known-answer fixture with
-  a 60 s budget, its one hanging fault made `--fault-workers 4` slower than
-  serial (126 s against 75 s). Keep `--budget` close to what a healthy run
-  needs.
-- Pick n at or below your CPU count divided by `--workers`; the probe warns
-  when it oversubscribes the machine. Each tree is one more checkout on disk
-  (`node_modules` is linked, not copied).
-- Not with `--in-place`. A project whose tests bind a fixed port or share an
-  external database or directory outside the project can collide across
-  trees; keep the default for it.
-- Evidence measured with a fan-out is never reused by a serial probe; serial
-  evidence is reused by any.
+- Baselines are measured once per defender set; different sets run side by
+  side, and one that is not green beside another is measured again alone
+  (`detail.baselineRemeasuredSerially`).
+- **Every kill rests on a run alone.** A fault whose runs were all kills
+  measured beside other faults takes its last run again later, in a tree of
+  its own, with nothing else running (`probeRuns[].alone`). That costs no
+  extra run, only the concurrency of those last runs
+  (`run.measurements.aloneConfirmRuns`, `aloneConfirmMs`).
+- **Disagreement is not flakiness.** If a run alone passes where runs beside
+  other faults failed, the failure was the neighbors': the fault is measured
+  again alone, in full, and its defender set is **not parallel-safe** for the
+  rest of the run (`detail.notParallelSafe`, and a warning naming its files).
+  Every kill in that set is then measured alone. A set whose baseline failed
+  beside other sets and passed alone is probed alone from the start.
+- A `TIMEOUT`, an inconsistent probe, a suite that failed to load, or an
+  undeclared-killer attribution measured beside other faults is measured
+  again alone before it is reported (`detail.remeasuredSerially`). A fan-out
+  that keeps hitting that path costs time, not honesty; lower n or keep
+  `--budget` close to what a healthy run needs.
+- Each tree is one more checkout on disk (`node_modules` is linked, not
+  copied). `--in-place` has one tree, so it probes one fault at a time.
+- A fan-out's evidence is reused by a fan-out of any width, so a laptop and
+  CI share it. It is never reused by a run that asked for one fault at a time.
 - Two probes of the same repository at once are safe: scratch-worktree
   creation and removal take turns on a lock keyed by the repository (kept in
   the temp or scratch directory, never inside the repository).
@@ -206,10 +270,10 @@ other than its own. A contended machine turns a slow suite into a `TIMEOUT` or
 `FLAKY-DEFENDER` verdict about the load, not the claim, so the probe warns and
 records the detection in the evidence (`run.contention`). Wait for the other
 run to finish before trusting a timeout. The warning's advice follows the run:
-a default run is already one file at a time, so it says to wait; a run that
-raised `--workers` is told to lower it or pass `--serial`; a `--runner-cmd` is
-told that its concurrency is the command's own; a fan-out is told to lower
-`--fault-workers` first.
+a run already at one test process says to wait; a run that raised `--workers`
+is told to lower it or pass `--serial`; a `--runner-cmd` is told that its
+concurrency is the command's own; a fan-out is told to lower `--fault-workers`
+first. An automatic width is halved when the check finds other runners.
 
 **Budgets.**
 
@@ -256,7 +320,9 @@ changed. All of these must match the evidence at the output path:
   words, hashed; reformatting whitespace is not a change);
 - the runner the evidence records (`run.runner`): the engine that ran, its
   version, and where it was resolved from (`project`, `path`, `builtin`);
-- `--confirm` and the worker policy (`--workers`, `--serial`).
+- `--confirm` and the worker policy (`--workers`, `--serial`; a fan-out of
+  any width stands in for another, never for a run that asked for one fault at
+  a time).
 
 Then one more check that no hash can make: the defender set runs once on
 unmodified source. Green, and every fault it defends is reused; red, and each
@@ -272,9 +338,10 @@ without the test requirements — and fixing it changes none of the hashed
 inputs. Reused verdicts print `(reused)`. `--no-reuse` re-probes everything.
 
 Reuse reads the previous document at the path this run will write: a
-`--claim` run reuses `.testguard/evidence-partial.json`, a provisional run
-`evidence-provisional.json`, a full run `evidence.json`, or whatever `--out`
-names. A cold run, a changed runner config or a changed worker policy probes
+provisional run `evidence-provisional.json`, a full run `evidence.json`, or
+whatever `--out` names. A `--claim` or `--changed` run reads
+`.testguard/evidence-partial.json` **and** the canonical `evidence.json`,
+each under the same rules, and where both hold a fault the later one wins. A cold run, a changed runner config or a changed worker policy probes
 from scratch even when your source has not changed.
 
 One kind of change reuse cannot see: anything outside the hashed inputs that
@@ -297,7 +364,8 @@ expensive part of a first pass. While you work on one claim:
 ```bash
 npx testguard-cli probe . --claim AUTH-ADMIN --no-escalate --include-dirty --confirm 1   # fast, provisional
 npx testguard-cli probe . --claim AUTH-ADMIN --include-dirty                             # confirmed, with escalation
-npx testguard-cli probe .                                                                # the final pass, defaults
+npx testguard-cli probe . --changed auto                                                 # everything your change can affect
+npx testguard-cli probe .                                                                # the full pass: nightly, or when asked
 ```
 
 - `--claim` takes one or more IDs (`--claim A,B --claim C`) and writes
@@ -315,6 +383,7 @@ npx testguard-cli probe .                                                       
 
 ## Next
 
+- [Upgrading](../upgrade.md) — `testguard init --upgrade` and staying current
 - [Languages and runners](../reference/languages-and-runners.md) — what each runner receives for `--workers` and `--serial`
 - [GitHub Actions](ci/github-actions.md) — caching evidence so CI reuses verdicts
 - [Verdicts](../reference/verdicts.md) — `TIMEOUT`, `FLAKY-DEFENDER` and why a hang is not a detection

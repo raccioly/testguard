@@ -92,6 +92,21 @@ expect(store.writeAudit).toHaveBeenCalledWith(
 环境要求、离线安装、`ENOVERSIONS` 以及所有 CI 选项，见
 [安装指南](https://github.com/raccioly/testguard/blob/main/docs/installation.md)。
 
+## 让它更快
+
+```bash
+testguard probe --changed auto                 # after a change: only the claims it can affect
+testguard probe --claim <ID> --confirm 1       # while writing one test: fast, provisional
+testguard probe                                # nightly, or when asked: every claim
+```
+
+- 故障默认并行探测：CPU 数的一半，最多 4 个（`--serial` 一次一个）。
+- 每个 kill 都由一次单独运行确认，因此共享端口或数据库的测试套件无法伪造 kill。
+- 未变化的判定会被复用；`--changed` 或 `--claim` 运行会复用上一次完整探测。
+- `testguard init` 写入运行第一条命令的 pre-push 钩子，`init --ci github|gitlab` 写入在每个 pull request 上运行它、每晚运行完整探测的 CI 任务。
+
+仍然很慢？`testguard status` 会列出 `advice` 及要运行的命令，[为什么慢？](https://github.com/raccioly/testguard/blob/main/docs/guides/performance.md#why-is-this-slow) 是检查清单。
+
 ## 快速入门
 
 ```bash
