@@ -82,15 +82,19 @@ export const prePushBlockName = (dir) => (dir === '.' ? 'pre-push' : `pre-push-$
 
 /**
  * The pre-push block: probe only the claims the commits being pushed can
- * affect, with automatic fault workers. The project's own install first (it
- * respects a pin), then the repository root's, then a `testguard` on PATH
- * (Homebrew), then the exact version that wrote the block, through npx — a
- * push already needs the network. The full probe is the nightly job, never this hook. It lives in
+ * affect, with automatic fault workers. An installed TestGuard only (#301):
+ * the project's own install (it respects a pin), then the repository root's,
+ * then a `testguard` on PATH (Homebrew). With none, it says how to install the
+ * exact version that wrote the block and lets the push through: no npx fetch,
+ * which fails on machines whose npm refuses fresh releases (min-release-age)
+ * and would run unreviewed code from a hook. CI and the nightly job are the
+ * gate. The full probe is the nightly job, never this hook. It lives in
  * the hook file the repository already uses (`.husky/pre-push`, else
  * `.githooks/pre-push`), beside anything else there.
  */
 export function prePushBlock(dir = '.', { version } = {}) {
-  const fallback = npxPinned(version);
+  npxPinned(version); // the same exact-version rule as every template
+  const install = `npm i -D --save-exact testguard-cli@${version}, or brew install raccioly/tap/testguard`;
   return managedBlock(prePushBlockName(dir), `# TestGuard: probe only the claims the commits being pushed can affect.
 # --changed auto compares against the upstream / default branch; with no base
 # it probes nothing and says so (CI and the nightly job are the gate). Faults run in parallel by default, and every kill is
@@ -101,7 +105,7 @@ export function prePushBlock(dir = '.', { version } = {}) {
   if [ -x ./node_modules/.bin/testguard ]; then set -- ./node_modules/.bin/testguard
   elif [ -x "$ROOT/node_modules/.bin/testguard" ]; then set -- "$ROOT/node_modules/.bin/testguard"
   elif command -v testguard >/dev/null 2>&1; then set -- testguard
-  else set -- ${fallback}
+  else echo "testguard: not installed here, so this push was not probed (CI is the gate). Install it: ${install}" >&2; exit 0
   fi
   "$@" probe --changed auto --when-no-base skip --quiet
 ) || exit 1`);

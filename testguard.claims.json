@@ -15292,7 +15292,7 @@
     },
     {
       "id": "TG-INIT-WRITES-THE-FAST-HOOKS",
-      "statement": "init writes a pre-push block that probes --changed auto through the project install, then PATH, then exactly the version that wrote it; CI that probes the change and runs the full probe nightly; and init --upgrade rewrites only TestGuard blocks and skills nobody edited.",
+      "statement": "init writes a pre-push block that probes --changed auto through an installed TestGuard only (the project install, then PATH), never a fetch; CI that probes the change and runs the full probe nightly; and init --upgrade rewrites only TestGuard blocks and skills nobody edited.",
       "source": {
         "kind": "spec",
         "ref": "issue #270 (fast by default)"
@@ -16882,6 +16882,18 @@
             "producer": "agent",
             "by": "claude"
           }
+        },
+        {
+          "id": "F6",
+          "description": "The pre-push hook fetches a TestGuard through npx when none is installed.",
+          "faultClass": "other",
+          "file": "src/init/managed.mjs",
+          "find": "  else echo \"testguard: not installed here, so this push was not probed (CI is the gate). Install it: ${install}\" >&2; exit 0",
+          "replace": "  else set -- npx -y testguard-cli@${version}",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
         }
       ]
     },
@@ -17181,6 +17193,48 @@
           "file": "src/probe/scope.mjs",
           "find": "    else if (byDiscovery) reasons.set(claim.id, { claimId: claim.id, kind: 'discovery', file: byDiscovery });\n",
           "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-UNREADABLE-REUSE-SOURCE-IS-REMEASURED",
+      "statement": "A reuse source this TestGuard cannot read as evidence (an older release's file under rules since tightened) is skipped with a warning and every fault is measured again; it never refuses the run.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301 item 3"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/converge.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An unreadable reuse source refuses the run.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/probe.mjs",
+          "find": "    try { return [readSpecDoc('evidence', path)]; }\n    catch (e) {",
+          "replace": "    try { return [readSpecDoc('evidence', path)]; }\n    catch (e) {\n      throw e;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The skipped source goes unsaid.",
+          "faultClass": "statement-deleted",
+          "file": "src/commands/probe.mjs",
+          "find": "      warn(`warning: ${path} cannot be read as evidence by this TestGuard (",
+          "replace": "      void (`warning: ${path} cannot be read as evidence by this TestGuard (",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

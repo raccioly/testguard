@@ -64,6 +64,23 @@ export function reuseSources({ outPath, canonical, partial, noReuse }) {
   return [...new Set([outPath, ...(partial ? [canonical] : [])])];
 }
 
+/**
+ * The documents a probe may reuse from. One this TestGuard cannot read
+ * (evidence an older release wrote under rules since tightened, say a 0.23
+ * fan-out with no `alone` marks) is no reason to refuse the run: nothing is
+ * reused from it, every fault it held is measured again, and the file is
+ * replaced (#301). Never optimistic: an unreadable source only removes reuse.
+ */
+export function readReuseSources(paths, warn = () => {}) {
+  return paths.flatMap((path) => {
+    try { return [readSpecDoc('evidence', path)]; }
+    catch (e) {
+      warn(`warning: ${path} cannot be read as evidence by this TestGuard (${String(e.message).split('\n').slice(0, 2).join(' ').slice(0, 300)}); nothing is reused from it and every fault is measured again`);
+      return [];
+    }
+  });
+}
+
 /** One line on how wide the run was and what its guard cost, for a fan-out. */
 export function renderFanOut(run) {
   if (!(run.faultWorkers > 1)) return undefined;
@@ -287,7 +304,7 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   // verdicts: the canonical evidence, under the same reuse rule (#270). That is
   // what makes the pre-push path cheap.
   const previousPaths = reuseSources({ outPath, canonical: evidencePath(projectDir), partial: Boolean(only), noReuse: values['no-reuse'] }).filter((path) => existsSync(path));
-  const previous = previousPaths.map((path) => readSpecDoc('evidence', path));
+  const previous = readReuseSources(previousPaths, io.err);
   const basePath = values.baseline ? resolve(values.baseline) : baselinePath(projectDir);
   const baseline = existsSync(basePath) ? readSpecDoc('baseline', basePath) : undefined;
 

@@ -131,8 +131,11 @@ line that runs `probe --serial`, a full probe on every push, a pinned older
 `testguard-cli`, a floating version (the `latest` tag, or `npx
 testguard-cli` with no version) or an older TestGuard template.
 
-Every hook and CI file it writes runs the project's installed TestGuard first,
-else exactly the version that ran `init` through `npx`, never a floating tag.
+The pre-push block runs an installed TestGuard only (the project's, the
+repository root's, then one on `PATH`); with none it prints how to install the
+exact version that ran `init` and lets the push through, fetching nothing. The
+CI files run the project's installed TestGuard first, else exactly that version
+through `npx`. Nothing runs a floating tag.
 With a `package.json`, `init` also adds `testguard-cli` at that exact version to
 `devDependencies` (run your install so the lockfile records it) and writes a
 Dependabot rule for it in `.github/dependabot.yml`, or a Renovate rule when the

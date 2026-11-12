@@ -239,3 +239,22 @@ describe('a record kept stale is never current (#293)', () => {
     expect(result.unavailableReasons).toContain('stale-inputs');
   });
 });
+
+describe('a reuse source this TestGuard cannot read (#301)', () => {
+  it('is skipped with a warning, never a refusal', async () => {
+    const { readReuseSources } = await import('../src/commands/probe.mjs');
+    const dir = mkdtempSync(join(tmpdir(), 'tg-reuse-source-'));
+    try {
+      const old = structuredClone(example);
+      old.run.faultWorkers = 2;
+      for (const r of old.records) for (const run of r.detail.probeRuns ?? []) delete run.alone;
+      writeFileSync(join(dir, 'old.json'), JSON.stringify(old));
+      writeFileSync(join(dir, 'good.json'), JSON.stringify(example));
+      const warnings = [];
+      const docs = readReuseSources([join(dir, 'old.json'), join(dir, 'good.json')], (w) => warnings.push(w));
+      expect(docs).toHaveLength(1);
+      expect(docs[0].run.id).toBe(example.run.id);
+      expect(warnings).toEqual([expect.stringMatching(/old\.json cannot be read as evidence by this TestGuard .*measured alone.*measured again/)]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});

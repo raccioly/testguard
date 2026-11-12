@@ -36,6 +36,18 @@ describe('no template can carry a floating version', () => {
     }
   });
 
+  it('the pre-push hook runs an installed TestGuard only: with none it says how to install and lets the push through, fetching nothing (#301)', () => {
+    expect(prePushBlock('.', { version: '1.2.3' })).not.toMatch(/\bnpx\b/);
+    const dir = repo();
+    try {
+      mkdirSync(join(dir, '.githooks'));
+      writeFileSync(join(dir, '.githooks/pre-push'), `#!/bin/sh\n${prePushBlock('.', { version: '1.2.3' })}\n`);
+      const r = spawnSync('sh', ['.githooks/pre-push'], { cwd: dir, encoding: 'utf8', env: { PATH: '/usr/bin:/bin', HOME: dir } });
+      expect(r.status).toBe(0);
+      expect(r.stderr).toMatch(/not installed here, so this push was not probed \(CI is the gate\)\. Install it: npm i -D --save-exact testguard-cli@1\.2\.3/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
   it('refuses to pin anything but an exact version', () => {
     for (const bad of ['latest', 'next', '^1.2.3', '1.2', '', undefined]) expect(() => npxPinned(bad)).toThrow(/exact version/);
     expect(npxPinned('1.2.3-rc.1')).toBe('npx -y testguard-cli@1.2.3-rc.1');

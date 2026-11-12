@@ -1582,9 +1582,13 @@ skill written before markers, equals a template a release shipped); an edited
 one is reported and left alone unless `--force`. Nothing outside a block is
 touched.
 
-**Pinned versions (#293).** What those blocks run is the project's installed
-TestGuard, else exactly the version that wrote them (`npx -y
-testguard-cli@<x.y.z>`), never a floating tag: a floating tag would run every
+**Pinned versions (#293).** The pre-push block runs an installed TestGuard
+only (the project's, the repository root's, then one on PATH); with none it
+prints how to install exactly the version that wrote it and lets the push
+through, fetching nothing (#301: an npx fetch fails where npm refuses fresh
+releases, and would run unreviewed code from a hook). The CI files run the
+project's installed TestGuard, else exactly the version that wrote them (`npx
+-y testguard-cli@<x.y.z>`). Neither ever runs a floating tag: a floating tag would run every
 new release in an adopter's CI before anyone reviewed it. GitHub Actions in
 the CI template are pinned by commit SHA with the version in a comment. With a
 `package.json`, `init` adds `testguard-cli` at that exact version to
