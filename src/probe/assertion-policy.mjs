@@ -33,6 +33,19 @@ export function evaluateAssertionPolicy(records) {
   return { state: exceptionOnlyKills.length ? 'failed' : 'passed', exceptionOnlyKills };
 }
 
+/**
+ * The two answers a converging scoped run gives (#293 review): the document
+ * it writes holds the policy over every record in it (unavailable while one
+ * is kept stale), and the run's own exit and line judge what it measured,
+ * as a scoped run always has: a stale record outside the selection is not
+ * this run's to judge. `unjudged` counts those records.
+ */
+export function scopedAssertionPolicy({ measured, written, converged }) {
+  const document = evaluateAssertionPolicy(written);
+  if (!converged) return { document, run: document, unjudged: 0 };
+  return { document, run: evaluateAssertionPolicy(measured), unjudged: written.filter((r) => r.carried === 'inputs-changed').length };
+}
+
 export const renderAssertionPolicy = (policy) => policy.state === 'unavailable'
   ? `assertion policy: unavailable; ${policy.staleRecords.length} record${policy.staleRecords.length === 1 ? ' was' : 's were'} kept stale by a converging probe and ${policy.staleRecords.length === 1 ? 'is' : 'are'} not current evidence: ${policy.staleRecords.map((k) => `${k.claimId}/${k.faultId}`).join(', ')}. Probe them (or run the full probe) and ask again`
   : policy.state === 'passed'

@@ -1447,9 +1447,17 @@ write the evidence file must not trust a record it did not measure.
 **Exit code and policies.** The findings gate and `run.claims[]` still read
 only the measured records, so a scoped run's exit code keeps meaning "the
 selection". The written document carries no origin or assertion policy from
-the document it replaced. `--require-assertion-kill` is evaluated over every
-record written, so a carried kill without a recorded `killKind` fails it, and a
-kept-stale record makes it unavailable.
+the document it replaced. `--require-assertion-kill` gives two answers. The
+document's `assertionPolicy` is evaluated over every record written: a carried
+kill without a recorded `killKind` fails it, and a kept-stale record makes it
+`unavailable`. The run's exit code, `probe --json`'s `run.assertionPolicy` and
+the printed policy line judge only the records this run measured, as a scoped
+run always has; the output says in one line when the document's answer
+differs, naming what outside the selection it did not judge. So a stale record
+from another commit never turns a scoped run red, and never reads as passed in
+the evidence file either. `--require-origin` refuses `--claim` and
+`--changed`, before this change and after it, so the origin policy has no
+scoped answer to split.
 `--require-origin` still refuses `--claim` and `--changed`, so a carried
 record never contributes to an origin-policy pass.
 

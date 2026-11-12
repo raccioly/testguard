@@ -258,3 +258,17 @@ describe('a reuse source this TestGuard cannot read (#301)', () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
+
+describe('a converging run judges its selection; the document judges itself (#293 review A)', () => {
+  it('exits on the measured records, keeps the whole document unavailable, and counts what it did not judge', async () => {
+    const { scopedAssertionPolicy } = await import('../src/probe/assertion-policy.mjs');
+    const decisions = new Map([[`${B}/F1`, CARRIED.changed], [`${B}/F2`, CARRIED.changed], [`${C}/F1`, CARRIED.match], [`${C}/F2`, CARRIED.match]]);
+    const merged = mergeEvidence({ measured, canonical, decisions, claims, scope: { selectedClaims: [A] } });
+    const r = scopedAssertionPolicy({ measured: measured.records, written: merged.records, converged: true });
+    expect(r.run).toEqual({ state: 'passed', exceptionOnlyKills: [] });
+    expect(r.document.state).toBe('unavailable');
+    expect(r.unjudged).toBe(2);
+    // A run that did not converge judges what it wrote, which is what it measured.
+    expect(scopedAssertionPolicy({ measured: measured.records, written: measured.records, converged: false })).toMatchObject({ unjudged: 0, run: { state: 'passed' } });
+  });
+});

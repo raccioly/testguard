@@ -79,6 +79,18 @@ describe('a change-scoped probe converges the canonical evidence', () => {
     expect((await run(['baseline', p.dir])).code).toBe(2);
   });
 
+  it('judges the assertion policy over its selection: a stale record outside it does not fail the run (review A)', async () => {
+    const p = await probedThenEdited();
+    touch(p.dir, 'src/price.mjs');
+    commit(p.root, 'edit price');
+    // TAX-DOUBLES changed before HEAD~1: kept stale, outside the selection.
+    const r = await run(['probe', p.dir, ...node, '--changed', 'HEAD~1', '--require-assertion-kill']);
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/assertion policy: passed/);
+    expect(r.out).toMatch(/assertion policy: 2 records kept stale outside the selection were not judged; the evidence file's policy is unavailable until they are probed/);
+    expect(read(canonical(p.dir)).assertionPolicy.state).toBe('unavailable');
+  });
+
   it('names the records it kept stale, and baseline refuses the document', async () => {
     const p = await probedThenEdited();
     touch(p.dir, 'src/price.mjs');
@@ -137,15 +149,17 @@ describe('a change-scoped probe converges the canonical evidence', () => {
     expect(read(canonical(p.dir)).run.id).toBe('run-20991231T000000');
   });
 
-  it('judges a carried kill with no recorded kill kind under --require-assertion-kill', async () => {
+  it('records a carried kill with no recorded kill kind as a failure of the evidence file\'s policy, outside the run\'s own judgment', async () => {
     const p = await probedThenEdited();
     const old = read(canonical(p.dir));
     for (const x of old.records) if (x.claim.id === 'PRICE-TOTAL') { delete x.detail.killKind; delete x.detail.killKindReason; }
     writeFileSync(canonical(p.dir), JSON.stringify(old, null, 2));
-    const r = await run(['probe', p.dir, ...node, '--changed', 'HEAD~1', '--require-assertion-kill', '--json']);
-    const doc = JSON.parse(r.out);
-    expect(doc.run.converged.carried).toBe(2);
-    expect(r.code).toBe(1);
-    expect(doc.run.assertionPolicy.exceptionOnlyKills.map((k) => `${k.claimId}/${k.faultId}`)).toEqual(['PRICE-TOTAL/F1', 'PRICE-TOTAL/F2']);
+    const r = await run(['probe', p.dir, ...node, '--changed', 'HEAD~1', '--require-assertion-kill']);
+    // The selection (TAX-DOUBLES) was killed by assertions: the run passes, as a scoped run always judged what it measured.
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/the evidence file's policy is failed, because of records outside this selection that this run did not judge: PRICE-TOTAL\/F1, PRICE-TOTAL\/F2/);
+    const doc = read(canonical(p.dir));
+    expect(doc.records.filter((x) => x.carried === 'inputs-match').length).toBe(2);
+    expect(doc.assertionPolicy.exceptionOnlyKills.map((k) => `${k.claimId}/${k.faultId}`)).toEqual(['PRICE-TOTAL/F1', 'PRICE-TOTAL/F2']);
   });
 });

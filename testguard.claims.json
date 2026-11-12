@@ -17241,6 +17241,48 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-SCOPED-RUN-JUDGES-ITS-SELECTION",
+      "statement": "A converging scoped run's exit and printed assertion policy judge only the records it measured, while the evidence file keeps the policy over every record written and the output counts the stale records it did not judge.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (review A of PR #298)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/converge.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The run is judged over the merged document.",
+          "faultClass": "variable-swap",
+          "file": "src/probe/assertion-policy.mjs",
+          "find": "  return { document, run: evaluateAssertionPolicy(measured), unjudged:",
+          "replace": "  return { document, run: document, unjudged:",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The stale records outside the selection go uncounted.",
+          "faultClass": "return-altered",
+          "file": "src/probe/assertion-policy.mjs",
+          "find": "unjudged: written.filter((r) => r.carried === 'inputs-changed').length };",
+          "replace": "unjudged: 0 };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
     }
   ]
 }

@@ -12,7 +12,7 @@ import { progressMode, stageReporter, clearStageLine, recordEvent, isProgressMod
 import { validate } from '../../spec/lib/validate.mjs';
 import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
 import { originPolicyRequest, evaluateOriginPolicy } from '../probe/origin-policy.mjs';
-import { assertionPolicyRequest, evaluateAssertionPolicy, renderAssertionPolicy, isWeakKill } from '../probe/assertion-policy.mjs';
+import { assertionPolicyRequest, scopedAssertionPolicy, renderAssertionPolicy, isWeakKill } from '../probe/assertion-policy.mjs';
 import { readNativeTestUniverse } from '../probe/universe.mjs';
 import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
 import { runnerOptions } from './runner-options.mjs';
@@ -410,7 +410,8 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   if (only && values.out && resolve(values.out) === canonicalPath && !converged && !exhausted) io.err(`warning: --out names the canonical evidence, but this scoped run did not converge (${convergeReason}); written to ${partialPath} instead`);
   const claimsSource = claimsSourceOf(projectDir, claimsPath);
   if (claimsSource) evidence.run.claimsSource = claimsSource;
-  if (requireAssertionKill) evidence.assertionPolicy = evaluateAssertionPolicy(evidence.records);
+  const assertion = requireAssertionKill ? scopedAssertionPolicy({ measured, written: evidence.records, converged: Boolean(converged) }) : undefined;
+  if (assertion) evidence.assertionPolicy = assertion.document;
   commandBudget?.assertOpen();
   writeSpecDoc('evidence', outPath, evidence);
 
@@ -418,7 +419,8 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   // counting it would hide how many findings the measured part really holds.
   const g = gate(exhausted ? measured.filter((r) => !isNotReached(r)) : measured, baseline, { severityFloor: values.severity });
   const policy = evidence.originPolicy;
-  const weak = evidence.assertionPolicy;
+  // The exit and the printed line judge what this run measured; the document keeps the whole file's answer.
+  const weak = assertion?.run;
   const incomplete = exhausted ? partialExit({ newGating: g.new.length, policyFailed: weak?.state === 'failed' }) : undefined;
   const exitCode = incomplete ? incomplete.exitCode : policy?.state === 'unavailable' || weak?.state === 'unavailable' ? 2 : policy?.state === 'failed' || weak?.state === 'failed' || g.new.length > 0 ? 1 : 0;
   const scope = measuredScope({ requested, changed: changedScope, records: measured });
@@ -469,6 +471,8 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   io.out(baseline ? `${g.new.length} new since baseline, ${g.baselined.length} baselined.` : 'No baseline.');
   if (policy) io.out(renderOriginPolicy(policy, { basis: 'current' }));
   if (weak) io.out(renderAssertionPolicy(weak));
+  if (assertion?.unjudged) io.out(`assertion policy: ${assertion.unjudged} record${assertion.unjudged === 1 ? '' : 's'} kept stale outside the selection ${assertion.unjudged === 1 ? 'was' : 'were'} not judged; the evidence file's policy is unavailable until ${assertion.unjudged === 1 ? 'it is' : 'they are'} probed`);
+  else if (assertion && assertion.document.state !== assertion.run.state) io.out(`assertion policy: the evidence file's policy is ${assertion.document.state}, because of records outside this selection that this run did not judge: ${assertion.document.exceptionOnlyKills.map((k) => `${k.claimId}/${k.faultId}`).slice(0, 5).join(', ')}`);
   if (values.cost) {
     io.out('');
     io.out(renderCost(costReport(measured, { run: probed.run })));
