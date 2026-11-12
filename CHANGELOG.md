@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The Playwright gallery's reference runs once, in its own CI job (#305, repository only).** Modes that only compare with the reference run with `--reference-later` and the scorecard job compares them (`corpus/lib/deferred.mjs`): a missing reference, one of another subject or size, a comparison that never arrived, claim halves of `twice` that do not cover every fault exactly once, and a mode that applies with no shard are all failures. Modes that do not apply to a subject are recorded as such from `applies()`.
+
 ## [0.25.0] - 2026-11-12
 
 Automated weekly release — everything merged since `v0.24.0`.

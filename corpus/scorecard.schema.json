@@ -477,6 +477,18 @@
               }
             }
           }
+        },
+        "observed": {
+          "description": "A reference row only: the answers other jobs' modes are compared with at merge time (#305), with the identity the merge checks: subject and fault count.",
+          "type": "object"
+        },
+        "pending": {
+          "description": "Comparisons with the reference that the merge makes (#305): the mode's own answers, the faults compared and the fault count it measured. Consumed by the merge; absent from a merged scorecard.",
+          "type": "array"
+        },
+        "slice": {
+          "description": "This row measured one slice of the subject's claims (`--slice i/n`, #305): the faults it covered. The merge fails unless the slices together cover every fault exactly once.",
+          "type": "object"
         }
       }
     }

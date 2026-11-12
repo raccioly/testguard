@@ -5,8 +5,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MODES } from '../corpus/lib/modes.mjs';
-import { listSubjects } from '../corpus/lib/subject.mjs';
+import { MODES, applies } from '../corpus/lib/modes.mjs';
+import { listSubjects, loadSubject, subjectRef } from '../corpus/lib/subject.mjs';
 import { parseYaml } from './helpers/yaml.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -27,13 +27,20 @@ describe('corpus shards', () => {
     expect([...new Set(named)].sort()).toEqual(listSubjects().sort());
   });
 
-  it('every mode of the Playwright gallery runs in exactly one shard, one mode (or only no-op ones) per shard', () => {
-    const modes = GALLERY.flatMap((s) => [...s.args.matchAll(/--mode (\S+)/g)].map((m) => m[1]));
-    expect([...modes].sort()).toEqual(MODES.filter((m) => m !== 'reference').sort());
+  it('every mode that applies to the gallery has a shard, the reference has its own, and none is spent on a mode that does not apply', () => {
+    const { dir } = subjectRef('js-playwright-gallery');
+    const subject = loadSubject(dir, {});
+    const modeOf = (s) => [...s.args.matchAll(/--mode (\S+)/g)].map((m) => m[1]);
+    const modes = GALLERY.flatMap(modeOf);
+    expect([...new Set(modes)].sort()).toEqual(MODES.filter((m) => applies(m, subject)).sort());
     for (const s of GALLERY) {
-      const own = [...s.args.matchAll(/--mode (\S+)/g)].map((m) => m[1]);
-      expect(own.filter((m) => !['partial', 'typecheck', 'changed'].includes(m)).length, s.name).toBeLessThanOrEqual(1);
+      expect(modeOf(s).length, s.name).toBe(1);
+      // every shard but the reference's takes the reference from the reference job
+      expect(s.args.includes('--reference-later'), s.name).toBe(modeOf(s)[0] !== 'reference');
     }
+    // `twice` runs as two claim halves, one shard each; every other mode once
+    for (const m of new Set(modes)) expect(modes.filter((x) => x === m).length, m).toBe(m === 'twice' ? 2 : 1);
+    expect(GALLERY.filter((s) => modeOf(s)[0] === 'twice').map((s) => /--slice (\d+\/\d+)/.exec(s.args)?.[1]).sort()).toEqual(['1/2', '2/2']);
   });
 
   it('every tool mutant is in exactly one shard', () => {
@@ -51,6 +58,7 @@ describe('corpus.yml builds its matrix and its expected-shard check from corpus/
     expect(workflow.jobs.scorecard.needs).toEqual(['plan', 'shard']);
     const plan = workflow.jobs.plan.steps.find((s) => s.id === 'plan').run;
     expect(plan).toContain('corpus/shards.json');
+    expect(workflow.jobs.scorecard.steps.find((s) => s.name === 'Merge, compare and publish').run).toContain('--complete');
     const check = workflow.jobs.scorecard.steps.find((s) => s.name === 'Every planned shard delivered its scorecard');
     expect(check.env.NAMES).toBe('${{ needs.plan.outputs.names }}');
     expect(check.run).toContain('missing shard scorecard');

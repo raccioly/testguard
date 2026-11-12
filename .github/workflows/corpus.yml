@@ -128,7 +128,7 @@ jobs:
       - name: Merge, compare and publish
         run: |
           set +e
-          node corpus/run.mjs --merge $(find shards -name '*.json' | sort) --base base/scorecard.json --json scorecard/scorecard.json --markdown scorecard/scorecard.md
+          node corpus/run.mjs --merge $(find shards -name '*.json' | sort) --complete --base base/scorecard.json --json scorecard/scorecard.json --markdown scorecard/scorecard.md
           code=$?
           cat scorecard/scorecard.md >> "$GITHUB_STEP_SUMMARY"
           exit $code
