@@ -61,6 +61,10 @@ describe('the managed pre-push hook, run', () => {
     expect(r.status).toBe(0);
     expect(r.stderr).toMatch(/^testguard: not installed here, so this push was not probed \(CI is the gate\)\. Install it: npm i -D --save-exact testguard-cli@/);
   });
+  it('never advises installing a version older than the block needs', () => {
+    expect(prePushScript('.', { version: '0.1.0' })).not.toContain('testguard-cli@0.1.0');
+    expect(prePushScript('.', { version: '0.1.0' })).toContain(`testguard-cli@${HOOK_MIN_VERSION}`);
+  });
   it('TESTGUARD_SKIP_HOOK=1 skips it with a one-line notice', () => {
     const r = push({ code: 1, env: { TESTGUARD_SKIP_HOOK: '1' } });
     expect(r).toEqual({ status: 0, stderr: 'testguard: TESTGUARD_SKIP_HOOK=1, so this push was not probed', args: '' });

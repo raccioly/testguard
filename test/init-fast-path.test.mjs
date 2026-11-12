@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { initProject } from '../src/init/init.mjs';
-import { TEMPLATE_VERSION, managedBlock, parseManagedBlocks, prePushBlock, prePushScript, markSkill, skillState, scanInstalled, olderThan } from '../src/init/managed.mjs';
+import { HOOK_MIN_VERSION, TEMPLATE_VERSION, managedBlock, parseManagedBlocks, prePushBlock, prePushScript, markSkill, skillState, scanInstalled, olderThan } from '../src/init/managed.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const TEMPLATE = readFileSync(join(ROOT, 'src/init/templates/SKILL.md'), 'utf8');
@@ -26,7 +26,7 @@ describe('the templates are fast and pinned', () => {
     expect(hook).toMatch(/"\$@" probe --changed auto --when-no-base skip --quiet/);
     expect(hook).not.toMatch(/--serial|--fault-workers|@latest/);
     expect(hook).not.toMatch(/\bnpx\b/);
-    expect(hook).toContain('npm i -D --save-exact testguard-cli@0.23.0');
+    expect(hook).toContain(`npm i -D --save-exact testguard-cli@${HOOK_MIN_VERSION}`);
     expect(parseManagedBlocks(hook)).toEqual([expect.objectContaining({ name: 'pre-push', template: TEMPLATE_VERSION, modified: false })]);
     // A nested project gets its own block, run from its own directory.
     expect(prePushBlock('backend', { version: '0.23.0' })).toMatch(/testguard managed: pre-push-backend template=/);

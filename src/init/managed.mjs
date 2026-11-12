@@ -103,7 +103,8 @@ export const prePushBlockName = (dir) => (dir === '.' ? 'pre-push' : `pre-push-$
  */
 export function prePushBlock(dir = '.', { version } = {}) {
   npxPinned(version); // the same exact-version rule as every template
-  const install = `npm i -D --save-exact testguard-cli@${version}, or brew install raccioly/tap/testguard`;
+  // Never advise installing a version the block would itself refuse.
+  const install = `npm i -D --save-exact testguard-cli@${olderThan(version, HOOK_MIN_VERSION) ? HOOK_MIN_VERSION : version}, or brew install raccioly/tap/testguard`;
   return managedBlock(prePushBlockName(dir), `# TestGuard: probe only the claims the commits being pushed can affect.
 # Exit 1 (unproven) and 2 (could not evaluate) refuse the push; a usage error
 # (3: an older binary, an edited flag) and a missing or too-old install let it
