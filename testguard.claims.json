@@ -15726,6 +15726,18 @@
             "producer": "agent",
             "by": "claude"
           }
+        },
+        {
+          "id": "F4",
+          "description": "Two runs in one second share an id.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/probe.mjs",
+          "find": "export const runId = (startedAt) => `run-${startedAt.replace(/[-:.]/g, '').slice(0, 18)}`;",
+          "replace": "export const runId = (startedAt) => `run-${startedAt.replace(/[-:.]/g, '').slice(0, 15)}`;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
         }
       ]
     },

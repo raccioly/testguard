@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { baselineCommand } from '../src/commands/baseline.mjs';
 import { convergeRequest, mergeEvidence, reuseTally, staleCarried, CARRIED } from '../src/evidence/carry.mjs';
 import { inputsMatch, isReusable } from '../src/probe/attribution.mjs';
-import { carryRefusal, reusableRun } from '../src/probe/probe.mjs';
+import { carryRefusal, reusableRun, runId } from '../src/probe/probe.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { recordedOriginSummary } from '../spec/lib/origins.mjs';
 import { renderConverged } from '../src/commands/probe.mjs';
@@ -176,5 +176,12 @@ describe('baseline and a converged document', () => {
     const r = await run(withEvidence(fresh));
     expect(r.code).toBe(0);
     expect(r.out).toMatch(/4 of the 6 records were carried from run-old/);
+  });
+});
+
+describe('run ids', () => {
+  it('differ for two runs that start in the same second, so a carried-from id and the lost-update check never collide', () => {
+    expect(runId('2026-11-12T15:36:12.123Z')).toBe('run-20261112T153612123');
+    expect(runId('2026-11-12T15:36:12.123Z')).not.toBe(runId('2026-11-12T15:36:12.456Z'));
   });
 });

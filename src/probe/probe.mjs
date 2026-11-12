@@ -174,6 +174,14 @@ export function priorRecords(previous, policy) {
   return map;
 }
 
+/**
+ * A run's id, from its start time to the millisecond. A converging scoped run
+ * (#293) carries records from the run before it and checks that no other
+ * command wrote in between by comparing ids, so two runs in the same second
+ * must not share one.
+ */
+export const runId = (startedAt) => `run-${startedAt.replace(/[-:.]/g, '').slice(0, 18)}`;
+
 /** How the fan-out width was chosen, as the evidence records it (#270). */
 export function fanOutPolicy({ faultWorkersSource, cpus } = {}) {
   if (!faultWorkersSource) return {};
@@ -232,7 +240,7 @@ function partialDocument(options, ctx) {
     schemaVersion: 1,
     tool: { name: 'testguard', version: toolVersion },
     run: {
-      id: `run-${ctx.startedAt.replace(/[-:.]/g, '').slice(0, 15)}`,
+      id: runId(ctx.startedAt),
       startedAt: ctx.startedAt,
       finishedAt: new Date().toISOString(),
       repo: { head, dirty: isDirty(gitRoot(projectDir)), ...(ctx.snapshot ? { snapshot: ctx.snapshot } : {}), ...(ctx.ignoredDirty?.length ? { ignoredDirty: ctx.ignoredDirty } : {}) },
@@ -1069,7 +1077,7 @@ async function measureProbe({
     schemaVersion: 1,
     tool: { name: 'testguard', version: toolVersion },
     run: {
-      id: `run-${startedAt.replace(/[-:.]/g, '').slice(0, 15)}`,
+      id: runId(startedAt),
       startedAt,
       finishedAt: new Date().toISOString(),
       repo: { head, dirty, ...(snapshot ? { snapshot } : {}), ...(ignoredDirty.length ? { ignoredDirty } : {}) },
