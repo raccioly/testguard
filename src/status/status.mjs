@@ -42,8 +42,15 @@ const P = (projectDir) => ({
  * ANOTHER commit (CI's, fetched as an artifact) is legitimate input. Staleness
  * is computed from the recorded input hashes exactly as for a local run, so a
  * foreign document is trusted only for the faults whose inputs still match.
+ *
+ * `only` (claim ids) asks the same question of a selection: the claims file,
+ * its anchors and the evidence are narrowed to those claims, and everything
+ * that belongs to the rest of the file (unclaimed changes, the claimed
+ * surface) is left out. A `--claim` or `--changed` run reports that view as
+ * `run.scope.state`/`run.scope.next`, so the selection is never told to repair
+ * something it did not select. The whole-file answer is the call without `only`.
  */
-export function computeStatus({ projectDir, toolVersion, generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20, changedRef, includeDirty = false, evidence: evidenceOverride }) {
+export function computeStatus({ projectDir, toolVersion, generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20, changedRef, includeDirty = false, evidence: evidenceOverride, only }) {
   const rel = (p) => relative(projectDir, p) || '.';
   const doc = {
     schemaVersion: 1,
@@ -97,7 +104,8 @@ export function computeStatus({ projectDir, toolVersion, generatedAt = new Date(
   if (source) doc.claimsSource = source;
   else doc.paths.claims = rel(paths.claims);
 
-  const claims = loadClaims(paths.claims);
+  const whole = loadClaims(paths.claims);
+  const claims = only ? { ...whole, claims: whole.claims.filter((c) => only.includes(c.id)) } : whole;
   doc.origins = declaredOriginSummary(claims.claims);
   if (claims.claims.length) doc.notes.push(...projectAnnotationAdvisory(projectDir, claims, { customClaims: paths.claims !== defaultClaimsPath(projectDir) }).notes);
   const thin = thinClaims(claims.claims);
@@ -112,7 +120,7 @@ export function computeStatus({ projectDir, toolVersion, generatedAt = new Date(
   const faultIndex = new Map();
   for (const c of claims.claims) for (const f of c.faults) faultIndex.set(`${c.id}/${f.id}`, { claim: c, fault: f });
 
-  if (changes && changes.uncovered.length > 0) {
+  if (!only && changes && changes.uncovered.length > 0) {
     const u = changes.uncovered[0];
     doc.state = 'unclaimed-changes';
     doc.next = { action: 'claim', command: u.suggestion, why: unclaimedWhy(), file: u.file };
@@ -152,10 +160,11 @@ export function computeStatus({ projectDir, toolVersion, generatedAt = new Date(
   }
   doc.paths.evidence = rel(evidenceFile);
   doc.evidenceSource = evidenceOverride ? 'provided' : 'local';
-  const evidence = readSpecDoc('evidence', evidenceFile);
+  const fullEvidence = readSpecDoc('evidence', evidenceFile);
+  const evidence = only ? { ...fullEvidence, records: fullEvidence.records.filter((r) => only.includes(r.claim.id)) } : fullEvidence;
   // Offline status cannot collect native runner/configuration membership.
   // Only reuse the selection; a saved pass is never current freshness proof.
-  if (evidence.originPolicy) doc.originPolicy = evaluateOriginPolicy({ claims, evidence, eligibleKinds: evidence.originPolicy.eligibleKinds, fresh: false });
+  if (!only && evidence.originPolicy) doc.originPolicy = evaluateOriginPolicy({ claims, evidence, eligibleKinds: evidence.originPolicy.eligibleKinds, fresh: false });
   // A verdict is about a commit. When the evidence describes a different one,
   // say both: "looks right and is not" is the failure mode this prevents.
   doc.evidenceHead = evidence.run.repo.snapshot ?? evidence.run.repo.head;
@@ -309,7 +318,7 @@ export function computeStatus({ projectDir, toolVersion, generatedAt = new Date(
   } else {
     doc.next = { action: 'none', command: 'testguard probe', why: unprovenTotal ? `${unprovenTotal} baselined finding${unprovenTotal === 1 ? '' : 's'} remain; nothing new. Re-probe after changing code, tests or claims.` : 'Every claim is defended. Re-probe after changing code, tests or claims; add a claim for every new invariant.' };
   }
-  if (needsClaimExpansion(doc.surface)) {
+  if (!only && needsClaimExpansion(doc.surface)) {
     const candidate = doc.surface.rankedUnclaimed[0];
     doc.next = {
       action: 'claim',

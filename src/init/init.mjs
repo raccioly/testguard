@@ -126,9 +126,9 @@ function readSettings(settingsPath) {
   try {
     settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
   } catch (e) {
-    throw new PreconditionError(`${settingsPath} is not valid JSON (${e.message}); fix it before init can add the hook. Nothing was written.`);
+    throw new PreconditionError(`${settingsPath} is not valid JSON (${e.message}); fix it before init can add the hook. Nothing was written.`, 'init-settings');
   }
-  const refuse = (what) => { throw new PreconditionError(`${settingsPath}: ${what}; fix it before init can add the hook. Nothing was written.`); };
+  const refuse = (what) => { throw new PreconditionError(`${settingsPath}: ${what}; fix it before init can add the hook. Nothing was written.`, 'init-settings'); };
   if (!isPlainObject(settings)) refuse('the settings must be a JSON object');
   if (settings.hooks !== undefined && !isPlainObject(settings.hooks)) refuse('"hooks" must be an object');
   if (settings.hooks?.SessionStart !== undefined && !Array.isArray(settings.hooks.SessionStart)) refuse('"hooks.SessionStart" must be an array');

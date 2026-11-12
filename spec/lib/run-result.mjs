@@ -49,6 +49,10 @@ export function runErrors(run) {
 
   if (scope.requestedClaims && scope.requestedCount !== scope.requestedClaims.length) errors.push({ path: '/run/scope/requestedCount', message: 'requestedCount must equal requestedClaims.length' });
   if (scope.probedCount !== scope.probedClaims.length) errors.push({ path: '/run/scope/probedCount', message: 'probedCount must equal probedClaims.length' });
+  if (scope.state !== undefined && !measured) errors.push({ path: '/run/scope/state', message: 'only a measured run has a state of its own: an invocation that probed nothing has no selection to describe' });
+  const target = scope.next?.target;
+  if (target && !scope.probedClaims.includes(target.claimId)) errors.push({ path: '/run/scope/next/target/claimId', message: `the selection's next action names ${target.claimId}, which this invocation did not probe: a claim outside the selection belongs to the whole file's next, not the selection's` });
+  if (scope.state === 'unclaimed-changes' || scope.state === 'no-claims') errors.push({ path: '/run/scope/state', message: `${scope.state} describes the whole file or change; a selection of claims cannot be in it` });
   const requested = scope.requestedClaims ? new Set(scope.requestedClaims) : null;
   if (requested && scope.probedClaims.some((id) => !requested.has(id))) errors.push({ path: '/run/scope/probedClaims', message: 'every probed claim must have been requested' });
 

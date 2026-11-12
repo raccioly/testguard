@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ClaimsError } from './claims/load.mjs';
 import { PreconditionError } from './probe/worktree.mjs';
+import { UsageError, errorDocument } from './probe/precondition-error.mjs';
 import { resolveScratchDir, withScratchBase } from './scratch-dir.mjs';
 import { RUNNER_NAMES } from './probe/runners/index.mjs';
 import { GitError } from './git.mjs';
@@ -222,7 +223,27 @@ export function commandUsage(command) {
   return `${lines[0]}\n\n${overview}\n\n${sections.join('\n').trim()}\n\nCommon: ${common}\nExample: testguard ${examples[command] ?? `${command}${command === 'mcp' ? '' : ' .'}`}\n`;
 }
 
+/**
+ * Under --json a refusal is one `error` document on stdout (error.schema.json),
+ * whatever stopped the run, and the human message stays on stderr. A command
+ * that already wrote its own document for the refusal (an undetermined
+ * --changed writes the status document) is not given a second one: stdout is
+ * one JSON value.
+ */
 export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n'), err: (s) => process.stderr.write(s + '\n') }) {
+  let wrote = false;
+  const errLines = [];
+  const seen = { json: argv.includes('--json') };
+  const wrapped = { out: (s) => { wrote = true; io.out(s); }, err: (s) => { errLines.push(s); io.err(s); } };
+  const code = await dispatch(argv, wrapped, seen);
+  if (seen.json && (code === 2 || code === 3) && !wrote) {
+    const classified = seen.error ?? { kind: code === 3 ? 'usage' : 'refused', message: errLines[0] ?? 'refused', exitCode: code };
+    io.out(JSON.stringify(errorDocument(classified, { version: VERSION }), null, 2));
+  }
+  return code;
+}
+
+async function dispatch(argv, io, seen) {
   let parsed;
   try {
     parsed = parseArgs({
@@ -302,6 +323,7 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
     return 3;
   }
   const { values, positionals } = parsed;
+  seen.json = values.json && positionals[0] !== 'mcp'; // mcp's stdout is its protocol stream
   if (values.version) {
     io.out(VERSION);
     return 0;
@@ -370,6 +392,11 @@ export async function main(argv, io = { out: (s) => process.stdout.write(s + '\n
     const scratchBase = SCRATCH_COMMANDS.has(command) ? resolveScratchDir(values['scratch-dir']) : undefined;
     return await withScratchBase(scratchBase, () => handler({ projectDir, file: dirArg, files: positionals.slice(1), values, suppliedOptions, version: VERSION }, io));
   } catch (e) {
+    seen.error = e;
+    if (e instanceof UsageError) {
+      io.err(e.message);
+      return 3;
+    }
     if (e instanceof ClaimsError || e instanceof PreconditionError || e instanceof GitError || e instanceof SpecDocError) {
       io.err(`error: ${e.message}`);
       return 2;

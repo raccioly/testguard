@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The self-probe cost gate no longer credits a runner that slowed down
+  mid-run.** When the reference medians before and after the probe differ by
+  more than `reference.maxDrift`, the speed factor is the faster reading, not the
+  mean (170 ms then 320 ms turned 4588 normalized seconds into 3184 and passed a
+  3600 ceiling). A stable run keeps the mean, and the output names the reading.
+- **The cost reference is only valid on the runner class its baseline was taken
+  on.** `testguard.cost-budget.json` records `reference.cpus` and
+  `reference.platform`, `measure-reference.mjs` records the same for each
+  measurement, and `check-cost-budget.mjs` fails closed with
+  `reference-runner-mismatch` when they differ.
+- **SIGTERM exits 143, not 130.** SIGINT stays 130 and SIGHUP is 129 (128 plus
+  the signal number). Each prints `interrupted by <signal>; scratch trees
+  removed` once on stderr, and the cleanup is the same.
+- **Incompatible flags are exit 3 whatever the repository holds.**
+  `probe --include-dirty --in-place` exited 2 (a precondition) while every other
+  pair exited 3, the documented usage code; it, `--include-dirty --ref` and
+  `--ref --in-place` are now refused before the claims file or the repository
+  is read. Conditions that depend on the tree (no commits, an unresolvable ref,
+  uncommitted fault targets) stay exit 2.
+- **`--json` is one shape on every refusal.** `probe --json --claims /missing`,
+  `--typecheck` on a tree that fails the check, a repository with no commits and
+  every other exit 2, and every exit 3, now write one `error` document
+  (`{schemaVersion, tool, error: {kind, message, exitCode}}`) to stdout; the
+  message stays on stderr. Before, most of them wrote nothing to stdout, while
+  an unresolvable `--changed` ref wrote a status document (it still does: read
+  `error` first). Every `PreconditionError` now carries a kind from a closed
+  set and the build rejects one without it. New schema `error.schema.json`.
+- **A `--claim` or `--changed` run no longer tells you to repair a claim you did
+  not select.** The status header is about the whole claims file and stays so;
+  `run.scope.state` and `run.scope.next` are new and describe the selection
+  alone, and the human output leads with a `scope:` line, then a `rest of the
+  file:` line when the whole file says something different. Spec change:
+  `status.schema.json`, `GATE-SEMANTICS.md`, the validator, a conformance
+  example and three invalid ones.
+
 ## [0.22.1] - 2026-11-11
 
 Automated weekly release — everything merged since `v0.22.0`.

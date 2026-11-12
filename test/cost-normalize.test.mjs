@@ -7,7 +7,8 @@ import { median, assessReference, referenceFrom, normalize, checkCostBudget, ren
 // workload is timed immediately before and after the probe; its median, against
 // a recorded baseline, is the runner's speed factor.
 const BASELINE = 1000;
-const ref = (beforeMs, afterMs = beforeMs, extra = {}) => ({ beforeMs, afterMs, baselineMs: BASELINE, ...extra });
+const CLASS = { cpus: 4, platform: 'linux' };
+const ref = (beforeMs, afterMs = beforeMs, extra = {}) => ({ beforeMs, afterMs, baselineMs: BASELINE, runner: { baseline: CLASS, before: CLASS, after: CLASS }, ...extra });
 const report = (totalSeconds, claims = [], extra = {}) => ({ totalMs: totalSeconds * 1000, claims, reusedRecords: 0, ...extra });
 const claim = (claimId, seconds) => ({ claimId, ms: seconds * 1000, runs: 6 });
 const CEILING = { budgetSeconds: 3000, perClaimSeconds: 100 };
@@ -129,11 +130,11 @@ describe('checkCostBudget with a reference', () => {
   });
 
   it('a low-confidence run that is over the ceiling fails and says which, while one under it passes with the warning', () => {
-    const drifting = ref(900, 1600); // factor 1.25, drift 1.78
+    const drifting = ref(900, 1600); // drift 1.78: read at the faster 900 ms, factor 0.9 (the mean would be 1.25)
     const over = checkCostBudget(report(4000), { ...CEILING, reference: drifting });
     expect(over.ok).toBe(false);
     expect(over.failures).toEqual(['over-budget', 'low-confidence-over-ceiling']);
-    const under = checkCostBudget(report(3000), { ...CEILING, reference: drifting });
+    const under = checkCostBudget(report(2500), { ...CEILING, reference: drifting });
     expect(under).toMatchObject({ ok: true, failures: [] });
     expect(under.reference.lowConfidence).toBe(true);
   });
@@ -217,7 +218,7 @@ describe('referenceFrom', () => {
   const budget = { workload: 'w1', baselineMs: 1000, factorRange: [0.8, 1.5], maxDrift: 1.2 };
   it('takes the two medians and the baseline, range and drift limit from the budget file', () => {
     expect(referenceFrom({ before: { workload: 'w1', medianMs: 900 }, after: { workload: 'w1', medianMs: 1100 }, budget }))
-      .toEqual({ beforeMs: 900, afterMs: 1100, baselineMs: 1000, factorRange: [0.8, 1.5], maxDrift: 1.2 });
+      .toEqual({ beforeMs: 900, afterMs: 1100, baselineMs: 1000, runner: { baseline: { cpus: undefined, platform: undefined }, before: { cpus: undefined, platform: undefined }, after: { cpus: undefined, platform: undefined } }, factorRange: [0.8, 1.5], maxDrift: 1.2 });
   });
 
   it('drops a measurement of a different workload than the baseline was taken with, which then reads as missing', () => {

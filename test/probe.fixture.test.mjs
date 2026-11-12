@@ -273,6 +273,9 @@ describe('probe reproduces the known-answer fixture', () => {
         requestedCount: 2,
         probedClaims: ['REDACT-002', 'REDACT-003'],
         probedCount: 2,
+        // The selection's own answer (the top-level state is the whole file's).
+        state: expect.any(String),
+        next: expect.objectContaining({ action: expect.any(String) }),
       });
       expect(out.cost.records).toBe(2);
       expect(out.run.reuse.reused + out.run.reuse.measured).toBe(2);

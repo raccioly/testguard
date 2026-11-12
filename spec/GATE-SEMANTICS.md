@@ -1105,6 +1105,19 @@ the requested and actually probed claim ids and counts. Commands whose
 `--claim` is singular (`scaffold` and `admit`) reject repeated or comma-separated
 values instead of silently choosing one.
 
+A scoped run (`--claim` or `--changed`) that measured claims carries two
+answers. The document's `state` and `next` describe the whole claims file, as
+they do for `status`: an invalid anchor on a claim the invocation did not select
+is true of the file and stays visible there. `run.scope.state` and
+`run.scope.next` describe the selection alone: the same state machine over only
+the probed claims, their anchors and their evidence, with everything that
+belongs to the rest of the file (`unclaimed-changes`, `no-claims`, the claimed
+surface, the origin policy) left out. Either both are present or neither. The
+validator refuses a scoped `next` whose `target` is a claim the invocation did
+not probe, a scoped state of `unclaimed-changes` or `no-claims`, and a scoped
+state on an invocation that measured nothing. Human output leads with the scoped
+line and names the whole-file line only when it differs.
+
 ## Probing a change
 
 `probe --changed <ref>` measures only the claims a change can have affected.
@@ -1228,6 +1241,10 @@ evidence; they simply do not turn CI red.
 | `2` | Precondition failed (or, with `probe --partial-on-budget`, the command budget ran out and the measured part holds nothing that gates: `run.failureKind` `incomplete`; or, for `probe --changed`, the change could not be measured, or selected nothing under `--fail-on-empty-selection`): test runner not resolvable (e.g. no `node_modules` linked into the scratch worktree), working tree dirty for a fault target file, claims file invalid, no commits. Nothing was probed. |
 | `3` | Usage or configuration error. |
 
+A command interrupted by a signal exits `128` plus the signal number (SIGINT
+`130`, SIGTERM `143`, SIGHUP `129`) after stopping its runners and removing its
+scratch trees, and publishes nothing.
+
 A tool must never exit `0` because it had nothing to check. If the claims
 file is empty or every claim is out of scope, that is reported explicitly and
 the exit code is `2`.
@@ -1239,6 +1256,29 @@ output is the existing `no-claims` status document, without run metadata;
 it never reports a clean measurement. Missing or invalid claims still fail,
 and selected claims cannot be silently skipped. Run `gate` separately to
 enforce coverage of changed files during adoption. Integrations must opt in.
+
+### Refusals under `--json`
+
+A refusal is one JSON value on stdout whatever stopped the run. Under `--json`,
+every exit `2` and every exit `3` writes an `error` document
+(`error.schema.json`: `{schemaVersion, tool, error: {kind, message, exitCode}}`)
+and keeps the human message on stderr; a refusal that produced no document
+before it, whether thrown or reported by a command that returned the code, is
+never an empty stdout. `exitCode` is `3` exactly when `kind` is `usage`.
+A command that already writes a document for the refusal is not given a second
+one: an undetermined `probe --changed` writes the status document with
+`run.exitCode: 2` and `run.scope.changed.outcome: "undetermined"`. A reader
+checks for `error` first; when it is present nothing was measured.
+
+`usage` (exit 3) is a request that is wrong whatever the repository holds: a bad
+value, an unknown option, flags that cannot be combined (`--include-dirty` with
+`--in-place`, `--ref` with `--in-place`, `--fault-workers` above 1 with
+`--in-place`). A condition that depends on the tree is a precondition (exit 2).
+Exit-2 kinds are `claims-file`, `git`, `spec-document`, `refused` (a command
+declined and said why on stderr), `internal` (a defect in testguard) and the
+precondition kinds named in `PRECONDITION_KINDS`
+(`src/probe/precondition-error.mjs`): every `PreconditionError` carries one, and
+the build refuses a throw site without it.
 
 ### Explicit declared-origin policy result contract
 

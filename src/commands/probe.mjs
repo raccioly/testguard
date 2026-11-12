@@ -17,7 +17,7 @@ import { readNativeTestUniverse } from '../probe/universe.mjs';
 import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
 import { runnerOptions } from './runner-options.mjs';
 import { parseFaultWorkers } from '../probe/fan-out.mjs';
-import { selectByChange, measuredScope, renderNoSelection, renderUnmatched } from './probe-scope.mjs';
+import { selectByChange, measuredScope, renderNoSelection, renderUnmatched, scopedView, renderScopedView } from './probe-scope.mjs';
 import { claimResults } from '../probe/claim-results.mjs';
 import { partialExit, partialEvidencePath, isNotReached } from '../probe/partial-budget.mjs';
 export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
@@ -69,6 +69,27 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   }
   if (faultWorkers > 1 && values['in-place']) {
     io.err('--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place');
+    return 3;
+  }
+  // Flag combinations that are wrong whatever the repository holds, refused before the claims file or the repository is read.
+  if (values['in-place'] && values.ref !== undefined) {
+    io.err('--ref needs a scratch worktree; drop --in-place');
+    return 3;
+  }
+  if (values['include-dirty'] && values['in-place']) {
+    io.err('--include-dirty applies to worktree mode; drop --in-place');
+    return 3;
+  }
+  if (values['include-dirty'] && values.ref !== undefined) {
+    io.err('--include-dirty snapshots the working tree; it cannot be combined with --ref');
+    return 3;
+  }
+  if (values.changed !== undefined && (values.ref !== undefined || values['in-place'])) {
+    io.err('--changed selects against the tree being probed, so it cannot be combined with --ref or --in-place');
+    return 3;
+  }
+  if (values['fail-on-empty-selection'] && values.changed === undefined) {
+    io.err('--fail-on-empty-selection needs --changed <ref>: only a change-based selection can come up empty');
     return 3;
   }
   const commandBudgetMs = parseCommandBudget(values['command-budget']);
@@ -125,14 +146,6 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   const requested = claimSelection(values.claim);
   if (requested?.length === 0) {
     io.err('--claim must name at least one claim id');
-    return 3;
-  }
-  if (values['fail-on-empty-selection'] && values.changed === undefined) {
-    io.err('--fail-on-empty-selection needs --changed <ref>: only a change-based selection can come up empty');
-    return 3;
-  }
-  if (values.changed !== undefined && (values.ref !== undefined || values['in-place'])) {
-    io.err('--changed selects against the tree being probed, so it cannot be combined with --ref or --in-place');
     return 3;
   }
   let only = requested;
@@ -251,6 +264,13 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   const incomplete = exhausted ? partialExit({ newGating: g.new.length, policyFailed: weak?.state === 'failed' }) : undefined;
   const exitCode = incomplete ? incomplete.exitCode : policy?.state === 'unavailable' ? 2 : policy?.state === 'failed' || weak?.state === 'failed' || g.new.length > 0 ? 1 : 0;
   const scope = measuredScope({ requested, changed: changedScope, records: evidence.records });
+  const statusPaths = {
+    claims: values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir),
+    evidence: outPath, provisional: provisionalEvidencePath(projectDir),
+    baseline: values.baseline ? resolve(values.baseline) : baselinePath(projectDir),
+  };
+  // The status header is about the whole claims file. A scoped run also says what is true of the selection alone.
+  const view = scope ? scopedView({ probedClaims: scope.probedClaims, projectDir, toolVersion: version, includeDirty: values['include-dirty'], evidence: outPath, paths: statusPaths }) : undefined;
   if (values.json) {
     const status = withChangedRef(resolveChangedRef({ explicit: values.changed, projectDir }), (changedRef) => computeStatus({
       projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'], evidence: outPath,
@@ -260,7 +280,7 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
         baseline: values.baseline ? resolve(values.baseline) : baselinePath(projectDir),
       },
     }), io.err);
-    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode, ...(evidence.run.reuse ? { reuse: evidence.run.reuse } : {}), ...(policy ? { originPolicy: policy } : {}), ...(weak ? { assertionPolicy: weak } : {}), ...(scope ? { scope } : {}), ...(evidence.run.budget ? { budget: evidence.run.budget } : {}), ...(incomplete ? { failureKind: incomplete.failureKind, ...(incomplete.unprovenAtLeast !== undefined ? { unprovenAtLeast: incomplete.unprovenAtLeast } : {}) } : {}), claims: claimResults(evidence.records) }, ...(values.cost ? { cost: costReport(evidence.records, { run: evidence.run }) } : {}) };
+    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode, ...(evidence.run.reuse ? { reuse: evidence.run.reuse } : {}), ...(policy ? { originPolicy: policy } : {}), ...(weak ? { assertionPolicy: weak } : {}), ...(scope ? { scope: { ...scope, state: view.state, next: view.next } } : {}), ...(evidence.run.budget ? { budget: evidence.run.budget } : {}), ...(incomplete ? { failureKind: incomplete.failureKind, ...(incomplete.unprovenAtLeast !== undefined ? { unprovenAtLeast: incomplete.unprovenAtLeast } : {}) } : {}), claims: claimResults(evidence.records) }, ...(values.cost ? { cost: costReport(evidence.records, { run: evidence.run }) } : {}) };
     const result = validate('status', doc);
     if (!result.ok) throw new Error(`probe JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
     io.out(JSON.stringify(doc, null, 2));
@@ -272,6 +292,11 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     for (const r of sortForReport(evidence.records).filter((x) => x.verdict !== 'killed')) io.out('  ' + tag(r) + renderRecord(r, { provisional }));
   }
   io.out('');
+  if (scope && !values.quiet) {
+    const whole = computeStatus({ projectDir, toolVersion: version, includeDirty: values['include-dirty'], evidence: outPath, paths: statusPaths });
+    for (const line of renderScopedView(scope, view, whole)) io.out(line);
+    io.out('');
+  }
   if (!values.quiet && !values.verbose) {
     const killed = evidence.records.filter((r) => r.verdict === 'killed').length;
     if (killed) io.out(`  ${killed} killed (not listed; --verbose to see them)`);
