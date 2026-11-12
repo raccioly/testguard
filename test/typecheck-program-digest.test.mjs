@@ -40,20 +40,5 @@ describe('the program digest', () => {
     expect(again.records[0]).toMatchObject({ verdict: 'fault-invalid', detail: { typecheck: 'diagnostics' } });
   }, 180_000);
 
-  it('checks 0.24.0 evidence (no digest) fault by fault once; the next run needs no check', async () => {
-    const dir = stubProject();
-    const first = await runProbe(dir, { only: ['AFTER'], typecheck: '' });
-    const old = structuredClone(first);
-    delete old.run.typecheck.programDigest;
-    let log = logIn(dir);
-    const second = await runProbe(dir, { only: ['AFTER'], typecheck: '', previous: old });
-    expect(second.run.reuse).toEqual({ reused: 1, measured: 0 });
-    expect(checks(log)).toBe(2); // the baseline and the fault, once
-    expect(second.run.typecheck.programDigest).toBe(first.run.typecheck.programDigest);
-    log = logIn(dir);
-    const third = await runProbe(dir, { only: ['AFTER'], typecheck: '', previous: second });
-    expect(third.run.reuse).toEqual({ reused: 1, measured: 0 });
-    expect(checks(log)).toBe(1);
-  }, 180_000);
 
 });

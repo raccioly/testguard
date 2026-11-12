@@ -11409,8 +11409,7 @@
             "by": "claude"
           },
           "defendedBy": [
-            "test/typecheck-reuse-program.test.mjs",
-            "test/typecheck-program-digest.test.mjs"
+            "test/typecheck-digest-fallback.test.mjs"
           ]
         }
       ]
