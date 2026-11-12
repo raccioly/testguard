@@ -4,6 +4,13 @@
   "entries": [
     {
       "kind": "path",
+      "pattern": "test/typecheck-reuse-program.test.mjs",
+      "reason": "Stub-compiler acceptance for reuse across a program change (#236, #293): two probes of a generated project per case. Mandatory in npm test and CI. Since #293 the rule it exercises is claimed by TG-TYPECHECK-PROGRAM-DIGEST-VOUCHES (fast pure defender test/typecheck-digest-pure.test.mjs, probe-level test/typecheck-program-digest.test.mjs) and TG-TYPECHECK-IS-RECORDED-AND-RECHECKED-ON-REUSE (test/typecheck-digest-fallback.test.mjs); naming this file too would put those claims over the per-claim cost ceiling.",
+      "by": "claude",
+      "at": "2026-11-12T19:00:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/converge-sequence.test.mjs",
       "reason": "Real-CLI acceptance for convergence (#293): nine sequences of full and scoped probes on a generated project (a tool-version change, an undetermined scope, a provisional and a --no-reuse run, a concurrent writer, the assertion policy over carried kills, status and baseline agreeing on a kept record), about forty seconds in total. Mandatory in npm test and CI. The claims TG-SCOPED-PROBE-CONVERGES, TG-CARRY-NEEDS-UNCHANGED-INPUTS, TG-CONVERGED-EVIDENCE-CONFORMS and TG-BASELINE-REFUSES-STALE-CARRIED name the fast defenders test/converge.test.mjs and spec/conformance/convergence.test.mjs, and TG-CONVERGED-PROBE-ENDS-FRESH the one-sequence test/converge-cli.test.mjs; naming this file as a self-probe defender would pay for nested probes on every fault.",
       "by": "claude",
