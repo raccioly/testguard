@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The unit suite runs as three shards in CI (repository only).** Each Node
+  leg runs `vitest run --shard=i/3` as a matrix, each shard with its own
+  duration budget and a failure when it runs no test file. `static (N)` holds
+  the once-per-Node checks; `checks (22)`, `test (20)` and `test (24)` gather a
+  version's shards and static job from the run's job list, so the required check
+  names are unchanged. `npm test` is unchanged for local use.
+
 ### Fixed
 
 <<<<<<< HEAD
