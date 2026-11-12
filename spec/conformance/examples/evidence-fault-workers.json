@@ -31,12 +31,18 @@
       "runnerMs": 3089.2106239999994,
       "overheadMs": 801.5375010000007,
       "runnerInvocations": 20,
-      "reuseBaselineRuns": 0
+      "reuseBaselineRuns": 0,
+      "aloneConfirmRuns": 1,
+      "aloneConfirmMs": 412,
+      "remeasuredFaults": 1,
+      "remeasureMs": 1310
     },
     "workers": 1,
     "serial": true,
     "faultWorkers": 3,
-    "mode": "worktree"
+    "mode": "worktree",
+    "faultWorkersSource": "auto",
+    "cpus": 8
   },
   "records": [
     {
@@ -127,7 +133,8 @@
               "failed": 1
             },
             "assertionFailures": 1,
-            "durationMs": 343
+            "durationMs": 343,
+            "alone": true
           }
         ],
         "flakeRate": {
@@ -366,7 +373,8 @@
               "failed": 1
             },
             "assertionFailures": 1,
-            "durationMs": 349
+            "durationMs": 349,
+            "alone": true
           },
           {
             "outcome": "fail",
@@ -376,7 +384,8 @@
               "failed": 1
             },
             "assertionFailures": 1,
-            "durationMs": 344
+            "durationMs": 344,
+            "alone": true
           },
           {
             "outcome": "fail",
@@ -386,7 +395,8 @@
               "failed": 1
             },
             "assertionFailures": 1,
-            "durationMs": 346
+            "durationMs": 346,
+            "alone": true
           }
         ],
         "flakeRate": {

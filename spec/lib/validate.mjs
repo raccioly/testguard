@@ -220,6 +220,20 @@ const semantic = {
     // One mutable tree cannot hold two faults at once: a fan-out is only ever
     // measured in scratch worktrees.
     if (doc.run.faultWorkers > 1 && doc.run.mode === 'in-place') errors.push({ path: '/run/faultWorkers', message: 'a fault fan-out needs scratch worktrees; in-place runs probe one fault at a time' });
+    // How the fan-out width was chosen (#270). Auto is a property of the
+    // machine, so it records the machine's number; one fault at a time by
+    // request or by --in-place records no fan-out.
+    const source = doc.run.faultWorkersSource;
+    if (source === 'auto' && doc.run.cpus === undefined) errors.push({ path: '/run/cpus', message: 'an automatic fault-worker count records the CPUs it was derived from' });
+    if (doc.run.cpus !== undefined && source !== 'auto') errors.push({ path: '/run/cpus', message: 'cpus is recorded only for an automatic fault-worker count' });
+    if ((source === 'serial' || source === 'in-place') && doc.run.faultWorkers !== undefined) errors.push({ path: '/run/faultWorkers', message: `faultWorkersSource ${source} means one fault at a time` });
+    if (source === 'in-place' && doc.run.mode !== 'in-place') errors.push({ path: '/run/faultWorkersSource', message: 'faultWorkersSource in-place requires mode in-place' });
+    const fanOut = doc.run.faultWorkers > 1;
+    if (!fanOut && doc.run.measurements) {
+      for (const key of ['aloneConfirmRuns', 'aloneConfirmMs', 'remeasuredFaults', 'remeasureMs']) {
+        if (doc.run.measurements[key] !== undefined) errors.push({ path: `/run/measurements/${key}`, message: `${key} is a cost of the fan-out guard and requires run.faultWorkers above one` });
+      }
+    }
     const injection = isInjection(doc.run);
     const n = doc.run.confirmRuns;
     // N-run agreement is what fault injection means by "confirmed". A method
@@ -424,11 +438,30 @@ const semantic = {
       // describes a run that cannot have happened.
       // A serial re-measure exists only because a fan-out measured the record
       // first; a document without one describes a run that cannot have happened.
-      if (r.detail.baselineRemeasuredSerially && !(doc.run.faultWorkers > 1)) {
+      // A reused record keeps what the run that measured it said; a fan-out
+      // record may be carried into a run of another width (#270).
+      const measuredHere = !r.reusedFrom;
+      if (measuredHere && r.detail.baselineRemeasuredSerially && !(doc.run.faultWorkers > 1)) {
         errors.push({ path: `${p}/detail/baselineRemeasuredSerially`, message: 'baselineRemeasuredSerially requires run.faultWorkers above one' });
       }
-      if (r.detail.remeasuredSerially && !(doc.run.faultWorkers > 1)) {
+      if (measuredHere && r.detail.remeasuredSerially && !(doc.run.faultWorkers > 1)) {
         errors.push({ path: `${p}/detail/remeasuredSerially`, message: 'remeasuredSerially requires run.faultWorkers above one' });
+      }
+      if (measuredHere && r.detail.notParallelSafe && !(doc.run.faultWorkers > 1)) {
+        errors.push({ path: `${p}/detail/notParallelSafe`, message: 'notParallelSafe requires run.faultWorkers above one' });
+      }
+      const runsHere = r.detail.probeRuns ?? [];
+      if (measuredHere && !(doc.run.faultWorkers > 1)) {
+        runsHere.forEach((run, j) => { if (run.alone) errors.push({ path: `${p}/detail/probeRuns/${j}/alone`, message: 'alone marks a run under a fault fan-out; a serial run is alone by definition and records nothing' }); });
+      }
+      // The guard (#270): under a fan-out a kill rests on at least one run
+      // measured with no other fault in flight, and a record measured again
+      // alone, or in a set that is not parallel-safe, rests on nothing else.
+      if (measuredHere && doc.run.faultWorkers > 1 && r.verdict === 'killed' && !runsHere.some((run) => run.alone)) {
+        errors.push({ path: `${p}/detail/probeRuns`, message: 'a kill under a fault fan-out needs at least one probe run measured alone' });
+      }
+      if (measuredHere && doc.run.faultWorkers > 1 && (r.detail.remeasuredSerially || (r.detail.notParallelSafe && r.verdict === 'killed')) && !runsHere.every((run) => run.alone)) {
+        errors.push({ path: `${p}/detail/probeRuns`, message: 'a record measured again alone, or a kill in a set that is not parallel-safe, has every probe run alone' });
       }
       if (r.detail.restoreSkipped && doc.run.mode === 'in-place') {
         errors.push({ path: `${p}/detail/restoreSkipped`, message: 'restoreSkipped cannot occur in in-place mode, where a missing target is raised' });

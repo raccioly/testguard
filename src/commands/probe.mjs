@@ -16,7 +16,8 @@ import { assertionPolicyRequest, evaluateAssertionPolicy, renderAssertionPolicy,
 import { readNativeTestUniverse } from '../probe/universe.mjs';
 import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
 import { runnerOptions } from './runner-options.mjs';
-import { parseFaultWorkers } from '../probe/fan-out.mjs';
+import { resolveFaultWorkers } from '../probe/fan-out.mjs';
+import { availableParallelism } from 'node:os';
 import { selectByChange, measuredScope, renderNoSelection, renderUnmatched, scopedView, renderScopedView } from './probe-scope.mjs';
 import { claimResults } from '../probe/claim-results.mjs';
 import { partialExit, partialEvidencePath, isNotReached } from '../probe/partial-budget.mjs';
@@ -62,15 +63,15 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     io.err('--workers must be a positive safe integer');
     return 3;
   }
-  const faultWorkers = parseFaultWorkers(values['fault-workers']);
-  if (faultWorkers === null) {
-    io.err('--fault-workers must be a positive safe integer');
+  // Fast by default (#270): auto from the machine unless the flag, the
+  // environment or the explicit --serial says otherwise. Only the flag the
+  // user typed counts as --serial, never the derived "one runner worker".
+  const fanOut = resolveFaultWorkers({ flag: values['fault-workers'], env: process.env, serial: values.serial === true, inPlace: values['in-place'] === true, cpus: deps.cpus ?? availableParallelism() });
+  if (fanOut.error) {
+    io.err(fanOut.error);
     return 3;
   }
-  if (faultWorkers > 1 && values['in-place']) {
-    io.err('--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place');
-    return 3;
-  }
+  const { faultWorkers } = fanOut;
   // Flag combinations that are wrong whatever the repository holds, refused before the claims file or the repository is read.
   if (values['in-place'] && values.ref !== undefined) {
     io.err('--ref needs a scratch worktree; drop --in-place');
@@ -176,7 +177,11 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   let outPath = values.out ? resolve(values.out) : only ? join(projectDir, '.testguard', 'evidence-partial.json') : provisional ? provisionalEvidencePath(projectDir) : evidencePath(projectDir);
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
   const discoveryNoted = new Set();
-  const previous = !values['no-reuse'] && existsSync(outPath) ? readSpecDoc('evidence', outPath) : undefined;
+  // A partial run (--claim, --changed) also reuses the last full probe's
+  // verdicts: the canonical evidence, under the same reuse rule (#270). That is
+  // what makes the pre-push path cheap.
+  const previousPaths = values['no-reuse'] ? [] : [...new Set([outPath, ...(only ? [evidencePath(projectDir)] : [])])].filter((path) => existsSync(path));
+  const previous = previousPaths.map((path) => readSpecDoc('evidence', path));
   const basePath = values.baseline ? resolve(values.baseline) : baselinePath(projectDir);
   const baseline = existsSync(basePath) ? readSpecDoc('baseline', basePath) : undefined;
 
@@ -189,6 +194,8 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     workers,
     serial: values.serial || workers === 1,
     faultWorkers,
+    faultWorkersSource: fanOut.source,
+    ...(fanOut.cpus !== undefined ? { cpus: fanOut.cpus } : {}),
     commandBudget,
     partialOnBudget,
     mode: values['in-place'] ? 'in-place' : 'worktree',

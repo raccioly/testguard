@@ -81,11 +81,18 @@ describe('probe --partial-on-budget', () => {
       expect(validate('evidence', doc).errors).toEqual([]);
       expect(doc.records.map((r) => r.claim.id)).toEqual(['C1', 'C2', 'C3', 'C4']); // claim/fault order, whatever order they finished in
       const notReached = doc.records.filter((r) => r.detail.reason === 'not-reached-within-budget');
+      // Every one of them may be not reached: a kill measured only beside
+      // other faults is not published until a run alone confirms it (#270),
+      // and the budget ran out before that.
       expect(notReached.length).toBeGreaterThanOrEqual(1);
-      expect(notReached.length).toBeLessThan(4);
+      expect(notReached.length).toBeLessThanOrEqual(4);
       for (const record of doc.records) {
         if (record.detail.reason === 'not-reached-within-budget') expect(record.detail.probeRuns).toEqual([]);
-        else { expect(record.verdict).toBe('killed'); expect(record.detail.probeRuns).toHaveLength(3); }
+        else {
+          expect(record.verdict).toBe('killed');
+          expect(record.detail.probeRuns).toHaveLength(3);
+          expect(record.detail.probeRuns.some((run) => run.alone)).toBe(true);
+        }
       }
       expect(doc.run.budget.exhausted).toBe(true);
       expect(doc.run.budget.notReached).toBe(notReached.length);
@@ -189,7 +196,7 @@ describe('probe --partial-on-budget', () => {
 });
 
 describe('probe --partial-on-budget through the command', () => {
-  const baseValues = { confirm: '3', budget: String(LIMIT), workers: '1', runner: 'node-test', severity: 'low', json: true, quiet: true, progress: 'none', 'no-escalate': true, 'no-reuse': true, 'command-budget': String(LIMIT), 'partial-on-budget': true };
+  const baseValues = { confirm: '3', budget: String(LIMIT), workers: '1', 'fault-workers': '1', runner: 'node-test', severity: 'low', json: true, quiet: true, progress: 'none', 'no-escalate': true, 'no-reuse': true, 'command-budget': String(LIMIT), 'partial-on-budget': true };
 
   async function run(project, extra, startingFault, onTree) {
     const { budgetOptions, onStage, peak } = (() => {
