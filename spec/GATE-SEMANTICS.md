@@ -1287,14 +1287,16 @@ it never probes nothing, and it never exits 2 for a base it chose itself; an
 explicit `--changed <ref>` that does not resolve still does. A branch literally
 named `auto` is written `refs/heads/auto`.
 
-Two flags change what no base means (#293), both only with `--changed auto`:
-`--no-full-fallback` refuses (exit 2, error kind `no-base`), and
-`--skip-without-base` probes nothing, writes nothing, prints one line saying
-why and what to run, and exits 0. The pre-push block passes
-`--skip-without-base`: a git hook never starts a full probe, which on a large
-project takes hours; the CI job and the nightly full probe are the gate. A
-skipped run has no document, so `--skip-without-base` is refused with `--json`
-(exit 3).
+`--when-no-base <full|skip|fail>` says what no resolvable base means (#293);
+it is valid only with `--changed auto`. `full` (the default) is the behavior
+above. `skip` probes nothing, writes nothing, prints one line saying why and
+what to run, and exits 0. `fail` refuses (exit 2, error kind `no-base`). The
+pre-push block passes `--when-no-base skip`: a git hook never starts a full
+probe, which on a large project takes hours; the CI job and the nightly full
+probe are the gate. The option governs only a base that could not be found: a
+base that was found or named but cannot be measured (it does not resolve, no
+merge base, git failed) and any runner failure still exit 2 and fail the push.
+A skipped run has no document, so `skip` is refused with `--json` (exit 3).
 
 A claim is **selected** when any of those paths is one of: a fault's target; a
 defender, whether the claim names it (`defendedBy`, literally or by glob) or

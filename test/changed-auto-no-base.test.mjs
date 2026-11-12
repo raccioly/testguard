@@ -1,7 +1,7 @@
 // #293 part 3: the pre-push hook never starts a full probe. With no base to
-// compare against, `--skip-without-base` (what the hook passes) probes nothing,
-// says why in one line and exits 0; `--no-full-fallback` refuses (exit 2, kind
-// no-base); without either, the first line says every claim is probed.
+// compare against, `--when-no-base skip` (what the hook passes) probes nothing,
+// says why in one line and exits 0; `fail` refuses (exit 2, kind no-base);
+// `full`, the default, says first that every claim is probed.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.setConfig({ testTimeout: 60_000 });
@@ -33,24 +33,24 @@ const run = async (args) => {
 };
 
 describe('--changed auto with no base', () => {
-  it('--skip-without-base probes nothing, says why and what to run in one line, and exits 0', async () => {
+  it('--when-no-base skip probes nothing, says why and what to run in one line, and exits 0', async () => {
     const p = noBase();
-    const r = await run(['probe', p.dir, '--runner', 'node-test', '--changed', 'auto', '--skip-without-base', '--quiet']);
+    const r = await run(['probe', p.dir, '--runner', 'node-test', '--changed', 'auto', '--when-no-base', 'skip', '--quiet']);
     expect(r.code).toBe(0);
     expect(r.err).toHaveLength(1);
     expect(r.err[0]).toMatch(/no base to compare against.*nothing was probed.*testguard probe --changed <base-branch>/);
     expect(existsSync(join(p.dir, '.testguard'))).toBe(false);
   });
 
-  it('--no-full-fallback refuses with kind no-base', async () => {
+  it('--when-no-base fail refuses with kind no-base', async () => {
     const p = noBase();
-    const r = await run(['probe', p.dir, '--runner', 'node-test', '--changed', 'auto', '--no-full-fallback', '--json']);
+    const r = await run(['probe', p.dir, '--runner', 'node-test', '--changed', 'auto', '--when-no-base', 'fail', '--json']);
     expect(r.code).toBe(2);
     expect(JSON.parse(r.out).error.kind).toBe('no-base');
     expect(existsSync(join(p.dir, '.testguard'))).toBe(false);
   });
 
-  it('without either, its first line says there is no base and every claim is probed', async () => {
+  it('by default (full), its first line says there is no base and every claim is probed', async () => {
     const p = noBase();
     const r = await run(['probe', p.dir, '--runner', 'node-test', '--changed', 'auto', '--quiet']);
     expect(r.code).toBe(0);
@@ -58,17 +58,18 @@ describe('--changed auto with no base', () => {
     expect(existsSync(join(p.dir, '.testguard', 'evidence.json'))).toBe(true);
   });
 
-  it('both flags need --changed auto, and the skip has no JSON form', async () => {
+  it('the option needs --changed auto and one of its three values, and skip has no JSON form', async () => {
     const p = noBase();
-    expect((await run(['probe', p.dir, '--skip-without-base'])).code).toBe(3);
-    expect((await run(['probe', p.dir, '--changed', 'HEAD', '--no-full-fallback'])).code).toBe(3);
-    expect((await run(['probe', p.dir, '--changed', 'auto', '--skip-without-base', '--json'])).code).toBe(3);
+    expect((await run(['probe', p.dir, '--when-no-base', 'skip'])).code).toBe(3);
+    expect((await run(['probe', p.dir, '--changed', 'HEAD', '--when-no-base', 'fail'])).code).toBe(3);
+    expect((await run(['probe', p.dir, '--changed', 'auto', '--when-no-base', 'never'])).code).toBe(3);
+    expect((await run(['probe', p.dir, '--changed', 'auto', '--when-no-base', 'skip', '--json'])).code).toBe(3);
   });
 
   it('a base found but unresolvable is skipped or refused the same way', () => {
     const detected = { ref: 'origin/main', from: 'GITHUB_BASE_REF' };
-    expect(autoChangedDecision(detected, false, { skip: true })).toMatchObject({ skip: true, message: expect.stringMatching(/origin\/main .* does not resolve here.*nothing was probed/) });
-    expect(autoChangedDecision(detected, false, { noFullFallback: true })).toMatchObject({ refuse: true });
-    expect(autoChangedDecision(detected, true, { skip: true, noFullFallback: true })).toMatchObject({ changed: 'origin/main' });
+    expect(autoChangedDecision(detected, false, 'skip')).toMatchObject({ skip: true, message: expect.stringMatching(/origin\/main .* does not resolve here.*nothing was probed/) });
+    expect(autoChangedDecision(detected, false, 'fail')).toMatchObject({ refuse: true });
+    expect(autoChangedDecision(detected, true, 'skip')).toMatchObject({ changed: 'origin/main' });
   });
 });

@@ -103,7 +103,7 @@ export function prePushBlock(dir = '.', { version } = {}) {
   elif command -v testguard >/dev/null 2>&1; then set -- testguard
   else set -- ${fallback}
   fi
-  "$@" probe --changed auto --skip-without-base --quiet
+  "$@" probe --changed auto --when-no-base skip --quiet
 ) || exit 1`);
 }
 

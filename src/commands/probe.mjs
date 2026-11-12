@@ -37,14 +37,19 @@ export const baselinePath = (projectDir) => join(projectDir, '.testguard', 'base
  * shallow CI checkout), is a full probe — never a skip — and the second says
  * how to fix it. `warn` lines are printed even under --quiet.
  */
-export function autoChangedDecision(detected, resolves, { noFullFallback = false, skip = false } = {}) {
+/** What `--changed auto` does when it can resolve no base (#293): `full` probes every claim, `skip` nothing, `fail` refuses. */
+export const WHEN_NO_BASE = Object.freeze(['full', 'skip', 'fail']);
+
+export function autoChangedDecision(detected, resolves, whenNoBase = 'full') {
+  const skip = whenNoBase === 'skip';
+  const noFullFallback = whenNoBase === 'fail';
   if (detected && resolves) return { changed: detected.ref, message: `--changed auto: comparing against ${detected.ref} (${detected.from})`, warn: false };
   const why = detected
     ? `${detected.ref} (${detected.from}) does not resolve here; fetch it (GitHub Actions: actions/checkout with fetch-depth: 0)`
     : 'no base to compare against (no CI base branch, no remote default branch, no upstream)';
   // A hook never starts a full probe (#293): skip, or refuse, and say what to run instead.
   if (skip) return { changed: undefined, skip: true, message: `testguard: --changed auto found ${detected ? 'a base that ' + why : why}, so nothing was probed; CI and the nightly job probe this change. To probe it here: testguard probe --changed <base-branch>` };
-  if (noFullFallback) return { changed: undefined, refuse: true, message: `--changed auto: ${why}, and --no-full-fallback refuses to probe every claim instead; pass --changed <ref>` };
+  if (noFullFallback) return { changed: undefined, refuse: true, message: `--changed auto: ${why}, and --when-no-base fail refuses to probe every claim instead; pass --changed <ref>` };
   if (detected) return { changed: undefined, message: `--changed auto: ${detected.ref} (${detected.from}) does not resolve here, so every claim is probed; fetch it (GitHub Actions: actions/checkout with fetch-depth: 0) to probe only the change`, warn: true };
   return { changed: undefined, message: '--changed auto: no base to compare against (no CI base branch, no remote default branch, no upstream), so every claim is probed', warn: true };
 }
@@ -152,12 +157,17 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     io.err('--changed selects against the tree being probed, so it cannot be combined with --ref or --in-place');
     return 3;
   }
-  if ((values['no-full-fallback'] || values['skip-without-base']) && values.changed !== 'auto') {
-    io.err(`--${values['no-full-fallback'] ? 'no-full-fallback' : 'skip-without-base'} needs --changed auto: only a base TestGuard looks for itself can be missing`);
+  const whenNoBase = values['when-no-base'];
+  if (whenNoBase !== undefined && !WHEN_NO_BASE.includes(whenNoBase)) {
+    io.err(`--when-no-base must be one of ${WHEN_NO_BASE.join(', ')} (got ${whenNoBase})`);
     return 3;
   }
-  if (values['skip-without-base'] && values.json) {
-    io.err('--skip-without-base cannot be combined with --json: a skipped run has no document to print; use --no-full-fallback for a JSON refusal');
+  if (whenNoBase !== undefined && values.changed !== 'auto') {
+    io.err('--when-no-base needs --changed auto: only a base TestGuard looks for itself can be missing');
+    return 3;
+  }
+  if (whenNoBase === 'skip' && values.json) {
+    io.err('--when-no-base skip cannot be combined with --json: a skipped run has no document to print; use --when-no-base fail for a JSON refusal');
     return 3;
   }
   if (values['fail-on-empty-selection'] && values.changed === undefined) {
@@ -226,7 +236,7 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   // CI job need it. Nothing to compare against is a full probe, never a skip.
   if (values.changed === 'auto') {
     const detected = resolveAutoChangedRef({ projectDir });
-    const decision = autoChangedDecision(detected, Boolean(detected && headSha(repoRoot(projectDir), detected.ref)), { noFullFallback: values['no-full-fallback'], skip: values['skip-without-base'] });
+    const decision = autoChangedDecision(detected, Boolean(detected && headSha(repoRoot(projectDir), detected.ref)), whenNoBase ?? 'full');
     // #293: a hook never starts a full probe. No base is a skip (exit 0: CI and
     // the nightly job are the gate) or a refusal, said in one line.
     if (decision.skip) { io.err(decision.message); return 0; }

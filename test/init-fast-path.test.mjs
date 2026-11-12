@@ -23,7 +23,7 @@ describe('the templates are fast and pinned', () => {
   it('the pre-push hook probes the change with automatic workers, never --serial, never a full probe', () => {
     const hook = prePushScript('.', { version: '0.23.0' });
     expect(hook).toMatch(/^#!\/bin\/sh\n/);
-    expect(hook).toMatch(/"\$@" probe --changed auto --skip-without-base --quiet/);
+    expect(hook).toMatch(/"\$@" probe --changed auto --when-no-base skip --quiet/);
     expect(hook).not.toMatch(/--serial|--fault-workers|@latest/);
     expect(hook).toContain('npx -y testguard-cli@0.23.0');
     expect(parseManagedBlocks(hook)).toEqual([expect.objectContaining({ name: 'pre-push', template: TEMPLATE_VERSION, modified: false })]);
@@ -42,7 +42,7 @@ describe('the templates are fast and pinned', () => {
       chmodSync(join(dir, 'node_modules/.bin/testguard'), 0o755);
       const r = spawnSync('sh', ['.githooks/pre-push'], { cwd: dir, encoding: 'utf8' });
       expect(r.status).toBe(0);
-      expect(r.stdout.trim()).toBe("args: probe --changed auto --skip-without-base --quiet");
+      expect(r.stdout.trim()).toBe("args: probe --changed auto --when-no-base skip --quiet");
       // A probe that fails blocks the push.
       writeFileSync(join(dir, 'node_modules/.bin/testguard'), '#!/bin/sh\nexit 1\n');
       expect(spawnSync('sh', ['.githooks/pre-push'], { cwd: dir }).status).toBe(1);
