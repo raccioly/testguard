@@ -45,7 +45,9 @@ const speedDir = mkdtempSync(join(tmpdir(), 'tg-direct-speed-'));
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', timeout: 10000 }).trim();
 // The base commit predates `exceptionFailures`; a kill there was counted wholly in `assertionFailures`. Compare the sum.
-const comparable = ({ durationMs, exceptionFailures, kindNotReported, ...run }) => ({ ...run, assertionFailures: run.assertionFailures + (exceptionFailures ?? 0) });
+// `alone` marks which runs a fan-out measured with nothing else in flight (#270): a
+// property of the schedule, not of the verdict, so it is not compared.
+const comparable = ({ durationMs, exceptionFailures, kindNotReported, alone, ...run }) => ({ ...run, assertionFailures: run.assertionFailures + (exceptionFailures ?? 0) });
 const projection = (record) => ({
   id: record.claim.id + '/' + record.subject.id,
   subject: record.subject,
