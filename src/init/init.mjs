@@ -3,7 +3,7 @@ import { join, dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { PreconditionError } from '../probe/worktree.mjs';
-import { TEMPLATE_VERSION, prePushScript, huskyBlock, githubWorkflow, gitlabCi, installStep, markSkill, skillState, parseManagedBlocks, replaceManagedBlock, scanInstalled, renderFinding } from './managed.mjs';
+import { TEMPLATE_VERSION, prePushBlock, prePushBlockName, githubWorkflow, gitlabCi, installStep, markSkill, skillState, parseManagedBlocks, replaceManagedBlock, scanInstalled, renderFinding } from './managed.mjs';
 
 const TEMPLATES = join(dirname(fileURLToPath(import.meta.url)), 'templates');
 /** The hash of every skill template shipped before template markers: an installed copy matching one is unmodified. */
@@ -353,40 +353,46 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
   }
 
   // ---- the fast path: a pre-push hook, and CI on request (#270) ----
-  const hookPath = join(projectDir, '.testguard', 'hooks', 'pre-push');
   const handled = new Set(); // files whose TestGuard block this run judged itself
+  // A whole file TestGuard owns (CI): written, or rewritten where nobody edited it.
   const refresh = (path, text, label, name) => {
     handled.add(rel(path));
-    if (!existsSync(path)) { write(path, text, { mode: 0o755 }); done.push(label); return; }
+    if (!existsSync(path)) { write(path, text); done.push(label); return; }
     const current = readFileSync(path, 'utf8');
     const block = parseManagedBlocks(current).find((b) => b.name === name);
     if (current === text) { skipped.push(`${rel(path)} is the current template`); return; }
-    if (force || (upgrade && block && !block.modified)) { write(path, text, { mode: 0o755 }); done.push(`${label} (upgraded to template ${TEMPLATE_VERSION})`); return; }
+    if (force || (upgrade && block && !block.modified)) { write(path, text); done.push(`${label} (upgraded to template ${TEMPLATE_VERSION})`); return; }
     if (block && block.template < TEMPLATE_VERSION && !block.modified) outdated.push(`${rel(path)}: template ${block.template}, unmodified — testguard init --upgrade rewrites it`);
     else if (block?.modified) skipped.push(`${rel(path)} was edited by hand (use --force to replace it with the current template)`);
     else skipped.push(`${rel(path)} exists and is not TestGuard's; left alone`);
   };
-  refresh(hookPath, prePushScript(), `${rel(hookPath)}: pre-push → probe --changed auto (fault workers auto; the full probe is the nightly job)`, 'pre-push');
-  const huskyDir = join(agentRoot, '.husky');
-  if (existsSync(huskyDir)) {
-    const huskyPath = join(huskyDir, 'pre-push');
-    const block = huskyBlock(dir);
-    const existing = existsSync(huskyPath) ? readFileSync(huskyPath, 'utf8') : '';
-    const ours = parseManagedBlocks(existing).find((b) => b.name === 'pre-push');
-    handled.add(rel(huskyPath));
-    if (!ours) {
-      write(huskyPath, (existing ? existing.replace(/\s*$/, '\n') : '') + block + '\n', { mode: 0o755 });
-      done.push(`${rel(huskyPath)}: runs ${dir === '.' ? '' : `${dir}/`}.testguard/hooks/pre-push`);
-    } else if (existing.includes(block)) {
-      skipped.push(`${rel(huskyPath)} already runs the TestGuard pre-push hook`);
-    } else if ((upgrade && !ours.modified) || force) {
-      write(huskyPath, replaceManagedBlock(existing, 'pre-push', block), { mode: 0o755 });
-      done.push(`${rel(huskyPath)}: TestGuard block upgraded to template ${TEMPLATE_VERSION}`);
-    } else {
-      outdated.push(`${rel(huskyPath)}: the TestGuard block is template ${ours.template}${ours.modified ? ', edited by hand (--force replaces it)' : ' — testguard init --upgrade rewrites it'}`);
-    }
+  // The pre-push hook: a block in the hook file the repository already uses,
+  // husky's, else .githooks/ — never .git/hooks, which every worktree shares
+  // and no clone carries. Anything else in that file is left as it is.
+  const husky = existsSync(join(agentRoot, '.husky'));
+  const hookPath = join(agentRoot, husky ? '.husky' : '.githooks', 'pre-push');
+  const blockName = prePushBlockName(dir);
+  const block = prePushBlock(dir);
+  const existingHook = existsSync(hookPath) ? readFileSync(hookPath, 'utf8') : '';
+  const ourBlock = parseManagedBlocks(existingHook).find((b) => b.name === blockName);
+  handled.add(rel(hookPath));
+  const hookLabel = `${rel(hookPath)}: pre-push → probe --changed auto${dir === '.' ? '' : ` in ${dir}`} (the full probe is the nightly job)`;
+  if (!ourBlock) {
+    write(hookPath, (existingHook ? existingHook.replace(/\s*$/, '\n') : '#!/bin/sh\n') + block + '\n', { mode: 0o755 });
+    done.push(hookLabel);
+  } else if (existingHook.includes(block)) {
+    skipped.push(`${rel(hookPath)} already runs the current TestGuard pre-push block`);
+  } else if ((upgrade && !ourBlock.modified) || force) {
+    write(hookPath, replaceManagedBlock(existingHook, blockName, block), { mode: 0o755 });
+    done.push(`${hookLabel} (upgraded to template ${TEMPLATE_VERSION})`);
+  } else if (ourBlock.modified) {
+    skipped.push(`${rel(hookPath)}: the TestGuard block was edited by hand (use --force to replace it with the current template)`);
   } else {
-    notes.push(`Enable the pre-push hook (git keeps hooks per clone): ln -s "$(git rev-parse --show-toplevel)/${dir === '.' ? '' : `${dir}/`}.testguard/hooks/pre-push" "$(git rev-parse --git-path hooks)/pre-push" — or call it from your hook manager.`);
+    outdated.push(`${rel(hookPath)}: the TestGuard block is template ${ourBlock.template}, unmodified — testguard init --upgrade rewrites it`);
+  }
+  if (!husky) {
+    const hooksPath = spawnSync('git', ['config', '--get', 'core.hooksPath'], { cwd: agentRoot, encoding: 'utf8' }).stdout?.trim();
+    if (hooksPath !== '.githooks') notes.push('Enable the pre-push hook once per clone: git config core.hooksPath .githooks (or call .githooks/pre-push from your hook manager).');
   }
   if (ci !== undefined) {
     const install = installStep(projectDir);

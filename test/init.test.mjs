@@ -207,7 +207,7 @@ describe('init', () => {
     writeFileSync(join(dir, '.gitignore'), 'node_modules/\n.testguard/brief.json\n');
 
     const first = initProject({ projectDir: dir });
-    expect(first.done).toHaveLength(4);
+    expect(first.done).toHaveLength(5); // + the pre-push hook (#270)
     expect(first.warnings).toEqual([]);
     const settings = JSON.parse(readFileSync(join(dir, '.claude', 'settings.json'), 'utf8'));
     expect(settings.permissions.allow).toEqual(['Bash(npm test)']); // untouched
@@ -220,7 +220,7 @@ describe('init', () => {
     expect(cmd.endsWith('|| true')).toBe(true);           // never breaks a session
     const agents = readFileSync(join(dir, 'AGENTS.md'), 'utf8');
     expect(agents.startsWith('# My project')).toBe(true);
-    expect(agents).toContain('<!-- testguard:begin -->');
+    expect(agents).toMatch(/<!-- testguard:begin template=\d+ -->/);
     expect(agents).toContain('- This project: claims in `testguard.claims.json`');
     const gi = readFileSync(join(dir, '.gitignore'), 'utf8');
     expect(gi.split('\n').filter((l) => l === '.testguard/brief.json')).toHaveLength(1);
@@ -232,7 +232,7 @@ describe('init', () => {
 
     const second = initProject({ projectDir: dir });
     expect(second.done).toEqual([]);
-    expect(second.skipped).toHaveLength(4);
+    expect(second.skipped).toHaveLength(5);
     expect(JSON.parse(readFileSync(join(dir, '.claude', 'settings.json'), 'utf8')).hooks.SessionStart).toHaveLength(1);
 
     writeFileSync(join(dir, '.claude', 'skills', 'testguard', 'SKILL.md'), 'stale');
@@ -281,7 +281,7 @@ describe('init', () => {
     const hooks = JSON.parse(readFileSync(join(root, '.claude', 'settings.json'), 'utf8')).hooks.SessionStart;
     expect(hooks.map((h) => h.hooks[0].command)).toEqual([hookCommand('backend'), hookCommand('frontend')]);
     const agents2 = readFileSync(join(root, 'AGENTS.md'), 'utf8');
-    expect(agents2.match(/<!-- testguard:begin -->/g)).toHaveLength(1);
+    expect(agents2.match(/<!-- testguard:begin template=\d+ -->/g)).toHaveLength(1);
     expect(agents2).toContain('- `backend/`:');
     expect(agents2).toContain('- `frontend/`:');
     expect(second.done.some((d) => /now lists frontend/.test(d))).toBe(true);

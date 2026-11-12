@@ -7574,7 +7574,7 @@
           "description": "Omit the worker-policy reuse admission check.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "    && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand, faultWorkers })",
+          "find": "    && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand, faultWorkers, serialRequested })",
           "replace": "    && true",
           "producedBy": {
             "producer": "agent",
@@ -8326,8 +8326,8 @@
           "description": "Every run is told to pass --serial, including the default run that already has it.",
           "faultClass": "guard-removed",
           "file": "src/probe/contention.mjs",
-          "find": "  if (serial || workers <= 1) return",
-          "replace": "  if (false) return",
+          "find": "  if (serial || workers <= 1) {",
+          "replace": "  if (false) {",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -10162,8 +10162,8 @@
           "description": "The run's type check is not passed to the reuse decision.",
           "faultClass": "argument-swapped",
           "file": "src/probe/probe.mjs",
-          "find": "runner: recordedRunner, instrument, typecheck: typechecker?.spec, faultWorkers })",
-          "replace": "runner: recordedRunner, instrument, faultWorkers })",
+          "find": "runner: recordedRunner, instrument, typecheck: typechecker?.spec, faultWorkers, serialRequested:",
+          "replace": "runner: recordedRunner, instrument, faultWorkers, serialRequested:",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -10482,8 +10482,8 @@
           "description": "A verdict only contention produced is reported as measured.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "        if (contended && needsSerialRemeasure(record)) remeasure.push({ index, state });",
-          "replace": "        if (false) remeasure.push({ index, state });",
+          "find": "        else if (o.contended && needsSerialRemeasure(o.result)) remeasure.push(o);",
+          "replace": "        else if (false) remeasure.push(o);",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -10494,8 +10494,8 @@
           "description": "Fan-out records are published in completion order, bypassing the ordered emitter.",
           "faultClass": "call-removed",
           "file": "src/probe/probe.mjs",
-          "find": "        else settle(index, record);",
-          "replace": "        else { records.push(record); onProgress(record); }",
+          "find": "      for (const f of finals) settle(f.index, tagUnsafe(f.state, f.record));",
+          "replace": "      for (const f of finals) { records.push(f.record); onProgress(f.record); }",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -10524,8 +10524,8 @@
           "description": "The fan-out believes it is uncontended and never re-measures.",
           "faultClass": "literal-changed",
           "file": "src/probe/probe.mjs",
-          "find": "      const contended = slots.length > 1;",
-          "replace": "      const contended = false;",
+          "find": "        outcomes.push({ index, state, result, contended: token.contended });",
+          "replace": "        outcomes.push({ index, state, result, contended: false });",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -10578,7 +10578,7 @@
           "description": "Every flaky-defender, including a red baseline, is re-measured.",
           "faultClass": "condition-forced",
           "file": "src/probe/fan-out.mjs",
-          "find": "  return record.verdict === 'flaky-defender' && record.detail?.reason === 'inconsistent-probe';",
+          "find": "  return record.verdict === 'flaky-defender' && reason === 'inconsistent-probe';",
           "replace": "  return record.verdict === 'flaky-defender';",
           "producedBy": {
             "producer": "agent",
@@ -10704,7 +10704,7 @@
           "description": "Reuse ignores the fault fan-out entirely.",
           "faultClass": "return-altered",
           "file": "src/probe/probe.mjs",
-          "find": "  return previous === current || previous === 1;",
+          "find": "  return !(current === 1 && serialRequested);",
           "replace": "  return true;",
           "producedBy": {
             "producer": "agent",
@@ -10716,7 +10716,7 @@
           "description": "The worker policy no longer consults the fan-out.",
           "faultClass": "statement-deleted",
           "file": "src/probe/probe.mjs",
-          "find": "  if (!sameFaultWorkers(previousRun?.faultWorkers, faultWorkers)) return false;\n",
+          "find": "  if (!sameFaultWorkers(previousRun?.faultWorkers, faultWorkers, { serialRequested })) return false;\n",
           "replace": "",
           "producedBy": {
             "producer": "agent",
@@ -10757,9 +10757,9 @@
           "id": "F2",
           "description": "The CLI passes an in-place fan-out through.",
           "faultClass": "condition-forced",
-          "file": "src/commands/probe.mjs",
-          "find": "  if (faultWorkers > 1 && values['in-place']) {",
-          "replace": "  if (false) {",
+          "file": "src/probe/fan-out.mjs",
+          "find": "    if (asked.source === 'flag' && !asked.auto && asked.n > 1) return { error: '--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place' };",
+          "replace": "    if (false) return { error: '' };",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -10785,7 +10785,7 @@
           "description": "The validator admits a serial re-measure with no fan-out.",
           "faultClass": "condition-forced",
           "file": "spec/lib/validate.mjs",
-          "find": "      if (r.detail.remeasuredSerially && !(doc.run.faultWorkers > 1)) {",
+          "find": "      if (measuredHere && r.detail.remeasuredSerially && !(doc.run.faultWorkers > 1)) {",
           "replace": "      if (false) {",
           "defendedBy": [
             "spec/conformance/fault-workers.test.mjs"
@@ -10983,8 +10983,8 @@
           "description": "The CLI drops the requested fan-out.",
           "faultClass": "literal-changed",
           "file": "src/commands/probe.mjs",
-          "find": "    faultWorkers,\n    commandBudget,",
-          "replace": "    faultWorkers: 1,\n    commandBudget,",
+          "find": "    faultWorkers,\n    faultWorkersSource: fanOut.source,",
+          "replace": "    faultWorkers: 1,\n    faultWorkersSource: fanOut.source,",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -11112,8 +11112,8 @@
           "description": "The re-measure inherits the first tree and its stale state.",
           "faultClass": "argument-swapped",
           "file": "src/probe/probe.mjs",
-          "find": "          record = await measureOne(state, freshTree());",
-          "replace": "          record = await measureOne(state, primary);",
+          "find": "const tree = o.again ? freshTree() :",
+          "replace": "const tree = o.again ? primary :",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -12124,7 +12124,7 @@
           "description": "The validator admits a baseline re-measure with no fan-out.",
           "faultClass": "condition-forced",
           "file": "spec/lib/validate.mjs",
-          "find": "      if (r.detail.baselineRemeasuredSerially && !(doc.run.faultWorkers > 1)) {",
+          "find": "      if (measuredHere && r.detail.baselineRemeasuredSerially && !(doc.run.faultWorkers > 1)) {",
           "replace": "      if (false) {",
           "defendedBy": [
             "spec/conformance/fault-workers.test.mjs"
@@ -12592,8 +12592,8 @@
           "description": "The contention guard is dropped, so a lone timing-out fault is measured twice.",
           "faultClass": "guard-removed",
           "file": "src/probe/probe.mjs",
-          "find": "if (contended && needsSerialRemeasure(record))",
-          "replace": "if (needsSerialRemeasure(record))",
+          "find": "else if (o.contended && needsSerialRemeasure(o.result))",
+          "replace": "else if (needsSerialRemeasure(o.result))",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -12604,8 +12604,8 @@
           "description": "Every fan-out counts as contended.",
           "faultClass": "literal-changed",
           "file": "src/probe/probe.mjs",
-          "find": "const contended = slots.length > 1;",
-          "replace": "const contended = true;",
+          "find": "deferLastRun(probeRuns, confirmRuns, overlap.active > 1)",
+          "replace": "deferLastRun(probeRuns, confirmRuns, overlap.active > 0)",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

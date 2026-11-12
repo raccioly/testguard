@@ -742,6 +742,7 @@ async function measureProbe({
       return treeContext(scratch);
     };
     const releaseTrees = () => { while (extraTrees.length) extraTrees.pop().cleanup(); };
+    const releaseTree = (tree) => { extraTrees.splice(extraTrees.indexOf(tree.iso), 1); tree.iso.cleanup(); };
     /** Apply, probe, control, escalate and restore one fault in `tree`. */
     const measureOne = async (state, tree, opts) => {
       try {
@@ -924,14 +925,12 @@ async function measureProbe({
         for (const o of alone) {
           commandBudget?.assertOpen();
           const started = performance.now();
-          let tree;
-          if (o.again) tree = freshTree();
-          else tree = laneTree ??= freshTree();
+          const tree = o.again ? freshTree() : (laneTree ??= freshTree());
           let record;
           try {
             record = await measureOne(o.state, tree, { allAlone: true });
           } finally {
-            if (o.again) { extraTrees.splice(extraTrees.indexOf(tree.iso), 1); tree.iso.cleanup(); }
+            if (o.again && tree !== primary) releaseTree(tree);
           }
           if (o.again) {
             record.detail.remeasuredSerially = true;

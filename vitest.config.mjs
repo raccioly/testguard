@@ -18,5 +18,11 @@ export default defineConfig({
     // separate checkouts too: collecting them makes this tree's result depend
     // on unrelated, potentially unfinished work.
     exclude: [...configDefaults.exclude, 'fixtures/**', '.claude/**'],
+    // The suite is already parallel (maxWorkers above), and dozens of its
+    // tests run whole probes. Under the CLI's default `--fault-workers auto`
+    // each of those would fan out across more scratch trees on top, measuring
+    // the oversubscribed machine instead of the code. Tests that are about
+    // the fan-out or the default pass their own width, or delete this (#270).
+    env: { TESTGUARD_FAULT_WORKERS: '1' },
   },
 });
