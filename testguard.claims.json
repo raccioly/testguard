@@ -14483,6 +14483,239 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-ERROR-RUN-ALWAYS-SAYS-WHY",
+      "statement": "A run whose outcome is `error` always carries the runner's own words or a fixed sentence saying why; never an empty message.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/runner-error-messages.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The net under every parser is switched off: an error run that arrives without words stays wordless.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "if (result.run.outcome === 'error' && !String(result.loadMessage",
+          "replace": "if (false && result.run.outcome === 'error' && !String(result.loadMessage",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A Playwright run whose tests passed but which reported a global error is a pass again.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/playwright.mjs",
+          "find": "  else if (globalErrors.length > 0) outcome = 'error';\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An empty collection no longer says nothing was collected.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "      : outcome === 'error' ? 'the runner collected no tests: an empty selection, a filter or project that matched nothing, or a test file the runner does not read' : undefined;",
+          "replace": "      : undefined;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A merged run's error loses the erroring part's message.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "loadMessage: parts.find((p) => p.run.outcome === 'error' && String(p.loadMessage ?? '').trim())?.loadMessage\n      ?? (outcome === 'error' ? 'a runner reported an error without a message' : parts.find((p) => p.loadMessage)?.loadMessage),",
+          "replace": "loadMessage: parts.find((p) => p.loadMessage)?.loadMessage,",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-LOAD-FAILURE-MESSAGE-IS-IN-THE-RECORD",
+      "statement": "A `defenders-failed-to-load` record carries the runner's message in `detail.message`, not only the reason.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/probe-load-message.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The runner's message is kept in the anchor and never written to the record.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "        if (baseline.loadMessage) detail.message = String(baseline.loadMessage).split('\\n')[0].slice(0, 1024);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FOREIGN-SERVER-IS-NAMED",
+      "statement": "A Playwright defender set that stays green with the subject broken, under a config that declares a webServer, is reported with a note naming the reused server and the fix.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/foreign-server-note.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A config with a computed port gets no note.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/playwright.mjs",
+          "find": "  if (port && await listening(port)) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A literal port is no longer read from the config.",
+          "faultClass": "other",
+          "file": "src/probe/runners/playwright.mjs",
+          "find": "const m = /\\bport\\s*:\\s*(\\d{2,5})\\b/.exec(block)",
+          "replace": "const m = /\\bporttt\\s*:\\s*(\\d{2,5})\\b/.exec(block)",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A defender that is not Playwright's gets the note too.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/playwright.mjs",
+          "find": "if (!cfg || !defenders.some((file) => owns(projectDir, file))) return undefined;",
+          "replace": "if (!cfg) return undefined;",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SLOW-DEFENDERS-ADVICE-NAMES-THE-FEW",
+      "statement": "The slow-defenders advice names the few claims that hold a large share of recorded defender time, and says nothing when the data is thin or the cost is spread.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#speed-advice"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/advice.test.mjs",
+        "spec/conformance/advice.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The share threshold is dropped: every claim is an offender.",
+          "faultClass": "literal-changed",
+          "file": "src/status/advice.mjs",
+          "find": "minShare: 0.10",
+          "replace": "minShare: 0",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The minimum per-run seconds is dropped: many fast faults read as a slow file.",
+          "faultClass": "literal-changed",
+          "file": "src/status/advice.mjs",
+          "find": "minMedianSeconds: 15",
+          "replace": "minMedianSeconds: 0",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The thin-data floor on claims is dropped.",
+          "faultClass": "literal-changed",
+          "file": "src/status/advice.mjs",
+          "find": "minClaims: 20",
+          "replace": "minClaims: 0",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The validator accepts any command for the slow-defenders advice.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (a.id === 'slow-defenders-dominate' && a.command !== 'testguard claims --cost')",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

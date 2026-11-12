@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, rmSync, symlinkSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -8,7 +8,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { probe } from '../src/probe/probe.mjs';
 import { loadClaims } from '../src/claims/load.mjs';
 import { validate } from '../spec/lib/validate.mjs';
-import { resetConfigCache, webServerPort, foreignServerNote } from '../src/probe/runners/playwright.mjs';
+import { resetConfigCache } from '../src/probe/runners/playwright.mjs';
 import { FIXTURE_GIT } from './helpers/git.mjs';
 
 // #291: a Playwright config that reuses an existing server on a fixed port ran the scratch tree's specs
@@ -83,28 +83,4 @@ describe.skipIf(!INSTALLED)('a server from another checkout is never evidence', 
     expect(record.detail.reason).toBe('defenders-failed-to-load');
     expect(record.detail.message).toMatch(/already used/);
   }, 120_000);
-});
-
-describe('the note on a webServer the run did not start', () => {
-  it('reads a literal port, a url with a port, or says the port is computed', () => {
-    expect(webServerPort("export default { webServer: { command: 'x', port: 4173 } }")).toBe(4173);
-    expect(webServerPort("export default { webServer: { command: 'x', url: 'http://localhost:3000/health' } }")).toBe(3000);
-    expect(webServerPort('export default { webServer: { command: "x", port: Number(process.env.PORT) } }')).toBeNull();
-    expect(webServerPort('export default { testDir: "e2e" }')).toBeUndefined();
-  });
-
-  it('a config with a computed port gets the hedged note; one without a webServer gets none', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'testguard-note-'));
-    try {
-      mkdirSync(join(dir, 'e2e'));
-      writeFileSync(join(dir, 'e2e', 'a.spec.mjs'), '');
-      writeFileSync(join(dir, 'playwright.config.mjs'), 'export default { testDir: "e2e", webServer: { command: "x", port: Number(process.env.PORT) } };');
-      resetConfigCache();
-      expect(await foreignServerNote(dir, ['e2e/a.spec.mjs'])).toMatch(/may have reused a server started from another tree.*TESTGUARD_WORKER/);
-      expect(await foreignServerNote(dir, ['test/other.test.mjs'])).toBeUndefined(); // not a Playwright defender
-      writeFileSync(join(dir, 'playwright.config.mjs'), 'export default { testDir: "e2e" };');
-      resetConfigCache();
-      expect(await foreignServerNote(dir, ['e2e/a.spec.mjs'])).toBeUndefined();
-    } finally { rmSync(dir, { recursive: true, force: true }); resetConfigCache(); }
-  });
 });
