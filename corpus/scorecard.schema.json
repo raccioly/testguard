@@ -348,7 +348,14 @@
               "ok": {
                 "type": "boolean"
               },
-              "detail": {}
+              "detail": {},
+              "critical": {
+                "description": "A failure no known-failures entry can excuse: today only subject-untouched (the tool modified the project it measured).",
+                "type": "boolean"
+              },
+              "summary": {
+                "type": "string"
+              }
             }
           }
         },
@@ -462,6 +469,11 @@
               },
               "reason": {
                 "type": "string"
+              },
+              "knownIssue": {
+                "description": "The filed issue a reviewed known-failures.json entry names for this exact refusal (subject, exit, kind, reason phrase).",
+                "type": "integer",
+                "minimum": 1
               }
             }
           }

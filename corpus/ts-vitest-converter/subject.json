@@ -1,0 +1,30 @@
+{
+  "runner": "vitest",
+  "install": "npm",
+  "testFiles": "^test/.*\\.test\\.ts$",
+  "budgetMs": 60000,
+  "typecheck": true,
+  "counters": [
+    "test/support/.verify_rotation"
+  ],
+  "probeArgs": [
+    "--runner",
+    "vitest"
+  ],
+  "noise": [
+    {
+      "add": "src/unused-banner.ts",
+      "content": "// corpus metamorphic noise: an unrelated module nothing imports\nexport const BANNER = 'corpus';\n"
+    },
+    {
+      "rename": [
+        "SPEC.md",
+        "docs/SPEC.md"
+      ]
+    }
+  ],
+  "readOnlyNodeModules": {
+    "applies": false,
+    "why": "vitest 5 writes node_modules/.vitest-cache and node_modules/.vite-temp on every run, with no tool involved (seen in the install-unchanged check), so the subject's own runner cannot run against a read-only node_modules. The scratch mode here uses --scratch-dir with the writable install; js-jest-newsletter covers the read-only case."
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "expected": {
+    "SLOT-TIME-RANGE-REJECTED/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Baseline green 3/3; minute 60 is accepted and the out-of-range assertions fail in all three runs."
+    },
+    "SLOT-TIME-RANGE-REJECTED/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "With the range check removed, the expect(...).toThrow(InvalidSlotError) checks for 24:00 and :60 fail in all three runs."
+    },
+    "SLOT-QUARTER-HOUR-MIN-LENGTH/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "An end off the quarter hour is accepted; the rejection assertions fail in all three runs."
+    },
+    "SLOT-QUARTER-HOUR-MIN-LENGTH/F2": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "A 30-minute minimum makes every 15-minute slot the tests build throw InvalidSlotError outside any expect; all three runs fail by exception only, so the suite reaches the minimum-length rule without asserting it."
+    },
+    "CONFLICT-OVERLAP-ONLY/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Touching slots now conflict; the back-to-back assertions fail in all three runs."
+    },
+    "CONFLICT-OVERLAP-ONLY/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The overlap test compares b with itself; overlap assertions fail in all three runs."
+    },
+    "GAPS-MERGED-AND-CLIPPED/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "A booking nested inside a longer one moves the cursor backwards; the merged-gap assertions fail in all three runs."
+    },
+    "GAPS-MERGED-AND-CLIPPED/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The trailing gap to the end of the day is dropped; assertions fail in all three runs."
+    },
+    "RATES-AND-PEAK-WINDOW/F1": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "The declared defender test/pricing.test.js checks member prices only (partial): green 3/3 with the drop-in peak rate raised. Control (pricing.js unparseable) red, so it executes the module. The whole suite fails in all three runs on test/summary.test.js, which prices drop-in bookings through summarizeSlot but is not declared."
+    },
+    "RATES-AND-PEAK-WINDOW/F2": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "test/pricing.test.js never passes an unknown customer type: green 3/3, control red. test/summary.test.js asserts UnknownCustomerError and fails in all three runs, undeclared."
+    },
+    "PRICE-PER-MINUTE-SPLIT/F1": {
+      "verdict": "unverifiable",
+      "reason": "defenders-failed-to-load",
+      "why": "The only declared defender, test/legacy-rates.test.js, imports a module that does not exist (../src/legacy-rates.js): vitest reports the file failed to load on the unmodified baseline in all three runs, before any fault is applied."
+    },
+    "PRICE-PER-MINUTE-SPLIT/F2": {
+      "verdict": "unverifiable",
+      "reason": "defenders-failed-to-load",
+      "why": "Same declared defender, same load failure on the baseline."
+    },
+    "MONEY-FORMAT-DOLLARS-CENTS/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Thousands separators disappear; test/format.test.js (imported by the real path lib/format) fails by assertion in all three runs."
+    },
+    "MONEY-FORMAT-DOLLARS-CENTS/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Cents lose their zero padding; assertions fail in all three runs."
+    },
+    "SUMMARY-LINE-COMPOSITION/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The fault's file is named through the symlink src/format -> ../lib/format; the edit lands in lib/format/duration.js. One-hour durations lose their hour part and test/summary.test.js fails by assertion in all three runs."
+    },
+    "SUMMARY-LINE-COMPOSITION/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The duration is computed from the end minute alone; summary assertions fail in all three runs."
+    },
+    "SUMMARY-LINE-COMPOSITION/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The duration is dropped from the line; summary assertions fail in all three runs."
+    }
+  }
+}

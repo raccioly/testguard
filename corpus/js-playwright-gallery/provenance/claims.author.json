@@ -1,0 +1,186 @@
+[
+  {
+    "id": "SEARCH-TRIMMED-CASE-INSENSITIVE",
+    "requirement": "R1",
+    "statement": "Text search trims the query and matches title and photographer case-insensitively, so \"  harbor \" finds \"Old Harbor Light\".",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "Query is no longer trimmed, so a query with surrounding spaces matches nothing.",
+        "faultClass": "guard-removed",
+        "file": "src/filter.js",
+        "find": "String(query ?? \"\").trim().toLowerCase()",
+        "replace": "String(query ?? \"\").toLowerCase()"
+      },
+      {
+        "id": "F2",
+        "description": "Title is compared without lowercasing, so a lowercase query no longer matches a capitalized title.",
+        "faultClass": "call-removed",
+        "file": "src/filter.js",
+        "find": "card.title.toLowerCase().includes(q)",
+        "replace": "card.title.includes(q)"
+      }
+    ]
+  },
+  {
+    "id": "TAG-FILTER-AND-SEMANTICS",
+    "requirement": "R2",
+    "statement": "With tags active a card is kept only if it carries all of them, and the tag filter combines with the search filter by AND.",
+    "severity": "critical",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "AND semantics become OR (some), and with no active tags every card is dropped.",
+        "faultClass": "literal-changed",
+        "file": "src/filter.js",
+        "find": "active.every(",
+        "replace": "active.some("
+      },
+      {
+        "id": "F2",
+        "description": "Search and tag filters are combined with OR instead of AND.",
+        "faultClass": "condition-forced",
+        "file": "src/filter.js",
+        "find": "matchesSearch(c, query) && matchesTags(c, activeTags)",
+        "replace": "matchesSearch(c, query) || matchesTags(c, activeTags)"
+      }
+    ]
+  },
+  {
+    "id": "SORT-ORDER-AND-TIEBREAKS",
+    "requirement": "R4",
+    "statement": "Title sort is ascending with year ascending as tiebreak, and year sort is newest first with title as tiebreak.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "Title sort loses its year tiebreak, so cards with equal titles keep input order.",
+        "faultClass": "guard-removed",
+        "file": "src/sort.js",
+        "find": "byTitle(a, b) || a.year - b.year",
+        "replace": "byTitle(a, b)"
+      },
+      {
+        "id": "F2",
+        "description": "Year sort becomes oldest first instead of newest first.",
+        "faultClass": "variable-swap",
+        "file": "src/sort.js",
+        "find": "b.year - a.year || byTitle(a, b)",
+        "replace": "a.year - b.year || byTitle(a, b)"
+      }
+    ]
+  },
+  {
+    "id": "FAVORITE-TOGGLE-AND-COUNT",
+    "requirement": "R7",
+    "statement": "Toggling a valid card's favorite adds or removes it without error, the \"Favorites: K\" text counts exactly the favorited cards, and the toggle button's aria-pressed reflects favorite state.",
+    "severity": "critical",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "Adding a favorite calls a nonexistent method on a Set, so toggling a valid card throws a TypeError.",
+        "faultClass": "call-removed",
+        "file": "src/favorites.js",
+        "find": "else next.add(id);",
+        "replace": "else next.push(id);"
+      },
+      {
+        "id": "F2",
+        "description": "The favorites count is overstated by one, without any error.",
+        "faultClass": "literal-changed",
+        "file": "src/favorites.js",
+        "find": "${favorites.size}",
+        "replace": "${favorites.size + 1}"
+      },
+      {
+        "id": "F3",
+        "description": "Each card's aria-pressed shows the opposite of its favorite state, without any error.",
+        "faultClass": "return-altered",
+        "file": "src/cards.js",
+        "find": "String(favorited)",
+        "replace": "String(!favorited)"
+      }
+    ]
+  },
+  {
+    "id": "TOGGLE-REJECTS-UNKNOWN-NO-MUTATION",
+    "requirement": "R7",
+    "statement": "Toggling an id that belongs to no card is rejected with UnknownCardId, and toggling never mutates the input set.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The unknown-id check is removed, so unknown ids are silently added to the favorites.",
+        "faultClass": "guard-removed",
+        "file": "src/favorites.js",
+        "find": "if (!ids.has(id)) throw makeError(\"UnknownCardId\", `Unknown card id: ${id}`);",
+        "replace": ""
+      },
+      {
+        "id": "F2",
+        "description": "The function edits and returns the caller's own set instead of a copy.",
+        "faultClass": "variable-swap",
+        "file": "src/favorites.js",
+        "find": "const next = new Set(favorites);",
+        "replace": "const next = favorites;"
+      }
+    ]
+  },
+  {
+    "id": "CARD-VALIDATION-BOUNDS",
+    "requirement": "R8",
+    "statement": "A card is accepted only with a non-blank trimmed title and photographer and an integer year within 1826 to 2026 inclusive; otherwise it is rejected with InvalidCard.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The year upper bound becomes exclusive, so 2026 is wrongly rejected.",
+        "faultClass": "literal-changed",
+        "file": "src/cards.js",
+        "find": "c.year > 2026",
+        "replace": "c.year >= 2026"
+      },
+      {
+        "id": "F2",
+        "description": "Whitespace-only strings are no longer treated as blank, so a title of spaces is accepted.",
+        "faultClass": "guard-removed",
+        "file": "src/cards.js",
+        "find": "v.trim() === \"\"",
+        "replace": "v === \"\""
+      }
+    ]
+  },
+  {
+    "id": "CARD-RENDER-AND-UNIQUE-IDS",
+    "requirement": "R10",
+    "statement": "Each card renders its title, \"by <photographer>\" and a four-digit year, and two cards sharing an id are rejected at load with DuplicateCardId.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "Seen ids are never recorded, so duplicate ids are never detected at load.",
+        "faultClass": "statement-deleted",
+        "file": "src/cards.js",
+        "find": "ids.add(card.id);",
+        "replace": ""
+      },
+      {
+        "id": "F2",
+        "description": "The rendered year is off by one.",
+        "faultClass": "return-altered",
+        "file": "src/cards.js",
+        "find": "String(card.year).padStart(4, \"0\")",
+        "replace": "String(card.year + 1)"
+      },
+      {
+        "id": "F3",
+        "description": "The photographer template literal is unterminated, which is a syntax error that stops the module loading.",
+        "faultClass": "literal-changed",
+        "file": "src/cards.js",
+        "find": "`by ${card.photographer}`",
+        "replace": "`by ${card.photographer`"
+      }
+    ]
+  }
+]

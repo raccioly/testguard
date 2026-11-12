@@ -26,6 +26,7 @@ function runSummary(label, r) {
   // The tool wrote no evidence: a refusal (its own validator, a precondition)
   // or a crash. Reported as that, with the tool's reason, never as N wrong verdicts.
   if (!r.evidence) out.noEvidence = refusalReason(r);
+  if (r.untouched) out.untouched = { emptySnapshot: r.untouched.emptySnapshot, changes: r.untouched.changes.slice(0, 20), changed: r.untouched.changes.length };
   return out;
 }
 
@@ -41,6 +42,13 @@ function result(mode, subject, { runs, key = null, diff = null, checks = [], err
   const extra = [...checks];
   for (const run of runs) {
     if (run.noEvidence && !run.expectNoEvidence) extra.push(check('tool-wrote-evidence', false, { run: run.label, ...run.noEvidence }));
+  }
+  // Critical, never excusable: the tool modified the project it measured.
+  for (const run of runs) {
+    if (!run.untouched) { extra.push(check('subject-untouched', false, { run: run.label, note: 'no snapshot was taken' })); continue; }
+    if (run.untouched.emptySnapshot) extra.push(check('subject-untouched', false, { run: run.label, note: 'the snapshot was empty: nothing was compared' }));
+    else if (run.untouched.changed > 0) extra.push({ ...check('subject-untouched', false, { run: run.label, ...run.untouched }), critical: true, summary: `tool modified the subject: ${run.untouched.changes.map((c) => c.path).join(', ')}` });
+    else extra.push(check('subject-untouched', true, { run: run.label }));
   }
   if (!error && measured === 0 && !checks.some((c) => c.allowEmpty)) extra.push(check('measured-something', false, 'the mode produced no records: an empty comparison is a failure'));
   const ok = !error && (!key || (key.wrong === 0 && key.critical === 0)) && (!diff || diff.equal) && extra.every((c) => c.ok);
@@ -69,14 +77,14 @@ function keyAndDiff(ctx, mode, r, { ids, deltas, expected } = {}) {
 const exitCheck = (r) => check('exit-code', r.exit === 0 || r.exit === 1, `exit ${r.exit}${r.exit >= 2 ? `: ${r.stderr.trim().split('\n').slice(-3).join(' | ')}` : ''}`);
 
 export const RUN = {
-  /** Serial (--serial: one fault at a time since #270 made a fan-out the default), --no-reuse, a fresh process and a fresh repository: the oracle for every other mode. */
+  /** Serial (--serial and an explicit --fault-workers 1: one fault at a time, since #270 made a fan-out the default), --no-reuse, a fresh process and a fresh repository: the oracle for every other mode. */
   async reference(ctx) {
-    const { repo, r } = await freshProbe(ctx, 'reference', ['--no-reuse', '--serial']);
+    const { repo, r } = await freshProbe(ctx, 'reference', ['--no-reuse', '--serial', '--fault-workers', '1']);
     const { observed, key } = keyAndDiff({ ...ctx, reference: null }, 'reference', r);
     if (r.evidence) ctx.reference = observed;
     ctx.referenceRepo = repo;
     ctx.referenceElapsedMs = r.elapsedMs;
-    return result('reference', ctx.subject, { runs: [runSummary('reference', r)], key, checks: [exitCheck(r), check('every-fault-reported', observed.order.length === ctx.subject.faultIds.length, `${observed.order.length} of ${ctx.subject.faultIds.length}`)] });
+    return result('reference', ctx.subject, { runs: [runSummary('reference', r)], key, checks: [exitCheck(r), check('every-fault-reported', observed.order.length === ctx.subject.faultIds.length, `${observed.order.length} of ${ctx.subject.faultIds.length}`), check('serial-recorded', !r.evidence || (r.evidence.run?.faultWorkers ?? 1) === 1, `run.faultWorkers ${r.evidence?.run?.faultWorkers ?? 1}`)] });
   },
 
   /** Metamorphic: the same probe again, in the same repository: nothing may change. */
@@ -178,6 +186,22 @@ export const RUN = {
     for (const step of spec.steps) {
       commitEdits(repo, step.edits, `corpus: ${step.name}`);
       const r = await probe({ toolRoot: ctx.toolRoot, subject: ctx.subject, repo, outPath: out(repo, `changed-${step.name}`), args: ['--no-reuse', '--changed', 'HEAD~1'], python: ctx.python });
+      if (step.expectedClaims.length === 0) {
+        // A determined change that reaches no claim: exit 0, selectedCount 0,
+        // no evidence written. Anything probed is a wrong selection.
+        const scope = r.json?.run?.scope;
+        const selected = [...new Set((r.evidence?.records ?? []).map((x) => x.claim.id))].sort();
+        runs.push({ ...runSummary(step.name, r), expectNoEvidence: true });
+        const ok = r.exit === 0 && !r.evidence && scope?.selectedCount === 0 && scope?.changed?.outcome === 'determined';
+        const c = check(`selection:${step.name}`, ok, { expected: [], selected, exit: r.exit, scope: scope ?? null, wroteEvidence: Boolean(r.evidence) });
+        if (!ok) {
+          const k = ctx.known.find((x) => x.subject === ctx.subject.name && x.check === c.check && JSON.stringify([...x.observed.selected].sort()) === JSON.stringify(selected));
+          if (k) { c.ok = true; c.detail.knownIssue = k.issue; c.detail.unsound = false; }
+        }
+        checks.push(c);
+        c.allowEmpty = true;
+        continue;
+      }
       runs.push(runSummary(step.name, r));
       const selected = [...new Set((r.evidence?.records ?? []).map((x) => x.claim.id))].sort();
       const want = [...step.expectedClaims].sort();
@@ -260,7 +284,11 @@ export const RUN = {
   async 'assertion-kill'(ctx) {
     const { r } = await freshProbe(ctx, 'assertion-kill', ['--no-reuse', '--require-assertion-kill']);
     const { key, diff } = keyAndDiff(ctx, 'assertion-kill', r);
-    const want = Object.entries(expectedFor(ctx.subject, 'assertion-kill')).filter(([, e]) => e.verdict === 'killed' && e.killKind === 'exception-only').map(([id]) => id).sort();
+    // A keyed exception-only kill the tool did not report as a kill, under a
+    // reviewed known failure, is already accounted for by that entry; the
+    // policy can only name the kills the run actually produced.
+    const excused = new Set((key?.mismatches ?? []).filter((m) => m.knownIssue).map((m) => m.fault));
+    const want = Object.entries(expectedFor(ctx.subject, 'assertion-kill')).filter(([id, e]) => e.verdict === 'killed' && e.killKind === 'exception-only' && !excused.has(id)).map(([id]) => id).sort();
     const policy = r.json?.run?.assertionPolicy ?? r.evidence?.assertionPolicy;
     const got = (policy?.exceptionOnlyKills ?? []).map((k) => `${k.claimId}/${k.faultId}`).sort();
     const checks = [

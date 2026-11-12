@@ -12,6 +12,30 @@
         "verdict": "nocover"
       },
       "issue": 265
+    },
+    {
+      "subject": "js-vitest-booking",
+      "fault": "RATES-AND-PEAK-WINDOW/F1",
+      "expected": {
+        "verdict": "survived",
+        "reason": "killed-by-undeclared-tests"
+      },
+      "observed": {
+        "verdict": "survived"
+      },
+      "issue": 282
+    },
+    {
+      "subject": "js-vitest-booking",
+      "fault": "RATES-AND-PEAK-WINDOW/F2",
+      "expected": {
+        "verdict": "survived",
+        "reason": "killed-by-undeclared-tests"
+      },
+      "observed": {
+        "verdict": "survived"
+      },
+      "issue": 282
     }
   ]
 }

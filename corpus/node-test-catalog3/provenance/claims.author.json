@@ -1,0 +1,210 @@
+[
+  {
+    "id": "ISBN13-CHECK-DIGIT",
+    "requirement": "R1",
+    "statement": "A string is accepted as an ISBN-13 only when its 12 leading digits, weighted alternately 1 and 3 starting with 1, plus the 13th digit sum to a multiple of 10, so \"9780306406157\" is valid and \"9780306406158\" is invalid.",
+    "severity": "critical",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "Weights are applied starting with 3 instead of 1, so valid ISBNs such as 9780306406157 fail the check.",
+        "faultClass": "literal-changed",
+        "file": "packages/core/src/isbn.js",
+        "find": "i < 12 && i % 2 === 1 ? 3 : 1",
+        "replace": "i < 12 && i % 2 === 0 ? 3 : 1"
+      },
+      {
+        "id": "F2",
+        "description": "The sum is accepted when it is off by one from a multiple of 10, so a wrong check digit such as 9780306406158 passes.",
+        "faultClass": "return-altered",
+        "file": "packages/core/src/isbn.js",
+        "find": "return sum % 10 === 0;",
+        "replace": "return sum % 10 <= 1;"
+      }
+    ]
+  },
+  {
+    "id": "TITLE-NORMALIZATION",
+    "requirement": "R3",
+    "statement": "A stored title is trimmed and every internal run of whitespace is collapsed to a single space, and a title that is empty after trimming is rejected with InvalidTitleError.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "Internal whitespace runs are replaced with nothing instead of a single space, so \"The   Quiet  River\" becomes \"TheQuietRiver\".",
+        "faultClass": "literal-changed",
+        "file": "packages/core/src/title.js",
+        "find": ".replace(/\\s+/g, ' ')",
+        "replace": ".replace(/\\s+/g, '')"
+      },
+      {
+        "id": "F2",
+        "description": "The empty-title guard is removed, so a blank or whitespace-only title is accepted instead of raising InvalidTitleError.",
+        "faultClass": "guard-removed",
+        "file": "packages/core/src/title.js",
+        "find": "if (title === '') throw new InvalidTitleError('Title must not be empty');",
+        "replace": "/* guard removed */"
+      }
+    ]
+  },
+  {
+    "id": "AUTHOR-NAME-PARSING",
+    "requirement": "R4",
+    "statement": "A \"Last, First\" author string yields the trimmed last and first names, and a comma-free string yields the whole trimmed string as last name with an empty first name.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "Last and first names are swapped in the result, so \"Okafor, Ada\" yields last \"Ada\" and first \"Okafor\".",
+        "faultClass": "variable-swap",
+        "file": "packages/core/src/author.js",
+        "find": "return { last, first };",
+        "replace": "return { last: first, first: last };"
+      },
+      {
+        "id": "F2",
+        "description": "The first name is no longer trimmed, so \"Okafor,  Ada \" yields first name \"  Ada \" with surrounding whitespace.",
+        "faultClass": "call-removed",
+        "file": "packages/core/src/author.js",
+        "find": "parts[1].trim()",
+        "replace": "parts[1]"
+      },
+      {
+        "id": "F3",
+        "description": "A single-name author gets the placeholder \"N/A\" as first name instead of the empty string.",
+        "faultClass": "literal-changed",
+        "file": "packages/core/src/author.js",
+        "find": ": '';",
+        "replace": ": 'N/A';"
+      }
+    ]
+  },
+  {
+    "id": "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES",
+    "requirement": "R6",
+    "statement": "An exact ISBN lookup compares the query after R1 normalization, so a hyphenated or spaced ISBN finds the record stored under its 13-digit form, and a query that is not a valid ISBN-13 fails with InvalidIsbnError instead of returning no result.",
+    "severity": "critical",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "Normalization strips only hyphens and not spaces, so a spaced ISBN such as \"978 0 306 40615 7\" is no longer normalized and the lookup fails.",
+        "faultClass": "literal-changed",
+        "file": "packages/core/src/isbn.js",
+        "find": "/[-\\s]/g",
+        "replace": "/[-]/g"
+      },
+      {
+        "id": "F2",
+        "description": "The invalid-ISBN guard is removed, so a lookup with an invalid ISBN no longer throws InvalidIsbnError and returns no result instead.",
+        "faultClass": "guard-removed",
+        "file": "packages/core/src/isbn.js",
+        "find": "if (!isValidIsbn(input)) throw new InvalidIsbnError(`Invalid ISBN-13: ${input}`);",
+        "replace": "/* guard removed */"
+      }
+    ]
+  },
+  {
+    "id": "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY",
+    "requirement": "R7",
+    "statement": "A title prefix query is normalized like a stored title (trimmed, internal whitespace runs collapsed to one space) before it is matched against the start of each normalized title.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "Trimming is dropped from title normalization, so a query with leading whitespace such as \"  the qu\" keeps a leading space and no longer matches \"The Quiet River\".",
+        "faultClass": "call-removed",
+        "file": "packages/core/src/title.js",
+        "find": "input.trim().replace(",
+        "replace": "input.replace("
+      },
+      {
+        "id": "F2",
+        "description": "Only single spaces are matched for replacement, so runs of whitespace are not collapsed and the query \"the   qu\" no longer matches \"The Quiet River\".",
+        "faultClass": "literal-changed",
+        "file": "packages/core/src/title.js",
+        "find": "/\\s+/g",
+        "replace": "/ /g"
+      }
+    ]
+  },
+  {
+    "id": "SEARCH-RESULT-ORDERING",
+    "requirement": "R8",
+    "statement": "Search results are ordered by title ascending ignoring case, with records of equal titles ordered by ascending publication year.",
+    "severity": "medium",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The title comparison direction is reversed, so results come out in descending title order.",
+        "faultClass": "return-altered",
+        "file": "packages/search/src/order.js",
+        "find": "return ta < tb ? -1 : 1;",
+        "replace": "return ta < tb ? 1 : -1;"
+      },
+      {
+        "id": "F2",
+        "description": "Year tie-breaking is descending instead of ascending, so \"Atlas\" (2010) precedes \"atlas\" (1999).",
+        "faultClass": "variable-swap",
+        "file": "packages/search/src/order.js",
+        "find": "return a.year - b.year;",
+        "replace": "return b.year - a.year;"
+      }
+    ]
+  },
+  {
+    "id": "REPORT-DECADE-COUNTS",
+    "requirement": "R10",
+    "statement": "The summary groups records into decades by rounding the year down to a multiple of ten and lists each non-empty decade with its count in ascending order.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The decade is rounded to nearest instead of down, so 1999 lands in the 2000s.",
+        "faultClass": "literal-changed",
+        "file": "packages/report/src/index.js",
+        "find": "Math.floor(year / 10) * 10",
+        "replace": "Math.round(year / 10) * 10"
+      },
+      {
+        "id": "F2",
+        "description": "The ascending-order sort comparator is replaced by a truncated, syntactically invalid expression, so decade ordering is no longer defined.",
+        "faultClass": "return-altered",
+        "file": "packages/report/src/index.js",
+        "find": ".sort((a, b) => a[0] - b[0])",
+        "replace": ".sort((a, b) => a[0] - )"
+      }
+    ]
+  },
+  {
+    "id": "REPORT-CITATION-LINE",
+    "requirement": "R11",
+    "statement": "A citation reads `Last, F. (Year). Title. ISBN` with the first name's initial uppercased, omits the initial for single-name authors, and for several authors shows only the first followed by \", et al.\" before the year.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The author parser never reads a first name, so the citation loses the initial and shows \"Okafor (2004)\" instead of \"Okafor, A. (2004)\".",
+        "faultClass": "condition-forced",
+        "file": "packages/core/src/author.js",
+        "find": "parts.length === 2 ?",
+        "replace": "false ?"
+      },
+      {
+        "id": "F2",
+        "description": "The \", et al.\" suffix is added only when there are more than two authors, so a two-author record is cited as a single author.",
+        "faultClass": "literal-changed",
+        "file": "packages/report/src/index.js",
+        "find": "record.authors.length > 1",
+        "replace": "record.authors.length > 2"
+      },
+      {
+        "id": "F3",
+        "description": "The initial is no longer uppercased, so a first name \"ada\" is cited as \"a.\" instead of \"A.\".",
+        "faultClass": "call-removed",
+        "file": "packages/report/src/index.js",
+        "find": "[...first][0].toUpperCase()",
+        "replace": "[...first][0]"
+      }
+    ]
+  }
+]

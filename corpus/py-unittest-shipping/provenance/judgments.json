@@ -1,0 +1,120 @@
+{
+  "expected": {
+    "DIM-WEIGHT-ROUNDS-UP/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Dimensional weight rounds down; tests/test_parcel.py fails by assertion (unittest failure) in all three runs."
+    },
+    "DIM-WEIGHT-ROUNDS-UP/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Height is replaced by width; the dimensional-weight assertions fail in all three runs."
+    },
+    "STANDARD-BASE-RATE/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Every rate gains one extra step; assertions fail in all three runs."
+    },
+    "STANDARD-BASE-RATE/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Zone 3's step price changes; the zone-3 assertions fail in all three runs."
+    },
+    "EXPRESS-RATE-AND-LIMIT/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The half-cent rounding is dropped; the express assertions fail in all three runs."
+    },
+    "EXPRESS-RATE-AND-LIMIT/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Parcels over the express limit are accepted; the assertRaises checks fail in all three runs."
+    },
+    "REMOTE-SURCHARGE/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Part of the remote postal range is lost; the boundary assertions fail in all three runs."
+    },
+    "REMOTE-SURCHARGE/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Express remote deliveries are charged the standard surcharge; assertions fail in all three runs."
+    },
+    "OVERSIZE-SURCHARGE-CLASSES/F1": {
+      "verdict": "survived",
+      "why": "tests/test_surcharges.py never tests oversize (partial): green 3/3. Control (surcharges.py unparseable) fails to load, so the defender imports the module. The whole suite 3/3: no test fails in every run (oversize is not checked anywhere)."
+    },
+    "OVERSIZE-SURCHARGE-CLASSES/F2": {
+      "verdict": "survived",
+      "why": "As F1."
+    },
+    "QUOTE-ITEMIZED-TOTAL/F1": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "Swapped arguments make remote_surcharge raise inside quote(); tests/test_quote.py (hollow: it only checks that a quote is returned) fails by exception, never by assertion, in all three runs."
+    },
+    "QUOTE-ITEMIZED-TOTAL/F2": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "The hollow tests/test_quote.py stays green 3/3 with the oversize line left out of the total; control red. tests/test_rates.py (QuoteBreakdownTests, ExpressRateTests) fails in all three runs and is not declared."
+    },
+    "QUOTE-ITEMIZED-TOTAL/F3": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "As F2: the hollow defender stays green, the undeclared tests/test_rates.py breakdown tests fail every run."
+    },
+    "TRACKING-NUMBER-FORMAT/F1": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "The sequence upper bound drops a digit; the tests that build the largest valid tracking number now get ValueError raised outside assertRaises, an error (exception) in all three runs and no assertion failure."
+    },
+    "TRACKING-NUMBER-FORMAT/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The check digit is omitted; the format assertions fail in all three runs."
+    },
+    "TRACKING-NUMBER-FORMAT/F3": {
+      "verdict": "fault-invalid",
+      "reason": "replacement-does-not-compile",
+      "why": "`return total %` is a SyntaxError: unittest cannot import shipping.labels and reports a load failure (_FailedTest) in all three runs. A load failure is never a kill."
+    }
+  },
+  "modes": {
+    "changed": {
+      "why": "Selections derived by reading the imports (spec: a changed path selects a claim when it is a fault target, a defender, or in the import closure of either). Every test imports the shipping package, whose __init__ imports every module, so any change under shipping/ reaches every claim. The working tree also holds build/lib/shipping and build/lib/fieldkit, untracked and git-ignored copies (a build directory, #272; fieldkit resolves its submodules by computed import): no test imports them and no change to them can be committed.",
+      "steps": [
+        {
+          "name": "docs-only",
+          "edits": [
+            {
+              "file": "SPEC.md",
+              "find": "# Regional Parcel Rate Library",
+              "replace": "<!-- corpus: a docs-only change -->\n# Regional Parcel Rate Library"
+            }
+          ],
+          "expectedClaims": [],
+          "why": "SPEC.md is no claim's target, defender or import: the change is determined and selects nothing (exit 0, no evidence written)."
+        },
+        {
+          "name": "labels-test-only",
+          "edits": [
+            {
+              "file": "tests/test_labels.py",
+              "find": "import unittest\n",
+              "replace": "# corpus: a scripted change, behavior-neutral\nimport unittest\n"
+            }
+          ],
+          "expectedClaims": [
+            "TRACKING-NUMBER-FORMAT"
+          ],
+          "why": "tests/test_labels.py is the declared defender of TRACKING-NUMBER-FORMAT only, and no other test imports it."
+        }
+      ],
+      "badRef": {
+        "ref": "refs/heads/corpus-no-such-branch",
+        "exit": 2,
+        "why": "An unresolvable reference is a precondition failure."
+      }
+    }
+  }
+}

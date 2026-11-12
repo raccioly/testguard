@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The corpus gains seven subjects, a subject-untouched check and six tool
+  mutants (#258, repository only).** Playwright, unittest, a symlinked source
+  directory, a computed dynamic import with a mocked collaborator, a
+  three-package workspace in npm and pnpm layouts, vitest `test.projects`, a
+  vitest config that imports `vite`, ignored build directories holding
+  package copies, and a worktree whose `node_modules` entries link into
+  another checkout's install. Every probe is now bracketed by a snapshot of
+  the measured repository (git status, tracked-file hashes, every
+  `node_modules` level), and any difference is a critical failure; every
+  mode also checks the subject's install is unchanged. New keyed cases: the
+  `mixed` kill kind, `defenders-failed-to-load`, Playwright timeouts,
+  `--changed` over a docs-only commit, and the automatic fan-out width
+  compared with a serial reference. `bench/README.md` documents running a
+  project outside the repository through the same harness. It found #282.
+
 ## [0.24.0] - 2026-11-12
 
 Automated weekly release — everything merged since `v0.23.1`.

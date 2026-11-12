@@ -1,0 +1,63 @@
+{
+  "expected": {
+    "EQUAL-SPLIT-REMAINDER-ORDER/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Remainder cents go in input order instead of name order; test/split.test.js fails by assertion in all three runs."
+    },
+    "EQUAL-SPLIT-REMAINDER-ORDER/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "One participant too many gets an extra cent; assertions fail in all three runs."
+    },
+    "SHARES-LEFTOVER-ALLOCATION/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Ties on remainder break by reverse name; assertions fail in all three runs."
+    },
+    "SHARES-LEFTOVER-ALLOCATION/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Leftover cents go to the smallest remainders; assertions fail in all three runs."
+    },
+    "INVALID-SPLIT-VALIDATION/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Duplicate participants are accepted; toThrow(InvalidSplit) fails in all three runs."
+    },
+    "INVALID-SPLIT-VALIDATION/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Zero and negative weights are accepted; toThrow fails in all three runs."
+    },
+    "INVALID-SPLIT-VALIDATION/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "An unknown split type throws the wrong class; toThrow(UnknownSplitType) fails in all three runs."
+    },
+    "BALANCE-PAID-MINUS-PORTIONS/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Portions are credited instead of debited; test/balances.test.js fails by assertion in all three runs."
+    },
+    "BALANCE-PAID-MINUS-PORTIONS/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The payer is never credited; ten balance tests fail by assertion and one by exception in each of the three runs, so every run has an assertion failure."
+    },
+    "BALANCE-PAID-MINUS-PORTIONS/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Each entry overwrites the running total; assertions fail in all three runs."
+    },
+    "SETTLE-DETERMINISTIC-GREEDY/F1": {
+      "verdict": "survived",
+      "why": "test/settle.test.js never builds a tie between creditors (partial): green 3/3. Control (ledger.js unparseable) fails to load, so it executes the module. Whole suite 3/3: no test fails in every run."
+    },
+    "SETTLE-DETERMINISTIC-GREEDY/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Payments run backwards; settle assertions fail in all three runs."
+    }
+  }
+}

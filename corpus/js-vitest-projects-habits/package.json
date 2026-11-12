@@ -1,0 +1,9 @@
+{
+  "name": "corpus-js-vitest-projects-habits",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Corpus subject: vitest test.projects with two projects and a test file in both (#277). See SPEC.md and PROVENANCE.md.",
+  "type": "module",
+  "scripts": { "test": "vitest run" },
+  "devDependencies": { "vitest": "5.0.5" }
+}

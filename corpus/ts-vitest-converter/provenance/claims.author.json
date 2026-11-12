@@ -1,0 +1,186 @@
+[
+  {
+    "id": "REGISTRY-LAZY-PLUGIN-LOADING",
+    "requirement": "R1",
+    "statement": "The registry accepts exactly the categories volume, mass and temperature, and loads only the requested category's plugin on first use, leaving the other categories unloaded.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The valid category list drops temperature, so a valid category is rejected with UnknownCategory.",
+        "faultClass": "literal-changed",
+        "file": "src/registry.ts",
+        "find": "export const CATEGORIES = [\"volume\", \"mass\", \"temperature\"] as const;",
+        "replace": "export const CATEGORIES = [\"volume\", \"mass\"] as const;"
+      },
+      {
+        "id": "F2",
+        "description": "The first request for any category eagerly loads every other category's plugin too.",
+        "faultClass": "guard-removed",
+        "file": "src/registry.ts",
+        "find": "  const key = category as Category;",
+        "replace": "  const key = category as Category;\n  for (const c of CATEGORIES) if (c !== key && !loaded.has(c)) loaded.set(c, import(`./plugins/${c}.ts`) as Promise<Plugin>);"
+      }
+    ]
+  },
+  {
+    "id": "VOLUME-CONVERSION-RATIOS-AND-ROUNDING",
+    "requirement": "R3",
+    "statement": "Volume conversions use the fixed ratios (1 l = 1000 ml, 1 cup = 240 ml, 1 tbsp = 15 ml, 1 tsp = 5 ml) and return a number rounded to 2 decimal places, half away from zero.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "A cup is treated as 250 ml instead of 240 ml, so 2 cup to ml returns 500.",
+        "faultClass": "literal-changed",
+        "file": "src/plugins/volume.ts",
+        "find": "cup: 240",
+        "replace": "cup: 250"
+      },
+      {
+        "id": "F2",
+        "description": "The volume plugin returns the result as a string (toFixed(1)) instead of a number rounded to 2 decimals. The change runs as JavaScript but fails the strict TypeScript check, because the function is declared to return number.",
+        "faultClass": "return-altered",
+        "file": "src/plugins/volume.ts",
+        "find": "return ratioConvert(ML, 2, from, to, quantity);",
+        "replace": "return ratioConvert(ML, 2, from, to, quantity).toFixed(1);"
+      }
+    ]
+  },
+  {
+    "id": "MASS-CONVERSION-RATIOS-AND-ROUNDING",
+    "requirement": "R4",
+    "statement": "Mass conversions use 1 kg = 1000 g, 1 lb = 453.6 g and 1 oz = 28.35 g, converting from the source unit to the target unit and rounding to 1 decimal place.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "An ounce is treated as 28 g instead of 28.35 g, so 1 lb to oz returns 16.2 instead of 16.0.",
+        "faultClass": "literal-changed",
+        "file": "src/plugins/mass.ts",
+        "find": "oz: 28.35",
+        "replace": "oz: 28"
+      },
+      {
+        "id": "F2",
+        "description": "Source and target units are swapped in the call, so the conversion runs in the inverse direction without throwing.",
+        "faultClass": "argument-swapped",
+        "file": "src/plugins/mass.ts",
+        "find": "return ratioConvert(GRAMS, 1, from, to, quantity);",
+        "replace": "return ratioConvert(GRAMS, 1, to, from, quantity);"
+      }
+    ]
+  },
+  {
+    "id": "TEMPERATURE-ABSOLUTE-VS-DELTA",
+    "requirement": "R5",
+    "statement": "Absolute temperatures convert with the 9/5 factor plus the 32 offset, deltas use the scale factor only with no offset, and only absolute inputs below absolute zero fail with BelowAbsoluteZero, so deltas have no lower bound.",
+    "severity": "critical",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The Celsius-to-Fahrenheit offset is 30 instead of 32, so 100 C returns 210 instead of 212.",
+        "faultClass": "literal-changed",
+        "file": "src/plugins/temperature.ts",
+        "find": "(quantity * 9) / 5 + 32",
+        "replace": "(quantity * 9) / 5 + 30"
+      },
+      {
+        "id": "F2",
+        "description": "Delta conversions apply the absolute-temperature offset, so a 10 C delta returns 50 instead of 18.",
+        "faultClass": "return-altered",
+        "file": "src/plugins/temperature.ts",
+        "find": "if (delta) return round(from === \"C\" ? (quantity * 9) / 5 : (quantity * 5) / 9, 0);",
+        "replace": "if (delta) return round(from === \"C\" ? (quantity * 9) / 5 + 32 : ((quantity - 32) * 5) / 9, 0);"
+      },
+      {
+        "id": "F3",
+        "description": "The absolute-zero check also applies to deltas, so a large negative delta fails with BelowAbsoluteZero.",
+        "faultClass": "guard-removed",
+        "file": "src/plugins/temperature.ts",
+        "find": "if (!delta && quantity < ABSOLUTE_ZERO[from as \"C\" | \"F\"]) throw new BelowAbsoluteZero();",
+        "replace": "if (quantity < ABSOLUTE_ZERO[from as \"C\" | \"F\"]) throw new BelowAbsoluteZero();"
+      }
+    ]
+  },
+  {
+    "id": "AUDIT-ENTRY-CONTENT-AND-COUNT",
+    "requirement": "R8",
+    "statement": "Each successful conversion sends exactly one entry to the sink, carrying the category, source unit, target unit, input quantity, rounded result and a timestamp from the sink's own clock.",
+    "severity": "critical",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The rounded result is dropped from the entry sent to the sink.",
+        "faultClass": "field-dropped",
+        "file": "src/audit.ts",
+        "find": "await write({ ...entry, timestamp: now() });",
+        "replace": "await write({ category: entry.category, from: entry.from, to: entry.to, quantity: entry.quantity, timestamp: now() } as never);"
+      },
+      {
+        "id": "F2",
+        "description": "The timestamp comes from Date.now() instead of the sink's own clock.",
+        "faultClass": "call-removed",
+        "file": "src/audit.ts",
+        "find": "timestamp: now()",
+        "replace": "timestamp: Date.now()"
+      },
+      {
+        "id": "F3",
+        "description": "A successful audit call writes the entry to the sink a second time, so one conversion produces two entries.",
+        "faultClass": "return-altered",
+        "file": "src/audit.ts",
+        "find": "return undefined;",
+        "replace": "await write({ ...entry, timestamp: now() });\n    return undefined;"
+      }
+    ]
+  },
+  {
+    "id": "SCALER-MULTIPLY-THEN-CONVERT",
+    "requirement": "R10",
+    "statement": "The scaler applies the multiplier first and converts afterwards, and a scale factor of zero or less fails with InvalidScale.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The ingredient quantity is multiplied by itself instead of by the scale factor, so the requested scaling is ignored.",
+        "faultClass": "variable-swap",
+        "file": "src/scaler.ts",
+        "find": "item.quantity * factor",
+        "replace": "item.quantity * item.quantity"
+      },
+      {
+        "id": "F2",
+        "description": "A scale factor of exactly zero is accepted instead of failing with InvalidScale, and every ingredient scales to 0.",
+        "faultClass": "literal-changed",
+        "file": "src/scaler.ts",
+        "find": "factor > 0",
+        "replace": "factor >= 0"
+      }
+    ]
+  },
+  {
+    "id": "SCALER-ONE-AUDIT-ENTRY-PER-CONVERSION",
+    "requirement": "R12",
+    "statement": "Every conversion the scaler performs goes through the registry and the audit log, giving one entry per converted ingredient and none for ingredients already in the target unit.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "Ingredients already in the target unit are no longer skipped, so they go through the registry and produce an audit entry.",
+        "faultClass": "condition-forced",
+        "file": "src/scaler.ts",
+        "find": "if (item.unit === to) {",
+        "replace": "if (item.unit === to && quantity < 0) {"
+      },
+      {
+        "id": "F2",
+        "description": "The registry no longer calls the audit component, so scaler conversions leave no log entry.",
+        "faultClass": "call-removed",
+        "file": "src/registry.ts",
+        "find": "const warning = await record({ category, from, to, quantity: quantity as number, result });",
+        "replace": "const warning = undefined as AuditWriteFailed | undefined;"
+      }
+    ]
+  }
+]

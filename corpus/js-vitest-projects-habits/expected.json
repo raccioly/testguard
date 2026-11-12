@@ -1,0 +1,163 @@
+{
+  "confirmRuns": 3,
+  "derivedWith": "node corpus/derive.mjs (applies each fault by hand to a scratch copy and runs the subject's own runner; never TestGuard). Verdicts written by hand in provenance/judgments.json.",
+  "expected": {
+    "INVALID-DATE-REJECTED/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Malformed dates parse to a value instead of NaN; test/shared.test.js (in both vitest projects, so it runs once per project) fails by assertion in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/shared.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "fa790f5fe61c0e06bad9703c74dfea9e1dc6abc6064c881a6d43b866a39eb2e4",
+        "derivedAt": "2026-11-12T05:34:09.363Z"
+      }
+    },
+    "INVALID-DATE-REJECTED/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "checkIn stops validating its date; the InvalidDateError assertions in shared.test.js fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/shared.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "fadc59dbc6537bdc698cbed1f92d1e3a078ef1e8864bb9066e1bd38d396f654d",
+        "derivedAt": "2026-11-12T05:34:14.324Z"
+      }
+    },
+    "CURRENT-STREAK-TODAY-OR-YESTERDAY/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "A streak ending yesterday counts as 0; test/streaks/streak.test.js (project 'streaks') fails by assertion in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/streaks/streak.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "22f6bece24d47474f0c207fad3592c750df77e37c3e203cc7863df06d1284622",
+        "derivedAt": "2026-11-12T05:34:18.189Z"
+      }
+    },
+    "CURRENT-STREAK-TODAY-OR-YESTERDAY/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "'Yesterday' becomes two days ago; streak assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/streaks/streak.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "dd2ce2c2dc0301b9a8d888b2271a39c377d0d8f160356d546503e9f8b0e2b6db",
+        "derivedAt": "2026-11-12T05:34:22.425Z"
+      }
+    },
+    "FREEZE-BRIDGES-ONE-GAP/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "A freeze bridges a gap with no check-in before it; streak assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/streaks/streak.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "71a01e0d79fc8b4cba91acf2b7a6a0c8d3fdd96a0aeeb60bc84106311c02e627",
+        "derivedAt": "2026-11-12T05:34:26.090Z"
+      }
+    },
+    "FREEZE-BRIDGES-ONE-GAP/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Every missing day is bridged; streak assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/streaks/streak.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "75117af5c725f76c097f6c1db949c574e6959c927528a3ed39b61b98aea262af",
+        "derivedAt": "2026-11-12T05:34:29.628Z"
+      }
+    },
+    "FREEZE-BRIDGES-ONE-GAP/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The bridge checks the frozen day instead of the day before; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/streaks/streak.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "739a29602e3d313bdb49ce8ce407d23595f29fb06815762253b11485587c94f8",
+        "derivedAt": "2026-11-12T05:34:32.746Z"
+      }
+    },
+    "WEEKLY-PERCENT-ROUNDED/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Percentages truncate instead of rounding half up; test/weekly/weekly.test.js (project 'weekly') fails by assertion in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/weekly/weekly.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "281118de674bdcd52e63d43a5f5e82dd94e7689102e935a5898b2401b5e1b771",
+        "derivedAt": "2026-11-12T05:34:35.977Z"
+      }
+    },
+    "WEEKLY-PERCENT-ROUNDED/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Sunday is never counted; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/weekly/weekly.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "e6b66398d3dcf3c56c2378e8ae8573fc4f3c68ced949e28018f2d2819bb72d5a",
+        "derivedAt": "2026-11-12T05:34:39.227Z"
+      }
+    },
+    "WEEKLY-PERCENT-ROUNDED/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The week starts on the given date instead of its Monday; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/weekly/weekly.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "2018ecfbc87a5ffaa73d2aefa69f9fbfab14338dd64094b31aa79b6d18b80841",
+        "derivedAt": "2026-11-12T05:34:42.309Z"
+      }
+    },
+    "FREEZE-NOT-A-CHECKIN/F1": {
+      "verdict": "survived",
+      "why": "shared.test.js never freezes a day that already has a check-in (partial on R4: no ConflictError check): green 3/3. Control (tracker.js unparseable) fails to load, so it executes the module. Whole suite 3/3: no test fails in every run.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/shared.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism",
+          "wholeSuite": "node_modules/.bin/vitest run test/shared.test.js test/streaks/streak.test.js test/weekly/weekly.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "8f5caa724a1ad732afe688d7fc91e1f654a7b7f13874288573945df67283e0d9",
+        "derivedAt": "2026-11-12T05:34:50.108Z"
+      }
+    },
+    "FREEZE-NOT-A-CHECKIN/F2": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "A freeze recorded as a check-in passes the declared shared.test.js 3/3; test/streaks/streak.test.js and test/weekly/weekly.test.js fail in all three runs and are not declared for this claim.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/shared.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism",
+          "wholeSuite": "node_modules/.bin/vitest run test/shared.test.js test/streaks/streak.test.js test/weekly/weekly.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 14 test(s) fail every run",
+        "outputHash": "a5da95d968e5149eda46942ea191bf07f93b631fc10e8abd5d85adaf5230aee5",
+        "derivedAt": "2026-11-12T05:34:58.057Z"
+      }
+    }
+  }
+}

@@ -5,6 +5,10 @@
  *   provenance/judgments.json   the verdicts, written by hand, each with why
  *   provenance/derivation.json  what `node corpus/derive.mjs` observed (no TestGuard)
  *   provenance/derivation-reuse-edit.json  the same, with the reuse edit applied
+ *   provenance/derivation-<variant>.json   for a subject with layout variants
+ *       (subject.json `variants`): one derivation per variant. The key is one
+ *       for all variants, so every variant must have observed the same thing
+ *       (same summary per fault); the first variant's observation is attached.
  *
  * Every keyed fault must have an observation, every observation a judgment,
  * and each entry carries the command that was run, a one-line summary of the
@@ -46,11 +50,23 @@ function attach(entries, observations, label) {
 
 export function buildKey(dir) {
   const judgments = JSON.parse(readFileSync(join(dir, 'provenance', 'judgments.json'), 'utf8'));
-  const derivation = JSON.parse(readFileSync(join(dir, 'provenance', 'derivation.json'), 'utf8'));
+  const config = JSON.parse(readFileSync(join(dir, 'subject.json'), 'utf8'));
+  const variants = Object.keys(config.variants ?? {});
+  const derivations = variants.length
+    ? variants.map((v) => [v, JSON.parse(readFileSync(join(dir, 'provenance', `derivation-${v}.json`), 'utf8'))])
+    : [[null, JSON.parse(readFileSync(join(dir, 'provenance', 'derivation.json'), 'utf8'))]];
+  const derivation = derivations[0][1];
+  for (const [v, other] of derivations.slice(1)) {
+    const a = new Map(derivation.records.map((r) => [r.fault, summarize(r)]));
+    const b = new Map(other.records.map((r) => [r.fault, summarize(r)]));
+    const differ = [...new Set([...a.keys(), ...b.keys()])].filter((id) => a.get(id) !== b.get(id));
+    if (differ.length) throw new Error(`${dir}: variant ${v} observed differently from ${derivations[0][0]}: ${differ.join(', ')}`);
+  }
   const missing = derivation.records.map((r) => r.fault).filter((id) => !(id in judgments.expected));
   if (missing.length) throw new Error(`${dir}: observed but not judged: ${missing.join(', ')}`);
   const key = {
     confirmRuns: derivation.runs,
+    ...(variants.length ? { variants: Object.fromEntries(derivations.map(([v, d]) => [v, { outputHashes: Object.fromEntries(d.records.map((r) => [r.fault, r.outputHash])) }])) } : {}),
     derivedWith: 'node corpus/derive.mjs (applies each fault by hand to a scratch copy and runs the subject\'s own runner; never TestGuard). Verdicts written by hand in provenance/judgments.json.',
     expected: attach(judgments.expected, derivation, dir),
   };

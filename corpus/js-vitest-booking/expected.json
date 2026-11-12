@@ -1,0 +1,229 @@
+{
+  "confirmRuns": 3,
+  "derivedWith": "node corpus/derive.mjs (applies each fault by hand to a scratch copy and runs the subject's own runner; never TestGuard). Verdicts written by hand in provenance/judgments.json.",
+  "expected": {
+    "SLOT-TIME-RANGE-REJECTED/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Baseline green 3/3; minute 60 is accepted and the out-of-range assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/slots.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "f350a5088a6daf5b440a3329713b999b8eb7afd09e833e363b7cf712870cad15",
+        "derivedAt": "2026-11-12T05:34:08.161Z"
+      }
+    },
+    "SLOT-TIME-RANGE-REJECTED/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "With the range check removed, the expect(...).toThrow(InvalidSlotError) checks for 24:00 and :60 fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/slots.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "6930d05b044d0d9e91d4a7a6d4adaf1606314e11bc9c77e3f6d1d9e64a3a10d9",
+        "derivedAt": "2026-11-12T05:34:11.738Z"
+      }
+    },
+    "SLOT-QUARTER-HOUR-MIN-LENGTH/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "An end off the quarter hour is accepted; the rejection assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/slots.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "89e0ff02e594300edf334ff3af216ae9676fda2515907a31536c896b5b81b7c5",
+        "derivedAt": "2026-11-12T05:34:15.027Z"
+      }
+    },
+    "SLOT-QUARTER-HOUR-MIN-LENGTH/F2": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "A 30-minute minimum makes every 15-minute slot the tests build throw InvalidSlotError outside any expect; all three runs fail by exception only, so the suite reaches the minimum-length rule without asserting it.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/slots.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "a3aa2a9bb5c0f460a71c38f5c2a3eb8afb282b486b5a0a93bd9ae59598fc7565",
+        "derivedAt": "2026-11-12T05:34:18.661Z"
+      }
+    },
+    "CONFLICT-OVERLAP-ONLY/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Touching slots now conflict; the back-to-back assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/conflicts.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "49291751ff385e8fc57aad4802d6d0831d89466977498425d0103fc5711529aa",
+        "derivedAt": "2026-11-12T05:34:22.713Z"
+      }
+    },
+    "CONFLICT-OVERLAP-ONLY/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The overlap test compares b with itself; overlap assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/conflicts.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "ebd36bb0fcb37e9e4d48d5f1305e0d2cf7ff4ebded1c0764c0d74358a5c19fc1",
+        "derivedAt": "2026-11-12T05:34:26.652Z"
+      }
+    },
+    "GAPS-MERGED-AND-CLIPPED/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "A booking nested inside a longer one moves the cursor backwards; the merged-gap assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/conflicts.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "48d8e513febb47426ab6dc635bf074f782c6aba67e0984a59edbc7eb18e96b6d",
+        "derivedAt": "2026-11-12T05:34:29.943Z"
+      }
+    },
+    "GAPS-MERGED-AND-CLIPPED/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The trailing gap to the end of the day is dropped; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/conflicts.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "ec7a2b71cbf816f9ad847e073fc31f330362beaa61493c847a2ac76572be7fab",
+        "derivedAt": "2026-11-12T05:34:32.978Z"
+      }
+    },
+    "RATES-AND-PEAK-WINDOW/F1": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "The declared defender test/pricing.test.js checks member prices only (partial): green 3/3 with the drop-in peak rate raised. Control (pricing.js unparseable) red, so it executes the module. The whole suite fails in all three runs on test/summary.test.js, which prices drop-in bookings through summarizeSlot but is not declared.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/pricing.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism",
+          "wholeSuite": "node_modules/.bin/vitest run test/conflicts.test.js test/format.test.js test/legacy-rates.test.js test/pricing.test.js test/slots.test.js test/summary.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 3 test(s) fail every run",
+        "outputHash": "c678ca75402c200a3371331a037960e0b4125c71b5aa4714bf6a51045d61f0b8",
+        "derivedAt": "2026-11-12T05:34:40.385Z"
+      }
+    },
+    "RATES-AND-PEAK-WINDOW/F2": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "test/pricing.test.js never passes an unknown customer type: green 3/3, control red. test/summary.test.js asserts UnknownCustomerError and fails in all three runs, undeclared.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/pricing.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism",
+          "wholeSuite": "node_modules/.bin/vitest run test/conflicts.test.js test/format.test.js test/legacy-rates.test.js test/pricing.test.js test/slots.test.js test/summary.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 3 test(s) fail every run",
+        "outputHash": "3bd957f81c805e3a671ea014ee0cc29dee513b357ad242486ed92e45e9be17a8",
+        "derivedAt": "2026-11-12T05:34:48.030Z"
+      }
+    },
+    "PRICE-PER-MINUTE-SPLIT/F1": {
+      "verdict": "unverifiable",
+      "reason": "defenders-failed-to-load",
+      "why": "The only declared defender, test/legacy-rates.test.js, imports a module that does not exist (../src/legacy-rates.js): vitest reports the file failed to load on the unmodified baseline in all three runs, before any fault is applied.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/legacy-rates.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline LLL; probe LLL",
+        "outputHash": "ee7300473e602cf1df2b891a0f70a0549ab4335a861e2145c89db15b0125568f",
+        "derivedAt": "2026-11-12T05:34:51.274Z"
+      }
+    },
+    "PRICE-PER-MINUTE-SPLIT/F2": {
+      "verdict": "unverifiable",
+      "reason": "defenders-failed-to-load",
+      "why": "Same declared defender, same load failure on the baseline.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/legacy-rates.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline LLL; probe LLL",
+        "outputHash": "289ddf06d7737b7667576b2c011917b07c767ab2c1c9e1b42885337a6a34c590",
+        "derivedAt": "2026-11-12T05:34:54.544Z"
+      }
+    },
+    "MONEY-FORMAT-DOLLARS-CENTS/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Thousands separators disappear; test/format.test.js (imported by the real path lib/format) fails by assertion in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/format.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "842eba11ca2f7f12bb1b373f3895f3b7d9bbafc994d6dcf0b4f45cff388e22cc",
+        "derivedAt": "2026-11-12T05:34:57.879Z"
+      }
+    },
+    "MONEY-FORMAT-DOLLARS-CENTS/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Cents lose their zero padding; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/format.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "2b5dde50488d86f013c48aee5d944598835785185e27c45b26e201fffed73fdb",
+        "derivedAt": "2026-11-12T05:35:01.226Z"
+      }
+    },
+    "SUMMARY-LINE-COMPOSITION/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The fault's file is named through the symlink src/format -> ../lib/format; the edit lands in lib/format/duration.js. One-hour durations lose their hour part and test/summary.test.js fails by assertion in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/summary.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "4c7f93c44e08a0779adeeb3316f96d7db7598641656494d72cddce0d51348c05",
+        "derivedAt": "2026-11-12T05:35:04.666Z"
+      }
+    },
+    "SUMMARY-LINE-COMPOSITION/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The duration is computed from the end minute alone; summary assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/summary.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "66cbfbaa2a3b456aeab8ef6fe883a31f5101c4a2a865ff3153bce75fb3b593cf",
+        "derivedAt": "2026-11-12T05:35:08.225Z"
+      }
+    },
+    "SUMMARY-LINE-COMPOSITION/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The duration is dropped from the line; summary assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/summary.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "12ad1cb3446109e6ae3e8f7e38e49fed50e5259a587e9611cf5c8b3610f48d81",
+        "derivedAt": "2026-11-12T05:35:11.382Z"
+      }
+    }
+  }
+}

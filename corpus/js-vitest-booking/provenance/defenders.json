@@ -1,0 +1,41 @@
+{
+  "rule": "Fixed before the claim and test authors ran: a claim tied to a requirement is defended by the test file the test author was told to write for that requirement. R8 is deliberately declared against test/legacy-rates.test.js, which the test author was told to write importing a module that does not exist (a declared defender that cannot load).",
+  "byRequirement": {
+    "R1": [
+      "test/slots.test.js"
+    ],
+    "R2": [
+      "test/slots.test.js"
+    ],
+    "R3": [
+      "test/slots.test.js"
+    ],
+    "R4": [
+      "test/conflicts.test.js"
+    ],
+    "R5": [
+      "test/conflicts.test.js"
+    ],
+    "R6": [
+      "test/conflicts.test.js"
+    ],
+    "R7": [
+      "test/pricing.test.js"
+    ],
+    "R9": [
+      "test/pricing.test.js"
+    ],
+    "R8": [
+      "test/legacy-rates.test.js"
+    ],
+    "R10": [
+      "test/format.test.js"
+    ],
+    "R11": [
+      "test/format.test.js"
+    ],
+    "R12": [
+      "test/summary.test.js"
+    ]
+  }
+}

@@ -6,6 +6,8 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
+import { LayoutError, copySubjectFiles, linkDependencies, placeIgnoredCopies } from './layout.mjs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 
 export const CORPUS = resolve(dirname(new URL(import.meta.url).pathname), '..');
@@ -14,10 +16,20 @@ export const CORPUS = resolve(dirname(new URL(import.meta.url).pathname), '..');
 export class SubjectError extends Error {}
 
 export function listSubjects() {
-  return readdirSync(CORPUS, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && existsSync(join(CORPUS, e.name, 'subject.json')))
-    .map((e) => e.name)
-    .sort();
+  const out = [];
+  for (const e of readdirSync(CORPUS, { withFileTypes: true })) {
+    if (!e.isDirectory() || !existsSync(join(CORPUS, e.name, 'subject.json'))) continue;
+    const config = JSON.parse(readFileSync(join(CORPUS, e.name, 'subject.json'), 'utf8'));
+    if (config.variants) for (const v of Object.keys(config.variants)) out.push(`${e.name}@${v}`);
+    else out.push(e.name);
+  }
+  return out.sort();
+}
+
+/** `name` or `name@variant` → the subject directory and the variant. */
+export function subjectRef(ref) {
+  const [name, variant] = ref.split('@');
+  return { dir: join(CORPUS, name), variant };
 }
 
 /**
@@ -25,13 +37,19 @@ export function listSubjects() {
  * directory; `keyPath` then names its expected.json and `claimsPath` its
  * claims (both default to files inside the directory).
  */
-export function loadSubject(dir, { keyPath, claimsPath, configPath } = {}) {
+export function loadSubject(dir, { keyPath, claimsPath, configPath, variant } = {}) {
   const abs = resolve(dir);
   const read = (p, what) => {
     if (!existsSync(p)) throw new SubjectError(`${basename(abs)}: ${what} not found at ${p}`);
     return JSON.parse(readFileSync(p, 'utf8'));
   };
   const config = read(configPath ?? join(abs, 'subject.json'), 'subject.json');
+  let variantName = null;
+  if (config.variants) {
+    variantName = variant ?? Object.keys(config.variants)[0];
+    if (!config.variants[variantName]) throw new SubjectError(`${basename(abs)}: no variant ${variantName}`);
+    Object.assign(config, config.variants[variantName]);
+  }
   const claimsFile = claimsPath ? resolve(claimsPath) : join(abs, 'claims.json');
   const claims = read(claimsFile, 'claims').claims;
   const key = read(keyPath ? resolve(keyPath) : join(abs, 'expected.json'), 'answer key');
@@ -40,12 +58,13 @@ export function loadSubject(dir, { keyPath, claimsPath, configPath } = {}) {
   const unkeyed = faultIds.filter((id) => !keyed.includes(id));
   const stale = keyed.filter((id) => !faultIds.includes(id));
   if (unkeyed.length || stale.length) throw new SubjectError(`${basename(abs)}: key and claims disagree (unkeyed: ${unkeyed.join(', ') || 'none'}; keyed but absent: ${stale.join(', ') || 'none'})`);
-  return { name: config.name ?? basename(abs), dir: abs, config, claims, claimsFile, key, faultIds };
+  const name = `${config.name ?? basename(abs)}${variantName ? `@${variantName}` : ''}`;
+  return { name, dir: abs, config, claims, claimsFile, key, faultIds };
 }
 
 /** The interpreter a Python subject runs under: --python, TESTGUARD_PYTHON, then the subject's own .venv. */
 export function pythonFor(subject, explicit) {
-  return explicit ?? process.env.TESTGUARD_PYTHON ?? join(subject.dir, '.venv', 'bin', 'python');
+  return explicit ?? process.env.TESTGUARD_PYTHON ?? subject.config.python ?? join(subject.dir, '.venv', 'bin', 'python');
 }
 
 /**
@@ -70,6 +89,7 @@ export function preflight(subject, { python } = {}) {
     }
     return;
   }
+  if (install === 'none') return;
   const bin = join(subject.dir, 'node_modules', '.bin', runner);
   if (!existsSync(bin)) throw new SubjectError(`${subject.name}: ${runner} is not installed (no ${relative(CORPUS, bin)}). Install it: ${hint}`);
   if (subject.config.typecheck && !existsSync(join(subject.dir, 'node_modules', '.bin', 'tsc'))) throw new SubjectError(`${subject.name}: typescript is not installed. Install it: ${hint}`);
@@ -80,6 +100,7 @@ export function install(subject, { python } = {}) {
   const { install: kind } = subject.config;
   if (kind === 'npm' || kind === 'npm-workspace') {
     execFileSync('npm', ['ci', '--no-audit', '--no-fund', '--ignore-scripts'], { cwd: subject.dir, stdio: 'inherit' });
+    for (const [cmd, ...args] of subject.config.installExtra ?? []) execFileSync(cmd, args, { cwd: subject.dir, stdio: 'inherit' });
   } else if (kind === 'python-venv') {
     const venv = join(subject.dir, '.venv');
     if (!python && !existsSync(join(venv, 'bin', 'python'))) execFileSync('python3', ['-m', 'venv', venv], { stdio: 'inherit' });
@@ -88,15 +109,7 @@ export function install(subject, { python } = {}) {
   }
 }
 
-const IGNORE = ['node_modules/', '.venv/', '__pycache__/', '.testguard/', '.out/', '.fee_rotation', '.holds_counter'];
-
-/** Files the copy never takes from the subject directory. */
-function skipped(rel, subject) {
-  if (/(^|\/)(\.venv|\.out|__pycache__|\.testguard)(\/|$)/.test(rel)) return true;
-  if ((subject.config.counters ?? []).includes(rel)) return true;
-  if (/(^|\/)node_modules(\/|$)/.test(rel)) return true;
-  return false;
-}
+const IGNORE = ['node_modules/', '.venv/', '__pycache__/', '.testguard/', '.out/', '.fee_rotation', '.holds_counter', '.verify_rotation', 'test-results/', 'playwright-report/'];
 
 const git = (cwd, ...args) => execFileSync('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', '-c', 'user.email=corpus@example.invalid', '-c', 'user.name=corpus', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 export { git };
@@ -109,33 +122,24 @@ export { git };
  * Every workspace link is then checked to resolve inside the copy.
  */
 export function prepareRepo(subject, { scratchRoot, nodeModules } = {}) {
-  const dir = mkdtempSync(join(scratchRoot ?? tmpdir(), `corpus-${subject.name}-`));
-  cpSync(subject.dir, dir, { recursive: true, verbatimSymlinks: true, filter: (src) => { const rel = relative(subject.dir, src); return rel === '' || !skipped(rel, subject); } });
-  writeFileSync(join(dir, '.gitignore'), `${IGNORE.join('\n')}\n`);
+  const dir = mkdtempSync(join(scratchRoot ?? tmpdir(), `corpus-${subject.name.replace('@', '-')}-`));
+  copySubjectFiles(subject, dir);
+  // Build output a real working tree holds untracked and git-ignored (#272).
+  const ignoredTops = placeIgnoredCopies(subject, dir);
+  writeFileSync(join(dir, '.gitignore'), `${[...IGNORE, ...ignoredTops].join('\n')}\n`);
   // A project outside the corpus keeps its claims outside the project; the
   // copy carries them as claims.json so every mode can read (and reorder) them.
   if (resolve(subject.claimsFile) !== join(subject.dir, 'claims.json')) cpSync(subject.claimsFile, join(dir, 'claims.json'));
-  linkDependencies(subject, dir, { nodeModules });
+  try {
+    linkDependencies(subject, dir, { nodeModules });
+  } catch (error) {
+    if (error instanceof LayoutError) throw new SubjectError(error.message);
+    throw error;
+  }
   git(dir, 'init', '-q', '-b', 'main');
   git(dir, 'add', '-A');
   git(dir, 'commit', '-q', '-m', 'subject');
   return dir;
-}
-
-export function linkDependencies(subject, dir, { nodeModules } = {}) {
-  const { install: kind } = subject.config;
-  if (kind === 'npm-workspace') {
-    mkdirSync(join(dir, 'node_modules'), { recursive: true });
-    for (const link of subject.config.workspaceLinks ?? []) {
-      const target = readlinkSync(join(subject.dir, 'node_modules', link));
-      mkdirSync(dirname(join(dir, 'node_modules', link)), { recursive: true });
-      symlinkSync(target, join(dir, 'node_modules', link));
-      const resolved = realpathSync(join(dir, 'node_modules', link));
-      if (!resolved.startsWith(realpathSync(dir))) throw new SubjectError(`${subject.name}: workspace link ${link} resolves outside the copy (${resolved})`);
-    }
-  } else if (kind === 'npm') {
-    symlinkSync(nodeModules ?? join(subject.dir, 'node_modules'), join(dir, 'node_modules'), 'dir');
-  }
 }
 
 /** A read-only copy of the subject's node_modules, and a listing to prove nothing wrote through it. */
@@ -193,4 +197,38 @@ export function commitEdits(dir, edits, message) {
   }
   git(dir, 'add', '-A');
   git(dir, 'commit', '-q', '-m', message);
+}
+
+/**
+ * A content digest of a dependency install, to prove nothing wrote through it
+ * (#279): every regular file's bytes and every symlink's target, by path.
+ * `exclude` names top-level entries left out (a runner's own cache).
+ */
+export function installDigest(root, { exclude = [] } = {}) {
+  const h = createHash('sha256');
+  const walk = (rel) => {
+    if (exclude.includes(rel)) return;
+    const p = join(root, rel);
+    const st = lstatSync(p);
+    if (st.isSymbolicLink()) { h.update(`L ${rel} ${readlinkSync(p)}\n`); return; }
+    if (st.isDirectory()) { h.update(`D ${rel}\n`); for (const e of readdirSync(p).sort()) walk(rel ? `${rel}/${e}` : e); return; }
+    h.update(`F ${rel} ${st.size}\n`);
+    h.update(readFileSync(p));
+  };
+  walk('');
+  return h.digest('hex');
+}
+
+/**
+ * What the install-unchanged check hashes. A subject whose copies get a real
+ * node_modules of links (`nodeModulesLayout: linked-entries`, #279) is hashed
+ * byte for byte: anything a runner caches lands in the copy's own directory,
+ * so any change to the source install was written through a link. Where a
+ * copy's node_modules is one link to the whole install, vite and vitest write
+ * their own caches into it (node_modules/.vite, .vite-temp, .vitest-cache:
+ * the subject's runner does this with no tool involved), so those three are
+ * left out and everything else must be unchanged.
+ */
+export function installCheckScope(subject) {
+  return subject.config.nodeModulesLayout === 'linked-entries' ? { exclude: [] } : { exclude: ['.vite', '.vite-temp', '.vitest-cache'] };
 }

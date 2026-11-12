@@ -1,0 +1,343 @@
+{
+  "confirmRuns": 3,
+  "variants": {
+    "npm": {
+      "outputHashes": {
+        "ISBN13-CHECK-DIGIT/F1": "f98c1382e5f9cb89c6d1f3836d909d1cfc4c81239228da4d27620724232960ba",
+        "ISBN13-CHECK-DIGIT/F2": "8aff2a107dd534fa6d16ca3246b86e6c3529c9ffaa4732dae50fee62744416f9",
+        "TITLE-NORMALIZATION/F1": "a600de6754c41ce6647646c85e4e7045dc2adec58b3c00b2e099cadc0baeb0ab",
+        "TITLE-NORMALIZATION/F2": "23b00271cb5e0528dcef00ac23c10e41a44fe8a307f2cd2dffb76eb60a4607f5",
+        "AUTHOR-NAME-PARSING/F1": "e4e26465ca0d560feaecbaa3fabf50aed1194b8e5b1c8de5a93fb0fe432c2dd1",
+        "AUTHOR-NAME-PARSING/F2": "586492274977d3ef1720eacd069ff09234d99231d6146c937262b4e51025370d",
+        "AUTHOR-NAME-PARSING/F3": "ae99f394cbda5d56cf0283f5134d9df7b0bd3689b076e383916db6a1158f0244",
+        "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES/F1": "734eef89a5924a4fdaefc47851760264e4775c8c75549a7be1da4c172b3e5e7c",
+        "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES/F2": "337e68d0db970c35468e82eef78fdf1d4ad8179580c54a96862ffd6a9dedf446",
+        "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY/F1": "32c3f3b7ee9a85cf1146eadd5e7469873def23648ebc46683d22b292a9b96b91",
+        "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY/F2": "32c3f3b7ee9a85cf1146eadd5e7469873def23648ebc46683d22b292a9b96b91",
+        "SEARCH-RESULT-ORDERING/F1": "37680cbecd284818dabfa03a32934d9b764c5961162ec74c22767fbd3a77aa4b",
+        "SEARCH-RESULT-ORDERING/F2": "50684fca2aa05ce348cfb90f18486cf24a66dff473ca5ce770f3e646cd666374",
+        "REPORT-DECADE-COUNTS/F1": "9bd9b65b807fb3a89e8e5455f6e92c87a36105da544b06280b8787d6e2b7fd54",
+        "REPORT-DECADE-COUNTS/F2": "678e6915f2326943c02436ab1511db1d483b60678eea3a7c3ef286f81e378872",
+        "REPORT-CITATION-LINE/F1": "90a2105cbfa42b92a79696384f24c6a722d735ca1bae1549141a2cf7a0c1d454",
+        "REPORT-CITATION-LINE/F2": "38f3bac0bbda77e09383a9302b3603b5252e257ba524c0df153f2a24760c2e71",
+        "REPORT-CITATION-LINE/F3": "9f8bfd7e252e84d5374fdf8ff69503411f6bdf9736468e287b2807ed3f458294"
+      }
+    },
+    "pnpm": {
+      "outputHashes": {
+        "ISBN13-CHECK-DIGIT/F1": "f98c1382e5f9cb89c6d1f3836d909d1cfc4c81239228da4d27620724232960ba",
+        "ISBN13-CHECK-DIGIT/F2": "8aff2a107dd534fa6d16ca3246b86e6c3529c9ffaa4732dae50fee62744416f9",
+        "TITLE-NORMALIZATION/F1": "a600de6754c41ce6647646c85e4e7045dc2adec58b3c00b2e099cadc0baeb0ab",
+        "TITLE-NORMALIZATION/F2": "23b00271cb5e0528dcef00ac23c10e41a44fe8a307f2cd2dffb76eb60a4607f5",
+        "AUTHOR-NAME-PARSING/F1": "e4e26465ca0d560feaecbaa3fabf50aed1194b8e5b1c8de5a93fb0fe432c2dd1",
+        "AUTHOR-NAME-PARSING/F2": "586492274977d3ef1720eacd069ff09234d99231d6146c937262b4e51025370d",
+        "AUTHOR-NAME-PARSING/F3": "ae99f394cbda5d56cf0283f5134d9df7b0bd3689b076e383916db6a1158f0244",
+        "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES/F1": "734eef89a5924a4fdaefc47851760264e4775c8c75549a7be1da4c172b3e5e7c",
+        "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES/F2": "337e68d0db970c35468e82eef78fdf1d4ad8179580c54a96862ffd6a9dedf446",
+        "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY/F1": "32c3f3b7ee9a85cf1146eadd5e7469873def23648ebc46683d22b292a9b96b91",
+        "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY/F2": "32c3f3b7ee9a85cf1146eadd5e7469873def23648ebc46683d22b292a9b96b91",
+        "SEARCH-RESULT-ORDERING/F1": "37680cbecd284818dabfa03a32934d9b764c5961162ec74c22767fbd3a77aa4b",
+        "SEARCH-RESULT-ORDERING/F2": "50684fca2aa05ce348cfb90f18486cf24a66dff473ca5ce770f3e646cd666374",
+        "REPORT-DECADE-COUNTS/F1": "9bd9b65b807fb3a89e8e5455f6e92c87a36105da544b06280b8787d6e2b7fd54",
+        "REPORT-DECADE-COUNTS/F2": "678e6915f2326943c02436ab1511db1d483b60678eea3a7c3ef286f81e378872",
+        "REPORT-CITATION-LINE/F1": "90a2105cbfa42b92a79696384f24c6a722d735ca1bae1549141a2cf7a0c1d454",
+        "REPORT-CITATION-LINE/F2": "38f3bac0bbda77e09383a9302b3603b5252e257ba524c0df153f2a24760c2e71",
+        "REPORT-CITATION-LINE/F3": "9f8bfd7e252e84d5374fdf8ff69503411f6bdf9736468e287b2807ed3f458294"
+      }
+    }
+  },
+  "derivedWith": "node corpus/derive.mjs (applies each fault by hand to a scratch copy and runs the subject's own runner; never TestGuard). Verdicts written by hand in provenance/judgments.json.",
+  "expected": {
+    "ISBN13-CHECK-DIGIT/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Weights 3 and 1 swap places; packages/core/test/isbn.test.js fails by node:assert in all three runs (both layouts).",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/core/test/isbn.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "f98c1382e5f9cb89c6d1f3836d909d1cfc4c81239228da4d27620724232960ba",
+        "derivedAt": "2026-11-12T05:30:41.675Z"
+      }
+    },
+    "ISBN13-CHECK-DIGIT/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Sums ending in 1 are accepted; the invalid-ISBN assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/core/test/isbn.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "8aff2a107dd534fa6d16ca3246b86e6c3529c9ffaa4732dae50fee62744416f9",
+        "derivedAt": "2026-11-12T05:30:42.691Z"
+      }
+    },
+    "TITLE-NORMALIZATION/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Whitespace runs are deleted instead of collapsed; names.test.js fails by assertion in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/core/test/names.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "a600de6754c41ce6647646c85e4e7045dc2adec58b3c00b2e099cadc0baeb0ab",
+        "derivedAt": "2026-11-12T05:30:43.618Z"
+      }
+    },
+    "TITLE-NORMALIZATION/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Empty titles are accepted; assert.throws(InvalidTitleError) fails in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/core/test/names.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "23b00271cb5e0528dcef00ac23c10e41a44fe8a307f2cd2dffb76eb60a4607f5",
+        "derivedAt": "2026-11-12T05:30:44.618Z"
+      }
+    },
+    "AUTHOR-NAME-PARSING/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Last and first names swap; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/core/test/names.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "e4e26465ca0d560feaecbaa3fabf50aed1194b8e5b1c8de5a93fb0fe432c2dd1",
+        "derivedAt": "2026-11-12T05:30:45.725Z"
+      }
+    },
+    "AUTHOR-NAME-PARSING/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The first name keeps its leading space; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/core/test/names.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "586492274977d3ef1720eacd069ff09234d99231d6146c937262b4e51025370d",
+        "derivedAt": "2026-11-12T05:30:46.795Z"
+      }
+    },
+    "AUTHOR-NAME-PARSING/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "A missing first name becomes 'N/A'; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/core/test/names.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "ae99f394cbda5d56cf0283f5134d9df7b0bd3689b076e383916db6a1158f0244",
+        "derivedAt": "2026-11-12T05:30:47.792Z"
+      }
+    },
+    "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES/F1": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "The fault is in packages/core/src/isbn.js; the defender packages/search/test/search.test.js reaches it through the @shelf/core workspace link (search/src/index.js) and through the relative path ../../core/src/isbn.js. With spaces no longer stripped, the spaced-ISBN lookup throws InvalidIsbnError outside any assert: the one failing test fails by exception in all three runs, in both the npm and pnpm layouts.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/search/test/search.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "734eef89a5924a4fdaefc47851760264e4775c8c75549a7be1da4c172b3e5e7c",
+        "derivedAt": "2026-11-12T05:30:48.929Z"
+      }
+    },
+    "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Fault in packages/core: invalid ISBNs are no longer rejected; search.test.js's assert.throws checks fail in all three runs, both layouts. Only a tool that follows the workspace link into packages/core can probe it.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/search/test/search.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "337e68d0db970c35468e82eef78fdf1d4ad8179580c54a96862ffd6a9dedf446",
+        "derivedAt": "2026-11-12T05:30:50.101Z"
+      }
+    },
+    "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Fault in packages/core/src/title.js: padded queries no longer match; search assertions fail in all three runs, both layouts.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/search/test/search.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "32c3f3b7ee9a85cf1146eadd5e7469873def23648ebc46683d22b292a9b96b91",
+        "derivedAt": "2026-11-12T05:30:51.216Z"
+      }
+    },
+    "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Fault in packages/core/src/title.js: tabs and newlines are no longer collapsed; search assertions fail in all three runs, both layouts.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/search/test/search.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "32c3f3b7ee9a85cf1146eadd5e7469873def23648ebc46683d22b292a9b96b91",
+        "derivedAt": "2026-11-12T05:30:52.435Z"
+      }
+    },
+    "SEARCH-RESULT-ORDERING/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Titles sort descending; ordering assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/search/test/search.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "37680cbecd284818dabfa03a32934d9b764c5961162ec74c22767fbd3a77aa4b",
+        "derivedAt": "2026-11-12T05:30:53.571Z"
+      }
+    },
+    "SEARCH-RESULT-ORDERING/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Years sort descending within a title; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/search/test/search.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "50684fca2aa05ce348cfb90f18486cf24a66dff473ca5ce770f3e646cd666374",
+        "derivedAt": "2026-11-12T05:30:54.687Z"
+      }
+    },
+    "REPORT-DECADE-COUNTS/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Years round to the nearest decade; report assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/report/test/report.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "9bd9b65b807fb3a89e8e5455f6e92c87a36105da544b06280b8787d6e2b7fd54",
+        "derivedAt": "2026-11-12T05:30:55.823Z"
+      }
+    },
+    "REPORT-DECADE-COUNTS/F2": {
+      "verdict": "fault-invalid",
+      "reason": "replacement-does-not-compile",
+      "why": "`a[0] - )` is a SyntaxError: node --test reports the report test file failed to load in all three runs. A load failure is never a kill.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/report/test/report.test.js"
+        },
+        "observed": "baseline GGG; probe LLL",
+        "outputHash": "678e6915f2326943c02436ab1511db1d483b60678eea3a7c3ef286f81e378872",
+        "derivedAt": "2026-11-12T05:30:57.071Z"
+      }
+    },
+    "REPORT-CITATION-LINE/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Fault in packages/core/src/author.js, defended by packages/report/test/report.test.js through @shelf/core: two-part names are no longer split; citation assertions fail in all three runs, both layouts.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/report/test/report.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "90a2105cbfa42b92a79696384f24c6a722d735ca1bae1549141a2cf7a0c1d454",
+        "derivedAt": "2026-11-12T05:30:58.334Z"
+      }
+    },
+    "REPORT-CITATION-LINE/F2": {
+      "verdict": "survived",
+      "why": "report.test.js never cites a record with exactly two authors (partial): green 3/3. Control (report index unparseable) fails to load, so the defender executes it. Whole suite 3/3: no test fails in every run.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/report/test/report.test.js",
+          "wholeSuite": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/core/test/isbn.test.js packages/core/test/names.test.js packages/report/test/report.test.js packages/search/test/search.test.js"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "38f3bac0bbda77e09383a9302b3603b5252e257ba524c0df153f2a24760c2e71",
+        "derivedAt": "2026-11-12T05:31:00.155Z"
+      }
+    },
+    "REPORT-CITATION-LINE/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Initials are no longer upper-cased; citation assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/report/test/report.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "9f8bfd7e252e84d5374fdf8ff69503411f6bdf9736468e287b2807ed3f458294",
+        "derivedAt": "2026-11-12T05:31:01.429Z"
+      }
+    }
+  },
+  "modes": {
+    "changed": {
+      "why": "Selections derived by reading the imports (spec: a claim is selected when a changed path is a fault target, a defender, or in the import closure of either). Every core test imports packages/core/src/index.js, which imports isbn, title and author; search.test.js imports search/src/index.js (which imports order.js) and core both by package name and by relative path; report.test.js imports @shelf/report, @shelf/search and @shelf/core. The working tree also holds .build/vendor/@shelf/core, an untracked, git-ignored copy of packages/core (#272): it is nobody's import and no change can be committed there.",
+      "steps": [
+        {
+          "name": "docs-only",
+          "edits": [
+            {
+              "file": "SPEC.md",
+              "find": "# Shelfmark: A Three-Part Library Catalog Tool",
+              "replace": "# Shelfmark: A Three-Part Library Catalog Tool\n\n<!-- corpus: a docs-only change -->"
+            }
+          ],
+          "expectedClaims": [],
+          "why": "SPEC.md is no claim's target, defender, import, manifest or runner configuration: the change is determined and selects nothing (exit 0, no evidence written)."
+        },
+        {
+          "name": "search-order-only",
+          "edits": [
+            {
+              "file": "packages/search/src/order.js",
+              "find": "const fold = (title) => title.toLowerCase();",
+              "replace": "// corpus: a scripted change, behavior-neutral\nconst fold = (title) => title.toLowerCase();"
+            }
+          ],
+          "expectedClaims": [
+            "REPORT-CITATION-LINE",
+            "REPORT-DECADE-COUNTS",
+            "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES",
+            "SEARCH-RESULT-ORDERING",
+            "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY"
+          ],
+          "why": "order.js is a target of SEARCH-RESULT-ORDERING and is in the closure of search.test.js (via search/src/index.js) and report.test.js (via @shelf/search). The core claims' defenders import only packages/core: ISBN13-CHECK-DIGIT, TITLE-NORMALIZATION and AUTHOR-NAME-PARSING are not reached."
+        },
+        {
+          "name": "report-only",
+          "edits": [
+            {
+              "file": "packages/report/src/index.js",
+              "find": "import { RecordNotFoundError } from './errors.js';",
+              "replace": "// corpus: a scripted change, behavior-neutral\nimport { RecordNotFoundError } from './errors.js';"
+            }
+          ],
+          "expectedClaims": [
+            "REPORT-CITATION-LINE",
+            "REPORT-DECADE-COUNTS"
+          ],
+          "why": "Only report.test.js imports @shelf/report; nothing in core or search imports the report package."
+        }
+      ],
+      "badRef": {
+        "ref": "refs/heads/corpus-no-such-branch",
+        "exit": 2,
+        "why": "An unresolvable reference is a precondition failure."
+      }
+    }
+  }
+}
