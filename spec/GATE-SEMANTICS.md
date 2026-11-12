@@ -161,6 +161,20 @@ The verdict set is closed. Only one value is a pass.
 
 Rules that follow from the table:
 
+**The checks run in a fixed order, and the first that applies decides.**
+`nocover` (no defender) → `unverifiable` with an anchor reason (the fault
+cannot be applied) → the type check's `fault-invalid` or `timeout` (rule 16)
+→ `flaky-defender` (rule 1) → the fault's own result (rules 2–5, 12). Where
+two findings both hold, the worse and more actionable one is reported, and
+that is the order above: **`nocover` precedes an invalid anchor.** Both gate,
+but `nocover` is the worse finding (nothing can be tried, whatever the fault
+says; every rendering ranks it above `unverifiable`) and its repair, a test
+that imports the subject, is needed whatever the anchor's repair turns out to
+be, while repairing the anchor alone leaves a fault nothing can detect. A
+record that reports an anchor reason (`anchor-missing`, `anchor-ambiguous`)
+for a fault with no resolved defender does not conform. The verdict function's
+check order is this rule.
+
 1. **Green baseline first.** Defenders run N times unmodified before any fault
    is applied. Anything short of N/N pass is `flaky-defender` and stops there.
 2. **Confirm over N runs.** `killed` and `survived` both require exactly N
@@ -300,6 +314,65 @@ Rules that follow from the table:
    candidate. Python follows module names, including the packages a module's
    import runs first and every `conftest.py` from the project root down to
    each file. Reuse requires the recorded and current maps to be equal.
+   **The closure describes the tree that will be probed.** Only files git
+   tracks at the probed commit are project files for the closure — plus
+   untracked files git does not ignore when the working tree is snapshotted
+   (`--include-dirty`) — which is exactly what the scratch worktree contains.
+   An ignored directory (a deployment bundle holding copies of third-party
+   packages, a vendored build) is never indexed or followed: a Python module
+   or a JavaScript file there does not exist for the closure, and an import
+   that reaches only such a file is unresolved (indeterminate), as it is in the
+   scratch tree. Root manifests are hashed under the same rule. So `probe`
+   (in the scratch tree), `probe --changed`, `status`, `gate` and the
+   origin-policy freshness check compute the same closure for the same commit.
+   Outside a git work tree every file on disk counts.
+   **A workspace package is followed like a relative import.** A bare
+   specifier that names a package the repository declares as a workspace
+   (root `package.json` `workspaces`, `pnpm-workspace.yaml` `packages`), or
+   that Node would resolve through a `node_modules` symlink whose target is
+   repository source (inside the repository and not under any `node_modules`:
+   a workspace, `file:` or `link:` dependency), is code the defenders run. The
+   closure includes that package's `package.json` and follows the entry its
+   `exports` names (every condition except `types`, since which one loads
+   depends on the caller; a subpath map with `*` patterns), else `main` and
+   `module`, else `index`, and on from there. Such a package inside the
+   repository but outside the project directory cannot be hashed
+   project-relative, and an entry that resolves to no file cannot be followed:
+   either makes the closure indeterminate (`unreadable-module`, naming the
+   specifier). A link whose target leaves the repository, and a package
+   installed as a real directory, stay outside the closure.
+   **An alias is read, or the closure says it could not be.** Aliased
+   specifiers resolve through tsconfig/jsconfig `paths`, package.json
+   `imports` and vite/vitest `alias`. A vite/vitest alias value is read from
+   the config's tokens, never by running the config, over a closed grammar of
+   path expressions: a relative string, `fileURLToPath(new URL('./x',
+   import.meta.url))`, `new URL(…).pathname`, `resolve`/`join`/`dirname` (bare
+   or as `path.…`) over `__dirname`, `__filename`, `import.meta.dirname`,
+   `import.meta.filename`, `process.cwd()` and string literals, and a
+   top-level `const` bound to one of those. An alias whose key is known but
+   whose value is outside that grammar resolves its specifiers to nothing, so
+   a closure that uses it is indeterminate (`unreadable-module`); an alias map
+   that cannot be read at all (a variable, a spread, a computed key, a RegExp
+   `find`) does the same for every bare specifier. Neither refuses the run, and
+   neither is dropped: a dropped alias made its specifiers look like packages,
+   outside the closure.
+   **Ordinary export forms are read, not refused.** A module whose exports the
+   reader cannot read is `unsupported-syntax`, which makes every importer's
+   closure indeterminate, so the reader covers what projects ordinarily write.
+   TypeScript type-only and ambient forms (`export interface`, `export type`,
+   `export type { … } from`, `import type`, `export declare …`,
+   `export as namespace`) declare no runtime binding and load nothing; `export
+   enum`, `export const enum`, `export namespace`/`module`, `export abstract
+   class`, generator functions, decorated classes, `satisfies`, several
+   declarators and destructuring declarations export the names they declare.
+   `import type from 'x'` is a default import named `type` and loads `x`. A
+   CommonJS `module.exports = { … }` exports each key: a shorthand or a name is
+   that binding; `require('x')` is module `x`, `require('x').y` its export `y`,
+   `ns.y` the export `y` of an imported namespace; any other value is computed
+   in the module, as `exports.X = call()` is. A spread, a computed key, an
+   accessor, a member of a named import, and a module load inside an
+   expression (`wrap(require('x'))`) stay `unsupported-syntax`: when in doubt
+   the closure is indeterminate, never smaller.
    When any import cannot be followed — a dynamic import, `require`,
    `import_module` or `__import__` whose argument is not one string literal; a
    project-relative or aliased specifier that resolves to no file; a module
@@ -312,8 +385,7 @@ Rules that follow from the table:
 
    **One live baseline licenses every carry-forward.** No hash sees the
    environment: installed packages, the interpreter, a data file a test reads,
-   a bare specifier that resolves through a `node_modules` symlink to a
-   workspace package (outside the project closure), a setup or global-setup
+   a setup or global-setup
    file a runner configuration names by string rather than imports, a lockfile
    above the project directory in a monorepo. So before a prior record
    with a non-empty defender set is carried forward, that defender set runs
@@ -369,7 +441,24 @@ Rules that follow from the table:
    **refuse the run** when the subject was loaded from outside the tree being
    probed — in Python an editable install (PEP 660) registers an import hook
    consulted ahead of every path entry, and a plain install leaves a copy in
-   `site-packages`, so this is the normal case, not an exotic one. When no
+   `site-packages`, so this is the normal case, not an exotic one.
+   JavaScript has the same hazard in a monorepo: a workspace link
+   (`node_modules/@scope/pkg -> ../../packages/pkg`) borrowed into a scratch
+   tree resolves to the original checkout's package, so a fault applied in the
+   scratch tree is never executed by a defender in a sibling package. A tool
+   that probes in a scratch tree must therefore give each tree its own
+   layout: every `node_modules` link whose target is repository source (as
+   rule 8 defines it) points at the scratch tree's copy of that package, in
+   the root install and in each package's own `node_modules`, for npm, yarn
+   and pnpm layouts, without writing into the shared install (which may be
+   read-only). The fan-out's trees and the serial re-measure tree get the
+   same layout. A package's ignored top-level entries (a build's `dist/`) are
+   linked from the source package, since the commit does not hold them; a
+   fault in its source does not reach them, which the negative control
+   (rule 12) reports as `subject-not-executed`, never as a verdict. A link to
+   repository source the scratch tree does not contain (an ignored or
+   uncommitted package) refuses the run with the precondition
+   `workspace-link-outside-tree`, naming the link. When no
    defender imported the subject at all, the run continues: an import inside a
    branch the fault does not reach is legitimate. It is recorded as
    `detail.targetNotImported`, because a `survived` there is a statement about
@@ -522,10 +611,16 @@ Rules that follow from the table:
    Static string literals are conservative dependency candidates, not proof
    of a filesystem dependency. Missing candidates, ordinary directories
    (including `/` in URL bases and string separators) and strings too long to
-   be a path are ignored. Symbolic links are followed while the real path stays
-   inside the project; containment is decided on the real path. An existing
-   candidate file whose real path is outside the project, a link (or dangling
-   link) that leaves it, and a link cycle are rejected, naming the path.
+   be a path are ignored: a string that names a directory (`new URL('./src',
+   import.meta.url)`) is never read as a module through its index file, only a
+   `references` entry's tsconfig/jsconfig is taken from it. Symbolic links are
+   followed while the real path stays inside the project; containment is
+   decided on the real path. An existing candidate file whose real path is
+   outside the project, a link (or dangling link) that leaves it, and a link
+   cycle are rejected, naming the path. An import in a config or config
+   dependency that the project's alias configuration maps (rule 8) is followed
+   to the project file it names, never resolved as a package; one the alias
+   maps to nothing is not followed here and never refuses the run.
 
 14. **Barrel resolution follows symbols, not module reachability.** Automatic
    discovery may traverse a re-export chain only for the binding the test
@@ -1078,10 +1173,32 @@ a `TMPDIR` inside it. Unset, it is the operating system's temp directory, as
 before. A directory that does not exist or cannot be written is a precondition
 error (exit 2) reported before anything is written; it is never created.
 
-The scratch worktree gets its own `node_modules` directory whose entries link
-to the shared install, so a tool that writes `node_modules/.vite-temp`,
-`.vite` or `.cache` writes into the scratch tree and never into the install.
-Dot-entries that are not part of an install are not carried across. The
+The scratch worktree gets its own `node_modules`, and **no level a package
+manager may write is a link into the user's install** (#279). A runner
+command can run a package manager in the scratch tree (`pnpm vitest …`
+verifies the install and relinks it), so every node_modules-level directory —
+the root, each scope, `.bin`, `.pnpm`, `.pnpm/<id>`, its `node_modules`, a
+package's own nested `node_modules`, and the same in every workspace
+package's `node_modules` — is a real directory in the scratch tree; every
+file at such a level (bin shims, install metadata) is a copy; every symlink is
+a new symlink to its resolved target, never a link to the user's link; and a
+package directory is a read-only leaf. Install metadata that names the
+user's checkout by absolute path (pnpm's workspace state) is rewritten to
+name the scratch tree. A `node_modules` the checked-out tree itself holds as
+a symlink (committed, or captured by an `--include-dirty` snapshot of a
+worktree whose `node_modules` links to the main checkout's) is replaced by
+this layout. So a tool that writes `node_modules/.vite-temp`, `.vite` or
+`.cache`, and a package manager that relinks, write into the scratch tree and
+never into the install. Tool cache directories are not carried across.
+
+**The install is checked, not trusted.** Before a scratch-tree run and again
+after every scratch tree is removed, each borrowed install is fingerprinted at
+the levels a package manager writes (entry names, kinds, link targets, file
+sizes and times). A difference refuses the run with the precondition
+`install-changed`, naming the paths and telling the user to reinstall; no
+evidence is written, because verdicts measured while the install changed
+under them describe nothing. Something else changing the install during the
+run (the user reinstalling) is refused the same way. The
 per-run temp directory also sets `XDG_DATA_HOME` (vitest keeps an API token
 there on Linux). Runs against the caller's own tree (the dirty-tree test
 discovery, `--in-place`) cannot be redirected: discovery asks vitest 4 and
@@ -1091,8 +1208,11 @@ later for `--configLoader runner` when the install is not writable, and
 `run.writeBoundary` records signals, never paths: `scratchDir` is `default` or
 `configured`; `nodeModulesWritable` is true when any linked install (or
 `--node-modules`) could be written as the run started, false when none could,
-and absent when none is linked. It does not enter reuse: it is a statement
-about where the run could write, and no verdict depends on it.
+and absent when none is linked. `installUnchanged` is `true` when the
+install fingerprints were compared and agreed; it is never `false` (that run
+is refused) and absent when nothing was borrowed or the run was in place. It
+does not enter reuse: it is a statement about where the run could write, and
+no verdict depends on it.
 
 What is not promised: the tests under probe run the project's own code with the
 caller's privileges. The boundary says where TestGuard and the built-in runners
@@ -1155,9 +1275,19 @@ A claim is **selected** when any of those paths is one of: a fault's target; a
 defender, whether the claim names it (`defendedBy`, literally or by glob) or
 discovery resolves it; or a file in the import closure of the target and the
 defenders (the same closure `inputs.dependencyHashes` records, manifests and
-runner configuration included). A closure that cannot be followed selects the
-claim whenever anything changed: not being able to tell is never read as
-"unaffected". `--claim` intersects: the selection is the requested ids that the
+runner configuration included; a workspace package reached through its link
+is part of it, rule 8). A closure that cannot be followed selects the
+claim whenever anything changed **anywhere in the repository**, not only in
+the project directory: what the closure could not follow may be a sibling
+package outside it, and not being able to tell is never read as
+"unaffected". The closures are those of the tree the probe will measure (rule
+8: tracked files, plus untracked non-ignored ones under `--include-dirty`).
+`run.scope.changed.matchReasons` says why each matched claim was selected, in
+`matchedClaims` order: `file` (the first changed file that is a target, a
+resolved defender or in the closure), `glob` (a changed path only a
+`defendedBy` glob matches, such as a deleted defender) or `indeterminate`
+(with the closure's first recorded issue). It names each matched claim once
+and nothing else. `--claim` intersects: the selection is the requested ids that the
 change reached, in the order requested. An unknown `--claim` id is an error
 whatever the change is.
 

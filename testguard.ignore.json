@@ -4,17 +4,10 @@
   "entries": [
     {
       "kind": "path",
-      "pattern": "corpus/**",
-      "reason": "The benchmark corpus (#258): subject projects that TestGuard is measured AGAINST, plus the harness that runs it. Its source files are inputs to the tool, not part of it, and are judged by their own hand-derived keys (corpus/*/expected.json, re-checked by corpus/key.mjs --check). It is excluded from the package and from npm test, exactly as fixtures/** is excluded by default. The harness is proven by the corpus CI job going red on a planted wrong key, a planted wrong verdict and the tool mutants.",
+      "pattern": "test/workspace.acceptance.test.mjs",
+      "reason": "Real-probe acceptance for #263 and #268: a two-package workspace probed under node:test (npm and pnpm layouts, --fault-workers 2, and a reuse run across a workspace-package change), about half a minute of nested probes. Mandatory in npm test and CI. The claims TG-SCRATCH-TREE-RUNS-ITS-OWN-WORKSPACE-PACKAGES and TG-WORKSPACE-PACKAGES-ARE-IN-THE-IMPORT-CLOSURE name the fast defenders test/workspace-scratch.test.mjs and test/workspace-closure.test.mjs; naming this file as a self-probe defender would pay for nested probes on every fault.",
       "by": "claude",
-      "at": "2026-11-11T23:30:00Z"
-    },
-    {
-      "kind": "path",
-      "pattern": "test/corpus-mutants.test.mjs",
-      "reason": "Checks only that the corpus's tool-mutant patches (corpus/tool-mutants/*.patch) still apply to src/ (git apply --check); it asserts nothing about TestGuard's behavior, so no claim's fault could make it fail except by moving the patched lines, which is exactly what it reports. Runs in npm test so a src/ change that breaks a patch regenerates it in the same pull request.",
-      "by": "claude",
-      "at": "2026-11-11T23:30:00Z"
+      "at": "2026-11-11T22:30:00Z"
     },
     {
       "kind": "path",
@@ -103,7 +96,7 @@
     {
       "kind": "path",
       "pattern": "src/probe/runners/python/**",
-      "reason": "The injected Python reporters. They are not JavaScript, so a claim here could only be probed by running TestGuard's Python runner against TestGuard itself \u2014 circular, and it would prove the runner with the runner. They are instead held to fixtures/known-answer-python, whose sixteen verdicts were verified by hand against `python -m unittest`'s own exit code and must reproduce under BOTH engines: any behaviour change in a reporter moves a verdict there, in CI, on every push. Re-evaluate if they gain logic the fixture cannot reach.",
+      "reason": "The injected Python reporters. They are not JavaScript, so a claim here could only be probed by running TestGuard's Python runner against TestGuard itself — circular, and it would prove the runner with the runner. They are instead held to fixtures/known-answer-python, whose sixteen verdicts were verified by hand against `python -m unittest`'s own exit code and must reproduce under BOTH engines: any behaviour change in a reporter moves a verdict there, in CI, on every push. Re-evaluate if they gain logic the fixture cannot reach.",
       "by": "maintainer",
       "at": "2026-09-18T00:00:00Z"
     },
@@ -124,7 +117,7 @@
     {
       "kind": "claim",
       "pattern": "TG-CALIBRATION-EXCLUDES-UNINFORMATIVE",
-      "reason": "Replaced by TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS, which states the opposite of one half of it. The old statement said nocover \"carries no information about detection\" and its one fault (every verdict enters the denominator) was killed \u2014 but the claim it defended was wrong: nocover is a successful measurement with the worst result, and excluding it scored a project with no tests for a subsystem better than one with weak tests, because its worst outcomes left the denominator before the ratio was taken. The other half (flaky and unverifiable are failed measurements and enter neither side) is carried into the new claim's statement and test. Not a rename, because the statement had to change; not a silent removal, because this entry says why.",
+      "reason": "Replaced by TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS, which states the opposite of one half of it. The old statement said nocover \"carries no information about detection\" and its one fault (every verdict enters the denominator) was killed — but the claim it defended was wrong: nocover is a successful measurement with the worst result, and excluding it scored a project with no tests for a subsystem better than one with weak tests, because its worst outcomes left the denominator before the ratio was taken. The other half (flaky and unverifiable are failed measurements and enter neither side) is carried into the new claim's statement and test. Not a rename, because the statement had to change; not a silent removal, because this entry says why.",
       "by": "maintainer",
       "at": "2026-09-18T15:35:15Z"
     },
@@ -228,6 +221,20 @@
       "reason": "Fixture builder for test/probe-partial-budget.test.mjs, the slow acceptance test above: it builds a four-claim node:test project in a temporary git repository and asserts nothing. The claims that matter are defended by test/partial-budget.test.mjs and the conformance suite, which do not use it.",
       "by": "claude",
       "at": "2026-11-11T03:30:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "corpus/**",
+      "reason": "The benchmark corpus (#258): subject projects that TestGuard is measured AGAINST, plus the harness that runs it. Its source files are inputs to the tool, not part of it, and are judged by their own hand-derived keys (corpus/*/expected.json, re-checked by corpus/key.mjs --check). It is excluded from the package and from npm test, exactly as fixtures/** is excluded by default. The harness is proven by the corpus CI job going red on a planted wrong key, a planted wrong verdict and the tool mutants.",
+      "by": "claude",
+      "at": "2026-11-11T23:30:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/corpus-mutants.test.mjs",
+      "reason": "Checks only that the corpus's tool-mutant patches (corpus/tool-mutants/*.patch) still apply to src/ (git apply --check); it asserts nothing about TestGuard's behavior, so no claim's fault could make it fail except by moving the patched lines, which is exactly what it reports. Runs in npm test so a src/ change that breaks a patch regenerates it in the same pull request.",
+      "by": "claude",
+      "at": "2026-11-11T23:30:00Z"
     },
     {
       "kind": "path",

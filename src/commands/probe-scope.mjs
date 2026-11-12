@@ -19,7 +19,7 @@ export function selectByChange({ projectDir, claims, ref, includeDirty, only, fa
   if (scope.outcome === 'undetermined') {
     return { outcome: 'undetermined', exitCode: 2, scope: { probedClaims: [], probedCount: 0, changed: { ref, outcome: 'undetermined', reason: scope.reason } } };
   }
-  const changed = { ref, outcome: 'determined', base: scope.base, head: scope.head, includeDirty, files: scope.files, matchedClaims: scope.matchedClaims, unmatchedFiles: scope.unmatchedFiles, note: scope.note };
+  const changed = { ref, outcome: 'determined', base: scope.base, head: scope.head, includeDirty, files: scope.files, matchedClaims: scope.matchedClaims, matchReasons: scope.matchReasons, unmatchedFiles: scope.unmatchedFiles, note: scope.note };
   if (scope.selected.length === 0) {
     return { outcome: 'empty', exitCode: failOnEmpty ? 2 : 0, scope: { ...(only ? { requestedClaims: only, requestedCount: only.length } : {}), probedClaims: [], probedCount: 0, selectedCount: 0, changed } };
   }

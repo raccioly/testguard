@@ -298,10 +298,13 @@ export function classifyPythonDefenders(projectDir, targetRel, candidates) {
  * A name two files share (`src/pkg/mod.py` and `tests/pkg/mod.py`) maps to
  * both: which one Python loads depends on `sys.path`, so both are inputs.
  */
-export function pyModuleIndex(projectDir) {
+export function pyModuleIndex(projectDir, { visible = null } = {}) {
   const index = new Map();
   for (const rel of walk(projectDir)) {
     if (!PY.test(rel)) continue;
+    // #272: an ignored or untracked copy (a deployment bundle holding
+    // pydantic) is not a project module; the scratch tree will not hold it.
+    if (visible && !visible.has(rel)) continue;
     const { dotted } = pyModuleName(projectDir, rel);
     if (!dotted) continue;
     if (!index.has(dotted)) index.set(dotted, []);
@@ -325,7 +328,7 @@ const RELATIVE_FROM = /^\s*from\s+(\.+)([\w.]*)\s+import\s/;
  * that names no project module. Absolute names that match no project file are
  * the standard library or installed packages, outside this closure.
  */
-export function pyClosure(projectDir, relFiles, { index = pyModuleIndex(projectDir), limits = {} } = {}) {
+export function pyClosure(projectDir, relFiles, { visible = null, index = pyModuleIndex(projectDir, { visible }), limits = {} } = {}) {
   const cap = { maxModules: 256, maxFileBytes: 1_048_576, maxTotalBytes: 16_777_216, ...limits };
   const files = new Set();
   const issues = [];
@@ -336,7 +339,7 @@ export function pyClosure(projectDir, relFiles, { index = pyModuleIndex(projectD
     add(rel);
     for (let dir = dirname(rel); ; dir = dirname(dir)) {
       const conftest = dir === '.' ? 'conftest.py' : `${dir}/conftest.py`;
-      if (existsSync(join(projectDir, conftest))) add(conftest);
+      if (existsSync(join(projectDir, conftest)) && (!visible || visible.has(conftest))) add(conftest);
       if (dir === '.' || dir === '/' || dir === '') break;
     }
   }
