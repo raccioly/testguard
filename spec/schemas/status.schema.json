@@ -682,14 +682,14 @@
           "items": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" }
         },
         "matchReasons": {
-          "description": "Why each matched claim was selected, one entry per matchedClaims id in the same order: `file` (a changed file is a fault target, a resolved defender or in the import closure; `file` names the first), `glob` (a changed path only a defendedBy glob matches, such as a deleted defender), or `indeterminate` (the closure cannot be followed and something in the repository changed; `issue` is its first recorded reason). Absent in documents written before it existed.",
+          "description": "Why each matched claim was selected, one entry per matchedClaims id in the same order: `file` (a changed file is a fault target, a resolved defender or in the import closure; `file` names the first), `glob` (a changed path only a defendedBy glob matches, such as a deleted defender), `discovery` (#297: the claim's defenders are discovered and a changed file is one of its discovery inputs, a candidate test file or something a candidate imports, as found now or as its evidence recorded them; `file` names the first), or `indeterminate` (the closure or the defender discovery cannot be followed and something in the repository changed; `issue` is the closure's first recorded reason). Absent in documents written before it existed.",
           "type": "array",
           "items": {
             "type": "object",
             "required": ["claimId", "kind"],
             "properties": {
               "claimId": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" },
-              "kind": { "enum": ["file", "glob", "indeterminate"] },
+              "kind": { "enum": ["file", "glob", "discovery", "indeterminate"] },
               "file": { "type": "string", "minLength": 1 },
               "glob": { "type": "string", "minLength": 1 },
               "issue": {

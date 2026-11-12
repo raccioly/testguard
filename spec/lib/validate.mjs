@@ -576,7 +576,7 @@ const semantic = {
       const ids = changedScope.matchReasons.map((reason) => reason.claimId);
       if (ids.length !== changedScope.matchedClaims.length || ids.some((id, i) => id !== changedScope.matchedClaims[i])) errors.push({ path: '/run/scope/changed/matchReasons', message: 'matchReasons must name each matchedClaims id exactly once, in the same order' });
       changedScope.matchReasons.forEach((reason, i) => {
-        if (reason.kind === 'file' && !changedScope.files.includes(reason.file)) errors.push({ path: `/run/scope/changed/matchReasons/${i}/file`, message: 'a file reason names a changed file' });
+        if ((reason.kind === 'file' || reason.kind === 'discovery') && !changedScope.files.includes(reason.file)) errors.push({ path: `/run/scope/changed/matchReasons/${i}/file`, message: 'a file reason names a changed file' });
       });
     }
     if (doc.changes && doc.changes.uncovered.length > 0 && !['no-claims', 'unclaimed-changes'].includes(doc.state)) errors.push({ path: '/state', message: 'uncovered changed files are hidden behind a later state; unclaimed-changes precedes every evidence state' });

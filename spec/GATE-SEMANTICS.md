@@ -1318,6 +1318,14 @@ and nothing else. `--claim` intersects: the selection is the requested ids that 
 change reached, in the order requested. An unknown `--claim` id is an error
 whatever the change is.
 
+For a fault whose defenders are **discovered** (no `defendedBy`), the claim is
+also selected when a changed path is one of its discovery inputs (#297): a
+candidate test file, or a file a candidate imports, as discovery finds them now
+or as the claim's evidence recorded them (`inputs.discoveryHashes`; a deleted
+candidate is known only there). An edit to any of them can give the claim a
+defender, which changes its verdict. Discovery that cannot be followed selects
+the claim as an indeterminate closure does. The reason is `discovery`.
+
 Selection has three outcomes, reported in `run.scope.changed.outcome` and
 `run.scope.selectedCount`, and they are never confused:
 
