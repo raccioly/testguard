@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import config from '../vitest.config.mjs';
 
 describe('the root test boundary', () => {
-  it('never collects fixtures or agent-managed nested worktrees', () => {
+  it('never collects fixtures, the benchmark corpus or agent-managed nested worktrees', () => {
     expect(config.test.maxWorkers).toBe(process.env.CI ? 3 : Math.min(2, Math.max(1, availableParallelism() - 1)));
     expect(config.test.exclude).toEqual(expect.arrayContaining([
       'fixtures/**',
+      // corpus/ subjects carry planted flaky, hanging and failing tests (#258)
+      'corpus/**',
       '.claude/**',
     ]));
   });

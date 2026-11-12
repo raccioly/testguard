@@ -1,0 +1,9 @@
+{
+  "rule": "Fixed before the claim and test authors ran: a claim tied to a requirement is defended by the test file the test author was told to write for that requirement.",
+  "byRequirement": {
+    "R1": ["tests/test_loans.py"], "R2": ["tests/test_loans.py"], "R3": ["tests/test_loans.py"],
+    "R4": ["tests/test_fees.py"], "R5": ["tests/test_fees.py"], "R6": ["tests/test_fees.py"], "R7": ["tests/test_fees.py"],
+    "R8": ["tests/test_holds.py"], "R9": ["tests/test_holds.py"], "R10": ["tests/test_holds.py"],
+    "R11": ["tests/test_membership.py"], "R12": ["tests/test_membership.py"], "R13": ["tests/test_membership.py"]
+  }
+}

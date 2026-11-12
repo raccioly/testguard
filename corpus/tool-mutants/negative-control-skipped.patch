@@ -1,0 +1,9 @@
+diff --git a/src/probe/probe.mjs b/src/probe/probe.mjs
+index ca27130..297f4fa 100644
+--- a/src/probe/probe.mjs
++++ b/src/probe/probe.mjs
+@@ -1147,3 +1147,3 @@ async function measureFault(state, tree) {
+       if (provisional.verdict === 'survived') {
+-        subjectReached = await negativeControl({ file: fault.file, defenders, iso, runDefenders, fatalEditFor, cache: controlCache, stage });
++        subjectReached = undefined;
+         if (subjectReached !== undefined) detail.negativeControl = subjectReached ? 'reached' : 'not-reached';

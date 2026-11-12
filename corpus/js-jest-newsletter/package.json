@@ -1,0 +1,10 @@
+{
+  "name": "corpus-js-jest-newsletter",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Corpus subject: plain CommonJS JavaScript under jest. See SPEC.md and PROVENANCE.md.",
+  "scripts": { "test": "jest" },
+  "devDependencies": {
+    "jest": "30.5.2"
+  }
+}

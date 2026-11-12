@@ -1,0 +1,390 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "ESCAPE-BY-DEFAULT",
+      "statement": "Substituted values are HTML-escaped by default (& < > \" '), while the triple-brace form inserts the value unescaped.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-jest-newsletter#R2"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/template.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The less-than character is escaped to the greater-than entity.",
+          "faultClass": "literal-changed",
+          "file": "src/template.js",
+          "find": "'<': '&lt;'",
+          "replace": "'<': '&gt;'",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Raw triple-brace values are escaped as well.",
+          "faultClass": "condition-forced",
+          "file": "src/template.js",
+          "find": "out += raw ? value : escapeHtml(value);",
+          "replace": "out += escapeHtml(value);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A missing comma in the escape table makes the module fail to load.",
+          "faultClass": "statement-deleted",
+          "file": "src/template.js",
+          "find": "'>': '&gt;'",
+          "replace": "'>': '&gt;' '\"': '&quot;'",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MISSING-VALUE-HANDLING",
+      "statement": "In strict mode a placeholder with no value fails with MissingValueError 'missing value: <name>', and a name present with an empty-string value is not missing.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-jest-newsletter#R3"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/template.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Presence is judged by truthiness, so an empty-string value is treated as missing.",
+          "faultClass": "condition-forced",
+          "file": "src/template.js",
+          "find": "Object.prototype.hasOwnProperty.call(map, name)",
+          "replace": "map[name]",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The error message drops the 'value' word.",
+          "faultClass": "literal-changed",
+          "file": "src/template.js",
+          "find": "`missing value: ${name}`",
+          "replace": "`missing: ${name}`",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "UNCLOSED-PLACEHOLDER-ERROR",
+      "statement": "A template with an unclosed '{{' fails with TemplateSyntaxError reporting the zero-based index of the opening '{{'.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-jest-newsletter#R4"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/template.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The error reports the position after the braces instead of the opening braces.",
+          "faultClass": "variable-swap",
+          "file": "src/template.js",
+          "find": "position ${open}",
+          "replace": "position ${start}",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Stale anchor for the closer definition under an older variable name.",
+          "faultClass": "literal-changed",
+          "file": "src/template.js",
+          "find": "const closing = raw ? '}}}' : '}}';",
+          "replace": "const closing = '}}';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SLUG-FORMAT",
+      "statement": "slugify lowercases the title, turns each run of non-alphanumeric characters into a single hyphen, and strips leading and trailing hyphens.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-jest-newsletter#R5"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/slug.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Calls a non-existent string method, so slugify throws for any ordinary title.",
+          "faultClass": "literal-changed",
+          "file": "src/slug.js",
+          "find": ".toLowerCase()",
+          "replace": ".toLowerCaseAll()",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Only leading hyphens are stripped, so slugs for titles like 'Hello!' keep a trailing hyphen.",
+          "faultClass": "guard-removed",
+          "file": "src/slug.js",
+          "find": ".replace(/^-+|-+$/g, '')",
+          "replace": ".replace(/^-+/, '')",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SLUG-LIMIT",
+      "statement": "slugify cuts a slug longer than the limit at the limit and removes any trailing hyphen, and a limit below 1 fails with InvalidLimitError.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-jest-newsletter#R7"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/slug.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The trailing hyphen left by the cut is no longer removed.",
+          "faultClass": "call-removed",
+          "file": "src/slug.js",
+          "find": ".replace(/-+$/, '')",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A limit of 0 is accepted instead of rejected.",
+          "faultClass": "literal-changed",
+          "file": "src/slug.js",
+          "find": "limit < 1",
+          "replace": "limit < 0",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "COUNT-WORDS",
+      "statement": "countWords returns the number of maximal runs of non-whitespace characters, and 0 for empty or whitespace-only text.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-jest-newsletter#R8"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/reading.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "countWords loops forever for any input.",
+          "faultClass": "condition-forced",
+          "file": "src/reading.js",
+          "find": "const trimmed = String(text).trim();",
+          "replace": "const trimmed = String(text).trim();\n  while (true) {}",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Words are split on single spaces only, so tabs, newlines and repeated spaces miscount.",
+          "faultClass": "literal-changed",
+          "file": "src/reading.js",
+          "find": "split(/\\s+/)",
+          "replace": "split(' ')",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "READING-TIME-MINUTES",
+      "statement": "readingTime returns whole minutes rounded up at 400 words per minute for skimmers and 200 for careful readers, with at least 1 minute for any positive count.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-jest-newsletter#R9"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/rates.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Rounds down instead of up, so 201 careful words gives 1 minute.",
+          "faultClass": "return-altered",
+          "file": "src/reading.js",
+          "find": "Math.ceil(count / RATES[readerClass])",
+          "replace": "Math.floor(count / RATES[readerClass])",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The skimmer rate is changed from 400 to 300 words per minute.",
+          "faultClass": "literal-changed",
+          "file": "src/reading.js",
+          "find": "skimmer: 400",
+          "replace": "skimmer: 300",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SCHEDULE-VALIDATION",
+      "statement": "An empty day set fails with EmptyScheduleError 'at least one send day is required', and a time that is not a valid 24-hour HH:MM fails with InvalidTimeError.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-jest-newsletter#R13"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The first EmptyScheduleError message is reworded, so an empty day set reports the wrong message.",
+          "faultClass": "literal-changed",
+          "file": "src/schedule.js",
+          "find": "at least one send day is required",
+          "replace": "at least one day is required",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The hour pattern accepts 24 to 29, so a time like 24:00 is no longer rejected.",
+          "faultClass": "guard-removed",
+          "file": "src/schedule.js",
+          "find": "([01]\\d|2[0-3])",
+          "replace": "([0-2]\\d)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "FOOTER-BY-AUDIENCE",
+      "statement": "footer greets a subscriber by name, gives guests the fixed subscribe line, and rejects any other recipient kind with UnknownRecipientError.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-jest-newsletter#R14"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The subscriber footer prints the recipient kind instead of the name.",
+          "faultClass": "variable-swap",
+          "file": "src/footer.js",
+          "find": "${recipient.name}",
+          "replace": "${kind}",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Any kind other than subscriber gets the guest footer, so unknown kinds no longer fail.",
+          "faultClass": "condition-forced",
+          "file": "src/footer.js",
+          "find": "if (kind === 'guest') {",
+          "replace": "if (kind !== 'subscriber') {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    }
+  ]
+}

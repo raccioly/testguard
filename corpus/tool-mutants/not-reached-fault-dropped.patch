@@ -1,0 +1,9 @@
+diff --git a/src/probe/partial-budget.mjs b/src/probe/partial-budget.mjs
+index 33ac57c..79c52fc 100644
+--- a/src/probe/partial-budget.mjs
++++ b/src/probe/partial-budget.mjs
+@@ -58,3 +58,3 @@ export function notReachedRecord({ claim, fault, inputs, limitMs }) {
+ export function completeRecords(faults, settled, reachedOf) {
+-  return faults.map((item, index) => settled.get(index) ?? reachedOf(item));
++  return faults.map((item, index) => settled.get(index)).filter(Boolean);
+ }

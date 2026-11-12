@@ -4,6 +4,20 @@
   "entries": [
     {
       "kind": "path",
+      "pattern": "corpus/**",
+      "reason": "The benchmark corpus (#258): subject projects that TestGuard is measured AGAINST, plus the harness that runs it. Its source files are inputs to the tool, not part of it, and are judged by their own hand-derived keys (corpus/*/expected.json, re-checked by corpus/key.mjs --check). It is excluded from the package and from npm test, exactly as fixtures/** is excluded by default. The harness is proven by the corpus CI job going red on a planted wrong key, a planted wrong verdict and the tool mutants.",
+      "by": "claude",
+      "at": "2026-11-11T23:30:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/corpus-mutants.test.mjs",
+      "reason": "Checks only that the corpus's tool-mutant patches (corpus/tool-mutants/*.patch) still apply to src/ (git apply --check); it asserts nothing about TestGuard's behavior, so no claim's fault could make it fail except by moving the patched lines, which is exactly what it reports. Runs in npm test so a src/ change that breaks a patch regenerates it in the same pull request.",
+      "by": "claude",
+      "at": "2026-11-11T23:30:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/write-boundary.acceptance.test.mjs",
       "reason": "Real-runner acceptance for the declared write boundary: four fixtures (vitest, jest, unittest, Playwright), each probed in a sandbox with a read-only and a writable copy of node_modules and a before/after listing, a few minutes in total. Mandatory in npm test and CI. The claims about the boundary (TG-SCRATCH-ROOT-IS-ONE-CALLS-DIRECTORY, TG-NODE-MODULES-IS-NEVER-WRITTEN-THROUGH and the others) are defended by the fast tests in test/scratch-dir.test.mjs and test/write-boundary.helpers.test.mjs; naming this file as a self-probe defender would re-run four runners for every fault.",
       "by": "claude",
@@ -89,7 +103,7 @@
     {
       "kind": "path",
       "pattern": "src/probe/runners/python/**",
-      "reason": "The injected Python reporters. They are not JavaScript, so a claim here could only be probed by running TestGuard's Python runner against TestGuard itself — circular, and it would prove the runner with the runner. They are instead held to fixtures/known-answer-python, whose sixteen verdicts were verified by hand against `python -m unittest`'s own exit code and must reproduce under BOTH engines: any behaviour change in a reporter moves a verdict there, in CI, on every push. Re-evaluate if they gain logic the fixture cannot reach.",
+      "reason": "The injected Python reporters. They are not JavaScript, so a claim here could only be probed by running TestGuard's Python runner against TestGuard itself \u2014 circular, and it would prove the runner with the runner. They are instead held to fixtures/known-answer-python, whose sixteen verdicts were verified by hand against `python -m unittest`'s own exit code and must reproduce under BOTH engines: any behaviour change in a reporter moves a verdict there, in CI, on every push. Re-evaluate if they gain logic the fixture cannot reach.",
       "by": "maintainer",
       "at": "2026-09-18T00:00:00Z"
     },
@@ -110,7 +124,7 @@
     {
       "kind": "claim",
       "pattern": "TG-CALIBRATION-EXCLUDES-UNINFORMATIVE",
-      "reason": "Replaced by TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS, which states the opposite of one half of it. The old statement said nocover \"carries no information about detection\" and its one fault (every verdict enters the denominator) was killed — but the claim it defended was wrong: nocover is a successful measurement with the worst result, and excluding it scored a project with no tests for a subsystem better than one with weak tests, because its worst outcomes left the denominator before the ratio was taken. The other half (flaky and unverifiable are failed measurements and enter neither side) is carried into the new claim's statement and test. Not a rename, because the statement had to change; not a silent removal, because this entry says why.",
+      "reason": "Replaced by TG-CALIBRATION-COUNTS-NOCOVER-AS-A-MISS, which states the opposite of one half of it. The old statement said nocover \"carries no information about detection\" and its one fault (every verdict enters the denominator) was killed \u2014 but the claim it defended was wrong: nocover is a successful measurement with the worst result, and excluding it scored a project with no tests for a subsystem better than one with weak tests, because its worst outcomes left the denominator before the ratio was taken. The other half (flaky and unverifiable are failed measurements and enter neither side) is carried into the new claim's statement and test. Not a rename, because the statement had to change; not a silent removal, because this entry says why.",
       "by": "maintainer",
       "at": "2026-09-18T15:35:15Z"
     },

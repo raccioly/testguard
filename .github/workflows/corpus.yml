@@ -1,0 +1,130 @@
+name: Corpus
+
+# The benchmark corpus (issue #258, corpus/README.md): every subject under
+# every mode against hand-derived keys, plus the tool mutants. Not a leg of the
+# test job: it runs only when what it measures changed, one shard per subject
+# and per mutant group in parallel, and fails on any wrong verdict, any
+# differential mismatch and any mutant the corpus does not catch. On main it
+# keeps the scorecard as an artifact so pull requests can compare against it.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['src/**', 'spec/**', 'cli/**', 'corpus/**', 'package.json', 'package-lock.json', 'testguard.cost-budget.json', '.github/scripts/measure-reference.mjs', '.github/workflows/corpus.yml']
+  pull_request:
+    branches: [main]
+    paths: ['src/**', 'spec/**', 'cli/**', 'corpus/**', 'package.json', 'package-lock.json', 'testguard.cost-budget.json', '.github/scripts/measure-reference.mjs', '.github/workflows/corpus.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: corpus-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  shard:
+    name: corpus (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ts-vitest-stock
+            args: --subject ts-vitest-stock
+          - name: js-jest-newsletter
+            args: --subject js-jest-newsletter
+          - name: py-pytest-circulation
+            args: --subject py-pytest-circulation
+          - name: node-test-floorplan
+            args: --subject node-test-floorplan
+          - name: mutants-classify
+            args: --tool-mutants --mutant timeout-counted-as-kill --mutant mixed-result-counted-as-kill --mutant baseline-not-required-green --mutant negative-control-skipped
+          - name: mutants-reuse
+            args: --tool-mutants --mutant reuse-ignores-import-closure --mutant reuse-ignores-tool-version --mutant exception-only-reported-as-assertion
+          - name: mutants-modes
+            args: --tool-mutants --mutant fault-not-restored --mutant typecheck-skipped --mutant fan-out-shares-one-tree
+          - name: mutants-scope
+            args: --tool-mutants --mutant not-reached-fault-dropped --mutant changed-git-failure-is-empty
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install the tool
+        run: npm ci
+      # Each subject's pinned dependencies, from its own lockfile or
+      # requirements.txt. The harness refuses to run (exit 2) without them.
+      - name: Install the subjects this shard runs
+        run: node corpus/run.mjs --install ${{ matrix.args }}
+      - name: Every mutant patch still applies
+        run: node corpus/run.mjs --check-mutants
+      - name: Run the corpus
+        run: node corpus/run.mjs ${{ matrix.args }} --json corpus-out/${{ matrix.name }}.json --markdown corpus-out/${{ matrix.name }}.md
+      - name: Shard scorecard
+        if: always()
+        run: if [ -f corpus-out/${{ matrix.name }}.md ]; then cat corpus-out/${{ matrix.name }}.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: corpus-shard-${{ matrix.name }}
+          path: corpus-out/
+          if-no-files-found: warn
+
+  scorecard:
+    name: corpus scorecard
+    needs: shard
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install the tool
+        run: npm ci
+      - name: Collect the shards
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "${{ github.run_id }}" --repo "${{ github.repository }}" --pattern 'corpus-shard-*' --dir shards
+      # The latest successful corpus run on main, when there is one: its
+      # scorecard is printed beside this one (normalized seconds), so a speed
+      # claim shows here. Its absence is said, never treated as a pass.
+      - name: Base scorecard (main)
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh run list --repo "${{ github.repository }}" --workflow corpus.yml --branch main --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -n "$id" ] && gh run download "$id" --repo "${{ github.repository }}" --name corpus-scorecard --dir base; then
+            echo "Base scorecard: run $id on main." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No base scorecard on main yet: head numbers only." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Merge, compare and publish
+        run: |
+          set +e
+          node corpus/run.mjs --merge $(find shards -name '*.json' | sort) --base base/scorecard.json --json scorecard/scorecard.json --markdown scorecard/scorecard.md
+          code=$?
+          cat scorecard/scorecard.md >> "$GITHUB_STEP_SUMMARY"
+          exit $code
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: corpus-scorecard
+          path: scorecard/
+          if-no-files-found: warn
+      # A shard that could not write its scorecard (a precondition failure, a
+      # crash, a timeout) is missing from the merge above: fail on it here.
+      - name: Every shard finished green
+        if: needs.shard.result != 'success'
+        run: |
+          echo "a corpus shard failed: ${{ needs.shard.result }}"
+          exit 1

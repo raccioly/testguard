@@ -1,0 +1,160 @@
+{
+  "expected": {
+    "LOAN-DUE-DATE/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Baseline green 3/3; the book due-date assertions fail in all three runs."
+    },
+    "LOAN-DUE-DATE/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Every non-book due date is wrong; assertions fail in all three runs."
+    },
+    "LATE-FEE-GRACE/F1": {
+      "verdict": "flaky-defender",
+      "reason": "inconsistent-probe",
+      "why": "tests/test_fees.py checks members on even runs and guests on odd runs (counter file). Baseline green 3/3; a member-only fault fails runs 2 only (green, red, green): the probe runs disagree."
+    },
+    "LATE-FEE-GRACE/F2": {
+      "verdict": "flaky-defender",
+      "reason": "inconsistent-probe",
+      "why": "A guest-only fault: red, green, red. Any three consecutive runs disagree, whatever the counter's starting value."
+    },
+    "LATE-FEE-GRACE/F3": {
+      "verdict": "unverifiable",
+      "reason": "anchor-missing",
+      "why": "`grace[patron_class]` does not occur in circulation/fees.py (the source says GRACE_DAYS)."
+    },
+    "LATE-FEE-RATE/F1": {
+      "verdict": "flaky-defender",
+      "reason": "inconsistent-probe",
+      "why": "Guest-only fault on the rotating defender: red, green, red."
+    },
+    "LATE-FEE-RATE/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The dvd rate changes for both classes; the per-item-type assertion fails in all three runs."
+    },
+    "LATE-FEE-RATE/F3": {
+      "verdict": "flaky-defender",
+      "reason": "inconsistent-probe",
+      "why": "Member-only fault on the rotating defender: green, red, green."
+    },
+    "LATE-FEE-CAP/F1": {
+      "verdict": "flaky-defender",
+      "reason": "inconsistent-probe",
+      "why": "Guest-only cap change: red, green, red."
+    },
+    "LATE-FEE-CAP/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "No cap for either class; the cap assertions fail in all three runs."
+    },
+    "LATE-FEE-CAP/F3": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "With the class check skipped, 'staff' reaches GRACE_DAYS[...] and raises KeyError, which pytest.raises(CirculationError) does not catch: the test fails by exception, never an assertion, in all three runs."
+    },
+    "HOLD-QUEUE-ORDER/F1": {
+      "verdict": "flaky-defender",
+      "reason": "defenders-not-green",
+      "why": "tests/test_holds.py contains a test that fails on every other run (counter file): the unmodified baseline is green, red, green. Nothing about the fault can be concluded."
+    },
+    "HOLD-QUEUE-ORDER/F2": {
+      "verdict": "flaky-defender",
+      "reason": "defenders-not-green",
+      "why": "Same defender set, same baseline (green, red, green)."
+    },
+    "HOLD-DUPLICATE-AND-PRIORITY/F1": {
+      "verdict": "unverifiable",
+      "reason": "anchor-ambiguous",
+      "why": "`entry[2] == patron_id` occurs twice in circulation/holds.py; expectHits is 1."
+    },
+    "HOLD-DUPLICATE-AND-PRIORITY/F2": {
+      "verdict": "flaky-defender",
+      "reason": "defenders-not-green",
+      "why": "Same flaky defender set: baseline green, red, green."
+    },
+    "MEMBERSHIP-NEW-EXPIRY/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The lapsed-renewal assertions fail in all three runs."
+    },
+    "MEMBERSHIP-NEW-EXPIRY/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The 29 February assertions fail in all three runs."
+    },
+    "MEMBERSHIP-EARLY-DISCOUNT/F1": {
+      "verdict": "survived",
+      "why": "tests/test_membership.py never tests renewal_fee: green 3/3. Control (membership.py unparseable) red, so it executes the module. Whole suite 3/3: only the alternating holds test fails, never in every run."
+    },
+    "MEMBERSHIP-EARLY-DISCOUNT/F2": {
+      "verdict": "survived",
+      "why": "As F1."
+    },
+    "MEMBERSHIP-EARLY-DISCOUNT/F3": {
+      "verdict": "fault-invalid",
+      "reason": "replacement-does-not-compile",
+      "why": "`return fee * 90 //` is a SyntaxError: pytest reports a collection error in all three runs, which is a load failure, never a kill."
+    }
+  },
+  "modes": {
+    "reuse-edit": {
+      "why": "circulation/errors.py is imported by every module, and every test imports the package (whose __init__ imports every module), so a comment there must re-measure every fault.",
+      "edits": [
+        {
+          "file": "circulation/errors.py",
+          "find": "class CirculationError(Exception):",
+          "replace": "# corpus: a scripted change, behavior-neutral\nclass CirculationError(Exception):"
+        }
+      ],
+      "expected": {},
+      "mustRemeasure": [
+        "LOAN-DUE-DATE/F1",
+        "LOAN-DUE-DATE/F2",
+        "LATE-FEE-GRACE/F1",
+        "LATE-FEE-GRACE/F2",
+        "LATE-FEE-RATE/F1",
+        "LATE-FEE-RATE/F2",
+        "LATE-FEE-RATE/F3",
+        "LATE-FEE-CAP/F1",
+        "LATE-FEE-CAP/F2",
+        "LATE-FEE-CAP/F3",
+        "HOLD-QUEUE-ORDER/F1",
+        "HOLD-QUEUE-ORDER/F2",
+        "HOLD-DUPLICATE-AND-PRIORITY/F2",
+        "MEMBERSHIP-NEW-EXPIRY/F1",
+        "MEMBERSHIP-NEW-EXPIRY/F2",
+        "MEMBERSHIP-EARLY-DISCOUNT/F1",
+        "MEMBERSHIP-EARLY-DISCOUNT/F2",
+        "MEMBERSHIP-EARLY-DISCOUNT/F3"
+      ]
+    },
+    "changed": {
+      "why": "Selections derived by reading the imports.",
+      "steps": [
+        {
+          "name": "membership-test",
+          "edits": [
+            {
+              "file": "tests/test_membership.py",
+              "find": "from circulation import renew_membership",
+              "replace": "# corpus: a scripted change, behavior-neutral\nfrom circulation import renew_membership"
+            }
+          ],
+          "expectedClaims": [
+            "MEMBERSHIP-EARLY-DISCOUNT",
+            "MEMBERSHIP-NEW-EXPIRY"
+          ],
+          "why": "Only the two membership claims declare tests/test_membership.py."
+        }
+      ],
+      "badRef": {
+        "ref": "refs/heads/corpus-no-such-branch",
+        "exit": 2,
+        "why": "An unresolvable reference is a precondition failure."
+      }
+    }
+  }
+}

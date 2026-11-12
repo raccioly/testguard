@@ -1,0 +1,9 @@
+diff --git a/src/probe/probe.mjs b/src/probe/probe.mjs
+index 9c5dcef..1f625b0 100644
+--- a/src/probe/probe.mjs
++++ b/src/probe/probe.mjs
+@@ -119,4 +119,2 @@ export function reusableRun(previous, { confirmRuns, workers, serial, runnerComm
+     && sameRunner(previous.run, runner)
+-    && previous.tool?.version === instrument.toolVersion
+-    && previous.run.instrument?.toolVersion === instrument.toolVersion
+     && previous.run.instrument?.digest === instrument.digest

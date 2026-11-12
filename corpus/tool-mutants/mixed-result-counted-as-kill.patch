@@ -1,0 +1,13 @@
+diff --git a/src/probe/probe.mjs b/src/probe/probe.mjs
+index ca27130..b5a4bb7 100644
+--- a/src/probe/probe.mjs
++++ b/src/probe/probe.mjs
+@@ -1139,2 +1139,8 @@ async function measureFault(state, tree) {
+       }
++      for (let k = 0; k < probeRuns.length; k++) {
++        for (let attempt = 0; attempt < 2 && probeRuns[k].outcome === 'pass' && probeRuns.some((r) => r.outcome === 'fail'); attempt++) {
++          const again = await runDefenders(defenders, [fault.file]);
++          probeRuns[k] = { ...again.run, timeouts: again.timeouts, loadMessage: again.loadMessage, failedTests: again.failedTests };
++        }
++      }
+       detail.probeRuns = probeRuns.map(({ timeouts, loadMessage, failedTests, ...run }) => run);
