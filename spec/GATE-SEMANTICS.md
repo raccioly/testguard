@@ -161,6 +161,20 @@ The verdict set is closed. Only one value is a pass.
 
 Rules that follow from the table:
 
+**The checks run in a fixed order, and the first that applies decides.**
+`nocover` (no defender) → `unverifiable` with an anchor reason (the fault
+cannot be applied) → the type check's `fault-invalid` or `timeout` (rule 16)
+→ `flaky-defender` (rule 1) → the fault's own result (rules 2–5, 12). Where
+two findings both hold, the worse and more actionable one is reported, and
+that is the order above: **`nocover` precedes an invalid anchor.** Both gate,
+but `nocover` is the worse finding (nothing can be tried, whatever the fault
+says; every rendering ranks it above `unverifiable`) and its repair, a test
+that imports the subject, is needed whatever the anchor's repair turns out to
+be, while repairing the anchor alone leaves a fault nothing can detect. A
+record that reports an anchor reason (`anchor-missing`, `anchor-ambiguous`)
+for a fault with no resolved defender does not conform. The verdict function's
+check order is this rule.
+
 1. **Green baseline first.** Defenders run N times unmodified before any fault
    is applied. Anything short of N/N pass is `flaky-defender` and stops there.
 2. **Confirm over N runs.** `killed` and `survived` both require exactly N

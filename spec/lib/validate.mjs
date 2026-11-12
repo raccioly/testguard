@@ -328,6 +328,12 @@ const semantic = {
       if (r.verdict === 'nocover' && !r.defenders.nocover) {
         errors.push({ path: `${p}/defenders/nocover`, message: 'nocover verdict requires defenders.nocover = true' });
       }
+      // GATE-SEMANTICS "The checks run in a fixed order": a fault with no
+      // defender is nocover whatever its anchor does, so an anchor reason on
+      // one describes a run that cannot have happened.
+      if (r.verdict === 'unverifiable' && /^anchor-/.test(r.detail.reason ?? '') && (r.defenders.nocover || (Array.isArray(r.defenders.resolved) && r.defenders.resolved.length === 0))) {
+        errors.push({ path: `${p}/verdict`, message: `nocover precedes an invalid anchor: a fault with no defender is nocover, never unverifiable (${r.detail.reason})` });
+      }
       // GATE-SEMANTICS rule 16: the type check decides before any test runs.
       const tc = r.detail.typecheck;
       if (tc !== undefined && !doc.run.typecheck) errors.push({ path: `${p}/detail/typecheck`, message: 'detail.typecheck requires a run that declares run.typecheck' });

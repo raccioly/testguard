@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`dist/`) is linked from the source package. A link to repository source the
   scratch tree does not contain refuses the run with the new precondition
   `workspace-link-outside-tree`, naming the link.
+- **The verdict order between `nocover` and an invalid anchor is specified
+  (#265).** `GATE-SEMANTICS.md` now states the fixed order of the checks and
+  that `nocover` precedes an invalid anchor (the worse finding, whose repair is
+  needed either way). The tool already behaved this way; the validator now
+  rejects a record that reports `anchor-missing` or `anchor-ambiguous` for a
+  fault with no resolved defender.
 - **A vitest alias written `fileURLToPath(new URL('./src', import.meta.url))`
   no longer refuses the whole probe (#264).** Discovery read the string
   `'./src'` as a module, hashed `src/index.ts` as a config dependency and

@@ -18,6 +18,12 @@ describe('classify — the order of checks is the spec', () => {
   it('nocover before anything else', () =>
     expect(classify({ defenders: [], anchor: { status: 'anchor-missing' }, baselineRuns: [], probeRuns: [], confirmRuns: N })).toEqual({ verdict: 'nocover' }));
 
+  // #265: GATE-SEMANTICS orders nocover before an invalid anchor, for every anchor status.
+  it.each(['anchor-missing', 'anchor-ambiguous', 'file-missing'])('nocover precedes an invalid anchor (%s)', (status) => {
+    expect(classify({ defenders: [], anchor: { status }, baselineRuns: [], probeRuns: [], confirmRuns: N })).toEqual({ verdict: 'nocover' });
+    expect(classify({ defenders: D, anchor: { status }, baselineRuns: [], probeRuns: [], confirmRuns: N })).toEqual({ verdict: 'unverifiable', reason: status });
+  });
+
   it('unverifiable carries the anchor status as reason', () => {
     expect(classify({ defenders: D, anchor: { status: 'anchor-missing' }, baselineRuns: [], probeRuns: [], confirmRuns: N })).toEqual({ verdict: 'unverifiable', reason: 'anchor-missing' });
     expect(classify({ defenders: D, anchor: { status: 'anchor-ambiguous' }, baselineRuns: [], probeRuns: [], confirmRuns: N }).reason).toBe('anchor-ambiguous');
