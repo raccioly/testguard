@@ -1,0 +1,9 @@
+{
+  "rule": "Fixed before the claim and test authors ran. R9 is deliberately declared against test/rates.test.js, which the test author was told never to import src/ (a declared defender that never executes its target). Scheduling (R11-R13) and the footer (R14) declare no defenders, so TestGuard must discover them: no test imports the scheduler, and the only test that imports the footer mocks it.",
+  "byRequirement": {
+    "R1": ["test/template.test.js"], "R2": ["test/template.test.js"], "R3": ["test/template.test.js"], "R4": ["test/template.test.js"],
+    "R5": ["test/slug.test.js"], "R6": ["test/slug.test.js"], "R7": ["test/slug.test.js"],
+    "R8": ["test/reading.test.js"], "R9": ["test/rates.test.js"], "R10": ["test/reading.test.js"],
+    "R11": null, "R12": null, "R13": null, "R14": null
+  }
+}

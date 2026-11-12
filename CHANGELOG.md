@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A benchmark corpus with independent answer keys (#258, repository only, not
+  in the package).** `npm run corpus` runs four subject projects (vitest with
+  strict TypeScript, jest, pytest, a node:test workspace) under every probe
+  mode and compares each verdict with a key derived by hand without TestGuard,
+  with the serial reference run, and with transformed copies of the subject;
+  `--tool-mutants` requires twelve deliberately broken builds to go red. It
+  found #263, #264, #265, #266, #267 and #268.
+
 ### Fixed
 
 - **A probe no longer writes into the user's `node_modules` (#279).** From a git

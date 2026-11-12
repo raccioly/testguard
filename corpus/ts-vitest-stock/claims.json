@@ -1,0 +1,414 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "RESERVE-SUCCEEDS-WITHIN-AVAILABLE",
+      "statement": "Reserve succeeds for any positive whole quantity up to and including the available quantity, returns a reservation with a unique id, and the reserved units stop being available.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:ts-vitest-stock#R1"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/reserve.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Reservation ids stop advancing, so consecutive reservations share the same id.",
+          "faultClass": "literal-changed",
+          "file": "src/reservations.ts",
+          "find": "id: `RES-${this.nextId++}`,",
+          "replace": "id: `RES-${this.nextId}`,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The new reservation is never stored, so available stock does not drop and release of the returned id throws UnknownReservation.",
+          "faultClass": "statement-deleted",
+          "file": "src/reservations.ts",
+          "find": "this.reservations.set(reservation.id, reservation);",
+          "replace": "void 0;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Off-by-one in the stock check rejects a reservation for exactly the available quantity with InsufficientStock.",
+          "faultClass": "condition-forced",
+          "file": "src/reservations.ts",
+          "find": "quantity > this.availableOf(sku)",
+          "replace": "quantity >= this.availableOf(sku)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "RESERVE-REJECTS-INVALID-INPUT",
+      "statement": "Reserve rejects a zero, negative or fractional quantity with InvalidQuantity and an unknown SKU with UnknownSku, leaving stock unchanged.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:ts-vitest-stock#R2"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/reserve.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The quantity validation call is removed, so a zero quantity creates a reservation.",
+          "faultClass": "statement-deleted",
+          "file": "src/reservations.ts",
+          "find": "assertPositiveInteger(quantity);",
+          "replace": "void 0;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The unknown-SKU check is disabled, so an unknown SKU fails with InsufficientStock instead of UnknownSku.",
+          "faultClass": "condition-forced",
+          "file": "src/reservations.ts",
+          "find": "if (!this.onHandBySku.has(sku)) throw new UnknownSku();",
+          "replace": "if (false) throw new UnknownSku();",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SWEEP-EXPIRES-AT-EXPIRY-INSTANT",
+      "statement": "Sweep expires every active reservation whose expiry is at or before the given time, including one expiring exactly at that time, and returns the count.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:ts-vitest-stock#R5"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/lifetime.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A reservation expiring exactly at the sweep time is no longer expired.",
+          "faultClass": "condition-forced",
+          "file": "src/reservations.ts",
+          "find": "r.expiresAt <= now",
+          "replace": "r.expiresAt < now",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The comparison loses its right-hand operand, leaving a source file that cannot be parsed.",
+          "faultClass": "guard-removed",
+          "file": "src/reservations.ts",
+          "find": "if (r.status === 'active' && r.expiresAt <= now) {",
+          "replace": "if (r.status === 'active' && r.expiresAt <= ) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "RECEIVE-ADDS-STOCK",
+      "statement": "Receive adds a positive whole quantity to on-hand, registering a new SKU, and accepts only SKUs of 3 to 12 uppercase letters, digits or hyphens.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:ts-vitest-stock#R6"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/adjustments.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The default for a not-yet-registered SKU is removed, so receiving a new SKU throws a TypeError.",
+          "faultClass": "guard-removed",
+          "file": "src/adjustments.ts",
+          "find": "(this.onHandBySku.get(sku) ?? 0) + quantity",
+          "replace": "this.onHandBySku.get(sku)!.valueOf() + quantity",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The SKU length limit is removed, so SKUs longer than 12 characters are accepted.",
+          "faultClass": "literal-changed",
+          "file": "src/adjustments.ts",
+          "find": "[A-Z0-9-]{3,12}",
+          "replace": "[A-Z0-9-]{3,}",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The SKU pattern test is forced off, so malformed SKUs are registered instead of failing with InvalidSku.",
+          "faultClass": "condition-forced",
+          "file": "src/adjustments.ts",
+          "find": "!SKU_PATTERN.test(sku)",
+          "replace": "false",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "WRITEOFF-PROTECTS-RESERVED",
+      "statement": "WriteOff reduces on-hand by the given quantity but never below the currently reserved total; a request that would do so fails with InsufficientStock and changes nothing.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:ts-vitest-stock#R7"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/adjustments.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The protective check written against an older variable name, forced off so over-write-offs pass.",
+          "faultClass": "condition-forced",
+          "file": "src/adjustments.ts",
+          "find": "if (current - quantity < this.reservedOf(sku)) throw new InsufficientStock();",
+          "replace": "if (false) throw new InsufficientStock();",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The reserved-total floor is replaced by zero, so on-hand can drop below reserved stock.",
+          "faultClass": "guard-removed",
+          "file": "src/adjustments.ts",
+          "find": "onHand - quantity < this.reservedOf(sku)",
+          "replace": "onHand - quantity < 0",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A write-off increases on-hand instead of reducing it.",
+          "faultClass": "literal-changed",
+          "file": "src/adjustments.ts",
+          "find": "this.onHandBySku.set(sku, onHand - quantity);",
+          "replace": "this.onHandBySku.set(sku, onHand + quantity);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PRICING-BULK-DISCOUNT-AND-ROUNDING",
+      "statement": "An order of 100 or more units gets an extra 5% on top of the customer-type discount, summed and not compounded, with percentage discounts rounded half up to a whole cent.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:ts-vitest-stock#R10"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/pricing.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The bulk percentage becomes a string, so for member bulk orders the percentages concatenate into a wrong percent.",
+          "faultClass": "literal-changed",
+          "file": "src/pricing.ts",
+          "find": "const BULK_PERCENT = 5;",
+          "replace": "const BULK_PERCENT = '5';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Rounding half up is replaced by truncation, so 1851.75 rounds to 1851.",
+          "faultClass": "return-altered",
+          "file": "src/pricing.ts",
+          "find": "(2 * cents * percent + 100) / 200",
+          "replace": "(2 * cents * percent) / 200",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The customer-type set is never constructed, so pricing any order throws a TypeError.",
+          "faultClass": "call-removed",
+          "file": "src/pricing.ts",
+          "find": "const types = new Set<CustomerType>();",
+          "replace": "const types = null as unknown as Set<CustomerType>;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "STOCK-REPORT-STATUS-AND-RESERVED",
+      "statement": "stockReport counts only active reservations as reserved, reports status \"low\" for 1 to 9 available and \"ok\" from 10, and returns an entry for every known SKU.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:ts-vitest-stock#R11"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/report.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Released reservations keep counting toward reserved (first of two matches is replaced).",
+          "faultClass": "condition-forced",
+          "file": "src/reservations.ts",
+          "find": "r.status === 'active'",
+          "replace": "r.status !== 'expired'",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Ten available units are reported as \"low\" instead of \"ok\".",
+          "faultClass": "literal-changed",
+          "file": "src/reporting.ts",
+          "find": "available < 10",
+          "replace": "available <= 10",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The entries array is undefined, so stockReport throws a TypeError whenever any SKU is registered.",
+          "faultClass": "variable-swap",
+          "file": "src/reporting.ts",
+          "find": "const entries: StockEntry[] = [];",
+          "replace": "const entries: StockEntry[] = undefined as unknown as StockEntry[];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "REPORT-TOTALS-SUMS",
+      "statement": "reportTotals returns the SKU count and the sums of onHand, reserved and available across all SKUs, and all four are 0 with no SKUs.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:ts-vitest-stock#R13"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/totals.test.ts"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The reserved total sums available quantities instead of reserved quantities.",
+          "faultClass": "variable-swap",
+          "file": "src/reporting.ts",
+          "find": "totals.reserved += e.reserved;",
+          "replace": "totals.reserved += e.available;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The SKU count is pinned to 1 whenever at least one SKU exists.",
+          "faultClass": "literal-changed",
+          "file": "src/reporting.ts",
+          "find": "totals.skuCount++;",
+          "replace": "totals.skuCount = 1;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The onHand total keeps only the last SKU's quantity instead of summing.",
+          "faultClass": "argument-swapped",
+          "file": "src/reporting.ts",
+          "find": "totals.onHand += e.onHand;",
+          "replace": "totals.onHand = e.onHand;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    }
+  ]
+}

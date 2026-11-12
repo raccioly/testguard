@@ -1,0 +1,12 @@
+{
+  "name": "corpus-ts-vitest-stock",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Corpus subject: strict TypeScript, vitest, a tsconfig path alias and a barrel file. See SPEC.md and PROVENANCE.md.",
+  "type": "module",
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit -p tsconfig.json" },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
+  }
+}

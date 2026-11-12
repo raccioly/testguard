@@ -1,0 +1,9 @@
+diff --git a/src/probe/probe.mjs b/src/probe/probe.mjs
+index 9c5dcef..d57faec 100644
+--- a/src/probe/probe.mjs
++++ b/src/probe/probe.mjs
+@@ -983,3 +983,3 @@ const refusedByTypecheck = (typecheck) => typecheck?.status === 'diagnostics' ||
+ async function typecheckFault({ typechecker, iso, fault, budgetMs, stage, detail, cut }) {
+-  if (!typechecker.applicable(fault.file)) return { status: 'not-applicable' };
++  if (typechecker.applicable(fault.file)) return { status: 'clean' };
+   const mutation = applyFault(iso.projectDir, fault, { inPlace: iso.mode === 'in-place' });

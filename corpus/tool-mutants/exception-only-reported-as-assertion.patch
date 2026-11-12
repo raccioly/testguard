@@ -1,0 +1,9 @@
+diff --git a/src/probe/runners/shared.mjs b/src/probe/runners/shared.mjs
+index 2e0c260..3be8523 100644
+--- a/src/probe/runners/shared.mjs
++++ b/src/probe/runners/shared.mjs
+@@ -270,3 +270,3 @@ export function parseReport(report, durationMs, kinds) {
+   const kindOf = (t) => (t.failureDetails !== undefined ? failureKind(t.failureDetails, t.failureMessages) : t.sidecarKind);
+-  const assertionFailures = settled.filter((t) => kindOf(t) === 'assertion').length;
++  const assertionFailures = settled.filter((t) => kindOf(t) === 'assertion' || kindOf(t) === 'exception').length;
+   const exceptionFailures = settled.length - assertionFailures;

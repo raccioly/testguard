@@ -1,0 +1,8 @@
+# Subject dependencies are installed per subject, never committed.
+node_modules/
+.venv/
+# Counter files the planted flaky and rotating tests write (see each PROVENANCE.md).
+.fee_rotation
+.holds_counter
+# Harness output.
+.out/
