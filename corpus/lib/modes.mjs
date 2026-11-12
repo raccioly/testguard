@@ -77,14 +77,14 @@ function keyAndDiff(ctx, mode, r, { ids, deltas, expected } = {}) {
 const exitCheck = (r) => check('exit-code', r.exit === 0 || r.exit === 1, `exit ${r.exit}${r.exit >= 2 ? `: ${r.stderr.trim().split('\n').slice(-3).join(' | ')}` : ''}`);
 
 export const RUN = {
-  /** Serial (--serial: one fault at a time since #270 made a fan-out the default), --no-reuse, a fresh process and a fresh repository: the oracle for every other mode. */
+  /** Serial (--serial and an explicit --fault-workers 1: one fault at a time, since #270 made a fan-out the default), --no-reuse, a fresh process and a fresh repository: the oracle for every other mode. */
   async reference(ctx) {
-    const { repo, r } = await freshProbe(ctx, 'reference', ['--no-reuse', '--serial']);
+    const { repo, r } = await freshProbe(ctx, 'reference', ['--no-reuse', '--serial', '--fault-workers', '1']);
     const { observed, key } = keyAndDiff({ ...ctx, reference: null }, 'reference', r);
     if (r.evidence) ctx.reference = observed;
     ctx.referenceRepo = repo;
     ctx.referenceElapsedMs = r.elapsedMs;
-    return result('reference', ctx.subject, { runs: [runSummary('reference', r)], key, checks: [exitCheck(r), check('every-fault-reported', observed.order.length === ctx.subject.faultIds.length, `${observed.order.length} of ${ctx.subject.faultIds.length}`)] });
+    return result('reference', ctx.subject, { runs: [runSummary('reference', r)], key, checks: [exitCheck(r), check('every-fault-reported', observed.order.length === ctx.subject.faultIds.length, `${observed.order.length} of ${ctx.subject.faultIds.length}`), check('serial-recorded', !r.evidence || (r.evidence.run?.faultWorkers ?? 1) === 1, `run.faultWorkers ${r.evidence?.run?.faultWorkers ?? 1}`)] });
   },
 
   /** Metamorphic: the same probe again, in the same repository: nothing may change. */

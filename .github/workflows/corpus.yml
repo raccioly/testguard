@@ -47,7 +47,7 @@ jobs:
             browser: true
             timeout: 60
           - name: js-playwright-gallery-2
-            args: --subject js-playwright-gallery --mode workers-2 --mode workers-4 --mode partial
+            args: --subject js-playwright-gallery --mode default --mode workers-4 --mode partial
             browser: true
             timeout: 60
           - name: js-playwright-gallery-3
@@ -55,7 +55,7 @@ jobs:
             browser: true
             timeout: 60
           - name: js-playwright-gallery-4
-            args: --subject js-playwright-gallery --mode reorder --mode noise --mode typecheck --mode changed
+            args: --subject js-playwright-gallery --mode workers-2 --mode reorder --mode noise --mode typecheck --mode changed
             browser: true
             timeout: 60
           - name: py-unittest-shipping

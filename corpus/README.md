@@ -138,7 +138,7 @@ where the runner can report one.
 
 | Mode | What runs | Checked against |
 |---|---|---|
-| `reference` | serial (`--serial`), `--no-reuse`, fresh process, fresh repository | the key |
+| `reference` | serial (`--serial --fault-workers 1`, recorded as one worker), `--no-reuse`, fresh process, fresh repository | the key |
 | `twice` | the same probe again in the same repository | key, reference |
 | `reuse` | seed; unchanged; after the keyed edit to an imported file; after a simulated tool-version change | key (with the edit's overrides); unchanged run reuses something; the edit re-measures every fault that imports the file; the version change reuses nothing |
 | `default` | no width flag and `TESTGUARD_FAULT_WORKERS` unset: the CLI's automatic width (#270) | key, reference (map and order), `run.faultWorkersSource: auto` with `run.cpus` |
