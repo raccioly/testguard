@@ -1127,6 +1127,19 @@ Paths are project-relative; a change outside the project directory is not this
 project's change. A deletion is a change. A rename or copy contributes its old
 path and its new path.
 
+**`--changed auto` (#270).** The base is found offline, in this order: the CI
+base (`GITHUB_BASE_REF` as `origin/<branch>`, then
+`CI_MERGE_REQUEST_DIFF_BASE_SHA`, then `CI_MERGE_REQUEST_TARGET_BRANCH_NAME`);
+the remote default branch, unless it is the current branch's own name; a
+differently named upstream; then the branch's own upstream (`@{upstream}`),
+whose difference from HEAD is exactly the commits not pushed yet — the pre-push
+question. When none is found, or the one found does not resolve to a commit in
+this repository (a shallow CI checkout), the run probes every claim, writes the
+canonical evidence, and says so on stderr even under `--quiet`, naming the fix
+for an unresolvable base. It never probes nothing, and it never exits 2 for a
+base it chose itself; an explicit `--changed <ref>` that does not resolve still
+does. A branch literally named `auto` is written `refs/heads/auto`.
+
 A claim is **selected** when any of those paths is one of: a fault's target; a
 defender, whether the claim names it (`defendedBy`, literally or by glob) or
 discovery resolves it; or a file in the import closure of the target and the
@@ -1215,6 +1228,38 @@ a consumer without the claims file can still read the results per claim id. It
 cannot check `claim-changed` (claim metadata against the file) and cannot tell
 whether the file it was measured against is the one a caller holds, except by
 comparing `sha256`.
+
+## Speed advice
+
+`status`, `brief` and the end of a text-mode `probe` carry `advice` (#270):
+where a run is leaving speed on the table, one line each with the exact
+command. Advice is informational. It never changes `state`, `next`, a verdict
+or an exit code; computing it reads only files on disk, the machine's CPU count
+and local git, and makes no network call. The set is closed:
+
+| id | when | command |
+|---|---|---|
+| `serial-on-multicore` | the last evidence ran one fault at a time (no `run.faultWorkers`) because it was asked for (`faultWorkersSource` `serial`, `flag` or `env`, or absent: evidence from before 0.24), and the automatic width on this machine is above one | `testguard probe` |
+| `full-probe-where-changed-would-do` | asked about a change — `status --changed <ref>`, or the end of a full probe with the base `--changed auto` would use — `next.action` is `probe` (status), and the change selects fewer claims than the file holds (the selection rule of [Probing a change](#probing-a-change)). Selecting walks every claim's import closure, so a `brief`, the MCP tools and a `status` without `--changed` do not compute it. | `testguard probe --changed auto` |
+| `nothing-reused` | the last evidence reused no verdict, measured at least one fault, and took a minute or longer | `testguard probe` |
+| `hook-outdated` | a hook or CI file in the repository runs TestGuard with `probe --serial`, probes every claim from a pre-push hook, pins `testguard-cli@<x.y.z>` or the action or pre-commit `rev` below this version, or holds a TestGuard managed block from an older template; one line per file and line, at most five | `testguard init --upgrade` |
+
+A selection's view (`--claim`, `--changed`) carries no advice. Validators
+reject an unknown id, a command that is not a `testguard` command, an id other
+than `hook-outdated` said twice, `full-probe-where-changed-would-do` where
+`next.action` is not `probe` or whose command is not a `probe --changed`, and
+`hook-outdated` with any command but `testguard init --upgrade`, in a status
+document and in a brief alike.
+
+**Managed blocks.** What `init` writes for the fast path — the pre-push block
+(in `.husky/pre-push` when the repository uses husky, else
+`.githooks/pre-push`; never `.git/hooks`), the `--ci github|gitlab` file, the
+skill and the `AGENTS.md` section — carries `template=<n>` and, for blocks and
+the skill, the sha256 of its body. `init --upgrade` rewrites one only when it is
+from an older template and its body still has its recorded hash (or, for a
+skill written before markers, equals a template a release shipped); an edited
+one is reported and left alone unless `--force`. Nothing outside a block is
+touched.
 
 ## Thin claims
 

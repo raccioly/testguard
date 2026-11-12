@@ -68,12 +68,15 @@ export function computeStatus(options) {
  * machine its CPU count, and — when the next step is a probe and a base is
  * known — how many claims the change since that base can affect.
  */
-function statusAdvice(doc, { projectDir, toolVersion, paths = P(projectDir), changedRef, includeDirty = false, evidence: evidenceOverride, cpus = availableParallelism() }) {
+function statusAdvice(doc, { projectDir, toolVersion, paths = P(projectDir), changedRef, includeDirty = false, evidence: evidenceOverride, cpus = availableParallelism(), adviseChange = false }) {
   let evidence;
   const evidenceFile = evidenceOverride ?? paths.evidence;
   try { if (existsSync(evidenceFile)) evidence = readSpecDoc('evidence', evidenceFile); } catch { evidence = undefined; }
   let changed;
-  if (changedRef && doc.next?.action === 'probe' && doc.counts.claims > 0 && existsSync(paths.claims)) {
+  // Selecting by change walks every claim's import closure: seconds on a large
+  // project. Only a caller that asked about a change pays for it, never a
+  // session-start brief (#270).
+  if (adviseChange && changedRef && doc.next?.action === 'probe' && doc.counts.claims > 0 && existsSync(paths.claims)) {
     try {
       const claims = loadClaims(paths.claims);
       const scope = resolveProbeScope({ projectDir, claims, ref: changedRef, includeDirty, timeoutMs: 10_000 });

@@ -203,6 +203,13 @@
     },
     {
       "kind": "path",
+      "pattern": "test/helpers/fixed-port-project.mjs",
+      "reason": "The fixed-port project generator (#270): a test suite that binds one port and fails when another copy of itself is running. Its behavior is the oracle of test/probe-fixed-port.test.mjs, which defends TG-FAN-OUT-NEVER-REPORTS-A-NEIGHBOURS-KILL, and test/probe-fixed-port-serial.test.mjs re-derives its serial answer on every npm test. A fault in the helper costs a 7 s defender six runs (38 s on CI) to prove what the serial test already shows: that the suite interferes with itself.",
+      "by": "claude",
+      "at": "2026-11-12T06:30:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/probe-fast-path-cli.test.mjs",
       "reason": "Acceptance for the fast path through the command (#270): the default width from the CPUs, --serial, partial runs reusing the last full probe, --changed auto with no base and with a CI base that does not resolve, and the status advice after a serial run. It probes a generated four-claim project six times, about fifteen seconds per run; named as a self-probe defender it cost 601 s on CI. The behavior is claimed where it lives and defended by fast tests: TG-PARTIAL-RUNS-REUSE-THE-LAST-FULL-PROBE and TG-CHANGED-AUTO-FINDS-THE-BASE-OFFLINE name test/probe-fast-path-pure.test.mjs, TG-AUTO-FAULT-WORKERS-FOLLOW-THE-MACHINE names test/fan-out-guard.test.mjs, TG-BRIEF-AND-MCP-CARRY-THE-FAST-LOOP names test/advice.test.mjs. Mandatory in npm test and CI.",
       "by": "claude",

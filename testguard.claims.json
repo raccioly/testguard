@@ -12724,18 +12724,6 @@
             "producer": "agent",
             "by": "claude"
           }
-        },
-        {
-          "id": "F2",
-          "description": "The fixture takes an ephemeral port, so its suite is hermetic and no longer exercises a shared one.",
-          "faultClass": "literal-changed",
-          "file": "test/helpers/fixed-port-project.mjs",
-          "find": "const PORT = Number(process.env.TG_FIXED_PORT);",
-          "replace": "const PORT = 0;",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
         }
       ]
     },

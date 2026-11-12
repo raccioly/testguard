@@ -542,6 +542,7 @@ const semantic = {
       if (new Set(doc.surface.rankedUnclaimed.map((item) => item.file)).size !== doc.surface.rankedUnclaimed.length) errors.push({ path: '/surface/rankedUnclaimed', message: 'ranked unclaimed modules must be unique' });
     }
     if (doc.run) errors.push(...runErrors(doc.run));
+    errors.push(...adviceErrors(doc.advice, doc.next?.action));
     // One invocation result per document: `run` is what a probe measured,
     // `baseline` is what a baseline command wrote. A document carrying both
     // would attribute one command's result to the other.
@@ -702,9 +703,30 @@ const semantic = {
     if (doc.summary.new + doc.summary.baselined > byVerdictTotal) {
       errors.push({ path: '/summary', message: 'new + baselined cannot exceed the total of byVerdict' });
     }
+    errors.push(...adviceErrors(doc.advice, doc.next?.action));
     return errors;
   },
 };
+
+/**
+ * Speed advice (#270) is informational, but each line must be the one its
+ * rule produces: the change-scoped probe is advised only where the next step
+ * is a probe, an outdated hook is fixed by `init --upgrade`, and every rule
+ * but hook-outdated (one line per file and line) says its piece once.
+ */
+function adviceErrors(advice, nextAction) {
+  const errors = [];
+  if (!advice) return errors;
+  const seen = new Set();
+  advice.forEach((a, i) => {
+    if (a.id !== 'hook-outdated' && seen.has(a.id)) errors.push({ path: `/advice/${i}/id`, message: `${a.id} is said once` });
+    seen.add(a.id);
+    if (a.id === 'full-probe-where-changed-would-do' && nextAction !== 'probe') errors.push({ path: `/advice/${i}/id`, message: 'full-probe-where-changed-would-do is advice about a probe the next step makes: it requires next.action = probe' });
+    if (a.id === 'full-probe-where-changed-would-do' && !/^testguard probe --changed /.test(a.command)) errors.push({ path: `/advice/${i}/command`, message: 'full-probe-where-changed-would-do names a probe --changed command' });
+    if (a.id === 'hook-outdated' && a.command !== 'testguard init --upgrade') errors.push({ path: `/advice/${i}/command`, message: 'hook-outdated is fixed by testguard init --upgrade' });
+  });
+  return errors;
+}
 
 // `--require-assertion-kill` is a pure function of the records it ran on, so a
 // recorded result is checked against them: no kill by exception can be hidden,

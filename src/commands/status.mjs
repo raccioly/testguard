@@ -13,7 +13,7 @@ export const statusPaths = (projectDir, claims) => ({
 
 export async function statusCommand({ projectDir, values, version }, io) {
   const evidence = values.evidence ? resolve(values.evidence) : undefined;
-  const doc = withChangedRef(resolveChangedRef({ explicit: values.changed, projectDir }), (changedRef) => computeStatus({ projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'], evidence, ...(values.claims ? { paths: statusPaths(projectDir, values.claims) } : {}) }), io.err);
+  const doc = withChangedRef(resolveChangedRef({ explicit: values.changed, projectDir }), (changedRef) => computeStatus({ projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'], evidence, adviseChange: values.changed !== undefined, ...(values.claims ? { paths: statusPaths(projectDir, values.claims) } : {}) }), io.err);
   const result = validate('status', doc);
   if (!result.ok) throw new Error(`status document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
   io.out(values.json ? JSON.stringify(doc, null, 2) : renderStatus(doc));

@@ -13,7 +13,7 @@ const paths = (doc) => validate('status', doc).errors.map((e) => e.path);
 describe('status advice', () => {
   it('a status with advice lines conforms', () => {
     const doc = load('examples', 'status-advice.json');
-    expect(doc.advice.map((a) => a.id)).toEqual(['serial-on-multicore', 'full-probe-where-changed-would-do', 'hook-outdated']);
+    expect(doc.advice.map((a) => a.id)).toEqual(['serial-on-multicore', 'hook-outdated']);
     expect(validate('status', doc).errors).toEqual([]);
   });
 
@@ -23,5 +23,25 @@ describe('status advice', () => {
 
   it('every line names a TestGuard command, never anything else to run', () => {
     expect(paths(load('invalid', 'status.advice-not-a-testguard-command.json'))).toContain('/advice/0/command');
+  });
+});
+
+describe('advice is the line its rule produces', () => {
+  it('the change-scoped probe is advised only where the next step is a probe', () => {
+    expect(paths(load('invalid', 'status.advice-changed-without-a-probe-next.json'))).toEqual(['/advice/1/id']);
+  });
+
+  it('an outdated hook is fixed by init --upgrade, and the change-scoped advice names probe --changed', () => {
+    const doc = load('examples', 'status-advice.json');
+    doc.advice[1].command = 'testguard init';
+    expect(paths(doc)).toEqual(['/advice/1/command']);
+  });
+
+  it('a brief carries the same advice under the same rules', () => {
+    const brief = load('examples', 'brief-advice.json');
+    expect(validate('brief', brief).errors).toEqual([]);
+    brief.advice[0].command = 'testguard probe';
+    expect(validate('brief', brief).errors.map((e) => e.path)).toEqual(['/advice/0/command']);
+    expect(validate('brief', load('invalid', 'brief.advice-said-twice.json')).errors.map((e) => e.path)).toEqual(['/advice/2/id']);
   });
 });

@@ -108,11 +108,6 @@
       "command": "testguard probe"
     },
     {
-      "id": "full-probe-where-changed-would-do",
-      "message": "Your change since origin/main can affect 3 of 41 claims; probe just those in the inner loop and keep the full probe for the nightly job.",
-      "command": "testguard probe --changed auto"
-    },
-    {
       "id": "hook-outdated",
       "message": ".husky/pre-push:4: runs probe --serial: one fault at a time — drop --serial (faults now run in parallel safely)",
       "command": "testguard init --upgrade"
