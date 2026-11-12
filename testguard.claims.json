@@ -8981,7 +8981,7 @@
           "description": "Lockfiles and runner configuration are left out of the hashed inputs.",
           "faultClass": "statement-deleted",
           "file": "src/probe/dependencies.mjs",
-          "find": "    for (const file of DEPENDENCY_MANIFEST_FILES) if (existsSync(join(root, file))) files.add(file);\n",
+          "find": "    for (const file of DEPENDENCY_MANIFEST_FILES) if (existsSync(join(root, file)) && (!shownManifests || shownManifests.has(file))) files.add(file);\n",
           "replace": "",
           "defendedBy": [
             "test/dependency-closure.test.mjs"
@@ -8996,7 +8996,7 @@
           "description": "Python closures stop including the conftest.py files pytest loads first.",
           "faultClass": "condition-forced",
           "file": "src/probe/pyimports.mjs",
-          "find": "      if (existsSync(join(projectDir, conftest))) add(conftest);",
+          "find": "      if (existsSync(join(projectDir, conftest)) && (!visible || visible.has(conftest))) add(conftest);",
           "replace": "      if (false) add(conftest);",
           "defendedBy": [
             "test/dependency-closure.test.mjs"
@@ -9377,7 +9377,7 @@
           "faultClass": "condition-forced",
           "file": "src/probe/scope.mjs",
           "find": "(indeterminate && (changed.repoChanged ?? changed.files.length) > 0)",
-          "replace": "indeterminate",
+          "replace": "(indeterminate)",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -13126,6 +13126,21 @@
           "file": "src/probe/scope.mjs",
           "find": "reasons.set(claim.id, { claimId: claim.id, kind: 'glob', file: byGlob.file, glob: byGlob.entry.glob });",
           "replace": "reasons.set(claim.id, { claimId: claim.id, kind: 'file', file: byGlob.file });",
+          "defendedBy": [
+            "test/visible-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "Untracked files git ignores are listed as project files.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/visible-files.mjs",
+          "find": "...(untracked ? ['--others', '--exclude-standard'] : [])",
+          "replace": "...(untracked ? ['--others'] : [])",
           "defendedBy": [
             "test/visible-closure.test.mjs"
           ],

@@ -102,13 +102,23 @@ describe('the closure ignores what git ignores', () => {
   });
 
   it('an untracked, non-ignored file is a project file only under --include-dirty', () => {
-    const { root, base } = repo();
-    write(root, { 'app/extra.py': 'def extra():\n    return 1\n', 'app/core.py': 'import pydantic\nfrom app import extra\n\ndef double(n):\n    return n * 2\n' });
-    const clean = resolveProbeScope({ projectDir: root, claims: CLAIMS, ref: base });
-    expect(clean.selected).toEqual([]);
-    const dirty = resolveProbeScope({ projectDir: root, claims: CLAIMS, ref: base, includeDirty: true });
-    expect(dirty.selected).toEqual(['CORE']);
-    expect(dirty.matchReasons[0]).toMatchObject({ claimId: 'CORE', kind: 'file' });
+    const { root } = repo();
+    // Committed: price imports ./extra.mjs; extra.mjs itself is left untracked (not ignored).
+    write(root, { 'src/price.mjs': "import { round } from './round.mjs';\nimport { extra } from './extra.mjs';\nexport const total = (a, b) => round(a + b) + extra;\n" });
+    commit(root);
+    writeFileSync(join(root, 'README.md'), 'docs\n');
+    const head = commit(root);
+    write(root, { 'src/extra.mjs': 'export const extra = 0;\n' });
+    // The commit alone cannot load ./extra.mjs, which is what the scratch tree will hold.
+    const clean = resolveProbeScope({ projectDir: root, claims: CLAIMS, ref: `${head}~1` });
+    expect(clean.matchReasons).toEqual([{ claimId: 'PRICE', kind: 'indeterminate', issue: { code: 'unreadable-module', file: 'src/price.mjs', specifier: './extra.mjs' } }]);
+    // Snapshotting the working tree includes it: a changed (untracked) file in PRICE's closure.
+    const dirty = resolveProbeScope({ projectDir: root, claims: CLAIMS, ref: `${head}~1`, includeDirty: true });
+    expect(dirty.matchReasons).toEqual([{ claimId: 'PRICE', kind: 'file', file: 'src/extra.mjs' }]);
+    // Untracked counts, ignored never: the bundle's pydantic copy stays out.
+    const withUntracked = createDependencyHasher(root, { cache: false, untracked: true }).inputsFor(['app/core.py', 'tests/test_core.py']);
+    expect(withUntracked.dependencyClosure).toBe('complete');
+    expect(Object.keys(withUntracked.dependencyHashes).some((file) => file.startsWith('deploy-bundle/'))).toBe(false);
   });
 });
 
