@@ -11,7 +11,7 @@
 #         hooks:
 #           - id: testguard-claims        # fast: validates the claims file + drift
 #           - id: testguard-gate          # fast: every changed source file must carry a claim
-#           - id: testguard-probe         # slow: pre-push stage, runs the faults
+#           - id: testguard-probe         # pre-push: probes the claims the pushed commits can affect
 #
 #     # install the push-stage hook once per clone:
 #     #   pre-commit install --hook-type pre-push
@@ -33,9 +33,9 @@
   always_run: true
 
 - id: testguard-probe
-  name: TestGuard probe (pre-push)
-  description: Injects every claim's faults and fails on any the tests miss. Gated by the committed baseline.
-  entry: testguard probe --quiet
+  name: TestGuard probe (pre-push, the change only)
+  description: Injects the faults of the claims the commits being pushed can affect (--changed auto, faults in parallel, every kill confirmed alone) and fails on any the tests miss. The full probe belongs to a nightly job, not this hook. Gated by the committed baseline.
+  entry: testguard probe --changed auto --quiet
   language: node
   pass_filenames: false
   always_run: true
