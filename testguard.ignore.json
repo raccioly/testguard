@@ -203,6 +203,13 @@
     },
     {
       "kind": "path",
+      "pattern": "bench/*.mjs",
+      "reason": "Hand-run measurement scripts (#270): the fixture verdict-equality check across every runner (serial against the default fan-out) and the cheap-unit-test timing table in docs/guides/performance.md. They ship in no package (package.json files excludes bench/), change no verdict, and their own output is the evidence they produce; the behavior they measure is claimed where it lives (TG-FAN-OUT-GUARD-RULES, TG-AUTO-FAULT-WORKERS-FOLLOW-THE-MACHINE, TG-FAN-OUT-MATCHES-THE-KNOWN-ANSWERS).",
+      "by": "claude",
+      "at": "2026-11-12T04:30:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/probe-fixed-port-serial.test.mjs",
       "reason": "The measured serial answer for the fixed-port project (#270): the oracle that test/probe-fixed-port.test.mjs holds the fan-out to, re-derived on every npm test instead of written down. It asserts no behavior of its own beyond serial probing, which every known-answer fixture already defends; the fan-out guard it calibrates is claimed as TG-FAN-OUT-NEVER-REPORTS-A-NEIGHBOURS-KILL.",
       "by": "claude",

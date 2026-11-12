@@ -56,7 +56,7 @@ git('commit', '-qm', 'cheap units');
 
 const run = (label, args) => {
   const started = performance.now();
-  const r = spawnSync(process.execPath, [CLI, 'probe', '.', '--no-escalate', '--quiet', ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, TESTGUARD_FAULT_WORKERS: '' } });
+  const r = spawnSync(process.execPath, [CLI, 'probe', '.', '--no-escalate', ...(process.env.BENCH_VERBOSE ? [] : ['--quiet']), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, TESTGUARD_FAULT_WORKERS: '' } });
   const ms = performance.now() - started;
   if (r.status !== 0) throw new Error(`${label}: exit ${r.status}\n${r.stdout}\n${r.stderr}`);
   const out = args.includes('--out') ? args[args.indexOf('--out') + 1] : args.includes('--changed') ? '.testguard/evidence-partial.json' : '.testguard/evidence.json';
@@ -71,7 +71,7 @@ try {
   rows.push(run('from scratch, --serial (0.22 behavior)', ['--serial', '--out', '.testguard/serial.json', '--no-reuse']));
   rows.push(run('from scratch, default', ['--no-reuse']));
   rows.push(run('no-change rerun, default', []));
-  writeFileSync(join(dir, 'src/m0.mjs'), readFileSync(join(dir, 'src/m0.mjs'), 'utf8').replace('total - 5', 'total - 5 // touched'));
+  writeFileSync(join(dir, 'src/m0.mjs'), readFileSync(join(dir, 'src/m0.mjs'), 'utf8') + '// touched\n');
   git('commit', '-qam', 'touch m0');
   rows.push(run('--changed HEAD~1 after touching one module', ['--changed', 'HEAD~1']));
 } finally {
