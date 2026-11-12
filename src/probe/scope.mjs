@@ -1,9 +1,9 @@
-import { realpathSync } from 'node:fs';
-import { extname, relative, resolve } from 'node:path';
+import { readFileSync, realpathSync } from 'node:fs';
+import { extname, join, relative, resolve } from 'node:path';
 import { git, GitError } from '../git.mjs';
 import { SOURCE_EXT, isDefaultExcluded } from '../gate/changed.mjs';
 import { resolveDefenders } from './runners/shared.mjs';
-import { discoverDefenders } from './discover.mjs';
+import { discoverDefendersDetailed } from './discover.mjs';
 import { defenderSelection } from './attribution.mjs';
 import { createDependencyHasher } from './dependencies.mjs';
 import { globToRegExp } from '../util/glob.mjs';
@@ -110,10 +110,35 @@ export function changedSince({ projectDir, ref, includeDirty = false, timeoutMs 
   return { base, head, files: files.sort(), repoChanged: paths.size };
 }
 
+/**
+ * The discovery inputs each claim's evidence recorded (`inputs.discoveryHashes`),
+ * read from the project's evidence when there is one (#297): a candidate test
+ * that was deleted is no candidate at HEAD, and only the record remembers it.
+ * Best effort and only ever widening: unreadable evidence adds nothing.
+ */
+function recordedDiscovery(projectDir) {
+  const byClaim = new Map();
+  let doc;
+  try { doc = JSON.parse(readFileSync(join(projectDir, '.testguard', 'evidence.json'), 'utf8')); } catch { return byClaim; }
+  for (const record of Array.isArray(doc?.records) ? doc.records : []) {
+    const id = record?.claim?.id;
+    const files = Object.keys(record?.inputs?.discoveryHashes ?? {});
+    if (typeof id !== 'string' || !files.length) continue;
+    if (!byClaim.has(id)) byClaim.set(id, new Set());
+    for (const file of files) byClaim.get(id).add(file);
+  }
+  return byClaim;
+}
+
 /** Everything one claim's verdicts depend on, as project-relative paths and literals. */
-function dependenciesOf(projectDir, claim, hasher) {
+function dependenciesOf(projectDir, claim, hasher, recorded = new Set()) {
   const named = new Set();
   const globs = [];
+  // A discovered defender set depends on every candidate test file and what
+  // they import (#297): an edit there can give the claim a defender. Kept
+  // apart from `named` so the reason can say which input it was.
+  const discovery = new Set(recorded);
+  let discoveryIndeterminate = false;
   let indeterminate = false;
   let issue;
   for (const fault of claim.faults) {
@@ -123,13 +148,22 @@ function dependenciesOf(projectDir, claim, hasher) {
       named.add(entry);
       globs.push(entry);
     }
-    const defenders = requested.length ? resolveDefenders(projectDir, requested) : discoverDefenders(projectDir, fault.file);
+    let defenders;
+    if (requested.length) defenders = resolveDefenders(projectDir, requested);
+    else {
+      const detailed = discoverDefendersDetailed(projectDir, fault.file);
+      defenders = detailed.canDetect;
+      for (const file of detailed.dependencies) discovery.add(file);
+      if (detailed.indeterminate.length) discoveryIndeterminate = true;
+    }
     for (const defender of defenders) named.add(defender);
     const inputs = hasher.inputsFor([fault.file, ...defenders]);
     for (const file of Object.keys(inputs.dependencyHashes)) named.add(file);
     if (inputs.dependencyClosure !== 'complete') { indeterminate = true; issue ??= inputs.dependencyIssues?.[0]; }
   }
-  return { named, globs: globs.map((glob) => ({ glob, re: globToRegExp(glob) })), indeterminate, issue };
+  // Discovery that cannot be followed cannot rule a change out either.
+  if (discoveryIndeterminate) indeterminate = true;
+  return { named, discovery, globs: globs.map((glob) => ({ glob, re: globToRegExp(glob) })), indeterminate, issue };
 }
 
 /**
@@ -153,16 +187,19 @@ export function resolveProbeScope({ projectDir, claims, ref, includeDirty = fals
   const touched = new Set();
   const matched = new Set();
   const reasons = new Map();
+  const recorded = recordedDiscovery(projectDir);
   for (const claim of claims.claims) {
-    const { named, globs, indeterminate, issue } = dependenciesOf(projectDir, claim, hasher);
+    const { named, discovery, globs, indeterminate, issue } = dependenciesOf(projectDir, claim, hasher, recorded.get(claim.id));
     for (const file of named) touched.add(file);
     // Why the claim is selected, so an over-selection can be read off the
     // document (#272): the first changed file it names, else the first one a
     // defender glob matches, else the first reason its closure is indeterminate.
     const byFile = changed.files.find((file) => named.has(file));
     const byGlob = byFile ? undefined : changed.files.map((file) => ({ file, entry: globs.find((g) => g.re.test(file)) })).find((hit) => hit.entry);
+    const byDiscovery = byFile || byGlob ? undefined : changed.files.find((file) => discovery.has(file));
     if (byFile) reasons.set(claim.id, { claimId: claim.id, kind: 'file', file: byFile });
     else if (byGlob) reasons.set(claim.id, { claimId: claim.id, kind: 'glob', file: byGlob.file, glob: byGlob.entry.glob });
+    else if (byDiscovery) reasons.set(claim.id, { claimId: claim.id, kind: 'discovery', file: byDiscovery });
     // A closure that cannot be followed cannot rule the change out, but with no change there is nothing to rule out.
     // "No change" is measured over the whole repository: what the closure could not follow may lie outside the project.
     else if (indeterminate && (changed.repoChanged ?? changed.files.length) > 0) reasons.set(claim.id, { claimId: claim.id, kind: 'indeterminate', ...(issue ? { issue } : {}) });

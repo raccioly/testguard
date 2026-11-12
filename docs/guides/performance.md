@@ -368,8 +368,11 @@ npx testguard-cli probe . --changed auto                                        
 npx testguard-cli probe .                                                                # the full pass: nightly, or when asked
 ```
 
-- `--claim` takes one or more IDs (`--claim A,B --claim C`) and writes
-  `.testguard/evidence-partial.json`, never the canonical file. The summary
+- `--claim` takes one or more IDs (`--claim A,B --claim C`). A confirmed run
+  converges: it replaces the records it measured in `.testguard/evidence.json`
+  and carries the others only when their inputs are unchanged, so `status`
+  stops asking for the full probe once the change is covered. A provisional
+  run (`--confirm 1`) writes `.testguard/evidence-partial.json`. The summary
   names both the requested and the probed count, so a green subset cannot pass
   for the whole selection.
 - `--include-dirty` probes a snapshot of your working tree, so uncommitted

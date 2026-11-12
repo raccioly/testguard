@@ -3,6 +3,7 @@ import { join, dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { PreconditionError } from '../probe/worktree.mjs';
+import { PACKAGE, pinDevDependency, dependabotRule, renovateRule, RENOVATE_JSON, RENOVATE_OTHER } from './pin.mjs';
 import { TEMPLATE_VERSION, prePushBlock, prePushBlockName, githubWorkflow, gitlabCi, installStep, markSkill, skillState, parseManagedBlocks, replaceManagedBlock, scanInstalled, renderFinding } from './managed.mjs';
 
 const TEMPLATES = join(dirname(fileURLToPath(import.meta.url)), 'templates');
@@ -372,7 +373,7 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
   const husky = existsSync(join(agentRoot, '.husky'));
   const hookPath = join(agentRoot, husky ? '.husky' : '.githooks', 'pre-push');
   const blockName = prePushBlockName(dir);
-  const block = prePushBlock(dir);
+  const block = prePushBlock(dir, { version: toolVersion });
   const existingHook = existsSync(hookPath) ? readFileSync(hookPath, 'utf8') : '';
   const ourBlock = parseManagedBlocks(existingHook).find((b) => b.name === blockName);
   handled.add(rel(hookPath));
@@ -398,12 +399,51 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
     const install = installStep(projectDir);
     if (ci === 'github') {
       const wf = join(agentRoot, '.github', 'workflows', dir === '.' ? 'testguard.yml' : `testguard-${dir.replace(/[^A-Za-z0-9_-]+/g, '-')}.yml`);
-      refresh(wf, githubWorkflow({ dir, install }) + '\n', `${rel(wf)}: pull requests probe --changed auto; nightly and manual runs probe every claim; evidence cached`, 'github-workflow');
+      refresh(wf, githubWorkflow({ dir, install, version: toolVersion }) + '\n', `${rel(wf)}: pull requests probe --changed auto; nightly and manual runs probe every claim; evidence cached`, 'github-workflow');
     } else {
       const gl = join(projectDir, 'testguard.gitlab-ci.yml');
-      refresh(gl, gitlabCi({ dir, install }) + '\n', `${rel(gl)}: include it from .gitlab-ci.yml; merge requests probe --changed auto, scheduled pipelines probe every claim`, 'gitlab-ci');
+      refresh(gl, gitlabCi({ dir, install, version: toolVersion }) + '\n', `${rel(gl)}: include it from .gitlab-ci.yml; merge requests probe --changed auto, scheduled pipelines probe every claim`, 'gitlab-ci');
     }
   }
+  // ---- the version that runs: pinned, and raised only by a pull request (#293) ----
+  const pkgPath = join(projectDir, 'package.json');
+  if (existsSync(pkgPath)) {
+    let pinned;
+    try { pinned = pinDevDependency(readFileSync(pkgPath, 'utf8'), toolVersion); }
+    catch (e) { warnings.push(`${rel(pkgPath)} could not be read as JSON (${e.message}); add "${PACKAGE}": "${toolVersion}" to devDependencies yourself`); }
+    if (pinned?.action === 'added') {
+      write(pkgPath, pinned.text, { checkIgnored: false });
+      done.push(`${rel(pkgPath)}: devDependency ${PACKAGE} pinned to exactly ${toolVersion}. The lockfile is now out of date, and npm ci / --frozen-lockfile will fail until you run your package manager's install (npm install, pnpm install, …) and commit the updated lockfile with it. Where npm enforces min-release-age, installing a release that new needs that setting overridden for one install, or a wait until the release is old enough`);
+    } else if (pinned?.action === 'exact') skipped.push(`${rel(pkgPath)} already pins ${PACKAGE} ${pinned.spec}`);
+    else if (pinned?.action === 'floating') outdated.push(`${rel(pkgPath)}: ${PACKAGE} "${pinned.spec}" is a floating version, so a new release runs here unreviewed — pin an exact version ("${toolVersion}") and let Dependabot/Renovate raise it`);
+    else if (pinned?.action === 'range') notes.push(`${rel(pkgPath)} asks for ${PACKAGE} "${pinned.spec}", a range: the lockfile pins it, a fresh install does not. An exact version ("${toolVersion}") makes every install run the same TestGuard.`);
+    // The update rule: Renovate's when the repository uses Renovate, else Dependabot's.
+    const repoRoot = gitRoot(agentRoot) ?? agentRoot;
+    const renovate = RENOVATE_JSON.find((f) => existsSync(join(repoRoot, f)));
+    const renovateOther = RENOVATE_OTHER.find((f) => existsSync(join(repoRoot, f)));
+    if (renovate) {
+      const path = join(repoRoot, renovate);
+      let rule;
+      try { rule = renovateRule(readFileSync(path, 'utf8')); } catch { rule = { action: 'manual' }; }
+      if (rule.action === 'extended') { write(path, rule.text); done.push(`${renovate}: a packageRules entry groups and pins ${PACKAGE}, so its updates arrive as pull requests`); }
+      else if (rule.action === 'present') skipped.push(`${renovate} already has a rule for ${PACKAGE}`);
+      else notes.push(`${renovate} could not be read as JSON; add to packageRules: { "matchPackageNames": ["${PACKAGE}"], "groupName": "testguard", "rangeStrategy": "pin" }`);
+    } else if (renovateOther) {
+      notes.push(`${renovateOther}: add to packageRules { matchPackageNames: ['${PACKAGE}'], groupName: 'testguard', rangeStrategy: 'pin' } so ${PACKAGE} updates arrive as pull requests (init does not edit JSON5)`);
+    } else if (ci === 'gitlab') {
+      notes.push(`Pin updates: GitLab has no Dependabot; with Renovate, add a packageRules entry { "matchPackageNames": ["${PACKAGE}"], "groupName": "testguard", "rangeStrategy": "pin" } so ${PACKAGE} updates arrive as merge requests.`);
+    } else {
+      const path = join(repoRoot, '.github', 'dependabot.yml');
+      const ymlPath = join(repoRoot, '.github', 'dependabot.yaml');
+      const existingPath = existsSync(path) ? path : existsSync(ymlPath) ? ymlPath : undefined;
+      const rule = dependabotRule(existingPath ? readFileSync(existingPath, 'utf8') : undefined, relative(repoRoot, projectDir).split(sep).join('/') || '.');
+      const shown = relative(agentRoot, existingPath ?? path).split(sep).join('/');
+      if (rule.action === 'created' || rule.action === 'appended') { write(existingPath ?? path, rule.text); done.push(`${shown}: ${rule.action === 'created' ? 'created with' : 'added'} an npm rule for ${PACKAGE}, so its updates arrive as pull requests your CI gates`); }
+      else if (rule.action === 'present') skipped.push(`${shown} already names ${PACKAGE}`);
+      else notes.push(`${shown} has an npm rule already; add to it so ${PACKAGE} updates arrive grouped:\n${rule.snippet}`);
+    }
+  }
+
   // Hooks and CI files this run does not write: the ones that still run
   // TestGuard the slow or stale way, reported with what fixes them.
   const writing = new Set(writes.map((w) => rel(w.path)));
@@ -423,11 +463,12 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
   if (mcp) {
     // Printed, never written: a harness's own config is the person's file
     // (and often global), so init shows the snippet and lets them place it.
-    const cmd = { command: 'npx', args: ['-y', 'testguard-cli', 'mcp'] };
+    // The exact version that printed it, like every template (#293).
+    const cmd = { command: 'npx', args: ['-y', `testguard-cli@${toolVersion}`, 'mcp'] };
     mcpConfig = {
       'Claude Code — .mcp.json in the project root, or `claude mcp add`': { mcpServers: { testguard: cmd } },
       'Cursor — .cursor/mcp.json': { mcpServers: { testguard: cmd } },
-      'Codex CLI — ~/.codex/config.toml': '[mcp_servers.testguard]\ncommand = "npx"\nargs = ["-y", "testguard-cli", "mcp"]',
+      'Codex CLI — ~/.codex/config.toml': `[mcp_servers.testguard]\ncommand = "npx"\nargs = ["-y", "testguard-cli@${toolVersion}", "mcp"]`,
     };
     notes.push('MCP: five read-only tools (status, brief, claims, evidence, next_command). Nothing there runs a probe.');
   }

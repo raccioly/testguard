@@ -133,9 +133,10 @@
             }
           ],
           "expectedClaims": [
-            "FOOTER-BY-AUDIENCE"
+            "FOOTER-BY-AUDIENCE",
+            "SCHEDULE-VALIDATION"
           ],
-          "why": "Only FOOTER-BY-AUDIENCE targets src/footer.js; no other claim's target or defender imports it (the only test that names it mocks it and defends nothing)."
+          "why": "FOOTER-BY-AUDIENCE targets src/footer.js. SCHEDULE-VALIDATION declares no defendedBy, so its defenders are discovered among the candidate test files, and test/footer.test.js requires ../src/footer: src/footer.js is one of its discovery inputs, and an edit there could give it a defender (the selection rule of #297). No other claim's target, declared defender or import closure reaches src/footer.js."
         }
       ],
       "badRef": {

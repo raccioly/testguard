@@ -18,7 +18,7 @@ their first consumer.
 ```bash
 npm ci --prefix fixtures/known-answer-typescript   # once; without it the type-check suites fail loudly (they never skip)
 npm ci --prefix fixtures/known-answer-playwright   # once; without it the Playwright fixture acceptance silently skips
-npm test               # unit + fixture acceptance; about 200 s here, CI fails it over 300 s
+npm test               # unit + fixture acceptance, about 200 s here in one process; CI runs it as three shards of 45-150 s each (the unit job in ci.yml has each shard's budget)
 npm run test:spec      # conformance suite only
 node cli/testguard.mjs gate --changed origin/main   # every changed source file, tests included, needs a claim
 node cli/testguard.mjs claims --check-anchors       # every fault anchor and replacement is valid (50 ms; a stale one costs a CI probe)

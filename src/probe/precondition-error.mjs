@@ -20,6 +20,7 @@ export const PRECONDITION_KINDS = Object.freeze([
   'file-missing',          // a named file does not exist
   'init-settings',         // a hook settings file init would edit is unusable
   'module-shadowed',       // Python imported a different copy of the faulted module
+  'no-base',               // --changed auto --when-no-base fail found no base to compare against
   'no-commits',            // the repository has no commit to tie a verdict to
   'no-fix-commits',        // replay found no fix commit in the range
   'path-outside-project',  // a named path escapes the project, repository or scratch tree

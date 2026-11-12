@@ -11,12 +11,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The Playwright gallery's reference runs once, in its own CI job (#305, repository only).** Modes that only compare with the reference run with `--reference-later` and the scorecard job compares them (`corpus/lib/deferred.mjs`): a missing reference, one of another subject or size, a comparison that never arrived, claim halves of `twice` that do not cover every fault exactly once, and a mode that applies with no shard are all failures. Modes that do not apply to a subject are recorded as such from `applies()`.
 
+## [0.25.0] - 2026-11-12
+
+Automated weekly release — everything merged since `v0.24.0`.
+
+### Changed
+
+- feat: the fast path converges; templates pin what they run (#293) (#298)
+- ci: shard the unit suite three ways inside each Node leg (#304)
+- fix: a dotted stem resolves in the import closure (Refs #301) (#303)
+- fix: runner errors carry their message, foreign webServer note, slow-defender advice (#291) (#302)
+- ci: scoped PR probe, one probe per release, release PR mergeability, AGENTS.md from the code (#294) (#299)
+- chore(homebrew): sha256 for v0.24.0 (#292)
+- test(corpus): PR 2 — seven subjects, subject-untouched, six mutants (#258) (#285)
+
+
 ### Changed
 
 - **The corpus CI runs one Playwright mode per shard (#305, repository only).** The shard list is `corpus/shards.json`; the workflow builds its matrix from it and the scorecard fails when a planned shard delivered no scorecard. Per-shard timeouts come from measurements. No subject, mode or mutant was dropped.
+- **The unit suite runs as three shards in CI (repository only).** Each Node
+  leg runs `vitest run --shard=i/3` as a matrix, each shard with its own
+  duration budget and a failure when it runs no test file. `static (N)` holds
+  the once-per-Node checks; `checks (22)`, `test (20)` and `test (24)` gather a
+  version's shards and static job from the run's job list, so the required check
+  names are unchanged. `npm test` is unchanged for local use.
 
 ### Fixed
 
+- **A dotted stem resolves (#301).** `./auth.config` is `auth.config.ts`: the
+  import closure tried no candidates for a specifier whose last segment holds a
+  dot, so it reported `unreadable-module` and every `--changed` run selected
+  each claim through that file. With no exact file and no script fallback it now
+  tries name plus each source extension and `name/index` plus each. An exact
+  file still wins, `./x.js` still falls back to `x.ts`, a missing module is
+  still unreadable.
 - **`defenders-failed-to-load` carries the runner's words (#291).** The first
   informative error line reached `anchor.message` and stopped there, so 71
   records of a 6,613-fault field run said only `defenders-failed-to-load`. It is
@@ -69,6 +97,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--changed` over a docs-only commit, and the automatic fan-out width
   compared with a serial reference. `bench/README.md` documents running a
   project outside the repository through the same harness. It found #282.
+
+### Changed
+
+- Two probe commands on one machine no longer hand out the same `TESTGUARD_WORKER` (#293). Each command offsets its indices by `TESTGUARD_WORKER_BASE`, or by 100 times a slot it holds under the scratch root while it runs. A lone command still starts at 0.
+- A fan-out reuses the baseline phase's scratch trees for its faults when `git status` shows each tree exactly as it was created (#293). On a generated 10,000-file repository with four fault workers, a probe created 5 trees instead of 8, and its mean time over three runs dropped from 20.0 s to 15.9 s.
+- The pre-push block survives version skew (#293). It checks `testguard --version` first, and a binary older than the version the block needs (0.25.0) lets the push through with one line naming both versions and how to install. Only exit 1 (unproven) and exit 2 (could not evaluate) refuse a push; exit 3 (a usage error) lets it through with one line. `TESTGUARD_SKIP_HOOK=1` skips the hook. A usage error now prints one line and `Run 'testguard --help' for usage.` instead of the whole help.
+- The pre-push hook never starts a full probe (#293). `probe --changed auto --when-no-base <full|skip|fail>`: when no base can be resolved, `skip` (what the pre-push block now passes) prints one line and exits 0 without measuring or writing anything, `fail` refuses (exit 2, error kind `no-base`), and `full` (the default) keeps probing every claim and says so in its first line. A base that was found but cannot be measured still exits 2.
+- Templates pin what they run (#293). The pre-push block runs an installed TestGuard only. If none is found, it prints how to install the exact version that wrote the block and lets the push through, without any npx fetch (#301). The GitHub and GitLab CI templates run the project's installed TestGuard, else exactly the version that wrote them. Nothing runs `testguard-cli@latest`. Actions are pinned by commit SHA. With a `package.json`, `init` adds `testguard-cli` at that exact version to `devDependencies` and writes a Dependabot rule (or a Renovate rule) so each release arrives as a pull request. The MCP snippet is pinned too. Any floating version in a hook or CI file is reported (`floating-version`, through `hook-outdated` advice). Template 3: `init --upgrade` rewrites 0.24.0's unedited blocks.
+- `probe --changed` no longer under-selects a claim with discovered defenders (#297). Such a claim is now selected when one of its discovery inputs changed: a candidate test file or a file a candidate imports, found now or recorded in its evidence. It is also selected when discovery cannot be followed. The reason is `discovery` in `run.scope.changed.matchReasons`.
+- `--typecheck` records `run.typecheck.programDigest`: a hash of the tsconfig, the resolved configuration, and every file `tsc --listFilesOnly` lists, with packages keyed by name and version (#293). Reuse and convergence compare it instead of type-checking every carried fault again. When the digest differs, nothing is reused or carried, even a fault the change did not touch. Evidence from 0.24.0 has no digest, so its faults are re-checked one by one, once.
+- `probe --out <file>` no longer refuses a file an older TestGuard wrote under rules since tightened, such as a 0.23 fan-out without `alone` marks (#301). Nothing is reused from it, and every fault is measured again.
+- The fast path converges (#293). A `probe --claim` or `probe --changed` run whose selection is determined now updates `.testguard/evidence.json`. The records it measured replace the old ones. Every other record is carried forward only when the probe finds its recorded inputs unchanged in the tree it probed, and it is marked `carried: "inputs-match"`. A record whose inputs changed is kept as it was and marked `carried: "inputs-changed"`. It is never reuse and never current: `run.reuse` counts it as `stale` (measured + reused + stale is the record count), `status` lists it stale, its claim reads `could-not-verify` / `inputs-changed`, `baseline` refuses the document, and both policies are `unavailable` while it is there. The output says why such a record can exist when the selection was sound. So after `probe --changed` covers a change, `status` is fresh and `next` no longer asks for the full probe. Provisional runs (`--confirm` below 3), runs cut by their budget, `--ref` and `--no-reuse` runs, and runs with an `--out` elsewhere still write `evidence-partial.json`, and each says why. A tool-version or configuration change carries nothing. `--no-reuse` also disables carrying. Run ids now have millisecond resolution (`run-20261112T153612123`), so a scoped run that starts within a second of the probe it carries from gets a different id.
 
 ## [0.24.0] - 2026-11-12
 

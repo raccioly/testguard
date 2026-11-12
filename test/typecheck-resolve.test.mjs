@@ -19,7 +19,7 @@ describe('the checker is the project\'s own, never a bundled compiler', () => {
     try {
       const one = await createTypechecker({ projectDir: a });
       const two = await createTypechecker({ projectDir: b });
-      expect(one.spec).toEqual({ commandHash: expect.stringMatching(/^[0-9a-f]{64}$/), version: '9.9.9' });
+      expect(one.spec).toEqual({ commandHash: expect.stringMatching(/^[0-9a-f]{64}$/), version: '9.9.9', programDigest: expect.stringMatching(/^[0-9a-f]{64}$/) });
       expect(one.spec).toEqual(two.spec);
       const calls = readFileSync(log, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
       const check = calls.find((c) => !c.includes('--showConfig') && !c.includes('--listFilesOnly'));

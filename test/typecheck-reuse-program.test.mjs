@@ -25,11 +25,13 @@ describe('reuse and the whole program', () => {
     expect(refusedAgain.run.measurements.reuseBaselineRuns).toBe(0);
   }, 180_000);
 
-  it('a verdict the program change did not touch is still reused, for one warm check', async () => {
+  it('a program that changed anywhere carries no verdict forward, even one the change did not touch (#293: the digest)', async () => {
     const dir = stubProject();
     const stable = await runProbe(dir, { only: ['AFTER'], typecheck: '' });
     writeFileSync(join(dir, 'src', 'other.ts'), 'export const unrelated = 1;\n');
     commitAll(dir, 'add an unrelated file');
-    expect((await runProbe(dir, { only: ['AFTER'], typecheck: '', previous: stable })).run.reuse).toEqual({ reused: 1, measured: 0 });
+    const again = await runProbe(dir, { only: ['AFTER'], typecheck: '', previous: stable });
+    expect(again.run.reuse).toEqual({ reused: 0, measured: 1 });
+    expect(again.records[0]).toMatchObject({ verdict: 'killed', detail: { typecheck: 'clean' } });
   }, 120_000);
 });

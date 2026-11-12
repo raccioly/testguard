@@ -183,3 +183,15 @@ describe('the ignore file has no kind that does nothing', () => {
     expect(c.lines.err.join('\n')).toMatch(/testguard\.ignore\.json[\s\S]*\/entries\/0\/kind: must be equal to one of the allowed values: path, claim, fault/);
   });
 });
+
+describe('a usage error says what was wrong in one line, never the whole help (#293 review)', () => {
+  it('for an unknown option and an unknown command', async () => {
+    for (const argv of [['probe', '.', '--bogus-flag'], ['nonsense']]) {
+      const err = [];
+      const code = await main(argv, { out: () => {}, err: (s) => err.push(s) });
+      expect(code).toBe(3);
+      expect(err).toHaveLength(2);
+      expect(err[1]).toBe("Run 'testguard --help' for usage.");
+    }
+  });
+});
