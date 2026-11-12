@@ -1,0 +1,9 @@
+diff --git a/src/evidence/carry.mjs b/src/evidence/carry.mjs
+index bb727b9..77a683b 100644
+--- a/src/evidence/carry.mjs
++++ b/src/evidence/carry.mjs
+@@ -66,3 +66,3 @@ export function mergeEvidence({ measured, canonical, decisions, claims, scope })
+       const record = earlier.get(id);
+-      if (!record || !decision) continue;
++      continue;
+       records.push({ ...record, reusedFrom: record.reusedFrom ?? canonical.run.id, carried: decision });

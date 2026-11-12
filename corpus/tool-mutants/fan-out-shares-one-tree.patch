@@ -1,9 +1,9 @@
 diff --git a/src/probe/probe.mjs b/src/probe/probe.mjs
-index 9bb53b9..34ec6c0 100644
+index e7b8482..2e88aa7 100644
 --- a/src/probe/probe.mjs
 +++ b/src/probe/probe.mjs
-@@ -864,3 +864,3 @@ async function measureProbe({
-         commandBudget?.assertOpen();
--        slots.push(freshTree(i));
-+        slots.push(primary);
-       }
+@@ -942,3 +942,3 @@ async function measureProbe({
+       });
+-      const slots = [primary, ...faultSlots];
++      const slots = [primary, ...faultSlots.map(() => primary)];
+       const overlap = createOverlapTracker();

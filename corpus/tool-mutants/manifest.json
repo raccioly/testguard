@@ -264,6 +264,32 @@
           ]
         }
       ]
+    },
+    {
+      "name": "converge-never-converges",
+      "patch": "converge-never-converges.patch",
+      "description": "A scoped run that may converge merges its records but writes the merged document to the partial file, so the canonical evidence stays stale after the change is covered (#293). Every check of the converge mode's runs reads the canonical file.",
+      "targets": [
+        {
+          "subject": "js-jest-newsletter",
+          "modes": [
+            "converge"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "converge-drops-carried-records",
+      "patch": "converge-drops-carried-records.patch",
+      "description": "The merged document keeps only the records the scoped run measured and drops every carried one, so the canonical evidence no longer names every fault (#293).",
+      "targets": [
+        {
+          "subject": "js-jest-newsletter",
+          "modes": [
+            "converge"
+          ]
+        }
+      ]
     }
   ]
 }
