@@ -19,13 +19,13 @@ describe('N: the progress stream after a budget expiry is the full record list, 
       const onStage = ({ claimId, stage }) => {
         if (stage !== 'probe' || seen.has(claimId)) return;
         seen.add(claimId);
-        if (seen.size === 3) now = LIMIT + 1;
+        if (seen.size === 2) now = LIMIT + 1;
       };
       const streamed = [];
-      const doc = await probe(base(project, { confirmRuns: 1, budgetMs: LIMIT, commandBudget: budget, partialOnBudget: true, onStage, onProgress: (r) => streamed.push(r) }));
-      expect(doc.records.map((r) => r.claim.id)).toEqual(['C1', 'C2', 'C3', 'C4']);
+      const doc = await probe(base(project, { only: ['C1', 'C2', 'C3'], confirmRuns: 1, budgetMs: LIMIT, commandBudget: budget, partialOnBudget: true, onStage, onProgress: (r) => streamed.push(r) }));
+      expect(doc.records.map((r) => r.claim.id)).toEqual(['C1', 'C2', 'C3']);
       expect(streamed.map((r) => `${r.claim.id}/${r.subject.id}:${r.verdict}`)).toEqual(doc.records.map((r) => `${r.claim.id}/${r.subject.id}:${r.verdict}`));
-      expect(streamed.slice(2).map((r) => r.detail.reason)).toEqual(['not-reached-within-budget', 'not-reached-within-budget']);
+      expect(streamed.slice(1).map((r) => r.detail.reason)).toEqual(['not-reached-within-budget', 'not-reached-within-budget']);
     } finally { rmSync(project.dir, { recursive: true, force: true }); }
   }, 60_000);
 });

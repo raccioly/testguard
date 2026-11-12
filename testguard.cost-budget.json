@@ -1,6 +1,6 @@
 {
   "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine.",
-  "seconds": 3600,
+  "seconds": 4200,
   "measured": {
     "seconds": 816,
     "at": "2026-09-18",
@@ -76,6 +76,11 @@
       "seconds": 3600,
       "at": "2026-11-11",
       "why": "The ceiling is now in NORMALIZED seconds (#255), so it is not comparable with the raw ceilings above it. Four from-scratch CI runs of the same 604 faults (verdict reuse off, 0 reused records) measured 2730, 3334, 3913 and 3963 s raw, a 45% spread, on runners whose reference workload took 166, 202, 237 and 238 ms. Normalized by the factor against baselineMs 200 they are 3278, 3300, 3306 and 3323 s, a 1.4% spread; median 3303 s (runs in `reference.runs`). 3600 is the median plus 9%: about six times the observed spread, kept because four runs on three machine speeds do not bound a fourth runner class. It replaces 4750 raw, which sat 19% above the slowest raw measurement and 74% above the fastest. Per-claim ceiling unchanged, now also normalized."
+    },
+    {
+      "seconds": 4200,
+      "at": "2026-11-12",
+      "why": "PR #262 (fixes from the independent and white-box verification of 0.22.1) adds 28 faults in 12 claims, from 604 to 632, and ci.yml test (22) measured 3946 normalized seconds (4828 raw, reference 241/249 ms, factor 1.22, 0 reused records) against 3600, over by 346. The median of the four runs that set 3600 was 3303 at 604 faults, 5.5 s a fault; the new claims run 7-12 s a fault because their honest defenders are end-to-end: real probes of a throwaway repository (scope state, a lone timing-out fault, the progress stream after a budget expiry, a written partial document), a real child process for the signal exits, and the Python engine on two fixture claims. Before raising, the two heaviest were cut (the budget-expiry defenders probe two or three claims, not four), an estimated 80 s. 4200 is 9% above the expected post-cut figure of about 3860, the same rule that set 3600; the 100 s per-claim ceiling is unchanged and every new claim is under it (worst 74 s locally before the cut)."
     }
   ],
   "measuredInCI": {
