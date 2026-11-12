@@ -175,11 +175,34 @@
         "newSinceBaseline": { "type": "integer", "minimum": 0 },
         "exitCode": { "enum": [0, 1, 2] },
         "reuse": {
-          "description": "Copied from the evidence's run.reuse: records carried forward versus measured by this invocation.",
+          "description": "Copied from the evidence's run.reuse: records carried forward versus measured by this invocation; for a converged scoped run (#293), of the written document, with `carried` and `stale`.",
           "type": "object",
           "required": ["reused", "measured"],
-          "properties": { "reused": { "type": "integer", "minimum": 0 }, "measured": { "type": "integer", "minimum": 0 } },
+          "properties": { "reused": { "type": "integer", "minimum": 0 }, "measured": { "type": "integer", "minimum": 0 }, "carried": { "type": "integer", "minimum": 0 }, "stale": { "type": "integer", "minimum": 0 } },
+          "dependentRequired": { "carried": ["stale"], "stale": ["carried"] },
           "additionalProperties": false
+        },
+        "converged": {
+          "description": "Scoped runs only (`--claim`, `--changed`): whether this invocation updated the canonical evidence (GATE-SEMANTICS \"Convergence\"). `into` is the canonical file, with how many records were carried from `carriedFrom` and the faults kept stale; or null with the `reason` it did not.",
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["into", "carriedFrom", "carried", "stale"],
+              "properties": {
+                "into": { "type": "string", "minLength": 1, "maxLength": 4096 },
+                "carriedFrom": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" },
+                "carried": { "type": "integer", "minimum": 0 },
+                "stale": { "type": "array", "items": { "type": "string", "minLength": 3, "maxLength": 257 } }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": ["into", "reason"],
+              "properties": { "into": { "const": null }, "reason": { "type": "string", "minLength": 1, "maxLength": 2000 } },
+              "additionalProperties": false
+            }
+          ]
         },
         "claims": {
           "description": "One entry per claim this invocation measured, in the order the claims were probed, keyed by claim id (never by position or line). `result` is derived from `faults` by the rule in GATE-SEMANTICS.md: proven only when at least one fault was measured and every fault is killed; unproven when any fault survived or had no defender; could-not-verify otherwise (the measurement did not happen). It ignores the baseline and the severity floor: it describes this run's measurement, not what gates. `reasons` has one entry per fault that was not killed, keyed by fault id.",

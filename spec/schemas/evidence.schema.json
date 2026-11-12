@@ -223,12 +223,37 @@
           "additionalProperties": false
         },
         "reuse": {
-          "description": "How many records this run carried forward from earlier evidence (`reused`, each with `reusedFrom`) and how many it measured. A gate over authors who can write the evidence file must run with --no-reuse (GATE-SEMANTICS rule 8).",
+          "description": "How many records this run carried forward from earlier evidence (`reused`, each with `reusedFrom`) and how many it measured. Of the reused, a converging scoped run (#293) also counts the records it carried without running their defenders: `carried` (inputs matched the probed tree) and `stale` (kept unchanged because they did not); both or neither, and both are part of `reused`. A gate over authors who can write the evidence file must run with --no-reuse (GATE-SEMANTICS rule 8).",
           "type": "object",
           "required": ["reused", "measured"],
           "properties": {
             "reused": { "type": "integer", "minimum": 0 },
-            "measured": { "type": "integer", "minimum": 0 }
+            "measured": { "type": "integer", "minimum": 0 },
+            "carried": { "type": "integer", "minimum": 0 },
+            "stale": { "type": "integer", "minimum": 0 }
+          },
+          "dependentRequired": { "carried": ["stale"], "stale": ["carried"] },
+          "additionalProperties": false
+        },
+        "scope": {
+          "description": "Present when a scoped run (`--claim`, `--changed`) converged into the canonical evidence (#293, GATE-SEMANTICS \"Convergence\"): the claims it measured, the change that selected them, and the run whose document the other records were carried from.",
+          "type": "object",
+          "required": ["selectedClaims", "carriedFrom"],
+          "properties": {
+            "selectedClaims": { "type": "array", "minItems": 1, "items": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" } },
+            "requestedClaims": { "type": "array", "minItems": 1, "items": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" } },
+            "changed": {
+              "type": "object",
+              "required": ["ref", "base", "head"],
+              "properties": {
+                "ref": { "type": "string", "minLength": 1, "maxLength": 512 },
+                "base": { "$ref": "urn:claimspec:v1:common#/$defs/gitSha" },
+                "head": { "$ref": "urn:claimspec:v1:common#/$defs/gitSha" },
+                "includeDirty": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            },
+            "carriedFrom": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" }
           },
           "additionalProperties": false
         },
@@ -868,6 +893,10 @@
         "reusedFrom": {
           "description": "Run id whose verdict was reused because fault, defender and recorded claim metadata inputs were unchanged. A changed claim statement, severity, source or producer requires a fresh probe.",
           "$ref": "urn:claimspec:v1:common#/$defs/identifier"
+        },
+        "carried": {
+          "description": "Set on a record a converging scoped run (#293) did not measure and ran no defender for. `inputs-match`: its recorded inputs equal the tree that run probed, under the same instrument; it vouches for nothing about the environment since its own run. `inputs-changed`: kept unchanged only so its verdict is not lost; it describes another tree, and a baseline is never frozen from a document holding one. Requires `reusedFrom`.",
+          "enum": ["inputs-match", "inputs-changed"]
         },
         "rank": {
           "description": "Additive ordering signal. Never alters `verdict`.",

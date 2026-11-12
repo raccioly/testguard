@@ -250,7 +250,29 @@ const semantic = {
     if (doc.run.reuse) {
       const reused = doc.records.filter((r) => r.reusedFrom).length;
       if (doc.run.reuse.reused !== reused || doc.run.reuse.measured !== doc.records.length - reused) errors.push({ path: '/run/reuse', message: `run.reuse must count the records: ${reused} reused, ${doc.records.length - reused} measured` });
+      const carried = doc.records.filter((r) => r.carried === 'inputs-match').length;
+      const stale = doc.records.filter((r) => r.carried === 'inputs-changed').length;
+      if ((doc.run.reuse.carried ?? 0) !== carried || (doc.run.reuse.stale ?? 0) !== stale) errors.push({ path: '/run/reuse', message: `run.reuse must count the carried records: ${carried} carried, ${stale} stale` });
     }
+    // Convergence (#293): a document holding records nobody measured in this
+    // run says which run measured the rest and which claims were selected, and
+    // a record is carried exactly when its claim was not selected.
+    const carriedRecords = doc.records.filter((r) => r.carried);
+    if (carriedRecords.length && !doc.run.scope) errors.push({ path: '/run/scope', message: 'a document with carried records names the scope that converged it' });
+    if (doc.run.scope) {
+      const selected = new Set(doc.run.scope.selectedClaims);
+      if (doc.run.provisional === true || doc.run.confirmRuns < 3) errors.push({ path: '/run/scope', message: 'a provisional run never converges into the canonical evidence' });
+      if (doc.run.budget) errors.push({ path: '/run/scope', message: 'a run cut by its command budget never converges into the canonical evidence' });
+      if (doc.run.scope.carriedFrom === doc.run.id) errors.push({ path: '/run/scope/carriedFrom', message: 'records are carried from an earlier run, never from this one' });
+      doc.records.forEach((r, i) => {
+        if (r.carried && selected.has(r.claim.id)) errors.push({ path: `/records/${i}/carried`, message: `${r.claim.id} was selected, so its records were measured, never carried` });
+        if (!r.carried && !selected.has(r.claim.id)) errors.push({ path: `/records/${i}`, message: `${r.claim.id} was not selected, so its record can only be carried` });
+      });
+    }
+    doc.records.forEach((r, i) => {
+      if (r.carried && !r.reusedFrom) errors.push({ path: `/records/${i}/reusedFrom`, message: 'a carried record names the run that measured it' });
+      if (r.carried && r.reusedFrom === doc.run.id) errors.push({ path: `/records/${i}/reusedFrom`, message: 'a carried record was measured by an earlier run' });
+    });
     if (doc.run.repo.ignoredDirty && doc.run.repo.snapshot) errors.push({ path: '/run/repo/ignoredDirty', message: 'a working-tree snapshot has no ignored dirty files: the tree was probed as it is' });
     // Completeness is cross-checked against the records, never asserted: a
     // document that says it was not exhausted while holding a record the budget
@@ -338,7 +360,7 @@ const semantic = {
       const closure = r.inputs.dependencyClosure;
       if (closure === 'indeterminate' && !r.inputs.dependencyIssues?.length) errors.push({ path: `${p}/inputs/dependencyIssues`, message: 'an indeterminate dependency closure must name at least one reason' });
       if (closure === 'complete' && r.inputs.dependencyIssues) errors.push({ path: `${p}/inputs/dependencyIssues`, message: 'a complete dependency closure has no issues' });
-      if (closure === 'indeterminate' && r.reusedFrom) errors.push({ path: `${p}/reusedFrom`, message: 'a record whose dependency closure is indeterminate is never reused (GATE-SEMANTICS rule 8)' });
+      if (closure === 'indeterminate' && r.reusedFrom && r.carried !== 'inputs-changed') errors.push({ path: `${p}/reusedFrom`, message: 'a record whose dependency closure is indeterminate is never reused (GATE-SEMANTICS rule 8)' });
       if (r.verdict === 'nocover' && !r.defenders.nocover) {
         errors.push({ path: `${p}/defenders/nocover`, message: 'nocover verdict requires defenders.nocover = true' });
       }

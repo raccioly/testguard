@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The fast path converges (#293). A `probe --claim` or `probe --changed` run whose selection is determined now updates `.testguard/evidence.json`. The records it measured replace the old ones. Every other record is carried forward only when the probe finds its recorded inputs unchanged in the tree it probed, and it is marked `carried: "inputs-match"`. A record whose inputs changed is kept as it was, marked `carried: "inputs-changed"`, and `status` still names it stale. So after `probe --changed` covers a change, `status` is fresh and `next` no longer asks for the full probe. Provisional runs (`--confirm` below 3), runs cut by their budget, `--ref` and `--no-reuse` runs, and runs with an `--out` elsewhere still write `evidence-partial.json`, and each says why. A tool-version or configuration change carries nothing. `--no-reuse` also disables carrying.
+
 ## [0.24.0] - 2026-11-12
 
 Automated weekly release — everything merged since `v0.23.1`.
