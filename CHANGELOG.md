@@ -10,9 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **The corpus CI runs one Playwright mode per shard (#305, repository only).** The shard list is `corpus/shards.json`; the workflow builds its matrix from it and the scorecard fails when a planned shard delivered no scorecard. Per-shard timeouts come from measurements. No subject, mode or mutant was dropped.
+- **The unit suite runs as three shards in CI (repository only).** Each Node
+  leg runs `vitest run --shard=i/3` as a matrix, each shard with its own
+  duration budget and a failure when it runs no test file. `static (N)` holds
+  the once-per-Node checks; `checks (22)`, `test (20)` and `test (24)` gather a
+  version's shards and static job from the run's job list, so the required check
+  names are unchanged. `npm test` is unchanged for local use.
 
 ### Fixed
 
+- **A dotted stem resolves (#301).** `./auth.config` is `auth.config.ts`: the
+  import closure tried no candidates for a specifier whose last segment holds a
+  dot, so it reported `unreadable-module` and every `--changed` run selected
+  each claim through that file. With no exact file and no script fallback it now
+  tries name plus each source extension and `name/index` plus each. An exact
+  file still wins, `./x.js` still falls back to `x.ts`, a missing module is
+  still unreadable.
 - **`defenders-failed-to-load` carries the runner's words (#291).** The first
   informative error line reached `anchor.message` and stopped there, so 71
   records of a 6,613-fault field run said only `defenders-failed-to-load`. It is

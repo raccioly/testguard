@@ -775,7 +775,7 @@ function expandBase(base) {
     const stem = base.slice(0, -extension.length);
     return SCRIPT_FALLBACKS[extension].map((ext) => candidateFile(stem + ext)).filter(Boolean);
   }
-  if (extension) return [];
+  // No exact file and no script fallback: the dot may be part of the NAME (`./auth.config` is auth.config.ts), as bundlers and TypeScript read it.
   return [...SOURCE_EXTENSIONS.map((ext) => candidateFile(base + ext)), ...SOURCE_EXTENSIONS.map((ext) => candidateFile(join(base, `index${ext}`)))].filter(Boolean);
 }
 
