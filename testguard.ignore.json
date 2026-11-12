@@ -203,6 +203,13 @@
     },
     {
       "kind": "path",
+      "pattern": "test/probe-fast-path-cli.test.mjs",
+      "reason": "Acceptance for the fast path through the command (#270): the default width from the CPUs, --serial, partial runs reusing the last full probe, --changed auto with no base and with a CI base that does not resolve, and the status advice after a serial run. It probes a generated four-claim project six times, about fifteen seconds per run; named as a self-probe defender it cost 601 s on CI. The behavior is claimed where it lives and defended by fast tests: TG-PARTIAL-RUNS-REUSE-THE-LAST-FULL-PROBE and TG-CHANGED-AUTO-FINDS-THE-BASE-OFFLINE name test/probe-fast-path-pure.test.mjs, TG-AUTO-FAULT-WORKERS-FOLLOW-THE-MACHINE names test/fan-out-guard.test.mjs, TG-BRIEF-AND-MCP-CARRY-THE-FAST-LOOP names test/advice.test.mjs. Mandatory in npm test and CI.",
+      "by": "claude",
+      "at": "2026-11-12T05:30:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "bench/*.mjs",
       "reason": "Hand-run measurement scripts (#270): the fixture verdict-equality check across every runner (serial against the default fan-out) and the cheap-unit-test timing table in docs/guides/performance.md. They ship in no package (package.json files excludes bench/), change no verdict, and their own output is the evidence they produce; the behavior they measure is claimed where it lives (TG-FAN-OUT-GUARD-RULES, TG-AUTO-FAULT-WORKERS-FOLLOW-THE-MACHINE, TG-FAN-OUT-MATCHES-THE-KNOWN-ANSWERS).",
       "by": "claude",
