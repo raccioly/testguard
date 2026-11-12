@@ -507,6 +507,16 @@ const semantic = {
     if (doc.state === 'invalid-anchors' && doc.next.action !== 'repair-fault') errors.push({ path: '/next/action', message: 'invalid-anchors requires next.action = repair-fault' });
     if (doc.invalidFaults?.length > 0 && doc.state !== 'invalid-anchors') errors.push({ path: '/state', message: 'invalid fault anchors are hidden behind a later state; invalid-anchors precedes every evidence state' });
     if (doc.evidenceSource && !doc.evidenceHead) errors.push({ path: '/evidenceHead', message: 'evidence was read, so the commit it describes must be recorded' });
+    // #272: `probe --changed` says why each claim was selected; the reasons and
+    // the selection are one list, never two that disagree.
+    const changedScope = doc.run?.scope?.changed;
+    if (changedScope?.matchReasons) {
+      const ids = changedScope.matchReasons.map((reason) => reason.claimId);
+      if (ids.length !== changedScope.matchedClaims.length || ids.some((id, i) => id !== changedScope.matchedClaims[i])) errors.push({ path: '/run/scope/changed/matchReasons', message: 'matchReasons must name each matchedClaims id exactly once, in the same order' });
+      changedScope.matchReasons.forEach((reason, i) => {
+        if (reason.kind === 'file' && !changedScope.files.includes(reason.file)) errors.push({ path: `/run/scope/changed/matchReasons/${i}/file`, message: 'a file reason names a changed file' });
+      });
+    }
     if (doc.changes && doc.changes.uncovered.length > 0 && !['no-claims', 'unclaimed-changes'].includes(doc.state)) errors.push({ path: '/state', message: 'uncovered changed files are hidden behind a later state; unclaimed-changes precedes every evidence state' });
     if (doc.surface) {
       if (doc.surface.claimedModules + doc.surface.unclaimedModules !== doc.surface.sourceModules) errors.push({ path: '/surface', message: 'claimedModules + unclaimedModules must equal sourceModules' });

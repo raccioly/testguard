@@ -115,6 +115,7 @@ function dependenciesOf(projectDir, claim, hasher) {
   const named = new Set();
   const globs = [];
   let indeterminate = false;
+  let issue;
   for (const fault of claim.faults) {
     named.add(fault.file);
     const { requested } = defenderSelection(claim, fault);
@@ -126,9 +127,9 @@ function dependenciesOf(projectDir, claim, hasher) {
     for (const defender of defenders) named.add(defender);
     const inputs = hasher.inputsFor([fault.file, ...defenders]);
     for (const file of Object.keys(inputs.dependencyHashes)) named.add(file);
-    if (inputs.dependencyClosure !== 'complete') indeterminate = true;
+    if (inputs.dependencyClosure !== 'complete') { indeterminate = true; issue ??= inputs.dependencyIssues?.[0]; }
   }
-  return { named, globs: globs.map((glob) => ({ glob, re: globToRegExp(glob) })), indeterminate };
+  return { named, globs: globs.map((glob) => ({ glob, re: globToRegExp(glob) })), indeterminate, issue };
 }
 
 /**
@@ -145,16 +146,27 @@ export function resolveProbeScope({ projectDir, claims, ref, includeDirty = fals
     if (error instanceof ScopeUndetermined) return { outcome: 'undetermined', ref, reason: { kind: error.kind, message: error.message } };
     throw error;
   }
-  const hasher = createDependencyHasher(projectDir);
+  // The closures describe the tree the probe will measure: the commit, plus
+  // the untracked files git does not ignore when the working tree is
+  // snapshotted. Never an ignored directory (#272).
+  const hasher = createDependencyHasher(projectDir, { untracked: includeDirty });
   const touched = new Set();
   const matched = new Set();
+  const reasons = new Map();
   for (const claim of claims.claims) {
-    const { named, globs, indeterminate } = dependenciesOf(projectDir, claim, hasher);
+    const { named, globs, indeterminate, issue } = dependenciesOf(projectDir, claim, hasher);
     for (const file of named) touched.add(file);
-    const hit = changed.files.some((file) => named.has(file) || globs.some((entry) => entry.re.test(file)));
+    // Why the claim is selected, so an over-selection can be read off the
+    // document (#272): the first changed file it names, else the first one a
+    // defender glob matches, else the first reason its closure is indeterminate.
+    const byFile = changed.files.find((file) => named.has(file));
+    const byGlob = byFile ? undefined : changed.files.map((file) => ({ file, entry: globs.find((g) => g.re.test(file)) })).find((hit) => hit.entry);
+    if (byFile) reasons.set(claim.id, { claimId: claim.id, kind: 'file', file: byFile });
+    else if (byGlob) reasons.set(claim.id, { claimId: claim.id, kind: 'glob', file: byGlob.file, glob: byGlob.entry.glob });
     // A closure that cannot be followed cannot rule the change out, but with no change there is nothing to rule out.
     // "No change" is measured over the whole repository: what the closure could not follow may lie outside the project.
-    if (hit || (indeterminate && (changed.repoChanged ?? changed.files.length) > 0)) matched.add(claim.id);
+    else if (indeterminate && (changed.repoChanged ?? changed.files.length) > 0) reasons.set(claim.id, { claimId: claim.id, kind: 'indeterminate', ...(issue ? { issue } : {}) });
+    if (reasons.has(claim.id)) matched.add(claim.id);
   }
   const selected = (only ?? claims.claims.map((claim) => claim.id)).filter((id) => matched.has(id));
   const unmatchedFiles = changed.files.filter((file) => SOURCE_EXT.has(extname(file)) && !isDefaultExcluded(file) && !touched.has(file));
@@ -166,6 +178,7 @@ export function resolveProbeScope({ projectDir, claims, ref, includeDirty = fals
     includeDirty,
     files: changed.files,
     matchedClaims: claims.claims.map((claim) => claim.id).filter((id) => matched.has(id)),
+    matchReasons: claims.claims.filter((claim) => matched.has(claim.id)).map((claim) => reasons.get(claim.id)),
     unmatchedFiles,
     selected,
     note: SCOPE_NOTE,

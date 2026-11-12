@@ -16,6 +16,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { sha256 } from '../util/hash.mjs';
 import { aliasConfigFiles, projectImportResolver } from './rank.mjs';
 import { pyClosure, pyModuleIndex } from './pyimports.mjs';
+import { visibleFiles } from './visible-files.mjs';
 
 export { sameDependencies } from './attribution.mjs';
 
@@ -55,12 +56,18 @@ function hashInside(root, file) {
  * tree cannot change underneath — the scratch worktree, between faults — so
  * callers on a live tree pass `cache: false`.
  */
-export function createDependencyHasher(projectDir, { cache = true, limits } = {}) {
+export function createDependencyHasher(projectDir, { cache = true, limits, untracked = true } = {}) {
   const root = realpathSync(resolve(projectDir));
   let resolver;
   let pyIndex;
   const hashes = new Map();
-  const freshResolver = () => projectImportResolver(root, limits ? { limits } : {});
+  // #272: the closure counts only what the probed tree will contain — files
+  // git tracks, plus untracked non-ignored ones when the working tree is what
+  // gets snapshotted (`untracked`; `probe --changed` passes --include-dirty).
+  // Read once per hasher when cached; a live tree re-reads it per call.
+  let visibleCache;
+  const visible = () => (cache ? (visibleCache === undefined ? (visibleCache = visibleFiles(root, { untracked })) : visibleCache) : visibleFiles(root, { untracked }));
+  const freshResolver = () => projectImportResolver(root, { ...(limits ? { limits } : {}), visible: visible() });
   const hashOf = (file) => {
     if (cache && hashes.has(file)) return hashes.get(file);
     const value = hashInside(root, file);
@@ -83,12 +90,14 @@ export function createDependencyHasher(projectDir, { cache = true, limits } = {}
       issues.push(...(result.issues ?? []));
     }
     if (py.length) {
-      const index = cache ? (pyIndex ??= pyModuleIndex(root)) : pyModuleIndex(root);
-      const result = pyClosure(root, py, { index, ...(limits ? { limits } : {}) });
+      const shown = visible();
+      const index = cache ? (pyIndex ??= pyModuleIndex(root, { visible: shown })) : pyModuleIndex(root, { visible: shown });
+      const result = pyClosure(root, py, { visible: shown, index, ...(limits ? { limits } : {}) });
       for (const file of result.files) files.add(file);
       issues.push(...(result.issues ?? []));
     }
-    for (const file of DEPENDENCY_MANIFEST_FILES) if (existsSync(join(root, file))) files.add(file);
+    const shownManifests = visible();
+    for (const file of DEPENDENCY_MANIFEST_FILES) if (existsSync(join(root, file)) && (!shownManifests || shownManifests.has(file))) files.add(file);
     const dependencyHashes = {};
     for (const file of [...files].sort()) {
       const hash = hashOf(file);

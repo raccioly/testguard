@@ -35,6 +35,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`dist/`) is linked from the source package. A link to repository source the
   scratch tree does not contain refuses the run with the new precondition
   `workspace-link-outside-tree`, naming the link.
+- **An ignored build directory no longer makes `probe --changed` select
+  every claim (#272).** Closures were computed on the working tree, whose
+  git-ignored deployment bundle held copies of third-party Python packages;
+  indexed as project modules they led into computed imports and made every
+  closure indeterminate, so a docs-only change selected 20 of 21 claims while
+  the scratch tree saw complete closures. Closure discovery (the Python module
+  index, the JavaScript resolver and the hashed manifests) now counts only files
+  git tracks, plus untracked non-ignored files under `--include-dirty`, so
+  `probe`, `--changed`, `status`, `gate` and the origin-policy freshness check
+  agree on a claim's closure for the same commit. `run.scope.changed` gains
+  `matchReasons`: why each claim was selected (`file`, `glob`, or
+  `indeterminate` with the first issue).
 - **The verdict order between `nocover` and an invalid anchor is specified
   (#265).** `GATE-SEMANTICS.md` now states the fixed order of the checks and
   that `nocover` precedes an invalid anchor (the worse finding, whose repair is

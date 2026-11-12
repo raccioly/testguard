@@ -13057,6 +13057,84 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-CLOSURE-COUNTS-ONLY-WHAT-THE-PROBE-WILL-CONTAIN",
+      "statement": "Closure discovery counts only files git tracks (plus untracked non-ignored files under --include-dirty), so an ignored directory holding copies of third-party packages never makes a closure indeterminate, the working-tree closure equals the scratch checkout's, and run.scope.changed names why each claim was selected.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/visible-closure.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The Python module index takes ignored copies as project modules again.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/pyimports.mjs",
+          "find": "    if (visible && !visible.has(rel)) continue;\n",
+          "replace": "",
+          "defendedBy": [
+            "test/visible-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The JavaScript resolver follows files git ignores.",
+          "faultClass": "return-altered",
+          "file": "src/probe/imports.mjs",
+          "find": "  const isVisible = (file) => !visible || !inside(root, file) || visible.has(rel(file));",
+          "replace": "  const isVisible = () => true;",
+          "defendedBy": [
+            "test/visible-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Untracked files count even without --include-dirty.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/scope.mjs",
+          "find": "  const hasher = createDependencyHasher(projectDir, { untracked: includeDirty });",
+          "replace": "  const hasher = createDependencyHasher(projectDir, { untracked: true });",
+          "defendedBy": [
+            "test/visible-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A selection reason is recorded for the wrong file kind: a glob match is reported as a file.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/scope.mjs",
+          "find": "reasons.set(claim.id, { claimId: claim.id, kind: 'glob', file: byGlob.file, glob: byGlob.entry.glob });",
+          "replace": "reasons.set(claim.id, { claimId: claim.id, kind: 'file', file: byGlob.file });",
+          "defendedBy": [
+            "test/visible-closure.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
     }
   ]
 }

@@ -849,7 +849,7 @@ function issue(code, file, specifier) {
   return { code, file, ...(specifier ? { specifier } : {}) };
 }
 
-export function createImportResolver(projectDir, { aliases = [], configFiles = [], limits = {} } = {}) {
+export function createImportResolver(projectDir, { aliases = [], configFiles = [], limits = {}, visible = null } = {}) {
   const root = realpathSync(resolve(projectDir));
   const cap = { ...IMPORT_LIMITS, ...limits };
   const parseCache = new Map();
@@ -858,6 +858,10 @@ export function createImportResolver(projectDir, { aliases = [], configFiles = [
   const display = (file) => inside(root, file) ? rel(file) : file;
   const repo = repositoryRoot(root);
   let workspaceIndex;
+  // #272: with `visible` (the files git tracks, see visible-files.mjs), a
+  // project file git does not track or ignores does not exist for the
+  // resolver: the scratch tree the probe runs in will not contain it either.
+  const isVisible = (file) => !visible || !inside(root, file) || visible.has(rel(file));
 
   /**
    * A bare specifier that names a workspace package (#268): the package's
@@ -882,7 +886,8 @@ export function createImportResolver(projectDir, { aliases = [], configFiles = [
     let unreadable = false;
     for (const dir of dirs) {
       const entry = packageEntryFiles(dir, parsed.subpath);
-      if (entry) for (const file of entry) files.add(file);
+      const shown = entry?.filter(isVisible);
+      if (shown?.length) for (const file of shown) files.add(file);
       else unreadable = true;
     }
     return { files: [...files], manifests: [...dirs].map((dir) => join(dir, 'package.json')), unreadable };
@@ -900,7 +905,7 @@ export function createImportResolver(projectDir, { aliases = [], configFiles = [
         const suffix = rule.suffix ?? '';
         const star = rule.wildcard ? specifier.slice(rule.prefix.length, specifier.length - suffix.length) : '';
         for (const target of rule.targets ?? []) {
-          const expanded = expandBase(target.replace('*', star));
+          const expanded = expandBase(target.replace('*', star)).filter(isVisible);
           if (expanded.length) { bases.push(...expanded); break; } // ordered TS-path fallback
         }
       }
@@ -909,7 +914,7 @@ export function createImportResolver(projectDir, { aliases = [], configFiles = [
       if (unique.length === 1) return { status: 'resolved', file: unique[0], usedAlias };
       return { status: 'missing', candidates: [], usedAlias };
     } else return { status: 'external', candidates: [], usedAlias: false };
-    const candidates = [...new Set(bases.flatMap(expandBase))];
+    const candidates = [...new Set(bases.flatMap(expandBase))].filter(isVisible);
     if (candidates.length > 1) return { status: 'ambiguous', candidates, usedAlias };
     if (candidates.length === 1) return { status: 'resolved', file: candidates[0], usedAlias };
     return { status: 'missing', candidates: [], usedAlias };

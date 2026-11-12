@@ -314,6 +314,18 @@ check order is this rule.
    candidate. Python follows module names, including the packages a module's
    import runs first and every `conftest.py` from the project root down to
    each file. Reuse requires the recorded and current maps to be equal.
+   **The closure describes the tree that will be probed.** Only files git
+   tracks at the probed commit are project files for the closure — plus
+   untracked files git does not ignore when the working tree is snapshotted
+   (`--include-dirty`) — which is exactly what the scratch worktree contains.
+   An ignored directory (a deployment bundle holding copies of third-party
+   packages, a vendored build) is never indexed or followed: a Python module
+   or a JavaScript file there does not exist for the closure, and an import
+   that reaches only such a file is unresolved (indeterminate), as it is in the
+   scratch tree. Root manifests are hashed under the same rule. So `probe`
+   (in the scratch tree), `probe --changed`, `status`, `gate` and the
+   origin-policy freshness check compute the same closure for the same commit.
+   Outside a git work tree every file on disk counts.
    **A workspace package is followed like a relative import.** A bare
    specifier that names a package the repository declares as a workspace
    (root `package.json` `workspaces`, `pnpm-workspace.yaml` `packages`), or
@@ -1219,7 +1231,14 @@ is part of it, rule 8). A closure that cannot be followed selects the
 claim whenever anything changed **anywhere in the repository**, not only in
 the project directory: what the closure could not follow may be a sibling
 package outside it, and not being able to tell is never read as
-"unaffected". `--claim` intersects: the selection is the requested ids that the
+"unaffected". The closures are those of the tree the probe will measure (rule
+8: tracked files, plus untracked non-ignored ones under `--include-dirty`).
+`run.scope.changed.matchReasons` says why each matched claim was selected, in
+`matchedClaims` order: `file` (the first changed file that is a target, a
+resolved defender or in the closure), `glob` (a changed path only a
+`defendedBy` glob matches, such as a deleted defender) or `indeterminate`
+(with the closure's first recorded issue). It names each matched claim once
+and nothing else. `--claim` intersects: the selection is the requested ids that the
 change reached, in the order requested. An unknown `--claim` id is an error
 whatever the change is.
 

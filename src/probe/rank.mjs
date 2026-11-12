@@ -227,7 +227,7 @@ export function resolveAliased(projectDir, fromFile, specifier) {
 }
 
 /** The import resolver with this project's alias configuration, for callers that walk many files. */
-export function projectImportResolver(projectDir, { limits } = {}) {
+export function projectImportResolver(projectDir, { limits, visible } = {}) {
   const { rules, configFiles } = loadAliasContext(projectDir);
-  return createImportResolver(projectDir, { aliases: rules, configFiles, ...(limits ? { limits } : {}) });
+  return createImportResolver(projectDir, { aliases: rules, configFiles, ...(limits ? { limits } : {}), ...(visible ? { visible } : {}) });
 }
