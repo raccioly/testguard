@@ -16,6 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the serial reference run, and with transformed copies of the subject;
   `--tool-mutants` requires twelve deliberately broken builds to go red. It
   found #263, #264, #265, #266, #267 and #268.
+- **The corpus gains seven subjects and five tool mutants (#258, repository
+  only).** Playwright, unittest, a symlinked source directory, a computed
+  dynamic import with a mocked collaborator, a three-package workspace in npm
+  and pnpm layouts, vitest `test.projects`, a vitest config that imports
+  `vite`, ignored build directories holding package copies, and a worktree
+  whose `node_modules` entries link into another checkout's install, which
+  every mode checks is left unchanged. New keyed cases: the `mixed` kill kind,
+  `defenders-failed-to-load`, Playwright timeouts, `--changed` over a
+  docs-only commit. `corpus/derive.mjs` reads vitest error classes from the
+  error objects, and `bench/README.md` documents running a project outside
+  the repository through the same harness. It found #282.
 
 ## [0.23.0] - 2026-11-12
 

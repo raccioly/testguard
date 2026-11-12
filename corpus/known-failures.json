@@ -278,6 +278,48 @@
         "reason": "subject-not-executed"
       },
       "issue": 263
+    },
+    {
+      "subject": "node-test-catalog3@npm",
+      "check": "selection:search-order-only",
+      "expected": {
+        "selected": [
+          "REPORT-CITATION-LINE",
+          "REPORT-DECADE-COUNTS",
+          "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES",
+          "SEARCH-RESULT-ORDERING",
+          "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY"
+        ]
+      },
+      "observed": {
+        "selected": [
+          "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES",
+          "SEARCH-RESULT-ORDERING",
+          "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY"
+        ]
+      },
+      "issue": 268
+    },
+    {
+      "subject": "node-test-catalog3@pnpm",
+      "check": "selection:search-order-only",
+      "expected": {
+        "selected": [
+          "REPORT-CITATION-LINE",
+          "REPORT-DECADE-COUNTS",
+          "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES",
+          "SEARCH-RESULT-ORDERING",
+          "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY"
+        ]
+      },
+      "observed": {
+        "selected": [
+          "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES",
+          "SEARCH-RESULT-ORDERING",
+          "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY"
+        ]
+      },
+      "issue": 268
     }
   ]
 }

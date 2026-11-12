@@ -1,0 +1,8 @@
+diff --git a/src/probe/runners/playwright.mjs b/src/probe/runners/playwright.mjs
+--- a/src/probe/runners/playwright.mjs
++++ b/src/probe/runners/playwright.mjs
+@@ -182,3 +182,3 @@
+   // A failed test is exactly one of: a timeout, an assertion, an exception.
+-  const settled = unexpected.filter((t) => !(t.finalResult === 'timedOut' || t.finalResult === 'interrupted'));
++  const settled = unexpected;
+   const assertionFailures = settled.filter((t) => t.kind === 'assertion').length;

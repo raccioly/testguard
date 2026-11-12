@@ -186,6 +186,71 @@
           ]
         }
       ]
+    },
+    {
+      "name": "mixed-kill-kind-read-as-assertion",
+      "patch": "mixed-kill-kind-read-as-assertion.patch",
+      "description": "A kill whose runs fail by assertion in some runs and only by exception in others is recorded as an assertion kill instead of mixed (rule 3). The evidence stays valid; the key for ts-vitest-converter's rotating plugin checks catches it.",
+      "targets": [
+        {
+          "subject": "ts-vitest-converter",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "defenders-load-error-read-as-flaky",
+      "patch": "defenders-load-error-read-as-flaky.patch",
+      "description": "A declared defender that fails to load on unmodified source is reported as flaky-defender/defenders-not-green instead of unverifiable/defenders-failed-to-load: a broken test file reads as an unstable one.",
+      "targets": [
+        {
+          "subject": "js-vitest-booking",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vitest-error-classes-ignored",
+      "patch": "vitest-error-classes-ignored.patch",
+      "description": "vitest's error classes (the kinds sidecar) are dropped and kinds are read from the JSON report's text alone, where a failed expect(...).rejects prints as 'Error: ...': an assertion kill reads as exception-only (rule 3).",
+      "targets": [
+        {
+          "subject": "ts-vitest-converter",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "playwright-timeout-read-as-failure",
+      "patch": "playwright-timeout-read-as-failure.patch",
+      "description": "A Playwright test that timed out is counted as an ordinary failure, so a fault the page hangs on reads as a kill (rule 3: a timeout is never a kill). A false kill: critical.",
+      "targets": [
+        {
+          "subject": "js-playwright-gallery",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "unittest-error-read-as-assertion",
+      "patch": "unittest-error-read-as-assertion.patch",
+      "description": "unittest's addError channel (the test raised) is recorded as an assertion failure, so an exception-only kill reads as an assertion kill (rule 3).",
+      "targets": [
+        {
+          "subject": "py-unittest-shipping",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
     }
   ]
 }

@@ -16,7 +16,9 @@
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 
-const ALWAYS_SKIPPED = /(^|\/)(\.venv|\.out|__pycache__|\.testguard|test-results|playwright-report)(\/|$)/;
+// `.git` too: a project outside the corpus is a real checkout, and its copy
+// gets a fresh repository of its own.
+const ALWAYS_SKIPPED = /(^|\/)(\.git|\.venv|\.out|__pycache__|\.testguard|test-results|playwright-report)(\/|$)/;
 
 export class LayoutError extends Error {}
 

@@ -62,6 +62,11 @@ jobs:
             args: --tool-mutants --mutant fault-not-restored --mutant typecheck-skipped --mutant fan-out-shares-one-tree
           - name: mutants-scope
             args: --tool-mutants --mutant not-reached-fault-dropped --mutant changed-git-failure-is-empty
+          - name: mutants-kinds
+            args: --tool-mutants --mutant mixed-kill-kind-read-as-assertion --mutant defenders-load-error-read-as-flaky --mutant vitest-error-classes-ignored --mutant unittest-error-read-as-assertion
+          - name: mutants-browser
+            args: --tool-mutants --mutant playwright-timeout-read-as-failure
+            browser: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

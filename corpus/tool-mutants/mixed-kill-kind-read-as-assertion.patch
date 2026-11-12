@@ -1,0 +1,8 @@
+diff --git a/src/probe/kill-kind.mjs b/src/probe/kill-kind.mjs
+--- a/src/probe/kill-kind.mjs
++++ b/src/probe/kill-kind.mjs
+@@ -28,3 +28,3 @@
+   const withAssertion = kills.filter((run) => (run.assertionFailures ?? 0) > 0).length;
+-  if (withAssertion === kills.length) return 'assertion';
++  if (withAssertion > 0) return 'assertion';
+   return withAssertion === 0 ? 'exception-only' : 'mixed';

@@ -29,6 +29,7 @@
  * runs, so a later re-derivation that saw the same thing has the same hash.
  *
  * usage: node corpus/derive.mjs <subject-dir> [--only CLAIM/FAULT,...] [--out <file>]
+ *        [--variant <name>] [--claims <claims.json>] [--config <subject.json>]   (a project outside the corpus)
  *                               [--python <interpreter>] [--budget <ms>] [--edits <edits.json>]
  *
  * --edits applies scripted {file, find, replace} edits to every copy first: how
@@ -45,9 +46,9 @@ import { copySubjectFiles, linkDependencies, placeIgnoredCopies } from './lib/la
 
 const RUNS = 3;
 
-export function loadSubject(dir, { variant } = {}) {
-  const config = JSON.parse(readFileSync(join(dir, 'subject.json'), 'utf8'));
-  const claims = JSON.parse(readFileSync(join(dir, 'claims.json'), 'utf8')).claims;
+export function loadSubject(dir, { variant, claimsPath, configPath } = {}) {
+  const config = JSON.parse(readFileSync(configPath ?? join(dir, 'subject.json'), 'utf8'));
+  const claims = JSON.parse(readFileSync(claimsPath ?? join(dir, 'claims.json'), 'utf8')).claims;
   let name = basename(resolve(dir));
   if (config.variants) {
     const v = variant ?? Object.keys(config.variants)[0];
@@ -351,8 +352,8 @@ export function outputHash(record) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const { values, positionals } = parseArgs({ allowPositionals: true, options: { only: { type: 'string' }, out: { type: 'string' }, python: { type: 'string' }, budget: { type: 'string' }, edits: { type: 'string' }, variant: { type: 'string' } } });
-  const subject = loadSubject(positionals[0], { variant: values.variant });
+  const { values, positionals } = parseArgs({ allowPositionals: true, options: { only: { type: 'string' }, out: { type: 'string' }, python: { type: 'string' }, budget: { type: 'string' }, edits: { type: 'string' }, variant: { type: 'string' }, claims: { type: 'string' }, config: { type: 'string' } } });
+  const subject = loadSubject(positionals[0], { variant: values.variant, claimsPath: values.claims, configPath: values.config });
   const only = values.only ? new Set(values.only.split(',')) : null;
   const python = values.python ?? process.env.TESTGUARD_PYTHON ?? subject.config.python ?? join(subject.dir, '.venv', 'bin', 'python');
   const edits = values.edits ? JSON.parse(readFileSync(values.edits, 'utf8')) : [];

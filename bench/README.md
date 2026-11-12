@@ -63,3 +63,67 @@ otherwise has to argue in prose: *was anything stale when the numbers were
 taken? did the tool point at the right next fix? would an agent have known
 what to do?* If `status.next` disagrees with what you did next, that
 disagreement is the most useful line in the report.
+
+## Through the corpus harness
+
+The procedure above compares one evidence file by eye. The benchmark corpus
+(`corpus/README.md`) does the same comparison mechanically, under every mode
+(twice, reuse, fault workers, `--changed`, partial budgets, a scratch
+directory, reordered claims, metamorphic noise), and the harness takes a
+project outside this repository by path. Everything about the project stays
+in a directory of your own, `~/bench/<project>/` below; nothing is copied into
+this repository, and the project's own working tree is never written to: the
+derivation and every mode work on scratch copies (without the project's
+`.git`), each committed as a fresh repository.
+
+```
+~/bench/<project>/
+  subject.json               how to run it (corpus/README.md, "Layout")
+  claims.json                the claims, fault paths relative to the project
+  provenance/judgments.json  your verdicts, each with why
+  provenance/derivation.json what the hand procedure observed
+  expected.json              built from the two above
+```
+
+1. Pin the project to a commit and install its dependencies the way its
+   developers do (`npm ci`, a venv). `subject.json` names the `runner`,
+   `testFiles` (the whole-suite pattern), `budgetMs` and `probeArgs`; for a
+   Python project also `python` (the interpreter that has its test runner);
+   for an install the harness should not touch, `install: "none"`.
+2. Derive what the project's own runner says, fault by fault, **without
+   TestGuard**:
+
+   ```bash
+   node corpus/derive.mjs /path/to/project \
+     --claims ~/bench/<project>/claims.json --config ~/bench/<project>/subject.json \
+     --out ~/bench/<project>/provenance/derivation.json
+   ```
+
+   For each fault it applies the replacement to a scratch copy, runs the
+   declared defenders three times unmodified and three times faulted, and, for
+   a would-be survivor, runs the whole suite three times and a negative
+   control. It prints one line per fault.
+3. Write `provenance/judgments.json` by hand from those observations and
+   `spec/GATE-SEMANTICS.md` (`{"expected": {"CLAIM/F1": {"verdict": …,
+   "reason": …, "killKind": …, "why": …}}}`), then build the key:
+
+   ```bash
+   node corpus/key.mjs ~/bench/<project>
+   ```
+
+   The key is written before TestGuard first runs on the project, and never
+   changed to match it. A disagreement is a finding about the tool, the
+   claims or the project: decide which, and say so where you change anything.
+4. Run the harness against the project:
+
+   ```bash
+   npm run corpus -- --subject-dir /path/to/project --key ~/bench/<project>/expected.json \
+     --claims ~/bench/<project>/claims.json --config ~/bench/<project>/subject.json \
+     --json ~/bench/<project>/scorecard.json --markdown ~/bench/<project>/scorecard.md
+   ```
+
+   Start with `--mode reference` on a large project: escalation re-runs the
+   whole suite per survivor. The scorecard has the same shape as the corpus's,
+   so the two can be read side by side. It names the project by `name` in
+   `subject.json` (default: the directory's name), so set `name` before you
+   share a scorecard.

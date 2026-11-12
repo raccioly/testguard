@@ -275,7 +275,11 @@ export const RUN = {
   async 'assertion-kill'(ctx) {
     const { r } = await freshProbe(ctx, 'assertion-kill', ['--no-reuse', '--require-assertion-kill']);
     const { key, diff } = keyAndDiff(ctx, 'assertion-kill', r);
-    const want = Object.entries(expectedFor(ctx.subject, 'assertion-kill')).filter(([, e]) => e.verdict === 'killed' && e.killKind === 'exception-only').map(([id]) => id).sort();
+    // A keyed exception-only kill the tool did not report as a kill, under a
+    // reviewed known failure, is already accounted for by that entry; the
+    // policy can only name the kills the run actually produced.
+    const excused = new Set((key?.mismatches ?? []).filter((m) => m.knownIssue).map((m) => m.fault));
+    const want = Object.entries(expectedFor(ctx.subject, 'assertion-kill')).filter(([id, e]) => e.verdict === 'killed' && e.killKind === 'exception-only' && !excused.has(id)).map(([id]) => id).sort();
     const policy = r.json?.run?.assertionPolicy ?? r.evidence?.assertionPolicy;
     const got = (policy?.exceptionOnlyKills ?? []).map((k) => `${k.claimId}/${k.faultId}`).sort();
     const checks = [
