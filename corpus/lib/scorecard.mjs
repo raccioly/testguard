@@ -136,6 +136,13 @@ export function renderMarkdown(doc, { base = null } = {}) {
       for (const m of mism) lines.push(`| ${m.subject} | ${m.mode} | ${m.fault} | ${fmt(m.expected)} | ${fmt(m.observed)} | ${m.critical ? '**CRITICAL**' : m.knownIssue ? `known: #${m.knownIssue}` : '**wrong**'} |`);
     }
   }
+  const knownChecks = doc.rows.flatMap((r) => r.checks.filter((c) => c.detail && c.detail.knownIssue).map((c) => ({ ...c, subject: r.subject, mode: r.mode })));
+  if (knownChecks.length) {
+    lines.push('');
+    lines.push('| subject | mode | check | known | |');
+    lines.push('|---|---|---|---|---|');
+    for (const c of knownChecks) lines.push(`| ${c.subject} | ${c.mode} | ${c.check} | #${c.detail.knownIssue} | ${c.detail.unsound ? '**UNSOUND: misses claims the change can affect**' : 'superset (imprecise, safe)'} |`);
+  }
   if (doc.mutants) {
     lines.push('');
     lines.push(`### Tool mutants: ${doc.mutants.caught} of ${doc.mutants.total} caught`);

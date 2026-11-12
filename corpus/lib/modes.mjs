@@ -160,15 +160,17 @@ export const RUN = {
       const want = [...step.expectedClaims].sort();
       const exact = JSON.stringify(selected) === JSON.stringify(want);
       const c = check(`selection:${step.name}`, exact, { expected: want, selected });
-      // A selection that misses a claim the change can affect is unsound and is
-      // never excused. A superset is safe but imprecise; it passes only when a
-      // reviewed known failure names this exact selection and its issue.
-      if (!exact && want.every((id) => selected.includes(id))) {
+      // A wrong selection passes only when a reviewed known failure names this
+      // exact selection and its issue (a superset is imprecise; a subset is
+      // unsound and is marked as such). The key and reference are then
+      // compared over what was actually selected.
+      let basis = want;
+      if (!exact) {
         const k = ctx.known.find((x) => x.subject === ctx.subject.name && x.check === c.check && JSON.stringify([...x.observed.selected].sort()) === JSON.stringify(selected));
-        if (k) { c.ok = true; c.detail.knownIssue = k.issue; }
+        if (k) { c.ok = true; c.detail.knownIssue = k.issue; c.detail.unsound = !want.every((id) => selected.includes(id)); basis = selected; }
       }
       checks.push(c);
-      const ids = ctx.subject.faultIds.filter((id) => want.includes(id.split('/')[0]));
+      const ids = ctx.subject.faultIds.filter((id) => basis.includes(id.split('/')[0]));
       const k = keyAndDiff(ctx, 'changed', r, { ids });
       key = mergeKey(key, k.key);
       diff = mergeDiff(diff, k.diff);

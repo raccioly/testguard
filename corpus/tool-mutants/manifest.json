@@ -65,13 +65,13 @@
       "description": "Reuse ignores dependencyHashes: a change to a file the target or defenders import no longer forces a re-measure (rule 8).",
       "targets": [
         {
-          "subject": "ts-vitest-stock",
+          "subject": "node-test-floorplan",
           "modes": [
             "reuse"
           ]
         },
         {
-          "subject": "js-jest-newsletter",
+          "subject": "py-pytest-circulation",
           "modes": [
             "reuse"
           ]
@@ -84,7 +84,13 @@
       "description": "Evidence written by another TestGuard version is carried forward (rule 8, the instrument).",
       "targets": [
         {
-          "subject": "js-jest-newsletter",
+          "subject": "node-test-floorplan",
+          "modes": [
+            "reuse"
+          ]
+        },
+        {
+          "subject": "py-pytest-circulation",
           "modes": [
             "reuse"
           ]

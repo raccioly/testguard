@@ -140,6 +140,7 @@ summary, with the base branch's numbers beside it when the base has one.
 | #264 | `ts-vitest-stock` | A vitest alias written `fileURLToPath(new URL('./src', import.meta.url))` makes `probe` refuse the whole project (exit 2). The subject uses the equivalent `join()` form so it measures everything else. |
 | #266 | `js-jest-newsletter` | `module.exports = { X: call() }` in `src/errors.js` makes every closure indeterminate: nothing is reused and `--changed` selects every claim (a safe superset). Known failure for the `footer-source` selection. |
 | #267 | `ts-vitest-stock` | `export interface` marks a module `unsupported-syntax`, so every closure is indeterminate: nothing is reused and `--changed` selects every claim (a safe superset). Known failure for the `adjustments-test` selection. |
+| #268 | `node-test-floorplan` | `--changed` after an edit to `packages/geometry/src/units.js` selects only the 4 geometry claims and misses the 4 planner claims that import it through `@floorplan/geometry`: an **unsound** selection (stale verdicts stand). Known failure for the `geometry-source` selection. |
 | #265 | `js-jest-newsletter` | GATE-SEMANTICS does not order `nocover` against an invalid anchor; the tool says `nocover`, the key says `anchor-ambiguous`. Known failure for `SCHEDULE-VALIDATION/F1` until the spec settles it. |
 
 ## A project outside the repository

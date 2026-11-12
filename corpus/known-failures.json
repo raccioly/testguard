@@ -82,6 +82,32 @@
         ]
       },
       "issue": 267
+    },
+    {
+      "subject": "node-test-floorplan",
+      "check": "selection:geometry-source",
+      "expected": {
+        "selected": [
+          "LENGTH-CONVERSION",
+          "LOT-SETBACK",
+          "LSHAPE-ESTIMATE-USES-CORE-AREA",
+          "OVERLAP-INTERIOR-ONLY",
+          "PLACE-ROOM-REJECTIONS",
+          "RECT-AREA-PERIMETER",
+          "SHAPE-REJECTS-INVALID",
+          "SUMMARY-TOTALS-AND-NAMES"
+        ]
+      },
+      "observed": {
+        "selected": [
+          "LENGTH-CONVERSION",
+          "OVERLAP-INTERIOR-ONLY",
+          "RECT-AREA-PERIMETER",
+          "SHAPE-REJECTS-INVALID"
+        ]
+      },
+      "unsound": true,
+      "issue": 268
     }
   ]
 }
