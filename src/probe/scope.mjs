@@ -103,7 +103,11 @@ export function changedSince({ projectDir, ref, includeDirty = false, timeoutMs 
     if (!prefix) return [file];
     return file.startsWith(`${prefix}/`) ? [file.slice(prefix.length + 1)] : [];
   });
-  return { base, head, files: files.sort() };
+  // `repoChanged`: the change outside the project counts too. A project that
+  // is one package of a monorepo runs its siblings' code through workspace
+  // links; a closure that crosses into them is indeterminate, and a change
+  // there must still select it even though no project file moved (#268).
+  return { base, head, files: files.sort(), repoChanged: paths.size };
 }
 
 /** Everything one claim's verdicts depend on, as project-relative paths and literals. */
@@ -149,7 +153,8 @@ export function resolveProbeScope({ projectDir, claims, ref, includeDirty = fals
     for (const file of named) touched.add(file);
     const hit = changed.files.some((file) => named.has(file) || globs.some((entry) => entry.re.test(file)));
     // A closure that cannot be followed cannot rule the change out, but with no change there is nothing to rule out.
-    if (hit || (indeterminate && changed.files.length > 0)) matched.add(claim.id);
+    // "No change" is measured over the whole repository: what the closure could not follow may lie outside the project.
+    if (hit || (indeterminate && (changed.repoChanged ?? changed.files.length) > 0)) matched.add(claim.id);
   }
   const selected = (only ?? claims.claims.map((claim) => claim.id)).filter((id) => matched.has(id));
   const unmatchedFiles = changed.files.filter((file) => SOURCE_EXT.has(extname(file)) && !isDefaultExcluded(file) && !touched.has(file));

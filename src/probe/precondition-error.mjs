@@ -28,6 +28,7 @@ export const PRECONDITION_KINDS = Object.freeze([
   'typecheck-red-baseline', // the unmodified tree does not type-check, so no fault can be judged
   'typecheck-timeout',     // the baseline type check outran --budget
   'typecheck-unavailable', // --typecheck cannot run (no tsconfig, no compiler, bad command)
+  'workspace-link-outside-tree', // a node_modules link names repository source the scratch tree does not contain
 ]);
 
 /** Everything a `--json` refusal can say: the preconditions, the other exit-2 classes, usage (exit 3) and a defect of ours. */

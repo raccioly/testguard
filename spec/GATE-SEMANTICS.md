@@ -300,6 +300,21 @@ Rules that follow from the table:
    candidate. Python follows module names, including the packages a module's
    import runs first and every `conftest.py` from the project root down to
    each file. Reuse requires the recorded and current maps to be equal.
+   **A workspace package is followed like a relative import.** A bare
+   specifier that names a package the repository declares as a workspace
+   (root `package.json` `workspaces`, `pnpm-workspace.yaml` `packages`), or
+   that Node would resolve through a `node_modules` symlink whose target is
+   repository source (inside the repository and not under any `node_modules`:
+   a workspace, `file:` or `link:` dependency), is code the defenders run. The
+   closure includes that package's `package.json` and follows the entry its
+   `exports` names (every condition except `types`, since which one loads
+   depends on the caller; a subpath map with `*` patterns), else `main` and
+   `module`, else `index`, and on from there. Such a package inside the
+   repository but outside the project directory cannot be hashed
+   project-relative, and an entry that resolves to no file cannot be followed:
+   either makes the closure indeterminate (`unreadable-module`, naming the
+   specifier). A link whose target leaves the repository, and a package
+   installed as a real directory, stay outside the closure.
    When any import cannot be followed — a dynamic import, `require`,
    `import_module` or `__import__` whose argument is not one string literal; a
    project-relative or aliased specifier that resolves to no file; a module
@@ -312,8 +327,7 @@ Rules that follow from the table:
 
    **One live baseline licenses every carry-forward.** No hash sees the
    environment: installed packages, the interpreter, a data file a test reads,
-   a bare specifier that resolves through a `node_modules` symlink to a
-   workspace package (outside the project closure), a setup or global-setup
+   a setup or global-setup
    file a runner configuration names by string rather than imports, a lockfile
    above the project directory in a monorepo. So before a prior record
    with a non-empty defender set is carried forward, that defender set runs
@@ -369,7 +383,24 @@ Rules that follow from the table:
    **refuse the run** when the subject was loaded from outside the tree being
    probed — in Python an editable install (PEP 660) registers an import hook
    consulted ahead of every path entry, and a plain install leaves a copy in
-   `site-packages`, so this is the normal case, not an exotic one. When no
+   `site-packages`, so this is the normal case, not an exotic one.
+   JavaScript has the same hazard in a monorepo: a workspace link
+   (`node_modules/@scope/pkg -> ../../packages/pkg`) borrowed into a scratch
+   tree resolves to the original checkout's package, so a fault applied in the
+   scratch tree is never executed by a defender in a sibling package. A tool
+   that probes in a scratch tree must therefore give each tree its own
+   layout: every `node_modules` link whose target is repository source (as
+   rule 8 defines it) points at the scratch tree's copy of that package, in
+   the root install and in each package's own `node_modules`, for npm, yarn
+   and pnpm layouts, without writing into the shared install (which may be
+   read-only). The fan-out's trees and the serial re-measure tree get the
+   same layout. A package's ignored top-level entries (a build's `dist/`) are
+   linked from the source package, since the commit does not hold them; a
+   fault in its source does not reach them, which the negative control
+   (rule 12) reports as `subject-not-executed`, never as a verdict. A link to
+   repository source the scratch tree does not contain (an ignored or
+   uncommitted package) refuses the run with the precondition
+   `workspace-link-outside-tree`, naming the link. When no
    defender imported the subject at all, the run continues: an import inside a
    branch the fault does not reach is legitimate. It is recorded as
    `detail.targetNotImported`, because a `survived` there is a statement about
@@ -1131,8 +1162,11 @@ A claim is **selected** when any of those paths is one of: a fault's target; a
 defender, whether the claim names it (`defendedBy`, literally or by glob) or
 discovery resolves it; or a file in the import closure of the target and the
 defenders (the same closure `inputs.dependencyHashes` records, manifests and
-runner configuration included). A closure that cannot be followed selects the
-claim whenever anything changed: not being able to tell is never read as
+runner configuration included; a workspace package reached through its link
+is part of it, rule 8). A closure that cannot be followed selects the
+claim whenever anything changed **anywhere in the repository**, not only in
+the project directory: what the closure could not follow may be a sibling
+package outside it, and not being able to tell is never read as
 "unaffected". `--claim` intersects: the selection is the requested ids that the
 change reached, in the order requested. An unknown `--claim` id is an error
 whatever the change is.

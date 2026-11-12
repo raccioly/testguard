@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { linkedSourceDirs, packageSpecifier, repositoryRoot, within, workspacePackages } from './workspaces.mjs';
 
 export const IMPORT_LIMITS = Object.freeze({
   maxFileBytes: 1_048_576,
@@ -597,6 +598,62 @@ function expandBase(base) {
   return [...SOURCE_EXTENSIONS.map((ext) => candidateFile(base + ext)), ...SOURCE_EXTENSIONS.map((ext) => candidateFile(join(base, `index${ext}`)))].filter(Boolean);
 }
 
+/** Every string target of a package.json `exports` condition value (`types` excluded: never loaded). */
+function conditionTargets(value) {
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) return value.flatMap(conditionTargets);
+  if (value && typeof value === 'object') {
+    return Object.entries(value).filter(([key]) => key !== 'types' && key !== 'typings').flatMap(([, child]) => conditionTargets(child));
+  }
+  return [];
+}
+
+/**
+ * The files a package directory's entry point can be, for `subpath` ('.' or
+ * './x'): `exports` (a string, an array, a conditions object or a subpath map
+ * with `*` patterns; every condition, since which one loads depends on the
+ * caller), else `main`/`module`, else `index`. A condition whose file does not
+ * exist cannot be what loads, so it is skipped while another resolves. null
+ * when nothing resolves or the manifest cannot be read: a package the closure
+ * cannot follow, which the caller must report, never drop.
+ */
+export function packageEntryFiles(dir, subpath) {
+  let pkg;
+  try { pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')); } catch { return null; }
+  if (!pkg || typeof pkg !== 'object') return null;
+  let targets;
+  if (pkg.exports !== undefined && pkg.exports !== null) {
+    const exp = pkg.exports;
+    const keys = exp && typeof exp === 'object' && !Array.isArray(exp) ? Object.keys(exp) : [];
+    const dotted = keys.filter((key) => key.startsWith('.'));
+    if (dotted.length && dotted.length !== keys.length) return null; // mixed subpaths and conditions: invalid
+    const map = dotted.length ? exp : { '.': exp };
+    let value = map[subpath];
+    let star = null;
+    if (value === undefined) {
+      const patterns = Object.keys(map).filter((key) => key.includes('*')).map((key) => {
+        const [prefix, suffix] = key.split('*');
+        return { key, prefix, suffix };
+      }).filter(({ prefix, suffix }) => subpath.startsWith(prefix) && subpath.endsWith(suffix) && subpath.length >= prefix.length + suffix.length)
+        .sort((a, b) => b.prefix.length - a.prefix.length);
+      if (patterns.length) {
+        value = map[patterns[0].key];
+        star = subpath.slice(patterns[0].prefix.length, subpath.length - patterns[0].suffix.length);
+      }
+    }
+    if (value === undefined) return null;
+    targets = conditionTargets(value).map((target) => (star === null ? target : target.split('*').join(star)));
+  } else if (subpath === '.') {
+    targets = [pkg.main, pkg.module].filter((target) => typeof target === 'string' && target);
+    if (!targets.length) targets = ['./index'];
+  } else targets = [subpath];
+  const files = [...new Set(targets.flatMap((target) => {
+    const base = resolve(dir, target);
+    return within(dir, base) ? expandBase(base) : [];
+  }))];
+  return files.length ? files : null;
+}
+
 function aliasMatches(specifier, aliases) {
   const matched = aliases.filter((rule) => rule.wildcard
     ? specifier.startsWith(rule.prefix) && specifier.endsWith(rule.suffix ?? '') && specifier.length >= rule.prefix.length + (rule.suffix?.length ?? 0)
@@ -618,6 +675,37 @@ export function createImportResolver(projectDir, { aliases = [], configFiles = [
 
   const rel = (file) => relative(root, file).split(sep).join('/');
   const display = (file) => inside(root, file) ? rel(file) : file;
+  const repo = repositoryRoot(root);
+  let workspaceIndex;
+
+  /**
+   * A bare specifier that names a workspace package (#268): the package's
+   * entry files, the manifests that decide them, and whether any of it could
+   * not be followed. null when the specifier is an ordinary package: outside
+   * the project, and outside the closure.
+   */
+  function resolveWorkspace(fromFile, specifier) {
+    const parsed = packageSpecifier(specifier);
+    if (!parsed) return null;
+    workspaceIndex ??= workspacePackages(root, repo);
+    const dirs = new Set();
+    if (workspaceIndex.has(parsed.name)) dirs.add(workspaceIndex.get(parsed.name));
+    // Node's own lookup: the nearest node_modules/<name> from the importer up.
+    for (let at = dirname(fromFile); within(repo, at); at = dirname(at)) {
+      const found = linkedSourceDirs(join(at, 'node_modules', parsed.name), repo);
+      if (found) { for (const dir of found) dirs.add(dir); break; }
+      if (at === repo || dirname(at) === at) break;
+    }
+    if (!dirs.size) return null;
+    const files = new Set();
+    let unreadable = false;
+    for (const dir of dirs) {
+      const entry = packageEntryFiles(dir, parsed.subpath);
+      if (entry) for (const file of entry) files.add(file);
+      else unreadable = true;
+    }
+    return { files: [...files], manifests: [...dirs].map((dir) => join(dir, 'package.json')), unreadable };
+  }
 
   function resolveSpecifier(fromFile, specifier) {
     const aliasRules = aliasMatches(specifier, aliases);
@@ -906,7 +994,20 @@ export function createImportResolver(projectDir, { aliases = [], configFiles = [
             if (!optional.has(specifier)) addIssue(ctx, 'unreadable-module', file, specifier);
             continue;
           }
-          const targets = found.status === 'resolved' ? [found.file] : found.status === 'ambiguous' ? found.candidates : [];
+          let targets = found.status === 'resolved' ? [found.file] : found.status === 'ambiguous' ? found.candidates : [];
+          if (found.status === 'external') {
+            // A workspace package is source the defenders run, reached by a
+            // name instead of a path. Followed like a relative import when it
+            // is inside the project; inside the repository but outside the
+            // project it cannot be hashed project-relative, so the closure is
+            // indeterminate — never silently smaller (#268).
+            const pkg = resolveWorkspace(file, specifier);
+            if (pkg) {
+              for (const manifest of pkg.manifests) ctx.dependencies.add(manifest);
+              if (pkg.unreadable || [...pkg.files, ...pkg.manifests].some((path) => !inside(root, path))) addIssue(ctx, 'unreadable-module', file, specifier);
+              targets = pkg.files;
+            }
+          }
           for (const target of targets) {
             if (!inside(root, target) || files.has(target)) continue;
             files.add(target);

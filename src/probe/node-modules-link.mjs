@@ -1,4 +1,4 @@
-import { accessSync, constants, mkdirSync, readdirSync, statSync, symlinkSync } from 'node:fs';
+import { accessSync, constants, lstatSync, mkdirSync, readdirSync, statSync, symlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 /**
@@ -14,6 +14,9 @@ const INSTALL_DOT_ENTRIES = new Set(['.bin', '.pnpm', '.package-lock.json', '.ya
 const isDirectory = (path) => {
   try { return statSync(path).isDirectory(); } catch { return false; }
 };
+const isLink = (path) => {
+  try { return lstatSync(path).isSymbolicLink(); } catch { return false; }
+};
 
 /**
  * Make `at` a node_modules for the scratch tree: a real directory in the
@@ -24,13 +27,28 @@ const isDirectory = (path) => {
  * would send those writes to the shared install, and to a read-only one they
  * would fail (vite's config loader dies on `.vite-temp` there).
  */
-export function linkNodeModules(target, at) {
+export function linkNodeModules(target, at, { redirect } = {}) {
   mkdirSync(at, { recursive: true });
   for (const entry of readdirSync(target)) {
     if (entry.startsWith('.') && !INSTALL_DOT_ENTRIES.has(entry)) continue;
     const from = join(target, entry);
-    symlinkSync(from, join(at, entry), isDirectory(from) ? 'dir' : 'file');
+    if (redirect && entry.startsWith('@') && isDirectory(from) && !isLink(from)) {
+      // A scope directory holds packages one by one, and a workspace package
+      // among them must be linked on its own (#263): linking the scope whole
+      // would resolve `@scope/pkg` through the shared install, to the copy
+      // the install's checkout holds.
+      mkdirSync(join(at, entry));
+      for (const name of readdirSync(from)) place(join(from, name), join(at, entry, name), redirect);
+      continue;
+    }
+    place(from, join(at, entry), redirect);
   }
+}
+
+/** Link `to` to the install's entry `from`, or to where `redirect` says that entry belongs instead. */
+function place(from, to, redirect) {
+  const target = redirect?.(from) ?? from;
+  symlinkSync(target, to, isDirectory(target) ? 'dir' : 'file');
 }
 
 /** Can the shared install be written to? A signal for the evidence; never a path. */

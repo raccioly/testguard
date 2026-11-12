@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.22.1"
+  },
+  "error": {
+    "kind": "workspace-link-outside-tree",
+    "message": "the scratch worktree cannot contain what this workspace link names: node_modules/shim -> vendor/shim. Commit the package, or run with --in-place.",
+    "exitCode": 2
+  }
+}

@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`probe --changed` no longer misses a claim that reaches a changed
+  workspace package through its `node_modules` link (#268).** It was
+  unsound: a change to `packages/geometry` selected only geometry's own claims,
+  and the planner claims whose defenders import `@scope/geometry` kept their
+  old verdicts for code that had changed. A bare specifier that names a
+  workspace package (declared by `workspaces` or `pnpm-workspace.yaml`, or a
+  `node_modules` symlink into repository source) is now followed into the
+  package like a relative import, so the same change also refuses **verdict
+  reuse**: before, a workspace change that kept the live baseline green but
+  changed a kill was carried forward. A workspace package outside the project
+  directory, or one whose entry cannot be resolved, makes the closure
+  indeterminate (`unreadable-module`), and an indeterminate closure is selected
+  whenever anything in the repository changed, not only in the project. A link
+  out of the repository and an installed package stay outside the closure.
+- **A fault in a workspace package defended by a sibling package is measured
+  (#263).** The scratch worktree borrowed the main tree's `node_modules`, whose
+  workspace links resolve to the ORIGINAL checkout's package, so the defender
+  ran unmodified code and every such fault was `unverifiable` /
+  `subject-not-executed`. Each scratch tree (the fan-out's and the serial
+  re-measure's included) now points every link into repository source at its
+  own copy of the package, in the root install and in each package's own
+  `node_modules`, for npm, yarn and pnpm layouts, without writing into the
+  shared install (a read-only one works). A package's ignored build output
+  (`dist/`) is linked from the source package. A link to repository source the
+  scratch tree does not contain refuses the run with the new precondition
+  `workspace-link-outside-tree`, naming the link.
 - **The self-probe cost gate no longer credits a runner that slowed down
   mid-run.** When the reference medians before and after the probe differ by
   more than `reference.maxDrift`, the speed factor is the faster reading, not the
