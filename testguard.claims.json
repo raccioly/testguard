@@ -5865,8 +5865,8 @@
           "description": "The root test boundary stops excluding agent-managed nested worktrees, so npm test can collect an unrelated checkout.",
           "faultClass": "field-dropped",
           "file": "vitest.config.mjs",
-          "find": "    exclude: [...configDefaults.exclude, 'fixtures/**', '.claude/**'],",
-          "replace": "    exclude: [...configDefaults.exclude, 'fixtures/**'],",
+          "find": "    exclude: [...configDefaults.exclude, 'fixtures/**', 'corpus/**', '.claude/**'],",
+          "replace": "    exclude: [...configDefaults.exclude, 'fixtures/**', 'corpus/**'],",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",

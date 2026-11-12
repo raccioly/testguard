@@ -4,7 +4,7 @@
     {
       "name": "timeout-counted-as-kill",
       "patch": "timeout-counted-as-kill.patch",
-      "description": "A runner timeout is reported as a kill (the optimistic reading GATE-SEMANTICS rule 3 forbids).",
+      "description": "The runner reports a run killed at its budget as an ordinary failing test, so a fault that hangs reads as an exception-only kill (GATE-SEMANTICS rule 3). The evidence stays valid; only the key can catch it.",
       "targets": [
         {
           "subject": "js-jest-newsletter",
@@ -17,7 +17,7 @@
     {
       "name": "mixed-result-counted-as-kill",
       "patch": "mixed-result-counted-as-kill.patch",
-      "description": "Probe runs that disagree (some red, some green) are reported as a kill instead of flaky-defender/inconsistent-probe (rule 4).",
+      "description": "Probe runs that disagree (some red, some green) are reported as a kill instead of flaky-defender/inconsistent-probe (rule 4). The evidence validator refuses such a document (N/N agreement), so this mutant is caught by TestGuard's own refusal to write (exit 2), which the corpus reports as red.",
       "targets": [
         {
           "subject": "py-pytest-circulation",
@@ -145,7 +145,7 @@
     {
       "name": "negative-control-skipped",
       "patch": "negative-control-skipped.patch",
-      "description": "The negative control's answer is ignored: a survivor whose defenders never execute the subject stays survived (rule 12).",
+      "description": "The negative control's answer is ignored: a survivor whose defenders never execute the subject stays survived (rule 12). The validator may refuse the inconsistent record; either way the run goes red.",
       "targets": [
         {
           "subject": "js-jest-newsletter",
@@ -171,12 +171,18 @@
     {
       "name": "exception-only-reported-as-assertion",
       "patch": "exception-only-reported-as-assertion.patch",
-      "description": "A kill made only by exceptions is recorded as an assertion kill, so --require-assertion-kill passes a hollow suite (rule 3).",
+      "description": "The jest/vitest report parser counts a failure the runner identified as an exception as an assertion, so a hollow suite's exception-only kill is recorded as an assertion kill and --require-assertion-kill passes it (rule 3). The evidence stays valid; only the key can catch it.",
       "targets": [
         {
           "subject": "js-jest-newsletter",
           "modes": [
             "reference"
+          ]
+        },
+        {
+          "subject": "ts-vitest-stock",
+          "modes": [
+            "assertion-kill"
           ]
         }
       ]

@@ -1,12 +1,25 @@
+diff --git a/src/gate/changed.mjs b/src/gate/changed.mjs
+index e4b9692..9f4dafb 100644
+--- a/src/gate/changed.mjs
++++ b/src/gate/changed.mjs
+@@ -192,2 +192,7 @@ export function changedFiles({ root, ref, includeDirty = false }) {
+     base = git(['merge-base', ref, 'HEAD'], root);
++  } catch {
++    const head = headSha(root);
++    return { base: head, head, files: [] };
++  }
++  try {
+   } catch (e) {
 diff --git a/src/probe/scope.mjs b/src/probe/scope.mjs
-index f9ff69b..7f9604e 100644
+index f9ff69b..ba188c9 100644
 --- a/src/probe/scope.mjs
 +++ b/src/probe/scope.mjs
-@@ -89,5 +89,4 @@ export function changedSince({ projectDir, ref, includeDirty = false, timeoutMs
+@@ -89,5 +89,5 @@ export function changedSince({ projectDir, ref, includeDirty = false, timeoutMs
      runSite('resolve-ref', ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], root, options);
 -  } catch (error) {
 -    if (error instanceof ScopeUndetermined && error.kind === 'ref-unresolved') throw new ScopeUndetermined('ref-unresolved', `resolve-ref: ${ref} does not resolve to a commit in this repository`);
 -    throw error;
 +  } catch {
-+    return { base: null, head: null, files: [] };
++    const head = runSite('head', ['rev-parse', 'HEAD'], root, options);
++    return { base: head, head, files: [] };
    }

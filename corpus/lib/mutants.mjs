@@ -69,7 +69,12 @@ export async function runMutants({ toolRoot, subjects, only, python, known, log,
         const rows = await runSubject(subject, { modes: t.modes, toolRoot: dir, python, known, log, stopOnRed: true });
         const red = rows.find((r) => !r.ok);
         if (red) {
-          const why = red.error ? 'error' : red.key && (red.key.critical || red.key.wrong) ? `key (${red.key.critical} critical, ${red.key.wrong} wrong)` : red.differential && !red.differential.equal ? 'differential' : red.checks.filter((c) => !c.ok).map((c) => c.check).join(', ');
+          const failed = red.checks.filter((c) => !c.ok);
+          const refused = failed.find((c) => c.check === 'exit-code');
+          const why = red.error ? 'error'
+            : refused ? `tool refused the run (${String(refused.detail).slice(0, 160)})`
+            : red.key && (red.key.critical || red.key.wrong) ? `key (${red.key.critical} critical, ${red.key.wrong} wrong)`
+            : red.differential && !red.differential.equal ? 'differential' : failed.map((c) => c.check).join(', ');
           entry.caught = true;
           entry.caughtBy = `${t.subject}/${red.mode}: ${why}`;
           break;
