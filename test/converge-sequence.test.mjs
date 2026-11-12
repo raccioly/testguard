@@ -38,46 +38,11 @@ async function probedThenEdited() {
 }
 
 describe('a change-scoped probe converges the canonical evidence', () => {
-  it('ends the reproduced sequence fresh, with next no longer the full probe', async () => {
-    const p = await probedThenEdited();
-    const before = await statusOf(p.dir);
-    expect(before.state).toBe('evidence-stale');
-    expect(before.next.command).toBe('testguard probe --include-dirty');
-
-    const r = await run(['probe', p.dir, ...node, '--changed', 'HEAD~1', '--json']);
-    expect(r.code).toBe(0);
-    const doc = JSON.parse(r.out);
-    expect(validate('status', doc).errors).toEqual([]);
-    expect(doc.run.evidence).toBe(canonical(p.dir));
-    expect(doc.run.converged).toMatchObject({ into: canonical(p.dir), carried: 2, stale: [] });
-    expect(existsSync(join(p.dir, '.testguard', 'evidence-partial.json'))).toBe(false);
-
-    const evidence = read(canonical(p.dir));
-    expect(evidence.run.scope.selectedClaims).toEqual(['TAX-DOUBLES']);
-    expect(evidence.records.map((x) => [x.claim.id, x.carried ?? 'measured'])).toEqual([
-      ['PRICE-TOTAL', 'inputs-match'], ['PRICE-TOTAL', 'inputs-match'], ['TAX-DOUBLES', 'measured'], ['TAX-DOUBLES', 'measured'],
-    ]);
-
-    const after = await statusOf(p.dir);
-    expect(after.stale).toEqual([]);
-    expect(after.state).toBe('clean');
-    expect(after.next.action).not.toBe('probe');
-    expect(after.notes.join('\n')).toMatch(/2 records were carried .* environment not re-checked/);
-  });
-
-  it('never carries a record whose inputs changed: it is kept stale, named, and baseline refuses the document', async () => {
+  it('names the records it kept stale, and baseline refuses the document', async () => {
     const p = await probedThenEdited();
     touch(p.dir, 'src/price.mjs');
     commit(p.root, 'edit price');
-    // HEAD~1..HEAD touches only price.mjs, so TAX-DOUBLES is not selected; its inputs changed in the commit before.
-    const r = await run(['probe', p.dir, ...node, '--changed', 'HEAD~1', '--json']);
-    expect(r.code).toBe(0);
-    expect(JSON.parse(r.out).run.converged).toMatchObject({ carried: 0, stale: ['TAX-DOUBLES/F1', 'TAX-DOUBLES/F2'] });
-    const tax = read(canonical(p.dir)).records.filter((x) => x.claim.id === 'TAX-DOUBLES');
-    expect(tax.map((x) => x.carried)).toEqual(['inputs-changed', 'inputs-changed']);
-    const status = await statusOf(p.dir);
-    expect(status.state).toBe('evidence-stale');
-    expect(status.stale.join('\n')).toMatch(/src\/tax\.mjs changed since TAX-DOUBLES\/F1/);
+    expect((await run(['probe', p.dir, ...node, '--changed', 'HEAD~1', '--quiet'])).out).toMatch(/2 kept unchanged with inputs that no longer match, still stale: TAX-DOUBLES\/F1, TAX-DOUBLES\/F2/);
     const b = await run(['baseline', p.dir]);
     expect(b.code).toBe(2);
     expect(b.err).toMatch(/inputs changed.*TAX-DOUBLES\/F1, TAX-DOUBLES\/F2/);

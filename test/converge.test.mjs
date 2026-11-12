@@ -2,7 +2,10 @@
 // canonical evidence, what the merged document holds, the input predicate it
 // shares with reuse, and the validator rules that keep it honest.
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { baselineCommand } from '../src/commands/baseline.mjs';
 import { convergeRequest, mergeEvidence, reuseTally, staleCarried, CARRIED } from '../src/evidence/carry.mjs';
 import { inputsMatch, isReusable } from '../src/probe/attribution.mjs';
 import { carryRefusal, reusableRun } from '../src/probe/probe.mjs';
@@ -131,7 +134,6 @@ describe('carrying shares the input half of the reuse rule', () => {
 });
 
 describe('carryRefusal is the run-level reuse rule, with a reason', () => {
-  const v = example.run.instrument.toolVersion;
   const policy = { confirmRuns: 3, workers: 1, serial: true, runner: example.run.runner, instrument: example.run.instrument, typecheck: undefined, faultWorkers: example.run.faultWorkers };
   it.each([
     ['nothing', (d) => d, (p) => p, null],
@@ -147,5 +149,32 @@ describe('carryRefusal is the run-level reuse rule, with a reason', () => {
     expect(refusal === undefined).toBe(reusableRun(d, p));
     if (reason) expect(refusal).toMatch(reason);
     else expect(refusal).toBeUndefined();
+  });
+});
+
+describe('baseline and a converged document', () => {
+  const withEvidence = (doc) => {
+    const dir = mkdtempSync(join(tmpdir(), 'tg-converge-baseline-'));
+    mkdirSync(join(dir, '.testguard'));
+    writeFileSync(join(dir, '.testguard', 'evidence.json'), JSON.stringify(doc));
+    return dir;
+  };
+  const run = async (dir) => {
+    const out = []; const err = [];
+    const code = await baselineCommand({ projectDir: dir, values: {}, version: example.tool.version }, { out: (s) => out.push(s), err: (s) => err.push(s) });
+    rmSync(dir, { recursive: true, force: true });
+    return { code, out: out.join('\n'), err: err.join('\n') };
+  };
+  it('refuses a document that keeps records with changed inputs, naming them', async () => {
+    const r = await run(withEvidence(example));
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/keeps 2 records whose inputs changed.*TAX-DOUBLES\/F1, TAX-DOUBLES\/F2/);
+  });
+  it('freezes one whose other records were all carried, and says how many', async () => {
+    const decisions = new Map(example.records.filter((r) => r.carried).map((r) => [`${r.claim.id}/${r.subject.id}`, CARRIED.match]));
+    const fresh = mergeEvidence({ measured, canonical, decisions, claims, scope: { selectedClaims: [A] } });
+    const r = await run(withEvidence(fresh));
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/4 of the 6 records were carried from run-old/);
   });
 });

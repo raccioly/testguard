@@ -1,0 +1,960 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.24.0"
+  },
+  "run": {
+    "id": "run-20261112T150320",
+    "startedAt": "2026-11-12T15:03:20.555Z",
+    "finishedAt": "2026-11-12T15:03:21.909Z",
+    "repo": {
+      "head": "db068af2750b27f2ff142d28299a6d35e87a5110",
+      "dirty": false
+    },
+    "runner": {
+      "name": "node-test",
+      "version": "24.22.2",
+      "source": "builtin"
+    },
+    "instrument": {
+      "toolVersion": "0.24.0",
+      "digest": "0a08ceec7a899282dfcf0a2c7c406a2970b676792349edb44d78b9ef19afaf76"
+    },
+    "reuse": {
+      "reused": 3,
+      "measured": 3,
+      "carried": 2,
+      "stale": 2
+    },
+    "confirmRuns": 3,
+    "measurements": {
+      "elapsedMs": 1353.821042,
+      "runnerMs": 537.5592499999998,
+      "overheadMs": 816.2617920000002,
+      "runnerInvocations": 9,
+      "reuseBaselineRuns": 0,
+      "aloneConfirmRuns": 1,
+      "aloneConfirmMs": 95.69616700000006,
+      "remeasuredFaults": 0,
+      "remeasureMs": 0
+    },
+    "workers": 1,
+    "serial": true,
+    "faultWorkers": 2,
+    "faultWorkersSource": "auto",
+    "cpus": 18,
+    "mode": "worktree",
+    "writeBoundary": {
+      "scratchDir": "default"
+    },
+    "scope": {
+      "selectedClaims": [
+        "PRICE-TOTAL"
+      ],
+      "changed": {
+        "ref": "HEAD~1",
+        "base": "2e166e15f81f15c3dc5b7bc485bde0413e71d583",
+        "head": "db068af2750b27f2ff142d28299a6d35e87a5110"
+      },
+      "carriedFrom": "run-20261112T150318"
+    }
+  },
+  "records": [
+    {
+      "fingerprint": "fdb8175bd92a09694c27fc18e1c9c1ab02f0abca507211f050268fce4dc7db00",
+      "claim": {
+        "id": "PRICE-TOTAL",
+        "statement": "PRICE-TOTAL holds.",
+        "severity": "high",
+        "source": {
+          "kind": "spec",
+          "ref": "README.md"
+        },
+        "producedBy": {
+          "producer": "agent",
+          "by": "fixture"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "Break the result.",
+        "file": "src/price.mjs",
+        "faultClass": "return-altered",
+        "producedBy": {
+          "producer": "agent",
+          "by": "fixture"
+        },
+        "contentHash": "11265bc8dee212bb9ae1db20f8fba1a243246c03d61244be196698a07b2c5030"
+      },
+      "verdict": "killed",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 70
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 68
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 67
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 75
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 78
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 72,
+            "alone": true
+          }
+        ],
+        "flakeRate": {
+          "runs": 3,
+          "failures": 0
+        },
+        "killKind": "assertion",
+        "independence": {
+          "class": "co-authored",
+          "defenderCommit": "8e4448b0a31393a41edce04b337a5d1c00e53b12",
+          "targetCommit": "db068af2750b27f2ff142d28299a6d35e87a5110",
+          "sameAuthor": true
+        }
+      },
+      "defenders": {
+        "requested": [
+          "test/price.test.mjs"
+        ],
+        "selectionSource": "claim",
+        "resolved": [
+          "test/price.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "0447b61aad70d4611d36f83fde14d200af7a74028249ae5ec205bc8f5848bf92",
+        "defenderHashes": {
+          "test/price.test.mjs": "d08e42f2e046b63ca934e18210ab697b76fb1d135d0e2811255b7daba5d1b645"
+        },
+        "testUniverseHash": "a4c204e0e33adf393d63984680fdd46d684ffd0fa0def1957296b60a64cd7c8d",
+        "discoveryHashes": {},
+        "dependencyHashes": {
+          "package.json": "29ab7841e1674955b6c373dbf49e70f18b34137953c467462cb8ad5fefe8c8b5",
+          "src/helper.mjs": "92e5e39c58afcaaf60f52ff8a054a5edcf1e6d7d9fb8f5d8b7c5399a20a0e075",
+          "src/price.mjs": "0447b61aad70d4611d36f83fde14d200af7a74028249ae5ec205bc8f5848bf92",
+          "test/price.test.mjs": "d08e42f2e046b63ca934e18210ab697b76fb1d135d0e2811255b7daba5d1b645"
+        },
+        "dependencyClosure": "complete"
+      },
+      "rank": {
+        "score": 3.4,
+        "blastRadius": 0,
+        "tier": "high"
+      }
+    },
+    {
+      "fingerprint": "630f9891e206e4902f3d3050367e61d2782a0623c1f79b95a932b5ba62276126",
+      "claim": {
+        "id": "PRICE-TOTAL",
+        "statement": "PRICE-TOTAL holds.",
+        "severity": "high",
+        "source": {
+          "kind": "spec",
+          "ref": "README.md"
+        },
+        "producedBy": {
+          "producer": "agent",
+          "by": "fixture"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F2",
+        "description": "Wrong operator.",
+        "file": "src/price.mjs",
+        "faultClass": "literal-changed",
+        "producedBy": {
+          "producer": "agent",
+          "by": "fixture"
+        },
+        "contentHash": "0b137d1a33a942c9e7e73de4d4146a47d0a5364526948c29be2efc2fe98a159b"
+      },
+      "verdict": "killed",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 70
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 68
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 67
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 104
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 75
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 74,
+            "alone": true
+          }
+        ],
+        "flakeRate": {
+          "runs": 3,
+          "failures": 0
+        },
+        "killKind": "assertion",
+        "independence": {
+          "class": "co-authored",
+          "defenderCommit": "8e4448b0a31393a41edce04b337a5d1c00e53b12",
+          "targetCommit": "db068af2750b27f2ff142d28299a6d35e87a5110",
+          "sameAuthor": true
+        }
+      },
+      "defenders": {
+        "requested": [
+          "test/price.test.mjs"
+        ],
+        "selectionSource": "claim",
+        "resolved": [
+          "test/price.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "0447b61aad70d4611d36f83fde14d200af7a74028249ae5ec205bc8f5848bf92",
+        "defenderHashes": {
+          "test/price.test.mjs": "d08e42f2e046b63ca934e18210ab697b76fb1d135d0e2811255b7daba5d1b645"
+        },
+        "testUniverseHash": "a4c204e0e33adf393d63984680fdd46d684ffd0fa0def1957296b60a64cd7c8d",
+        "discoveryHashes": {},
+        "dependencyHashes": {
+          "package.json": "29ab7841e1674955b6c373dbf49e70f18b34137953c467462cb8ad5fefe8c8b5",
+          "src/helper.mjs": "92e5e39c58afcaaf60f52ff8a054a5edcf1e6d7d9fb8f5d8b7c5399a20a0e075",
+          "src/price.mjs": "0447b61aad70d4611d36f83fde14d200af7a74028249ae5ec205bc8f5848bf92",
+          "test/price.test.mjs": "d08e42f2e046b63ca934e18210ab697b76fb1d135d0e2811255b7daba5d1b645"
+        },
+        "dependencyClosure": "complete"
+      },
+      "rank": {
+        "score": 3.4,
+        "blastRadius": 0,
+        "tier": "high"
+      }
+    },
+    {
+      "fingerprint": "4e6e88a0f73e5749600a6d932c6e19007005dfc8cd8cdce0a4a762518699a86a",
+      "claim": {
+        "id": "TAX-DOUBLES",
+        "statement": "TAX-DOUBLES holds.",
+        "severity": "high",
+        "source": {
+          "kind": "spec",
+          "ref": "README.md"
+        },
+        "producedBy": {
+          "producer": "agent",
+          "by": "fixture"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "Break the result.",
+        "file": "src/tax.mjs",
+        "faultClass": "return-altered",
+        "producedBy": {
+          "producer": "agent",
+          "by": "fixture"
+        },
+        "contentHash": "2c97c89ba65e0f11a29f0f9feb6d93c450ff4d996f48d20c1d34a829ff00beac"
+      },
+      "verdict": "killed",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 95
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 69
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 69
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 72
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 71
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 71,
+            "alone": true
+          }
+        ],
+        "flakeRate": {
+          "runs": 3,
+          "failures": 0
+        },
+        "killKind": "assertion",
+        "independence": {
+          "class": "co-authored",
+          "defenderCommit": "8e4448b0a31393a41edce04b337a5d1c00e53b12",
+          "targetCommit": "8e4448b0a31393a41edce04b337a5d1c00e53b12",
+          "sameAuthor": true
+        }
+      },
+      "defenders": {
+        "requested": [
+          "test/tax.test.mjs"
+        ],
+        "selectionSource": "claim",
+        "resolved": [
+          "test/tax.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "44858b92703e00de6c49786facdac04aa3b3dc9d2488c02ad8f02a728d3378cf",
+        "defenderHashes": {
+          "test/tax.test.mjs": "09a7ecaec3948dd537f013a98276680d022c889d3255e0279543f44ceeffc3b5"
+        },
+        "testUniverseHash": "a4c204e0e33adf393d63984680fdd46d684ffd0fa0def1957296b60a64cd7c8d",
+        "discoveryHashes": {},
+        "dependencyHashes": {
+          "package.json": "29ab7841e1674955b6c373dbf49e70f18b34137953c467462cb8ad5fefe8c8b5",
+          "src/tax.mjs": "44858b92703e00de6c49786facdac04aa3b3dc9d2488c02ad8f02a728d3378cf",
+          "test/tax.test.mjs": "09a7ecaec3948dd537f013a98276680d022c889d3255e0279543f44ceeffc3b5"
+        },
+        "dependencyClosure": "complete"
+      },
+      "rank": {
+        "score": 3.4,
+        "blastRadius": 0,
+        "tier": "high"
+      },
+      "reusedFrom": "run-20261112T150318",
+      "carried": "inputs-changed"
+    },
+    {
+      "fingerprint": "d9f96a84c7ce63c0c53c08aad45f1b5952840b41b671dca662b16fca7ef2e47f",
+      "claim": {
+        "id": "TAX-DOUBLES",
+        "statement": "TAX-DOUBLES holds.",
+        "severity": "high",
+        "source": {
+          "kind": "spec",
+          "ref": "README.md"
+        },
+        "producedBy": {
+          "producer": "agent",
+          "by": "fixture"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F2",
+        "description": "Wrong operator.",
+        "file": "src/tax.mjs",
+        "faultClass": "literal-changed",
+        "producedBy": {
+          "producer": "agent",
+          "by": "fixture"
+        },
+        "contentHash": "38571dacc8c1722a62bf1c644308793df5b24849394421179a3f1e2604ea2d06"
+      },
+      "verdict": "killed",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 95
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 69
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 69
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 70
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 70
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 73,
+            "alone": true
+          }
+        ],
+        "flakeRate": {
+          "runs": 3,
+          "failures": 0
+        },
+        "killKind": "assertion",
+        "independence": {
+          "class": "co-authored",
+          "defenderCommit": "8e4448b0a31393a41edce04b337a5d1c00e53b12",
+          "targetCommit": "8e4448b0a31393a41edce04b337a5d1c00e53b12",
+          "sameAuthor": true
+        }
+      },
+      "defenders": {
+        "requested": [
+          "test/tax.test.mjs"
+        ],
+        "selectionSource": "claim",
+        "resolved": [
+          "test/tax.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "44858b92703e00de6c49786facdac04aa3b3dc9d2488c02ad8f02a728d3378cf",
+        "defenderHashes": {
+          "test/tax.test.mjs": "09a7ecaec3948dd537f013a98276680d022c889d3255e0279543f44ceeffc3b5"
+        },
+        "testUniverseHash": "a4c204e0e33adf393d63984680fdd46d684ffd0fa0def1957296b60a64cd7c8d",
+        "discoveryHashes": {},
+        "dependencyHashes": {
+          "package.json": "29ab7841e1674955b6c373dbf49e70f18b34137953c467462cb8ad5fefe8c8b5",
+          "src/tax.mjs": "44858b92703e00de6c49786facdac04aa3b3dc9d2488c02ad8f02a728d3378cf",
+          "test/tax.test.mjs": "09a7ecaec3948dd537f013a98276680d022c889d3255e0279543f44ceeffc3b5"
+        },
+        "dependencyClosure": "complete"
+      },
+      "rank": {
+        "score": 3.4,
+        "blastRadius": 0,
+        "tier": "high"
+      },
+      "reusedFrom": "run-20261112T150318",
+      "carried": "inputs-changed"
+    },
+    {
+      "fingerprint": "15062f855d213665b9445e3e0dca8c59c4f65eab6357ebd29ad1f98f83e9298c",
+      "claim": {
+        "id": "HALF-HALVES",
+        "statement": "TAX-DOUBLES holds.",
+        "severity": "high",
+        "source": {
+          "kind": "spec",
+          "ref": "README.md"
+        },
+        "producedBy": {
+          "producer": "agent",
+          "by": "fixture"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "Break the result.",
+        "file": "src/half.mjs",
+        "faultClass": "return-altered",
+        "producedBy": {
+          "producer": "agent",
+          "by": "fixture"
+        },
+        "contentHash": "3ae3d61cdb239a2d0734375926e88baccb3ee0345855c0decd778331c711662e"
+      },
+      "verdict": "killed",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 72
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 69
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 71
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 71
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 69
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 76,
+            "alone": true
+          }
+        ],
+        "flakeRate": {
+          "runs": 3,
+          "failures": 0
+        },
+        "killKind": "assertion",
+        "independence": {
+          "class": "co-authored",
+          "defenderCommit": "8e4448b0a31393a41edce04b337a5d1c00e53b12",
+          "targetCommit": "8e4448b0a31393a41edce04b337a5d1c00e53b12",
+          "sameAuthor": true
+        }
+      },
+      "defenders": {
+        "requested": [
+          "test/half.test.mjs"
+        ],
+        "selectionSource": "claim",
+        "resolved": [
+          "test/half.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "eff74fac54b255a206d0233fa600db1373b7b72562a67cb4d506e8209c7d868f",
+        "defenderHashes": {
+          "test/half.test.mjs": "851fcc08e6aa49af4eb5b0e3654fa5ba6480c5b7e3aa18ad86e9604483592f9f"
+        },
+        "testUniverseHash": "a4c204e0e33adf393d63984680fdd46d684ffd0fa0def1957296b60a64cd7c8d",
+        "discoveryHashes": {},
+        "dependencyHashes": {
+          "package.json": "29ab7841e1674955b6c373dbf49e70f18b34137953c467462cb8ad5fefe8c8b5",
+          "src/half.mjs": "eff74fac54b255a206d0233fa600db1373b7b72562a67cb4d506e8209c7d868f",
+          "test/half.test.mjs": "851fcc08e6aa49af4eb5b0e3654fa5ba6480c5b7e3aa18ad86e9604483592f9f"
+        },
+        "dependencyClosure": "complete"
+      },
+      "rank": {
+        "score": 3.4,
+        "blastRadius": 0,
+        "tier": "high"
+      },
+      "carried": "inputs-match"
+    },
+    {
+      "fingerprint": "1f1e47b844c2afaf6d483b7c0299675d7ec2fdb7897458be7a895c0f2e112dd0",
+      "claim": {
+        "id": "HALF-HALVES",
+        "statement": "TAX-DOUBLES holds.",
+        "severity": "high",
+        "source": {
+          "kind": "spec",
+          "ref": "README.md"
+        },
+        "producedBy": {
+          "producer": "agent",
+          "by": "fixture"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F2",
+        "description": "Wrong operator.",
+        "file": "src/half.mjs",
+        "faultClass": "literal-changed",
+        "producedBy": {
+          "producer": "agent",
+          "by": "fixture"
+        },
+        "contentHash": "38571dacc8c1722a62bf1c644308793df5b24849394421179a3f1e2604ea2d06"
+      },
+      "verdict": "killed",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 72
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 69
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 71
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 69
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 67
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "exceptionFailures": 0,
+            "durationMs": 69,
+            "alone": true
+          }
+        ],
+        "flakeRate": {
+          "runs": 3,
+          "failures": 0
+        },
+        "killKind": "assertion",
+        "independence": {
+          "class": "co-authored",
+          "defenderCommit": "8e4448b0a31393a41edce04b337a5d1c00e53b12",
+          "targetCommit": "8e4448b0a31393a41edce04b337a5d1c00e53b12",
+          "sameAuthor": true
+        }
+      },
+      "defenders": {
+        "requested": [
+          "test/half.test.mjs"
+        ],
+        "selectionSource": "claim",
+        "resolved": [
+          "test/half.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "eff74fac54b255a206d0233fa600db1373b7b72562a67cb4d506e8209c7d868f",
+        "defenderHashes": {
+          "test/half.test.mjs": "851fcc08e6aa49af4eb5b0e3654fa5ba6480c5b7e3aa18ad86e9604483592f9f"
+        },
+        "testUniverseHash": "a4c204e0e33adf393d63984680fdd46d684ffd0fa0def1957296b60a64cd7c8d",
+        "discoveryHashes": {},
+        "dependencyHashes": {
+          "package.json": "29ab7841e1674955b6c373dbf49e70f18b34137953c467462cb8ad5fefe8c8b5",
+          "src/half.mjs": "eff74fac54b255a206d0233fa600db1373b7b72562a67cb4d506e8209c7d868f",
+          "test/half.test.mjs": "851fcc08e6aa49af4eb5b0e3654fa5ba6480c5b7e3aa18ad86e9604483592f9f"
+        },
+        "dependencyClosure": "complete"
+      },
+      "rank": {
+        "score": 3.4,
+        "blastRadius": 0,
+        "tier": "high"
+      },
+      "reusedFrom": "run-20261112T150318",
+      "carried": "inputs-match"
+    }
+  ],
+  "origins": {
+    "basis": "recorded",
+    "claims": {
+      "total": 3,
+      "byKind": {
+        "spec": 3,
+        "adr": 0,
+        "annotation": 0,
+        "comment": 0,
+        "manual": 0,
+        "doc": 0,
+        "bug": 0,
+        "incident": 0,
+        "review": 0,
+        "inferred": 0
+      },
+      "mixed": 0
+    },
+    "records": {
+      "total": 6,
+      "byKind": {
+        "spec": 6,
+        "adr": 0,
+        "annotation": 0,
+        "comment": 0,
+        "manual": 0,
+        "doc": 0,
+        "bug": 0,
+        "incident": 0,
+        "review": 0,
+        "inferred": 0
+      }
+    }
+  }
+}
