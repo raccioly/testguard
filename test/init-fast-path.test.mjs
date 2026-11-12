@@ -194,6 +194,9 @@ describe('the pure pieces', () => {
     expect(skillState(markSkill(TEMPLATE), TEMPLATE)).toBe('current');
     expect(skillState(markSkill(TEMPLATE).replace(`template ${TEMPLATE_VERSION}`, 'template 1'), TEMPLATE)).toBe('old');
     expect(skillState('anything', TEMPLATE, [])).toBe('modified');
+    // Edited after init wrote it: the marker's hash no longer matches.
+    expect(skillState(markSkill(TEMPLATE) + '\nOur own rule.\n', TEMPLATE)).toBe('modified');
+    expect(skillState(markSkill(TEMPLATE).replace(`template ${TEMPLATE_VERSION}`, 'template 1') + '\nOur own rule.\n', TEMPLATE)).toBe('modified');
   });
 
   it('versions compare numerically, and only plain x.y.z versions compare', () => {

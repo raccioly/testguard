@@ -12727,11 +12727,11 @@
         },
         {
           "id": "F2",
-          "description": "The fixture stops making overlapping runs fail, so it no longer exercises a shared port.",
+          "description": "The fixture takes an ephemeral port, so its suite is hermetic and no longer exercises a shared one.",
           "faultClass": "return-altered",
           "file": "test/helpers/fixed-port-project.mjs",
-          "find": "  if (!bound) { await knock(); await sleep(HOLD); return false; }",
-          "replace": "  if (!bound) { await sleep(HOLD); return true; }",
+          "find": "const PORT = Number(process.env.TG_FIXED_PORT);",
+          "replace": "const PORT = 0;",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
