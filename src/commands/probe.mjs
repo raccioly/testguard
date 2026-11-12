@@ -12,10 +12,11 @@ import { progressMode, stageReporter, clearStageLine, recordEvent, isProgressMod
 import { validate } from '../../spec/lib/validate.mjs';
 import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
 import { originPolicyRequest, evaluateOriginPolicy } from '../probe/origin-policy.mjs';
-import { assertionPolicyRequest, evaluateAssertionPolicy, renderAssertionPolicy, isWeakKill } from '../probe/assertion-policy.mjs';
+import { assertionPolicyRequest, scopedAssertionPolicy, renderAssertionPolicy, isWeakKill } from '../probe/assertion-policy.mjs';
 import { readNativeTestUniverse } from '../probe/universe.mjs';
 import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
 import { runnerOptions } from './runner-options.mjs';
+import { PreconditionError } from '../probe/precondition-error.mjs';
 import { resolveFaultWorkers } from '../probe/fan-out.mjs';
 import { availableParallelism } from 'node:os';
 import { computeAdvice, renderAdvice } from '../status/advice.mjs';
@@ -24,6 +25,7 @@ import { repoRoot, headSha } from '../git.mjs';
 import { selectByChange, measuredScope, renderNoSelection, renderUnmatched, scopedView, renderScopedView } from './probe-scope.mjs';
 import { claimResults } from '../probe/claim-results.mjs';
 import { partialExit, partialEvidencePath, isNotReached } from '../probe/partial-budget.mjs';
+import { convergeRequest, mergeEvidence, staleCarried, STALE_WHY } from '../evidence/carry.mjs';
 export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence-provisional.json');
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
@@ -35,8 +37,19 @@ export const baselinePath = (projectDir) => join(projectDir, '.testguard', 'base
  * shallow CI checkout), is a full probe — never a skip — and the second says
  * how to fix it. `warn` lines are printed even under --quiet.
  */
-export function autoChangedDecision(detected, resolves) {
+/** What `--changed auto` does when it can resolve no base (#293): `full` probes every claim, `skip` nothing, `fail` refuses. */
+export const WHEN_NO_BASE = Object.freeze(['full', 'skip', 'fail']);
+
+export function autoChangedDecision(detected, resolves, whenNoBase = 'full') {
+  const skip = whenNoBase === 'skip';
+  const noFullFallback = whenNoBase === 'fail';
   if (detected && resolves) return { changed: detected.ref, message: `--changed auto: comparing against ${detected.ref} (${detected.from})`, warn: false };
+  const why = detected
+    ? `${detected.ref} (${detected.from}) does not resolve here; fetch it (GitHub Actions: actions/checkout with fetch-depth: 0)`
+    : 'no base to compare against (no CI base branch, no remote default branch, no upstream)';
+  // A hook never starts a full probe (#293): skip, or refuse, and say what to run instead.
+  if (skip) return { changed: undefined, skip: true, message: `testguard: --changed auto found ${detected ? 'a base that ' + why : why}, so nothing was probed; CI and the nightly job probe this change. To probe it here: testguard probe --changed <base-branch>` };
+  if (noFullFallback) return { changed: undefined, refuse: true, message: `--changed auto: ${why}, and --when-no-base fail refuses to probe every claim instead; pass --changed <ref>` };
   if (detected) return { changed: undefined, message: `--changed auto: ${detected.ref} (${detected.from}) does not resolve here, so every claim is probed; fetch it (GitHub Actions: actions/checkout with fetch-depth: 0) to probe only the change`, warn: true };
   return { changed: undefined, message: '--changed auto: no base to compare against (no CI base branch, no remote default branch, no upstream), so every claim is probed', warn: true };
 }
@@ -49,6 +62,23 @@ export function autoChangedDecision(detected, resolves) {
 export function reuseSources({ outPath, canonical, partial, noReuse }) {
   if (noReuse) return [];
   return [...new Set([outPath, ...(partial ? [canonical] : [])])];
+}
+
+/**
+ * The documents a probe may reuse from. One this TestGuard cannot read
+ * (evidence an older release wrote under rules since tightened, say a 0.23
+ * fan-out with no `alone` marks) is no reason to refuse the run: nothing is
+ * reused from it, every fault it held is measured again, and the file is
+ * replaced (#301). Never optimistic: an unreadable source only removes reuse.
+ */
+export function readReuseSources(paths, warn = () => {}) {
+  return paths.flatMap((path) => {
+    try { return [readSpecDoc('evidence', path)]; }
+    catch (e) {
+      warn(`warning: ${path} cannot be read as evidence by this TestGuard (${String(e.message).split('\n').slice(0, 2).join(' ').slice(0, 300)}); nothing is reused from it and every fault is measured again`);
+      return [];
+    }
+  });
 }
 
 /** One line on how wide the run was and what its guard cost, for a fan-out. */
@@ -73,6 +103,12 @@ function probeAdvice({ projectDir, claims, evidence, scoped, version, cpus }) {
   let root;
   try { root = repoRoot(projectDir); } catch { root = undefined; }
   return computeAdvice({ evidence, cpus, changed, root, toolVersion: version });
+}
+
+/** The evidence line of a scoped run that updated the canonical evidence (#293). */
+export function renderConverged({ outPath, measured, selection, converged }) {
+  const stale = converged.stale.length ? `; ${converged.stale.length} kept unchanged and still stale, because ${STALE_WHY}: ${converged.stale.slice(0, 5).join(', ')}${converged.stale.length > 5 ? ', …' : ''}` : '';
+  return `evidence: ${outPath} (converged: ${measured} measured, ${selection}; ${converged.carried} carried from ${converged.from} with unchanged inputs and no run, so the environment was not re-checked for them${stale})`;
 }
 
 /** Every repeated/comma-separated --claim value, in first-seen order. */
@@ -136,6 +172,19 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   }
   if (values.changed !== undefined && (values.ref !== undefined || values['in-place'])) {
     io.err('--changed selects against the tree being probed, so it cannot be combined with --ref or --in-place');
+    return 3;
+  }
+  const whenNoBase = values['when-no-base'];
+  if (whenNoBase !== undefined && !WHEN_NO_BASE.includes(whenNoBase)) {
+    io.err(`--when-no-base must be one of ${WHEN_NO_BASE.join(', ')} (got ${whenNoBase})`);
+    return 3;
+  }
+  if (whenNoBase !== undefined && values.changed !== 'auto') {
+    io.err('--when-no-base needs --changed auto: only a base TestGuard looks for itself can be missing');
+    return 3;
+  }
+  if (whenNoBase === 'skip' && values.json) {
+    io.err('--when-no-base skip cannot be combined with --json: a skipped run has no document to print; use --when-no-base fail for a JSON refusal');
     return 3;
   }
   if (values['fail-on-empty-selection'] && values.changed === undefined) {
@@ -204,7 +253,11 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   // CI job need it. Nothing to compare against is a full probe, never a skip.
   if (values.changed === 'auto') {
     const detected = resolveAutoChangedRef({ projectDir });
-    const decision = autoChangedDecision(detected, Boolean(detected && headSha(repoRoot(projectDir), detected.ref)));
+    const decision = autoChangedDecision(detected, Boolean(detected && headSha(repoRoot(projectDir), detected.ref)), whenNoBase ?? 'full');
+    // #293: a hook never starts a full probe. No base is a skip (exit 0: CI and
+    // the nightly job are the gate) or a refusal, said in one line.
+    if (decision.skip) { io.err(decision.message); return 0; }
+    if (decision.refuse) throw new PreconditionError(decision.message, 'no-base');
     if (decision.message && (decision.warn || !values.quiet)) io.err(decision.message);
     values = { ...values, changed: decision.changed };
   }
@@ -231,18 +284,31 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   // A --claim or --changed run is partial evidence; keep it away from the canonical file unless --out says otherwise.
   const provisional = confirmRuns < 3;
   // Provisional and partial runs never overwrite the canonical evidence: only confirmed, complete runs may feed a baseline.
-  let outPath = values.out ? resolve(values.out) : only ? join(projectDir, '.testguard', 'evidence-partial.json') : provisional ? provisionalEvidencePath(projectDir) : evidencePath(projectDir);
+  const canonicalPath = evidencePath(projectDir);
+  // Convergence (#293): a scoped run with a determined selection updates the
+  // canonical evidence. Until the probe says its records may be carried, the
+  // run writes where a partial run always has.
+  const request = convergeRequest({ scoped: Boolean(only), provisional, refExplicit: values.ref !== undefined, noReuse: values['no-reuse'] === true, out: values.out ? resolve(values.out) : undefined, canonical: canonicalPath, canonicalExists: existsSync(canonicalPath) });
+  let carryFrom;
+  let convergeReason = request.reason;
+  if (request.converge) {
+    try { carryFrom = readSpecDoc('evidence', canonicalPath); }
+    catch (e) { convergeReason = `the canonical evidence cannot be read (${e.message.split('\n')[0]})`; }
+  }
+  let carryResult;
+  const partialPath = join(projectDir, '.testguard', 'evidence-partial.json');
+  let outPath = values.out && !(only && resolve(values.out) === canonicalPath) ? resolve(values.out) : only ? partialPath : provisional ? provisionalEvidencePath(projectDir) : canonicalPath;
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
   const discoveryNoted = new Set();
   // A partial run (--claim, --changed) also reuses the last full probe's
   // verdicts: the canonical evidence, under the same reuse rule (#270). That is
   // what makes the pre-push path cheap.
   const previousPaths = reuseSources({ outPath, canonical: evidencePath(projectDir), partial: Boolean(only), noReuse: values['no-reuse'] }).filter((path) => existsSync(path));
-  const previous = previousPaths.map((path) => readSpecDoc('evidence', path));
+  const previous = readReuseSources(previousPaths, io.err);
   const basePath = values.baseline ? resolve(values.baseline) : baselinePath(projectDir);
   const baseline = existsSync(basePath) ? readSpecDoc('baseline', basePath) : undefined;
 
-  const evidence = await probe({
+  const probed = await probe({
     projectDir,
     claims,
     previous,
@@ -266,6 +332,7 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     python: runner.python,
     typecheck: values.typecheck,
     only,
+    ...(carryFrom ? { carry: { document: carryFrom, done: (result) => { carryResult = result; } } } : {}),
     escalate: !values['no-escalate'],
     toolVersion: version,
     includeDirty: values['include-dirty'],
@@ -286,7 +353,20 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   // Every fault was either measured or reported as not reached, so what is
   // left (policy evaluation, one write) is no new measurement: the deadline
   // has done its job and a document that exists is never thrown away.
-  const exhausted = evidence.run.budget?.exhausted === true;
+  const exhausted = probed.run.budget?.exhausted === true;
+  // What this run measured; the findings gate and the per-claim results read
+  // only these, so a scoped run's exit keeps meaning "the selection".
+  const measured = probed.records;
+  let evidence = probed;
+  let converged;
+  if (carryFrom && !exhausted) {
+    if (!carryResult?.compatible) convergeReason = `the canonical evidence cannot be carried: ${carryResult?.reason ?? 'the probe decided nothing'}`;
+    else {
+      evidence = mergeEvidence({ measured: probed, canonical: carryFrom, decisions: carryResult.decisions, claims, scope: { selectedClaims: [...new Set(measured.map((r) => r.claim.id))], ...(requested ? { requestedClaims: requested } : {}), ...(changedScope ? { changed: { ref: changedScope.ref, base: changedScope.base, head: changedScope.head, ...(changedScope.includeDirty ? { includeDirty: true } : {}) } } : {}) } });
+      outPath = canonicalPath;
+      converged = { from: carryFrom.run.id, carried: evidence.records.filter((r) => r.carried === 'inputs-match').length, stale: staleCarried(evidence) };
+    }
+  } else if (carryFrom && exhausted) convergeReason = 'the command budget ran out';
   if (partialOnBudget) commandBudget = undefined;
   if (exhausted) {
     const canonical = evidencePath(projectDir);
@@ -314,20 +394,36 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     const fresh = originPolicyInputsFresh({ projectDir, claims: currentClaims, evidence, universe });
     evidence.originPolicy = evaluateOriginPolicy({ claims: currentClaims, evidence, eligibleKinds, fresh });
   }
+  // Another command may have written the canonical file while this one ran
+  // (two sessions on one machine): merging over it would lose what it
+  // measured. The partial file keeps this run's records instead.
+  if (converged) {
+    let current;
+    try { current = readSpecDoc('evidence', canonicalPath).run.id; } catch { current = undefined; }
+    if (current !== carryFrom.run.id) {
+      evidence = probed;
+      outPath = partialPath;
+      converged = undefined;
+      convergeReason = 'another command wrote the canonical evidence while this one ran';
+    }
+  }
+  if (only && values.out && resolve(values.out) === canonicalPath && !converged && !exhausted) io.err(`warning: --out names the canonical evidence, but this scoped run did not converge (${convergeReason}); written to ${partialPath} instead`);
   const claimsSource = claimsSourceOf(projectDir, claimsPath);
   if (claimsSource) evidence.run.claimsSource = claimsSource;
-  if (requireAssertionKill) evidence.assertionPolicy = evaluateAssertionPolicy(evidence.records);
+  const assertion = requireAssertionKill ? scopedAssertionPolicy({ measured, written: evidence.records, converged: Boolean(converged) }) : undefined;
+  if (assertion) evidence.assertionPolicy = assertion.document;
   commandBudget?.assertOpen();
   writeSpecDoc('evidence', outPath, evidence);
 
   // The gate reads what was measured: a not-reached record always gates, and
   // counting it would hide how many findings the measured part really holds.
-  const g = gate(exhausted ? evidence.records.filter((r) => !isNotReached(r)) : evidence.records, baseline, { severityFloor: values.severity });
+  const g = gate(exhausted ? measured.filter((r) => !isNotReached(r)) : measured, baseline, { severityFloor: values.severity });
   const policy = evidence.originPolicy;
-  const weak = evidence.assertionPolicy;
+  // The exit and the printed line judge what this run measured; the document keeps the whole file's answer.
+  const weak = assertion?.run;
   const incomplete = exhausted ? partialExit({ newGating: g.new.length, policyFailed: weak?.state === 'failed' }) : undefined;
-  const exitCode = incomplete ? incomplete.exitCode : policy?.state === 'unavailable' ? 2 : policy?.state === 'failed' || weak?.state === 'failed' || g.new.length > 0 ? 1 : 0;
-  const scope = measuredScope({ requested, changed: changedScope, records: evidence.records });
+  const exitCode = incomplete ? incomplete.exitCode : policy?.state === 'unavailable' || weak?.state === 'unavailable' ? 2 : policy?.state === 'failed' || weak?.state === 'failed' || g.new.length > 0 ? 1 : 0;
+  const scope = measuredScope({ requested, changed: changedScope, records: measured });
   const statusPaths = {
     claims: values.claims ? resolve(values.claims) : defaultClaimsPath(projectDir),
     evidence: outPath, provisional: provisionalEvidencePath(projectDir),
@@ -344,7 +440,7 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
         baseline: values.baseline ? resolve(values.baseline) : baselinePath(projectDir),
       },
     }), io.err);
-    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: evidence.records.length, newSinceBaseline: g.new.length, exitCode, ...(evidence.run.reuse ? { reuse: evidence.run.reuse } : {}), ...(policy ? { originPolicy: policy } : {}), ...(weak ? { assertionPolicy: weak } : {}), ...(scope ? { scope: { ...scope, state: view.state, next: view.next } } : {}), ...(evidence.run.budget ? { budget: evidence.run.budget } : {}), ...(incomplete ? { failureKind: incomplete.failureKind, ...(incomplete.unprovenAtLeast !== undefined ? { unprovenAtLeast: incomplete.unprovenAtLeast } : {}) } : {}), claims: claimResults(evidence.records) }, ...(values.cost ? { cost: costReport(evidence.records, { run: evidence.run }) } : {}) };
+    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: measured.length, newSinceBaseline: g.new.length, exitCode, ...(probed.run.reuse ? { reuse: probed.run.reuse } : {}), ...(only ? { converged: converged ? { into: outPath, carriedFrom: converged.from, carried: converged.carried, stale: converged.stale } : { into: null, reason: convergeReason ?? 'not requested' } } : {}), ...(policy ? { originPolicy: policy } : {}), ...(weak ? { assertionPolicy: weak } : {}), ...(scope ? { scope: { ...scope, state: view.state, next: view.next } } : {}), ...(evidence.run.budget ? { budget: evidence.run.budget } : {}), ...(incomplete ? { failureKind: incomplete.failureKind, ...(incomplete.unprovenAtLeast !== undefined ? { unprovenAtLeast: incomplete.unprovenAtLeast } : {}) } : {}), claims: claimResults(measured) }, ...(values.cost ? { cost: costReport(measured, { run: probed.run }) } : {}) };
     const result = validate('status', doc);
     if (!result.ok) throw new Error(`probe JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
     io.out(JSON.stringify(doc, null, 2));
@@ -353,7 +449,7 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   if (!values.quiet && baseline) {
     io.out('');
     const tag = (r) => (isNotReached(r) ? '[not reached] ' : g.new.includes(r) ? '[NEW]      ' : g.baselined.includes(r) ? '[baseline] ' : '[below floor] ');
-    for (const r of sortForReport(evidence.records).filter((x) => x.verdict !== 'killed')) io.out('  ' + tag(r) + renderRecord(r, { provisional }));
+    for (const r of sortForReport(measured).filter((x) => x.verdict !== 'killed')) io.out('  ' + tag(r) + renderRecord(r, { provisional }));
   }
   io.out('');
   if (scope && !values.quiet) {
@@ -362,10 +458,10 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     io.out('');
   }
   if (!values.quiet && !values.verbose) {
-    const killed = evidence.records.filter((r) => r.verdict === 'killed').length;
+    const killed = measured.filter((r) => r.verdict === 'killed').length;
     if (killed) io.out(`  ${killed} killed (not listed; --verbose to see them)`);
   }
-  io.out(renderSummary(evidence.records, evidence.run));
+  io.out(renderSummary(measured, probed.run));
   // Its own line: the summary ends with the origins line, which is not a sentence to append to.
   if (exhausted) {
     const b = evidence.run.budget;
@@ -375,9 +471,11 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   io.out(baseline ? `${g.new.length} new since baseline, ${g.baselined.length} baselined.` : 'No baseline.');
   if (policy) io.out(renderOriginPolicy(policy, { basis: 'current' }));
   if (weak) io.out(renderAssertionPolicy(weak));
+  if (assertion?.unjudged) io.out(`assertion policy: ${assertion.unjudged} record${assertion.unjudged === 1 ? '' : 's'} kept stale outside the selection ${assertion.unjudged === 1 ? 'was' : 'were'} not judged; the evidence file's policy is unavailable until ${assertion.unjudged === 1 ? 'it is' : 'they are'} probed`);
+  else if (assertion && assertion.document.state !== assertion.run.state) io.out(`assertion policy: the evidence file's policy is ${assertion.document.state}, because of records outside this selection that this run did not judge: ${assertion.document.exceptionOnlyKills.map((k) => `${k.claimId}/${k.faultId}`).slice(0, 5).join(', ')}`);
   if (values.cost) {
     io.out('');
-    io.out(renderCost(costReport(evidence.records, { run: evidence.run })));
+    io.out(renderCost(costReport(measured, { run: probed.run })));
     io.out('');
   }
   if (changedScope) for (const line of renderUnmatched(changedScope)) io.out(line);
@@ -387,7 +485,9 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     // Where this run left speed on the table (#270), with the command.
     for (const line of renderAdvice(probeAdvice({ projectDir, claims, evidence, scoped: Boolean(scope), version, cpus: deps.cpus ?? availableParallelism() }))) io.out(line);
   }
-  io.out(`evidence: ${outPath}${scope ? ` (partial: ${[scope.requestedClaims ? `${scope.requestedCount} claim${scope.requestedCount === 1 ? '' : 's'} requested` : null, scope.changed ? `${scope.selectedCount} selected by --changed ${scope.changed.ref}` : null, `${scope.probedCount} probed`].filter(Boolean).join(', ')}${scope.requestedClaims ? `: --claim ${scope.requestedClaims.join(',')}` : ''}; not the canonical evidence file)` : exhausted ? ' (incomplete: command budget exhausted; not the canonical evidence file)' : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);
+  const selectionText = scope ? [scope.requestedClaims ? `${scope.requestedCount} claim${scope.requestedCount === 1 ? '' : 's'} requested` : null, scope.changed ? `${scope.selectedCount} selected by --changed ${scope.changed.ref}` : null, `${scope.probedCount} probed`].filter(Boolean).join(', ') + (scope.requestedClaims ? `: --claim ${scope.requestedClaims.join(',')}` : '') : '';
+  if (converged) io.out(renderConverged({ outPath, measured: measured.length, selection: selectionText, converged }));
+  else io.out(`evidence: ${outPath}${scope ? ` (partial: ${selectionText}; not the canonical evidence file${convergeReason ? `, which was not updated because ${convergeReason}` : ''})` : exhausted ? ' (incomplete: command budget exhausted; not the canonical evidence file)' : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
   return exitCode;
 }

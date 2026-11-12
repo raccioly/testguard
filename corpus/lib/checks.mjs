@@ -31,8 +31,9 @@ export function loadKnownFailures(path = join(CORPUS, 'known-failures.json')) {
   for (const k of doc.entries ?? []) {
     if (!Number.isInteger(k.issue) || k.issue < 1) throw new Error(`known-failures.json: ${k.subject} ${k.fault} names no issue number`);
     const selection = k.check?.startsWith('selection:') && Array.isArray(k.observed?.selected);
+    const stale = k.check === 'nothing-left-stale' && Array.isArray(k.observed?.stale) && k.observed.stale.length > 0;
     const noEvidence = k.check === 'tool-wrote-evidence' && Number.isInteger(k.observed?.exit) && typeof k.observed?.kind === 'string' && typeof k.observed?.reasonIncludes === 'string';
-    if (k.check && !selection && !noEvidence) throw new Error(`known-failures.json: ${k.subject} ${k.check}: only a --changed selection, or a run where the tool wrote no evidence (observed exit, kind and reasonIncludes), can be a known check failure`);
+    if (k.check && !selection && !stale && !noEvidence) throw new Error(`known-failures.json: ${k.subject} ${k.check}: only a --changed selection, a converged record left stale, or a run where the tool wrote no evidence (observed exit, kind and reasonIncludes), can be a known check failure`);
     if (k.observed?.verdict === 'killed' && k.expected?.verdict !== 'killed') throw new Error(`known-failures.json: ${k.subject} ${k.fault} would excuse a false kill; a critical failure is never known`);
   }
   return doc.entries ?? [];

@@ -77,7 +77,7 @@ jobs:
           - name: mutants-modes
             args: --tool-mutants --mutant fault-not-restored --mutant typecheck-skipped --mutant fan-out-shares-one-tree
           - name: mutants-scope
-            args: --tool-mutants --mutant not-reached-fault-dropped --mutant changed-git-failure-is-empty
+            args: --tool-mutants --mutant not-reached-fault-dropped --mutant changed-git-failure-is-empty --mutant converge-never-converges --mutant converge-drops-carried-records
           - name: mutants-kinds
             args: --tool-mutants --mutant mixed-kill-kind-read-as-assertion --mutant discovery-writes-into-project --mutant defenders-load-error-read-as-flaky --mutant vitest-error-classes-ignored --mutant unittest-error-read-as-assertion
           - name: mutants-browser

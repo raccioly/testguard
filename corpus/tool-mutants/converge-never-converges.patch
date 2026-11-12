@@ -1,0 +1,9 @@
+diff --git a/src/commands/probe.mjs b/src/commands/probe.mjs
+index 90664e2..740051a 100644
+--- a/src/commands/probe.mjs
++++ b/src/commands/probe.mjs
+@@ -348,3 +348,3 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
+       evidence = mergeEvidence({ measured: probed, canonical: carryFrom, decisions: carryResult.decisions, claims, scope: { selectedClaims: [...new Set(measured.map((r) => r.claim.id))], ...(requested ? { requestedClaims: requested } : {}), ...(changedScope ? { changed: { ref: changedScope.ref, base: changedScope.base, head: changedScope.head, ...(changedScope.includeDirty ? { includeDirty: true } : {}) } } : {}) } });
+-      outPath = canonicalPath;
++      outPath = partialPath;
+       converged = { from: carryFrom.run.id, carried: evidence.records.filter((r) => r.carried === 'inputs-match').length, stale: staleCarried(evidence) };

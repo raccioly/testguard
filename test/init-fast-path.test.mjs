@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { initProject } from '../src/init/init.mjs';
-import { TEMPLATE_VERSION, managedBlock, parseManagedBlocks, prePushBlock, prePushScript, markSkill, skillState, scanInstalled, olderThan } from '../src/init/managed.mjs';
+import { HOOK_MIN_VERSION, TEMPLATE_VERSION, managedBlock, parseManagedBlocks, prePushBlock, prePushScript, markSkill, skillState, scanInstalled, olderThan } from '../src/init/managed.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const TEMPLATE = readFileSync(join(ROOT, 'src/init/templates/SKILL.md'), 'utf8');
@@ -19,32 +19,33 @@ const repo = () => {
 };
 const read = (dir, f) => readFileSync(join(dir, f), 'utf8');
 
-describe('the templates are fast and unpinned', () => {
+describe('the templates are fast and pinned', () => {
   it('the pre-push hook probes the change with automatic workers, never --serial, never a full probe', () => {
-    const hook = prePushScript();
+    const hook = prePushScript('.', { version: '0.23.0' });
     expect(hook).toMatch(/^#!\/bin\/sh\n/);
-    expect(hook).toMatch(/"\$@" probe --changed auto --quiet/);
-    expect(hook).not.toMatch(/--serial|--fault-workers|testguard-cli@\d/);
-    expect(hook).toContain('npx -y testguard-cli@latest');
+    expect(hook).toMatch(/"\$@" probe --changed auto --when-no-base skip --quiet/);
+    expect(hook).not.toMatch(/--serial|--fault-workers|@latest/);
+    expect(hook).not.toMatch(/\bnpx\b/);
+    expect(hook).toContain(`npm i -D --save-exact testguard-cli@${HOOK_MIN_VERSION}`);
     expect(parseManagedBlocks(hook)).toEqual([expect.objectContaining({ name: 'pre-push', template: TEMPLATE_VERSION, modified: false })]);
     // A nested project gets its own block, run from its own directory.
-    expect(prePushBlock('backend')).toMatch(/testguard managed: pre-push-backend template=/);
-    expect(prePushBlock('backend')).toContain('cd "$ROOT/backend"');
+    expect(prePushBlock('backend', { version: '0.23.0' })).toMatch(/testguard managed: pre-push-backend template=/);
+    expect(prePushBlock('backend', { version: '0.23.0' })).toContain('cd "$ROOT/backend"');
   });
 
   it('runs the project install first, and passes exactly the fast arguments', () => {
     const dir = repo();
     try {
       mkdirSync(join(dir, '.githooks'), { recursive: true });
-      writeFileSync(join(dir, '.githooks/pre-push'), prePushScript());
+      writeFileSync(join(dir, '.githooks/pre-push'), prePushScript('.', { version: '0.23.0' }));
       mkdirSync(join(dir, 'node_modules/.bin'), { recursive: true });
-      writeFileSync(join(dir, 'node_modules/.bin/testguard'), '#!/bin/sh\necho "args: $*"\nexit 0\n');
+      writeFileSync(join(dir, 'node_modules/.bin/testguard'), '#!/bin/sh\nif [ "$1" = --version ]; then echo 99.0.0; exit 0; fi\necho "args: $*"\nexit 0\n');
       chmodSync(join(dir, 'node_modules/.bin/testguard'), 0o755);
       const r = spawnSync('sh', ['.githooks/pre-push'], { cwd: dir, encoding: 'utf8' });
       expect(r.status).toBe(0);
-      expect(r.stdout.trim()).toBe('args: probe --changed auto --quiet');
+      expect(r.stdout.trim()).toBe("args: probe --changed auto --when-no-base skip --quiet");
       // A probe that fails blocks the push.
-      writeFileSync(join(dir, 'node_modules/.bin/testguard'), '#!/bin/sh\nexit 1\n');
+      writeFileSync(join(dir, 'node_modules/.bin/testguard'), '#!/bin/sh\nif [ "$1" = --version ]; then echo 99.0.0; exit 0; fi\nexit 1\n');
       expect(spawnSync('sh', ['.githooks/pre-push'], { cwd: dir }).status).toBe(1);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
@@ -64,15 +65,16 @@ describe('init writes the fast path', () => {
       ]));
       expect(statSync(join(dir, '.husky/pre-push')).mode & 0o111).not.toBe(0);
       // What was there stays, first; the block follows.
-      expect(read(dir, '.husky/pre-push')).toBe(`npm run lint\n${prePushBlock('.')}\n`);
+      expect(read(dir, '.husky/pre-push')).toBe(`npm run lint\n${prePushBlock('.', { version: '0.23.0' })}\n`);
       expect(existsSync(join(dir, '.githooks'))).toBe(false);
       const wf = read(dir, '.github/workflows/testguard.yml');
-      expect(wf).toContain('run: npx -y testguard-cli@latest probe --changed auto');
-      expect(wf).toMatch(/if: github\.event_name != 'pull_request'\n\s+run: npx -y testguard-cli@latest probe$/m);
+      expect(wf).toContain('else echo "TESTGUARD=npx -y testguard-cli@0.23.0" >> "$GITHUB_ENV"; fi');
+      expect(wf).toContain('run: $TESTGUARD probe --changed auto');
+      expect(wf).toMatch(/if: github\.event_name != 'pull_request'\n\s+run: \$TESTGUARD probe$/m);
       expect(wf).toContain("cron: '23 3 * * *'");
       expect(wf).toContain('run: npm ci');
       expect(wf).toContain('path: .testguard/evidence.json');
-      expect(wf).not.toMatch(/--serial|testguard-cli@\d/);
+      expect(wf).not.toMatch(/--serial|@latest|uses: [^#\n]*@v\d/);
       // A second init changes nothing.
       const again = initProject({ projectDir: dir, ci: 'github', toolVersion: '0.23.0' });
       expect(again.done).toEqual([]);
@@ -84,7 +86,9 @@ describe('init writes the fast path', () => {
     try {
       initProject({ projectDir: dir, ci: 'gitlab', toolVersion: '0.23.0' });
       const gl = read(dir, 'testguard.gitlab-ci.yml');
-      expect(gl).toContain('npx -y testguard-cli@latest probe --changed auto');
+      expect(gl).toContain('TESTGUARD="npx -y testguard-cli@0.23.0"');
+      expect(gl).toContain('$TESTGUARD probe --changed auto');
+      expect(gl).not.toContain('@latest');
       expect(gl).toContain('$CI_PIPELINE_SOURCE == "schedule"');
       expect(gl).toContain('- local: testguard.gitlab-ci.yml');
     } finally { rmSync(dir, { recursive: true, force: true }); }
@@ -94,7 +98,7 @@ describe('init writes the fast path', () => {
     const dir = repo();
     try {
       const r = initProject({ projectDir: dir, toolVersion: '0.23.0' });
-      expect(read(dir, '.githooks/pre-push')).toBe(prePushScript());
+      expect(read(dir, '.githooks/pre-push')).toBe(prePushScript('.', { version: '0.23.0' }));
       expect(statSync(join(dir, '.githooks/pre-push')).mode & 0o111).not.toBe(0);
       expect(r.notes.join('\n')).toMatch(/git config core\.hooksPath \.githooks/);
       expect(existsSync(join(dir, '.git/hooks/pre-push'))).toBe(false);
@@ -137,14 +141,14 @@ describe('init finds the slow and stale ways, and --upgrade fixes only its own',
       expect(initProject({ projectDir: dir, toolVersion: '0.23.0' }).outdated).toEqual([expect.stringMatching(/pre-push: the TestGuard block is template 1, unmodified — testguard init --upgrade rewrites it/)]);
       const up = initProject({ projectDir: dir, upgrade: true, toolVersion: '0.23.0' });
       expect(up.done).toEqual([expect.stringMatching(/pre-push.*\(upgraded to template \d+\)$/)]);
-      expect(readFileSync(hookPath, 'utf8')).toBe(prePushScript());
+      expect(readFileSync(hookPath, 'utf8')).toBe(prePushScript('.', { version: '0.23.0' }));
       // Edited by hand: the hash no longer matches, so --upgrade leaves it and says so.
-      writeFileSync(hookPath, prePushScript().replace('--quiet', '--quiet --serial').replace(`template=${TEMPLATE_VERSION}`, 'template=1'));
+      writeFileSync(hookPath, prePushScript('.', { version: '0.23.0' }).replace('--quiet', '--quiet --serial').replace(`template=${TEMPLATE_VERSION}`, 'template=1'));
       const edited = initProject({ projectDir: dir, upgrade: true, toolVersion: '0.23.0' });
       expect(edited.skipped).toEqual(expect.arrayContaining([expect.stringMatching(/pre-push: the TestGuard block was edited by hand \(use --force/)]));
       expect(readFileSync(hookPath, 'utf8')).toContain('--quiet --serial');
       initProject({ projectDir: dir, upgrade: true, force: true, toolVersion: '0.23.0' });
-      expect(readFileSync(hookPath, 'utf8')).toBe(prePushScript());
+      expect(readFileSync(hookPath, 'utf8')).toBe(prePushScript('.', { version: '0.23.0' }));
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 

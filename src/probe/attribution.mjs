@@ -142,8 +142,7 @@ export function sameDependencies(recorded, current) {
 }
 
 export function isReusable(prior, current) {
-  if (!prior || !prior.subject?.contentHash) return false;
-  if (current.claim && !sameClaimMetadata(prior.claim, current.claim)) return false;
+  if (!prior) return false;
   // A record that exists because the probe threw is a statement about the run,
   // not about the code. Reusing it would make one disturbed run permanent.
   if (prior.detail?.reason === 'probe-error') return false;
@@ -160,6 +159,20 @@ export function isReusable(prior, current) {
   // baseline today does not make yesterday's timeout today's answer.
   if (prior.verdict === 'timeout') return false;
   if (prior.verdict === 'flaky-defender') return false;
+  return inputsMatch(prior, current);
+}
+
+/**
+ * The input half of `isReusable`: the record was measured against exactly
+ * these inputs (target, defenders, universe, discovery, import closure, fault,
+ * claim metadata). Carrying a record forward without measuring it (#293) asks
+ * this and only this: the verdicts reuse refuses on environment grounds
+ * (timeout, flaky, probe-error, …) are pessimistic, and carrying a record
+ * never upgrades it.
+ */
+export function inputsMatch(prior, current) {
+  if (!prior || !prior.subject?.contentHash || !prior.inputs || !prior.defenders) return false;
+  if (current.claim && !sameClaimMetadata(prior.claim, current.claim)) return false;
   const origin = prior.defenders.selectionSource ?? (prior.defenders.requested.length ? 'claim' : 'discovery');
   if (current.selectionSource && origin !== current.selectionSource) return false;
   const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);

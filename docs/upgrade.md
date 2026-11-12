@@ -56,8 +56,8 @@ TestGuard itself never makes a network call. Pick one way to get new releases:
 
 | Way | Prefer it when | What to do |
 |---|---|---|
-| `npx -y testguard-cli@latest` in the pre-push hook and CI | you want the simplest setup | What `testguard init` writes by default: the project install first, then a `testguard` on `PATH`, then the latest release. Nothing to bump. |
-| A pinned devDependency, bumped by a bot | the project pins every dependency | `npm i -D testguard-cli`, then one of the rules below. The hook `init` writes runs the project install first. |
+| A pinned devDependency, bumped by a bot | the project has a `package.json` | What `testguard init` sets up: it adds `testguard-cli` at exactly its own version to `devDependencies` and writes a Dependabot rule (or a Renovate rule when the repository uses Renovate), so each release arrives as a pull request your CI gates. Run your install once so the lockfile records the pin. |
+| The exact version through npx | there is no `package.json` (a Python project) | What the pre-push hook and CI fall back to when nothing is installed: `npx -y testguard-cli@<the version that ran init>`. `testguard init --upgrade` raises it. A floating tag is never written, and `init` reports one it finds (`floating-version`), because it would run a release nobody reviewed. |
 | Homebrew | one machine runs many repositories | `brew tap raccioly/tap && brew install testguard`, then `brew upgrade testguard`. |
 
 Dependabot (`.github/dependabot.yml`), grouping TestGuard into its own pull
@@ -112,7 +112,7 @@ After any upgrade, run `testguard init --upgrade` once.
 
 | Channel | How to upgrade | Notes |
 |---|---|---|
-| npm devDependency | `npm i -D testguard-cli@latest`, or `@<version>` | Commit the lockfile. This is the copy the session-start hook runs. |
+| npm devDependency | `npm i -D --save-exact testguard-cli@<version>`, or merge the bot's pull request | Commit the lockfile. This is the copy the session-start hook, the pre-push hook and CI run. |
 | npx | `npx testguard-cli@<version> <command>` | Name the version to be sure which one npx runs. |
 | pip | `pip install -U testguard-cli` | This upgrades the wrapper only. The CLI it runs is the project's `node_modules/testguard-cli` when there is one, otherwise `npx -y testguard-cli@<version>` at the wrapper's own version, so upgrading the wrapper upgrades that CLI too; see [installation](installation.md#pip). |
 | Homebrew | `brew upgrade testguard` | |

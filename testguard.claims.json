@@ -178,7 +178,10 @@
           "file": "src/probe/runners/node/direct.mjs",
           "find": "const file = process.argv[1];",
           "replace": "const file = process.argv[2];",
-          "producedBy": { "producer": "agent", "by": "codex" }
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
         },
         {
           "id": "F4",
@@ -187,7 +190,10 @@
           "file": "src/probe/runners/node/direct.mjs",
           "find": "writeFileSync(reportFile, text, { mode: 0o600 });",
           "replace": "writeFileSync(process.env.TESTGUARD_NODE_REPORT, text, { mode: 0o600 });",
-          "producedBy": { "producer": "agent", "by": "codex" }
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
         },
         {
           "id": "F1",
@@ -235,8 +241,13 @@
         "ref": "test/runner-report-allocation.test.mjs"
       },
       "severity": "high",
-      "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/runner-report-allocation.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/runner-report-allocation.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -245,7 +256,10 @@
           "file": "src/probe/runners/discovery.mjs",
           "find": "    let bytes = Buffer.alloc(stat.size + 1);",
           "replace": "    let bytes = Buffer.alloc(maxBytes + 1);",
-          "producedBy": { "producer": "agent", "by": "codex" }
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
         },
         {
           "id": "F2",
@@ -254,7 +268,10 @@
           "file": "src/probe/runners/discovery.mjs",
           "find": "      if (length === bytes.length) {",
           "replace": "      if (false) {",
-          "producedBy": { "producer": "agent", "by": "codex" }
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
         }
       ]
     },
@@ -519,182 +536,362 @@
     {
       "id": "TG-PUBLIC-PROJECTIONS-PRESERVE-REFUSALS",
       "statement": "Public projections preserve recorded policy and origin caveats, while negative control keeps unexecuted subjects unproven.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
-      "severity": "critical", "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/origin-policy-projections.test.mjs", "test/origin-reporting.test.mjs", "test/negative-control.test.mjs"],
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/origin-policy-projections.test.mjs",
+        "test/origin-reporting.test.mjs",
+        "test/negative-control.test.mjs"
+      ],
       "faults": [
         {
-          "id": "F1", "description": "Drop recorded policy from the capped brief projection.",
-          "faultClass": "statement-deleted", "file": "src/brief/brief.mjs",
-          "find": "  if (evidence.originPolicy) doc.originPolicy = structuredClone(evidence.originPolicy);", "replace": "",
-          "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["test/origin-policy-projections.test.mjs"]
+          "id": "F1",
+          "description": "Drop recorded policy from the capped brief projection.",
+          "faultClass": "statement-deleted",
+          "file": "src/brief/brief.mjs",
+          "find": "  if (evidence.originPolicy) doc.originPolicy = structuredClone(evidence.originPolicy);",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/origin-policy-projections.test.mjs"
+          ]
         },
         {
-          "id": "F2", "description": "Advertise declared origins as authenticated independence.",
-          "faultClass": "other", "file": "src/render.mjs",
-          "find": "    ' — declared origins, not authenticated independence';",
-          "replace": "    ' — authenticated independent origins';",
-          "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["test/origin-reporting.test.mjs"]
+          "id": "F2",
+          "description": "Advertise declared origins as authenticated independence.",
+          "faultClass": "other",
+          "file": "src/render.mjs",
+          "find": "    ' \u2014 declared origins, not authenticated independence';",
+          "replace": "    ' \u2014 authenticated independent origins';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/origin-reporting.test.mjs"
+          ]
         },
         {
-          "id": "F3", "description": "Report an unexecuted subject as a genuine survivor.",
-          "faultClass": "condition-forced", "file": "src/probe/classify.mjs",
+          "id": "F3",
+          "description": "Report an unexecuted subject as a genuine survivor.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/classify.mjs",
           "find": "    if (subjectReached === false) return { verdict: 'unverifiable', reason: 'subject-not-executed' };",
           "replace": "    if (false) return { verdict: 'unverifiable', reason: 'subject-not-executed' };",
-          "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["test/classify.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/classify.test.mjs"
+          ]
         }
       ]
     },
     {
       "id": "TG-CLI-AUTHORING-REPORTS-FAILURE-HONESTLY",
       "statement": "The CLI reports failed draft publication as a refusal and read-only intent inspection as unverified, without success-shaped output.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
-      "severity": "critical", "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/draft-append-cli.test.mjs", "test/intent-input-cli.test.mjs"],
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/draft-append-cli.test.mjs",
+        "test/intent-input-cli.test.mjs"
+      ],
       "faults": [
         {
-          "id": "F1", "description": "Print successful draft output after a failed publication.",
-          "faultClass": "condition-forced", "file": "src/commands/scaffold.mjs",
-          "find": "      if (!report.ok) {", "replace": "      if (false) {",
-          "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["test/draft-append-cli.test.mjs"]
+          "id": "F1",
+          "description": "Print successful draft output after a failed publication.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/scaffold.mjs",
+          "find": "      if (!report.ok) {",
+          "replace": "      if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/draft-append-cli.test.mjs"
+          ]
         },
         {
-          "id": "F2", "description": "Promote read-only input inspection to completed verification in human output.",
-          "faultClass": "other", "file": "src/commands/scaffold.mjs",
+          "id": "F2",
+          "description": "Promote read-only input inspection to completed verification in human output.",
+          "faultClass": "other",
+          "file": "src/commands/scaffold.mjs",
           "find": "        io.out(`authoring input inspection (${input.kind}); verification not performed`);",
           "replace": "        io.out(`authoring input inspection (${input.kind}); verification completed`);",
-          "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["test/intent-input-cli.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/intent-input-cli.test.mjs"
+          ]
         }
       ]
     },
     {
       "id": "TG-CLI-POLICY-ADMISSION-PRECEDES-CLAIM-READS",
       "statement": "The CLI refuses incompatible origin policy usage before attempting to read claims, preserving a usage refusal instead of unrelated input failure.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
-      "severity": "critical", "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/origin-policy-cli.test.mjs"],
-      "faults": [{
-        "id": "F1", "description": "Skip early origin policy request admission before reading claims.",
-        "faultClass": "statement-deleted", "file": "src/cli.mjs",
-        "find": "  try { originPolicyRequest(values, command); assertionPolicyRequest(values, command); }",
-        "replace": "  try { /* skipped early policy admission */ assertionPolicyRequest(values, command); }",
-        "producedBy": { "producer": "agent", "by": "codex" },
-        "defendedBy": ["test/origin-policy-admission.test.mjs"]
-      }]
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/origin-policy-cli.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Skip early origin policy request admission before reading claims.",
+          "faultClass": "statement-deleted",
+          "file": "src/cli.mjs",
+          "find": "  try { originPolicyRequest(values, command); assertionPolicyRequest(values, command); }",
+          "replace": "  try { /* skipped early policy admission */ assertionPolicyRequest(values, command); }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/origin-policy-admission.test.mjs"
+          ]
+        }
+      ]
     },
     {
       "id": "TG-MCP-NEXT-COMMAND-RETAINS-STATUS-ACTION",
       "statement": "The read-only MCP next-command tool returns the same required action as status, rather than falsely declaring unprobed work complete.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
-      "severity": "high", "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/mcp.test.mjs"],
-      "faults": [{
-        "id": "F1", "description": "Advertise completion instead of the status-required next action.",
-        "faultClass": "other", "file": "src/mcp/tools.mjs",
-        "find": "return { state: doc.state, action: doc.next.action, command: doc.next.command,",
-        "replace": "return { state: doc.state, action: 'done', command: doc.next.command,",
-        "producedBy": { "producer": "agent", "by": "codex" },
-        "defendedBy": ["test/mcp-next.test.mjs"]
-      }]
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/mcp.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Advertise completion instead of the status-required next action.",
+          "faultClass": "other",
+          "file": "src/mcp/tools.mjs",
+          "find": "return { state: doc.state, action: doc.next.action, command: doc.next.command,",
+          "replace": "return { state: doc.state, action: 'done', command: doc.next.command,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/mcp-next.test.mjs"
+          ]
+        }
+      ]
     },
     {
       "id": "TG-ACCEPTANCE-HELPERS-PRESERVE-OBSERVABLE-ORACLES",
       "statement": "Acceptance helpers retain a value-specific assertion, nested project layout and actual formula digest observation rather than substituting weaker observations.",
-      "source": { "kind": "manual", "ref": "Test fixture helper contracts" },
+      "source": {
+        "kind": "manual",
+        "ref": "Test fixture helper contracts"
+      },
       "severity": "high",
-      "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/probe-isolation.test.mjs", "test/gate-coverage.test.mjs", "test/release-sync.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/probe-isolation.test.mjs",
+        "test/gate-coverage.test.mjs",
+        "test/release-sync.test.mjs"
+      ],
       "faults": [
         {
-          "id": "F1", "description": "Replace the fixture's concrete value assertion with a type-only assertion.",
-          "faultClass": "other", "file": "test/helpers/probe-assertions.mjs",
+          "id": "F1",
+          "description": "Replace the fixture's concrete value assertion with a type-only assertion.",
+          "faultClass": "other",
+          "file": "test/helpers/probe-assertions.mjs",
           "find": " : 'assert.equal(a(),1);' : 'assert.equal(b(),2);';",
           "replace": " : \"assert.equal(typeof a(),'number');\" : 'assert.equal(b(),2);';",
-          "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["test/probe-isolation.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/probe-isolation.test.mjs"
+          ]
         },
         {
-          "id": "F2", "description": "Move the fixture's nested project outside its declared pkg namespace.",
-          "faultClass": "other", "file": "test/helpers/gate-project.mjs",
+          "id": "F2",
+          "description": "Move the fixture's nested project outside its declared pkg namespace.",
+          "faultClass": "other",
+          "file": "test/helpers/gate-project.mjs",
           "find": "  const project = nested ? join(root, 'pkg') : root;",
           "replace": "  const project = nested ? join(root, 'other') : root;",
-          "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["test/gate-coverage.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/gate-coverage.test.mjs"
+          ]
         },
         {
-          "id": "F3", "description": "Observe a fabricated formula digest instead of reading the written release surface.",
-          "faultClass": "other", "file": "test/helpers/release-project.mjs",
+          "id": "F3",
+          "description": "Observe a fabricated formula digest instead of reading the written release surface.",
+          "faultClass": "other",
+          "file": "test/helpers/release-project.mjs",
           "find": "const formulaSha = (dir) => /^\\s*sha256 \"([^\"]*)\"/m.exec(readFileSync(join(dir, 'packaging/homebrew/testguard.rb'), 'utf8'))[1];",
           "replace": "const formulaSha = (dir) => '0'.repeat(64);",
-          "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["test/release-sync.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/release-sync.test.mjs"
+          ]
         }
       ]
     },
     {
       "id": "TG-SCAFFOLD-ADMISSION-IS-BOUNDED-AND-UNFINISHED",
       "statement": "Scaffold refuses excess proposals instead of truncating a draft, and reserves annotated and supplied identifiers before assigning unfinished placeholders.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
       "severity": "high",
-      "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/scaffold-admitted-source.test.mjs", "test/scaffold-placeholder.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/scaffold-admitted-source.test.mjs",
+        "test/scaffold-placeholder.test.mjs"
+      ],
       "faults": [
         {
-          "id": "F1", "description": "Silently truncate an excess proposal draft rather than refusing it.",
-          "faultClass": "other", "file": "src/scaffold/scaffold.mjs",
+          "id": "F1",
+          "description": "Silently truncate an excess proposal draft rather than refusing it.",
+          "faultClass": "other",
+          "file": "src/scaffold/scaffold.mjs",
           "find": "    if (maxProposals !== undefined && accepted >= maxProposals) throw new Error('scaffold proposal limit exceeded');",
           "replace": "    if (maxProposals !== undefined && accepted >= maxProposals) return false;",
-          "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["test/scaffold-admitted-source.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/scaffold-admitted-source.test.mjs"
+          ]
         },
         {
-          "id": "F2", "description": "Allocate a placeholder already owned by an annotation or supplied intent.",
-          "faultClass": "other", "file": "src/scaffold/scaffold.mjs",
+          "id": "F2",
+          "description": "Allocate a placeholder already owned by an annotation or supplied intent.",
+          "faultClass": "other",
+          "file": "src/scaffold/scaffold.mjs",
           "find": "      do { id = `TODO-CLAIM-${placeholder++}`; } while (reservedIds.has(id) || usedIds.has(id));",
           "replace": "      do { id = `TODO-CLAIM-${placeholder++}`; } while (usedIds.has(id));",
-          "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["test/scaffold-placeholder.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/scaffold-placeholder.test.mjs"
+          ]
         }
       ]
     },
     {
       "id": "TG-ANNOTATION-PLANS-REFUSE-INVALID-ANCHORS-AND-MUTATION",
       "statement": "Annotation authoring refuses an invalid target anchor and deeply freezes its prepared independent plan before application.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring"
+      },
       "severity": "critical",
-      "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/annotation-placement.test.mjs", "test/annotation-apply.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/annotation-placement.test.mjs",
+        "test/annotation-apply.test.mjs"
+      ],
       "faults": [
         {
-          "id": "F1", "description": "Place annotations despite an invalid target anchor.",
-          "faultClass": "condition-forced", "file": "src/claims/annotation-placement.mjs",
+          "id": "F1",
+          "description": "Place annotations despite an invalid target anchor.",
+          "faultClass": "condition-forced",
+          "file": "src/claims/annotation-placement.mjs",
           "find": "    if (invalid) { refuse(invalid.status); continue; }",
           "replace": "    if (false) { refuse(invalid.status); continue; }",
-          "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["test/annotation-placement.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/annotation-placement.test.mjs"
+          ]
         },
         {
-          "id": "F2", "description": "Expose mutable nested prepared plan containers.",
-          "faultClass": "statement-deleted", "file": "src/claims/annotation-placement.mjs",
+          "id": "F2",
+          "description": "Expose mutable nested prepared plan containers.",
+          "faultClass": "statement-deleted",
+          "file": "src/claims/annotation-placement.mjs",
           "find": "    for (const child of Object.values(value)) freezePrepared(child);",
           "replace": "",
-          "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["test/annotation-apply.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "test/annotation-apply.test.mjs"
+          ]
         }
       ]
     },
     {
       "id": "TG-ORIGIN-PROJECTIONS-ARE-SEMANTICALLY-BOUND",
       "statement": "Conforming origin summaries reproduce recorded declarations exactly, and policy projections cannot certify a provisional invocation.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
       "severity": "critical",
-      "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["spec/conformance/origin-summaries.test.mjs", "spec/conformance/origin-policy.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "spec/conformance/origin-summaries.test.mjs",
+        "spec/conformance/origin-policy.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -703,8 +900,13 @@
           "file": "spec/lib/validate.mjs",
           "find": "    if (kind === 'evidence' && !isDeepStrictEqual(o, recordedOriginSummary(doc.records))) fail('recorded origins must reproduce every actual record and distinct claim declaration');",
           "replace": "    if (false) fail('recorded origins must reproduce every actual record and distinct claim declaration');",
-          "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["spec/conformance/origin-summaries.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "spec/conformance/origin-summaries.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -713,18 +915,31 @@
           "file": "spec/lib/validate.mjs",
           "find": "    if (p && (doc.run.scope || doc.run.provisional || doc.run.budget)) errors.push({ path: '/run/originPolicy', message: 'origin policy cannot certify a partial, provisional or budget-limited invocation' });",
           "replace": "    if (false) errors.push({ path: '/run/originPolicy', message: 'origin policy cannot certify a partial, provisional or budget-limited invocation' });",
-          "producedBy": { "producer": "agent", "by": "codex" },
-          "defendedBy": ["spec/conformance/origin-policy.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          },
+          "defendedBy": [
+            "spec/conformance/origin-policy.test.mjs"
+          ]
         }
       ]
     },
     {
       "id": "TG-APPEND-CONTRACT-RETAINS-SUPPLIED-STATEMENT",
       "statement": "Appending generated fault proposals retains the supplied claim statement rather than replacing intent with producer text.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
       "severity": "critical",
-      "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["spec/conformance/draft-append.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "spec/conformance/draft-append.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -733,7 +948,10 @@
           "file": "src/scaffold/append.mjs",
           "find": "  const candidates = proposals.claims.flatMap((claim) => claim.faults);",
           "replace": "  target.statement = 'Generated proposal replaces supplied intent';\n  const candidates = proposals.claims.flatMap((claim) => claim.faults);",
-          "producedBy": { "producer": "agent", "by": "codex" }
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
         }
       ]
     },
@@ -1284,7 +1502,9 @@
             "producer": "agent",
             "by": "codex"
           },
-          "defendedBy": ["test/native-universe-hash.test.mjs"]
+          "defendedBy": [
+            "test/native-universe-hash.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -1297,7 +1517,9 @@
             "producer": "agent",
             "by": "codex"
           },
-          "defendedBy": ["test/native-universe-hash.test.mjs"]
+          "defendedBy": [
+            "test/native-universe-hash.test.mjs"
+          ]
         }
       ]
     },
@@ -1594,206 +1816,810 @@
     {
       "id": "TG-ORIGIN-SUMMARY-NEVER-PROMOTES-DECLARATIONS",
       "statement": "Origin summaries count distinct claim identities separately from actual records, refuse duplicate current declarations and retain conflicting recorded declarations as mixed rather than selecting an apparently consistent source.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
-      "severity": "high", "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/origin-summary.test.mjs"],
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/origin-summary.test.mjs"
+      ],
       "faults": [
-        { "id": "F1", "description": "Accept duplicate current claim identities as a consistent declaration.", "faultClass": "condition-forced", "file": "spec/lib/origins.mjs", "find": "    if (seen.has(claim.id)) throw new TypeError('duplicate declared claim identity');", "replace": "    if (false) throw new TypeError('duplicate declared claim identity');", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F2", "description": "Hide disagreement between recorded source declarations.", "faultClass": "condition-forced", "file": "spec/lib/origins.mjs", "find": "    else if (!isDeepStrictEqual(previous.source, source)) previous.mixed = true;", "replace": "    else if (false) previous.mixed = true;", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F3", "description": "Count one mixed claim both as mixed and as its first declared kind.", "faultClass": "condition-forced", "file": "spec/lib/origins.mjs", "find": "    else byKind[claim.source.kind]++;", "replace": "    byKind[claim.source.kind]++;", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F4", "description": "Replace actual record multiplicity with the distinct claim count.", "faultClass": "other", "file": "spec/lib/origins.mjs", "find": "    records: { total: records.length, byKind: recordKinds },", "replace": "    records: { total: claims.size, byKind: recordKinds },", "producedBy": { "producer": "agent", "by": "codex" } }
+        {
+          "id": "F1",
+          "description": "Accept duplicate current claim identities as a consistent declaration.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/origins.mjs",
+          "find": "    if (seen.has(claim.id)) throw new TypeError('duplicate declared claim identity');",
+          "replace": "    if (false) throw new TypeError('duplicate declared claim identity');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Hide disagreement between recorded source declarations.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/origins.mjs",
+          "find": "    else if (!isDeepStrictEqual(previous.source, source)) previous.mixed = true;",
+          "replace": "    else if (false) previous.mixed = true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Count one mixed claim both as mixed and as its first declared kind.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/origins.mjs",
+          "find": "    else byKind[claim.source.kind]++;",
+          "replace": "    byKind[claim.source.kind]++;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Replace actual record multiplicity with the distinct claim count.",
+          "faultClass": "other",
+          "file": "spec/lib/origins.mjs",
+          "find": "    records: { total: records.length, byKind: recordKinds },",
+          "replace": "    records: { total: claims.size, byKind: recordKinds },",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
       ]
     },
     {
       "id": "TG-ANNOTATION-PLACEMENT-IS-TARGET-LOCAL",
       "statement": "Explicit file-header placement uses each actual fault target, not global lexical links or annotation-like strings, preserves unrelated files and becomes idempotent after application.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
-      "severity": "high", "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/annotation-cli.test.mjs"],
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/annotation-cli.test.mjs"
+      ],
       "faults": [
-        { "id": "F1", "description": "Treat selected IDs as already placed without checking their target headers.", "faultClass": "other", "file": "src/claims/annotation-placement.mjs", "find": "    const missing = ids.filter((id) => !hasAnnotation(input.source, id, python));", "replace": "    const missing = [];", "producedBy": { "producer": "agent", "by": "codex" } }
+        {
+          "id": "F1",
+          "description": "Treat selected IDs as already placed without checking their target headers.",
+          "faultClass": "other",
+          "file": "src/claims/annotation-placement.mjs",
+          "find": "    const missing = ids.filter((id) => !hasAnnotation(input.source, id, python));",
+          "replace": "    const missing = [];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
       ]
     },
     {
       "id": "TG-ANNOTATION-ADVICE-RESOURCE-LIMITS",
       "statement": "Status annotation advice refuses incomplete scans at declared byte, file, directory-entry and depth ceilings, including stale-size growth, without asserting missing links.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
-      "severity": "high", "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/annotation-advisory-limits.test.mjs"],
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/annotation-advisory-limits.test.mjs"
+      ],
       "faults": [
-        { "id": "F1", "description": "Ignore cumulative descriptor byte consumption.", "faultClass": "other", "file": "src/claims/annotations.mjs", "find": "            const limit = Math.min(256 * 1024, 2 * 1024 * 1024 - bytes);", "replace": "            const limit = 256 * 1024;", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F2", "description": "Disable source-file count admission.", "faultClass": "condition-forced", "file": "src/claims/annotations.mjs", "find": "          if (++files > 1000) throw new Error('scan incomplete');", "replace": "          if (false) throw new Error('scan incomplete');", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F3", "description": "Disable streamed directory-entry admission.", "faultClass": "condition-forced", "file": "src/claims/annotations.mjs", "find": "        if (++entries > 10000) throw new Error('scan incomplete');", "replace": "        if (false) throw new Error('scan incomplete');", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F4", "description": "Disable directory-depth admission.", "faultClass": "condition-forced", "file": "src/claims/annotations.mjs", "find": "    if (depth > 64) throw new Error('scan incomplete');", "replace": "    if (false) throw new Error('scan incomplete');", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F5", "description": "Accept descriptor growth beyond the read ceiling despite stale stat size.", "faultClass": "condition-forced", "file": "src/claims/annotations.mjs", "find": "              if (read > limit) throw new Error('scan incomplete');", "replace": "              if (false) throw new Error('scan incomplete');", "producedBy": { "producer": "agent", "by": "codex" } }
+        {
+          "id": "F1",
+          "description": "Ignore cumulative descriptor byte consumption.",
+          "faultClass": "other",
+          "file": "src/claims/annotations.mjs",
+          "find": "            const limit = Math.min(256 * 1024, 2 * 1024 * 1024 - bytes);",
+          "replace": "            const limit = 256 * 1024;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Disable source-file count admission.",
+          "faultClass": "condition-forced",
+          "file": "src/claims/annotations.mjs",
+          "find": "          if (++files > 1000) throw new Error('scan incomplete');",
+          "replace": "          if (false) throw new Error('scan incomplete');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Disable streamed directory-entry admission.",
+          "faultClass": "condition-forced",
+          "file": "src/claims/annotations.mjs",
+          "find": "        if (++entries > 10000) throw new Error('scan incomplete');",
+          "replace": "        if (false) throw new Error('scan incomplete');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Disable directory-depth admission.",
+          "faultClass": "condition-forced",
+          "file": "src/claims/annotations.mjs",
+          "find": "    if (depth > 64) throw new Error('scan incomplete');",
+          "replace": "    if (false) throw new Error('scan incomplete');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "Accept descriptor growth beyond the read ceiling despite stale stat size.",
+          "faultClass": "condition-forced",
+          "file": "src/claims/annotations.mjs",
+          "find": "              if (read > limit) throw new Error('scan incomplete');",
+          "replace": "              if (false) throw new Error('scan incomplete');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
       ]
     },
     {
       "id": "TG-ANNOTATION-ID-MATCHING-IS-BOUNDED",
       "statement": "Lexical scanning and placement ID admission promptly reject long alphanumeric tokens without a required hyphen rather than exponentially backtracking.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
-      "severity": "high", "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/annotation-id-bounds.test.mjs"],
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/annotation-id-bounds.test.mjs"
+      ],
       "faults": [
-        { "id": "F1", "description": "Restore overlapping nested prefix quantifiers in scanning.", "faultClass": "other", "file": "src/claims/annotations.mjs", "find": "const RE = /@claim\\s+([A-Za-z0-9]+(?:[._][A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9])\\b/g;", "replace": "const RE = /@claim\\s+([A-Za-z0-9]+(?:[._]?[A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9])\\b/g;", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F2", "description": "Restore overlapping nested prefix quantifiers in placement admission.", "faultClass": "other", "file": "src/claims/annotation-placement.mjs", "find": "const CLAIM_ID = /^[A-Za-z0-9]+(?:[._][A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9]$/;", "replace": "const CLAIM_ID = /^[A-Za-z0-9]+(?:[._]?[A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9]$/;", "producedBy": { "producer": "agent", "by": "codex" } }
+        {
+          "id": "F1",
+          "description": "Restore overlapping nested prefix quantifiers in scanning.",
+          "faultClass": "other",
+          "file": "src/claims/annotations.mjs",
+          "find": "const RE = /@claim\\s+([A-Za-z0-9]+(?:[._][A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9])\\b/g;",
+          "replace": "const RE = /@claim\\s+([A-Za-z0-9]+(?:[._]?[A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9])\\b/g;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Restore overlapping nested prefix quantifiers in placement admission.",
+          "faultClass": "other",
+          "file": "src/claims/annotation-placement.mjs",
+          "find": "const CLAIM_ID = /^[A-Za-z0-9]+(?:[._][A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9]$/;",
+          "replace": "const CLAIM_ID = /^[A-Za-z0-9]+(?:[._]?[A-Za-z0-9]+)*-[A-Za-z0-9._-]*[A-Za-z0-9]$/;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
       ]
     },
     {
       "id": "TG-ANNOTATION-ADVICE-IS-INFORMATIONAL",
       "statement": "Missing lexical source links are reported as advisory guidance without replacing verification state or the existing annotation-sourced drift error.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
-      "severity": "high", "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/annotation-advisory.test.mjs"],
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/annotation-advisory.test.mjs"
+      ],
       "faults": [
-        { "id": "F1", "description": "Hide missing declared lexical source links.", "faultClass": "other", "file": "src/claims/annotations.mjs", "find": "  const missingIds = [...new Set(claims.claims.map((c) => c.id))].filter((id) => !linked.has(id)).sort();", "replace": "  const missingIds = [];", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F2", "description": "Omit missing-link advice from status while leaving its verification state unchanged.", "faultClass": "condition-forced", "file": "src/status/status.mjs", "find": "  if (claims.claims.length) doc.notes.push(...projectAnnotationAdvisory(projectDir, claims, { customClaims: paths.claims !== defaultClaimsPath(projectDir) }).notes);", "replace": "  if (false) doc.notes.push(...projectAnnotationAdvisory(projectDir, claims, { customClaims: paths.claims !== defaultClaimsPath(projectDir) }).notes);", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F3", "description": "Discard ordinary claims advisory information.", "faultClass": "other", "file": "src/commands/claims.mjs", "find": "  const advisory = annotationAdvisory(claims, annotations, { customClaims: Boolean(values.claims) });", "replace": "  const advisory = { missingIds: [], notes: [] };", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F4", "description": "Use the unbounded legacy scan for status advice.", "faultClass": "other", "file": "src/claims/annotations.mjs", "find": "  try { visit(projectDir, '', 0); return annotationAdvisory(claims, annotations, options); }", "replace": "  try { return annotationAdvisory(claims, scanAnnotations(projectDir), options); }", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F5", "description": "Let advisory read failures prevent status reporting.", "faultClass": "other", "file": "src/claims/annotations.mjs", "find": "  catch {\n    return { missingIds: [], notes: ['ANNOTATION ADVISORY unavailable:", "replace": "  catch (error) { throw error;\n    return { missingIds: [], notes: ['ANNOTATION ADVISORY unavailable:", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F6", "description": "Lose the custom claims selection in preview guidance.", "faultClass": "other", "file": "src/claims/annotations.mjs", "find": "      ...(customClaims ? ['Preserve the original --claims argument when running that preview; the default claims file is not this selection.'] : []),", "replace": "      ...(false ? ['Preserve the original --claims argument when running that preview; the default claims file is not this selection.'] : []),", "producedBy": { "producer": "agent", "by": "codex" } }
+        {
+          "id": "F1",
+          "description": "Hide missing declared lexical source links.",
+          "faultClass": "other",
+          "file": "src/claims/annotations.mjs",
+          "find": "  const missingIds = [...new Set(claims.claims.map((c) => c.id))].filter((id) => !linked.has(id)).sort();",
+          "replace": "  const missingIds = [];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Omit missing-link advice from status while leaving its verification state unchanged.",
+          "faultClass": "condition-forced",
+          "file": "src/status/status.mjs",
+          "find": "  if (claims.claims.length) doc.notes.push(...projectAnnotationAdvisory(projectDir, claims, { customClaims: paths.claims !== defaultClaimsPath(projectDir) }).notes);",
+          "replace": "  if (false) doc.notes.push(...projectAnnotationAdvisory(projectDir, claims, { customClaims: paths.claims !== defaultClaimsPath(projectDir) }).notes);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Discard ordinary claims advisory information.",
+          "faultClass": "other",
+          "file": "src/commands/claims.mjs",
+          "find": "  const advisory = annotationAdvisory(claims, annotations, { customClaims: Boolean(values.claims) });",
+          "replace": "  const advisory = { missingIds: [], notes: [] };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Use the unbounded legacy scan for status advice.",
+          "faultClass": "other",
+          "file": "src/claims/annotations.mjs",
+          "find": "  try { visit(projectDir, '', 0); return annotationAdvisory(claims, annotations, options); }",
+          "replace": "  try { return annotationAdvisory(claims, scanAnnotations(projectDir), options); }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "Let advisory read failures prevent status reporting.",
+          "faultClass": "other",
+          "file": "src/claims/annotations.mjs",
+          "find": "  catch {\n    return { missingIds: [], notes: ['ANNOTATION ADVISORY unavailable:",
+          "replace": "  catch (error) { throw error;\n    return { missingIds: [], notes: ['ANNOTATION ADVISORY unavailable:",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "Lose the custom claims selection in preview guidance.",
+          "faultClass": "other",
+          "file": "src/claims/annotations.mjs",
+          "find": "      ...(customClaims ? ['Preserve the original --claims argument when running that preview; the default claims file is not this selection.'] : []),",
+          "replace": "      ...(false ? ['Preserve the original --claims argument when running that preview; the default claims file is not this selection.'] : []),",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
       ]
     },
     {
       "id": "TG-ANNOTATION-CLI-IS-EXPLICIT",
       "statement": "Annotation authoring defaults to read-only preview, rejects unsafe invocation and selections, and never returns success for a refused apply.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
-      "severity": "critical", "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/annotation-cli.test.mjs"],
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/annotation-cli.test.mjs"
+      ],
       "faults": [
-        { "id": "F1", "description": "Perform apply even for a read-only preview.", "faultClass": "condition-forced", "file": "src/commands/annotations.mjs", "find": "  if (values.apply) {", "replace": "  if (true) {", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F2", "description": "Accept authoring without annotate or with unsafe combined switches.", "faultClass": "condition-forced", "file": "src/commands/annotations.mjs", "find": "  if (!values.annotate || suppliedOptions.some((key) => !allowed.has(key))) {", "replace": "  if (false) {", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F3", "description": "Accept empty or unknown selected claim IDs.", "faultClass": "condition-forced", "file": "src/commands/annotations.mjs", "find": "  if (claimIds.some((id) => !id || !claims.claims.some((claim) => claim.id === id))) {", "replace": "  if (false) {", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F4", "description": "Return success for a refused apply.", "faultClass": "other", "file": "src/commands/annotations.mjs", "find": "  return doc.state === 'preview' || doc.state === 'applied' ? 0 : 2;", "replace": "  return 0;", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F5", "description": "Expose authoring flags on a different command.", "faultClass": "condition-forced", "file": "src/cli.mjs", "find": "  if ((values.annotate || values.apply) && command !== 'claims') {", "replace": "  if (false) {", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F6", "description": "Leak raw filesystem failure paths through the public authoring result.", "faultClass": "other", "file": "src/commands/annotations.mjs", "find": "          failed: report.failed.map(publicFailure), recoveryDir: report.recoveryDir,", "replace": "          failed: report.failed, recoveryDir: report.recoveryDir,", "producedBy": { "producer": "agent", "by": "codex" } }
+        {
+          "id": "F1",
+          "description": "Perform apply even for a read-only preview.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/annotations.mjs",
+          "find": "  if (values.apply) {",
+          "replace": "  if (true) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Accept authoring without annotate or with unsafe combined switches.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/annotations.mjs",
+          "find": "  if (!values.annotate || suppliedOptions.some((key) => !allowed.has(key))) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Accept empty or unknown selected claim IDs.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/annotations.mjs",
+          "find": "  if (claimIds.some((id) => !id || !claims.claims.some((claim) => claim.id === id))) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Return success for a refused apply.",
+          "faultClass": "other",
+          "file": "src/commands/annotations.mjs",
+          "find": "  return doc.state === 'preview' || doc.state === 'applied' ? 0 : 2;",
+          "replace": "  return 0;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "Expose authoring flags on a different command.",
+          "faultClass": "condition-forced",
+          "file": "src/cli.mjs",
+          "find": "  if ((values.annotate || values.apply) && command !== 'claims') {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "Leak raw filesystem failure paths through the public authoring result.",
+          "faultClass": "other",
+          "file": "src/commands/annotations.mjs",
+          "find": "          failed: report.failed.map(publicFailure), recoveryDir: report.recoveryDir,",
+          "replace": "          failed: report.failed, recoveryDir: report.recoveryDir,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
       ]
     },
     {
       "id": "TG-ANNOTATION-RESULT-IS-NON-OPTIMISTIC",
       "statement": "Annotation authoring validation rejects applied results without complete verified targets, recovery and owned-lock release.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring" },
-      "severity": "critical", "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["spec/conformance/annotations.test.mjs"],
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#explicit-annotation-authoring"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "spec/conformance/annotations.test.mjs"
+      ],
       "faults": [
-        { "id": "F1", "description": "Accept an applied result despite missing verified targets, failures or failed release.", "faultClass": "condition-forced", "file": "spec/lib/validate.mjs", "find": "      if (doc.refused.length || o.failed.length || !same(o.changed, adds) || !same(o.touched, adds) || !o.recoveryDir || o.lockRelease?.released !== true) fail('/state', 'applied requires every admitted target verified, no refusals/failures, recovery and released owned lock');", "replace": "      if (false) fail('/state', 'applied requires every admitted target verified, no refusals/failures, recovery and released owned lock');", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F2", "description": "Accept writes despite an admission refusal.", "faultClass": "condition-forced", "file": "spec/lib/validate.mjs", "find": "    if (doc.refused.length && doc.state !== 'refused') fail('/state', 'any admission refusal blocks all writes');", "replace": "    if (false) fail('/state', 'any admission refusal blocks all writes');", "producedBy": { "producer": "agent", "by": "codex" } }
+        {
+          "id": "F1",
+          "description": "Accept an applied result despite missing verified targets, failures or failed release.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (doc.refused.length || o.failed.length || !same(o.changed, adds) || !same(o.touched, adds) || !o.recoveryDir || o.lockRelease?.released !== true) fail('/state', 'applied requires every admitted target verified, no refusals/failures, recovery and released owned lock');",
+          "replace": "      if (false) fail('/state', 'applied requires every admitted target verified, no refusals/failures, recovery and released owned lock');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Accept writes despite an admission refusal.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "    if (doc.refused.length && doc.state !== 'refused') fail('/state', 'any admission refusal blocks all writes');",
+          "replace": "    if (false) fail('/state', 'any admission refusal blocks all writes');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
       ]
     },
     {
       "id": "TG-CLAIM-METADATA-BOUND",
       "statement": "Changed recorded claim intent, severity, source or producer metadata cannot reuse a prior verdict or appear current in status.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
       "severity": "critical",
-      "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/attribution.test.mjs", "test/status.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/attribution.test.mjs",
+        "test/status.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
           "description": "Ignore changed claim metadata when deciding whether a measured verdict may be reused.",
           "faultClass": "condition-forced",
           "file": "src/probe/attribution.mjs",
-          "defendedBy": ["test/attribution.test.mjs"],
+          "defendedBy": [
+            "test/attribution.test.mjs"
+          ],
           "find": "  if (current.claim && !sameClaimMetadata(prior.claim, current.claim)) return false;",
           "replace": "  if (false) return false;",
-          "producedBy": { "producer": "agent", "by": "codex" }
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
         },
         {
           "id": "F2",
           "description": "Suppress claim metadata staleness while keeping measured verdicts unchanged.",
           "faultClass": "condition-forced",
           "file": "src/status/status.mjs",
-          "defendedBy": ["test/status.test.mjs"],
+          "defendedBy": [
+            "test/status.test.mjs"
+          ],
           "find": "    if (!sameClaimMetadata(r.claim, cur.claim)) doc.stale.push(`claim metadata for ${key} changed since it was probed`);",
           "replace": "    if (false) doc.stale.push(`claim metadata for ${key} changed since it was probed`);",
-          "producedBy": { "producer": "agent", "by": "codex" }
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
         }
       ]
     },
     {
       "id": "TG-FAULT-DEFENDER-ORCHESTRATION",
       "statement": "Probing selects and measures each fault's defenders rather than silently running its claim's broader inherited set.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#fault-specific-defender-selection" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-specific-defender-selection"
+      },
       "severity": "critical",
-      "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/fault-defender-orchestration.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/fault-defender-orchestration.test.mjs"
+      ],
       "faults": [
-        { "id": "F1", "description": "The probe orchestrator substitutes claim-level declarations for the selected per-fault set.", "faultClass": "condition-forced", "file": "src/probe/probe.mjs", "find": "      const declared = requested.length ? resolveDefenders(iso.projectDir, requested) : null;", "replace": "      const declared = claim.defendedBy?.length ? resolveDefenders(iso.projectDir, claim.defendedBy) : null;", "producedBy": { "producer": "agent", "by": "codex" } }
+        {
+          "id": "F1",
+          "description": "The probe orchestrator substitutes claim-level declarations for the selected per-fault set.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "      const declared = requested.length ? resolveDefenders(iso.projectDir, requested) : null;",
+          "replace": "      const declared = claim.defendedBy?.length ? resolveDefenders(iso.projectDir, claim.defendedBy) : null;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
       ]
     },
     {
       "id": "TG-FAULT-DEFENDER-SELECTION",
       "statement": "Fault overrides take precedence, empty overrides request discovery, absence inherits the claim, and selection-origin changes cannot reuse a prior verdict.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#fault-specific-defender-selection" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#fault-specific-defender-selection"
+      },
       "severity": "critical",
-      "producedBy": { "producer": "agent", "by": "codex" },
-      "defendedBy": ["test/attribution.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "codex"
+      },
+      "defendedBy": [
+        "test/attribution.test.mjs"
+      ],
       "faults": [
-        { "id": "F1", "description": "Fault overrides are ignored in favor of claim declarations.", "faultClass": "condition-forced", "file": "src/probe/attribution.mjs", "find": "  if (Object.hasOwn(fault, 'defendedBy')) return { requested: [...fault.defendedBy], selectionSource: 'fault' };", "replace": "  if (false) return { requested: [...fault.defendedBy], selectionSource: 'fault' };", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F2", "description": "An empty fault override incorrectly inherits the claim defenders.", "faultClass": "condition-forced", "file": "src/probe/attribution.mjs", "find": "  if (Object.hasOwn(fault, 'defendedBy')) return { requested: [...fault.defendedBy], selectionSource: 'fault' };", "replace": "  if (fault.defendedBy?.length) return { requested: [...fault.defendedBy], selectionSource: 'fault' };", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F3", "description": "An absent override fails to inherit a non-empty claim declaration.", "faultClass": "condition-forced", "file": "src/probe/attribution.mjs", "find": "  if (claim.defendedBy?.length) return { requested: [...claim.defendedBy], selectionSource: 'claim' };", "replace": "  if (false) return { requested: [...claim.defendedBy], selectionSource: 'claim' };", "producedBy": { "producer": "agent", "by": "codex" } },
-        { "id": "F4", "description": "Identical file selections incorrectly reuse evidence from a different origin.", "faultClass": "condition-forced", "file": "src/probe/attribution.mjs", "find": "  if (current.selectionSource && origin !== current.selectionSource) return false;", "replace": "  if (false) return false;", "producedBy": { "producer": "agent", "by": "codex" } }
+        {
+          "id": "F1",
+          "description": "Fault overrides are ignored in favor of claim declarations.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/attribution.mjs",
+          "find": "  if (Object.hasOwn(fault, 'defendedBy')) return { requested: [...fault.defendedBy], selectionSource: 'fault' };",
+          "replace": "  if (false) return { requested: [...fault.defendedBy], selectionSource: 'fault' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An empty fault override incorrectly inherits the claim defenders.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/attribution.mjs",
+          "find": "  if (Object.hasOwn(fault, 'defendedBy')) return { requested: [...fault.defendedBy], selectionSource: 'fault' };",
+          "replace": "  if (fault.defendedBy?.length) return { requested: [...fault.defendedBy], selectionSource: 'fault' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An absent override fails to inherit a non-empty claim declaration.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/attribution.mjs",
+          "find": "  if (claim.defendedBy?.length) return { requested: [...claim.defendedBy], selectionSource: 'claim' };",
+          "replace": "  if (false) return { requested: [...claim.defendedBy], selectionSource: 'claim' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Identical file selections incorrectly reuse evidence from a different origin.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/attribution.mjs",
+          "find": "  if (current.selectionSource && origin !== current.selectionSource) return false;",
+          "replace": "  if (false) return false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "codex"
+          }
+        }
       ]
     },
     {
       "id": "TG-RUNNER-TIMEOUT-IDENTITY",
       "statement": "Runner timeout identity is distinct from assertion text quoting timeout messages; actual runner timeouts remain non-detections.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#verdicts" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
       "severity": "critical",
-      "producedBy": { "producer": "human", "by": "maintainer" },
-      "defendedBy": ["test/runner-vitest.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/runner-vitest.test.mjs"
+      ],
       "faults": [
-        { "id": "F1", "description": "Quoted timeout text is classified as an actual runner timeout.", "faultClass": "condition-forced", "file": "src/probe/runners/shared.mjs", "find": "  const timeouts = results.filter(isRunnerTimeout).length;", "replace": "  const timeouts = results.filter((t) => (t.failureMessages ?? []).some((m) => /timed out|exceeded timeout/i.test(m))).length;", "producedBy": { "producer": "human" }, "defendedBy": ["test/runner-report.test.mjs"] },
-        { "id": "F2", "description": "Actual runner timeouts are counted as assertion detections.", "faultClass": "condition-forced", "file": "src/probe/runners/shared.mjs", "find": "  const timeouts = results.filter(isRunnerTimeout).length;", "replace": "  const timeouts = 0;", "producedBy": { "producer": "human" }, "defendedBy": ["test/runner-report.test.mjs"] },
-        { "id": "F3", "description": "Structured assertion errors quoting native timeout headers lose their assertion identity.", "faultClass": "condition-forced", "file": "src/probe/runners/shared.mjs", "find": "    if (error?.name === 'AssertionError' || error?.code === 'ERR_ASSERTION' || error?.operator !== undefined) return false;", "replace": "    if (false) return false;", "producedBy": { "producer": "human" }, "defendedBy": ["test/runner-report.test.mjs"] }
+        {
+          "id": "F1",
+          "description": "Quoted timeout text is classified as an actual runner timeout.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "  const timeouts = results.filter(isRunnerTimeout).length;",
+          "replace": "  const timeouts = results.filter((t) => (t.failureMessages ?? []).some((m) => /timed out|exceeded timeout/i.test(m))).length;",
+          "producedBy": {
+            "producer": "human"
+          },
+          "defendedBy": [
+            "test/runner-report.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "Actual runner timeouts are counted as assertion detections.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "  const timeouts = results.filter(isRunnerTimeout).length;",
+          "replace": "  const timeouts = 0;",
+          "producedBy": {
+            "producer": "human"
+          },
+          "defendedBy": [
+            "test/runner-report.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "Structured assertion errors quoting native timeout headers lose their assertion identity.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "    if (error?.name === 'AssertionError' || error?.code === 'ERR_ASSERTION' || error?.operator !== undefined) return false;",
+          "replace": "    if (false) return false;",
+          "producedBy": {
+            "producer": "human"
+          },
+          "defendedBy": [
+            "test/runner-report.test.mjs"
+          ]
+        }
       ]
     },
     {
       "id": "TG-CONFIG-LITERALS-ARE-NOT-FILES",
       "statement": "Configuration strings describing routes and separators do not prevent discovery, while real external file dependencies remain refused.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#verdicts" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts"
+      },
       "severity": "critical",
-      "producedBy": { "producer": "human", "by": "maintainer" },
-      "defendedBy": ["test/runner-discovery.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/runner-discovery.test.mjs"
+      ],
       "faults": [
-        { "id": "F1", "description": "Every absolute-looking string is rejected before determining whether it names a file.", "faultClass": "condition-forced", "file": "src/probe/runners/discovery.mjs", "find": "  if (!stat.isFile()) return null;\n  if (!inside(root, real)) throw new DiscoveryError(`${label} resolves outside the project: ", "replace": "  if (!inside(root, real)) throw new DiscoveryError('absolute literal rejected');\n  if (!stat.isFile()) return null;\n  if (!inside(root, real)) throw new DiscoveryError(`${label} resolves outside the project: ", "producedBy": { "producer": "human" }, "defendedBy": ["test/discovery-config.test.mjs"] },
-        { "id": "F2", "description": "Existing config dependencies may escape the project root.", "faultClass": "condition-forced", "file": "src/probe/runners/discovery.mjs", "find": "  if (!inside(root, real)) throw new DiscoveryError(`${label} resolves outside the project: ${displayPath(root, path)}${real === path ? '' : ` -> ${real}`}`);", "replace": "  if (false) throw new DiscoveryError(`${label} resolves outside the project: ${displayPath(root, path)}${real === path ? '' : ` -> ${real}`}`);", "producedBy": { "producer": "human" }, "defendedBy": ["test/discovery-config.test.mjs"] }
+        {
+          "id": "F1",
+          "description": "Every absolute-looking string is rejected before determining whether it names a file.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "  if (!stat.isFile()) return null;\n  if (!inside(root, real)) throw new DiscoveryError(`${label} resolves outside the project: ",
+          "replace": "  if (!inside(root, real)) throw new DiscoveryError('absolute literal rejected');\n  if (!stat.isFile()) return null;\n  if (!inside(root, real)) throw new DiscoveryError(`${label} resolves outside the project: ",
+          "producedBy": {
+            "producer": "human"
+          },
+          "defendedBy": [
+            "test/discovery-config.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "Existing config dependencies may escape the project root.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "  if (!inside(root, real)) throw new DiscoveryError(`${label} resolves outside the project: ${displayPath(root, path)}${real === path ? '' : ` -> ${real}`}`);",
+          "replace": "  if (false) throw new DiscoveryError(`${label} resolves outside the project: ${displayPath(root, path)}${real === path ? '' : ` -> ${real}`}`);",
+          "producedBy": {
+            "producer": "human"
+          },
+          "defendedBy": [
+            "test/discovery-config.test.mjs"
+          ]
+        }
       ]
     },
     {
       "id": "TG-EMPTY-PROBE-REQUIRES-OPT-IN",
       "statement": "Empty claims succeed only under an explicit adoption opt-in without claim selection, and never produce verification evidence.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#exit-codes" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#exit-codes"
+      },
       "severity": "critical",
-      "producedBy": { "producer": "human", "by": "maintainer" },
-      "defendedBy": ["test/claim-selection.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/claim-selection.test.mjs"
+      ],
       "faults": [
-        { "id": "F1", "description": "A default empty probe reports success without adoption opt-in.", "faultClass": "condition-forced", "file": "src/commands/probe.mjs", "find": "    if (values['allow-empty'] && values.claim === undefined) {", "replace": "    if (values.claim === undefined) {", "producedBy": { "producer": "human" } },
-        { "id": "F2", "description": "An explicit selection is silently skipped when the claims file is empty.", "faultClass": "condition-forced", "file": "src/commands/probe.mjs", "find": "    if (values['allow-empty'] && values.claim === undefined) {", "replace": "    if (values['allow-empty']) {", "producedBy": { "producer": "human" } }
+        {
+          "id": "F1",
+          "description": "A default empty probe reports success without adoption opt-in.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/probe.mjs",
+          "find": "    if (values['allow-empty'] && values.claim === undefined) {",
+          "replace": "    if (values.claim === undefined) {",
+          "producedBy": {
+            "producer": "human"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An explicit selection is silently skipped when the claims file is empty.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/probe.mjs",
+          "find": "    if (values['allow-empty'] && values.claim === undefined) {",
+          "replace": "    if (values['allow-empty']) {",
+          "producedBy": {
+            "producer": "human"
+          }
+        }
       ]
     },
     {
       "id": "TG-HELP-IS-COMMAND-SPECIFIC",
       "statement": "A known subcommand's help shows that command's options instead of a global option list that obscures the requested command.",
-      "source": { "kind": "manual", "ref": "https://github.com/raccioly/testguard/issues/120" },
+      "source": {
+        "kind": "manual",
+        "ref": "https://github.com/raccioly/testguard/issues/120"
+      },
       "severity": "medium",
-      "producedBy": { "producer": "human", "by": "maintainer" },
-      "defendedBy": ["test/claim-selection.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/claim-selection.test.mjs"
+      ],
       "faults": [
-        { "id": "F1", "description": "Subcommand help returns the global option list.", "faultClass": "argument-swapped", "file": "src/cli.mjs", "find": "    io.out(commandUsage(command));", "replace": "    io.out(USAGE);", "producedBy": { "producer": "human" } }
+        {
+          "id": "F1",
+          "description": "Subcommand help returns the global option list.",
+          "faultClass": "argument-swapped",
+          "file": "src/cli.mjs",
+          "find": "    io.out(commandUsage(command));",
+          "replace": "    io.out(USAGE);",
+          "producedBy": {
+            "producer": "human"
+          }
+        }
       ]
     },
     {
       "id": "TG-GATE-RESPECTS-NESTED-PROJECTS",
       "statement": "Parent change gates and source-surface reports delegate valid descendant projects visibly without calling their files unclaimed parent code; invalid project markers cannot suppress evaluation.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#claim-coverage-of-a-change" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#claim-coverage-of-a-change"
+      },
       "severity": "critical",
-      "producedBy": { "producer": "human", "by": "maintainer" },
-      "defendedBy": ["test/gate.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer"
+      },
+      "defendedBy": [
+        "test/gate.test.mjs"
+      ],
       "faults": [
-        { "id": "F1", "description": "Descendant files are evaluated against the parent's claims.", "faultClass": "condition-forced", "file": "src/gate/changed.mjs", "find": "    if (owner) {", "replace": "    if (false) {", "producedBy": { "producer": "human" } },
-        { "id": "F2", "description": "Invalid descendant claims suppress coverage evaluation.", "faultClass": "statement-deleted", "file": "src/gate/changed.mjs", "find": "          loadClaims(marker);", "replace": "          void marker;", "producedBy": { "producer": "human" } },
-        { "id": "F3", "description": "Descendant source modules inflate the parent's unclaimed surface.", "faultClass": "condition-forced", "file": "src/status/surface.mjs", "find": "    !isDefaultExcluded(file) && !ownerOf(file));", "replace": "    !isDefaultExcluded(file));", "producedBy": { "producer": "human" } }
+        {
+          "id": "F1",
+          "description": "Descendant files are evaluated against the parent's claims.",
+          "faultClass": "condition-forced",
+          "file": "src/gate/changed.mjs",
+          "find": "    if (owner) {",
+          "replace": "    if (false) {",
+          "producedBy": {
+            "producer": "human"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Invalid descendant claims suppress coverage evaluation.",
+          "faultClass": "statement-deleted",
+          "file": "src/gate/changed.mjs",
+          "find": "          loadClaims(marker);",
+          "replace": "          void marker;",
+          "producedBy": {
+            "producer": "human"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Descendant source modules inflate the parent's unclaimed surface.",
+          "faultClass": "condition-forced",
+          "file": "src/status/surface.mjs",
+          "find": "    !isDefaultExcluded(file) && !ownerOf(file));",
+          "replace": "    !isDefaultExcluded(file));",
+          "producedBy": {
+            "producer": "human"
+          }
+        }
       ]
     },
     {
@@ -2055,7 +2881,9 @@
             "producer": "human",
             "by": "maintainer"
           },
-          "defendedBy": ["test/probe-dirty-admission.test.mjs"]
+          "defendedBy": [
+            "test/probe-dirty-admission.test.mjs"
+          ]
         }
       ]
     },
@@ -2183,7 +3011,9 @@
             "by": "maintainer",
             "at": "2026-09-18T00:00:00Z"
           },
-          "defendedBy": ["test/attribution.test.mjs"]
+          "defendedBy": [
+            "test/attribution.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -2197,7 +3027,9 @@
             "by": "maintainer",
             "at": "2026-09-18T00:00:00Z"
           },
-          "defendedBy": ["test/attribution.test.mjs"]
+          "defendedBy": [
+            "test/attribution.test.mjs"
+          ]
         }
       ]
     },
@@ -2234,8 +3066,8 @@
           "description": "A prior record with no content hash is reused instead of re-probed, so pre-upgrade evidence carries verdicts that were never compared.",
           "faultClass": "guard-removed",
           "file": "src/probe/attribution.mjs",
-          "find": "  if (!prior || !prior.subject?.contentHash) return false;",
-          "replace": "  if (!prior) return false;",
+          "find": "  if (!prior || !prior.subject?.contentHash || !prior.inputs || !prior.defenders) return false;",
+          "replace": "  if (!prior || !prior.inputs || !prior.defenders) return false;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -2559,7 +3391,7 @@
     },
     {
       "id": "TG-RELEASE-SYNC-CHECK-FAILS-ON-DRIFT",
-      "statement": "The release version check exits non-zero when any version surface is out of step with package.json — including a Homebrew formula whose sha256 is the known-stale placeholder or, checked online, does not match the published tarball — the sha256 mode writes the hash of the registry tarball into the formula, and --list-surfaces names every file a release writes so the release workflows allow exactly those; a release can never ship with drifting version strings, an unverifiable formula, or be blocked by a surface its own allow-list forgot.",
+      "statement": "The release version check exits non-zero when any version surface is out of step with package.json \u2014 including a Homebrew formula whose sha256 is the known-stale placeholder or, checked online, does not match the published tarball \u2014 the sha256 mode writes the hash of the registry tarball into the formula, and --list-surfaces names every file a release writes so the release workflows allow exactly those; a release can never ship with drifting version strings, an unverifiable formula, or be blocked by a surface its own allow-list forgot.",
       "source": {
         "kind": "spec",
         "ref": "CONTRIBUTING.md#releases"
@@ -2851,7 +3683,9 @@
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
           },
-          "defendedBy": ["test/probe-dirty-admission.test.mjs"]
+          "defendedBy": [
+            "test/probe-dirty-admission.test.mjs"
+          ]
         }
       ]
     },
@@ -3198,7 +4032,9 @@
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
           },
-          "defendedBy": ["test/runner-project-resolution.test.mjs"]
+          "defendedBy": [
+            "test/runner-project-resolution.test.mjs"
+          ]
         }
       ]
     },
@@ -3397,8 +4233,8 @@
           "description": "A declared defender absent from every resolved manifest is assigned to the primary runner, so an unavailable owning runner becomes a verdict.",
           "faultClass": "other",
           "file": "src/probe/probe.mjs",
-          "find": "        const excluded = declared.filter((file) => !ownerByFile.has(file));",
-          "replace": "        const excluded = [];\n        for (const file of declared) if (!ownerByFile.has(file)) ownerByFile.set(file, runner);",
+          "find": "      const excluded = declared && !commandTemplate ? declared.filter((file) => !ownerByFile.has(file)) : [];",
+          "replace": "      const excluded = [];\n      if (declared && !commandTemplate) for (const file of declared) if (!ownerByFile.has(file)) ownerByFile.set(file, runner);",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -3724,7 +4560,9 @@
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
           },
-          "defendedBy": ["test/replay-selection.test.mjs"]
+          "defendedBy": [
+            "test/replay-selection.test.mjs"
+          ]
         }
       ]
     },
@@ -4116,7 +4954,9 @@
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
           },
-          "defendedBy": ["test/replay-selection.test.mjs"]
+          "defendedBy": [
+            "test/replay-selection.test.mjs"
+          ]
         }
       ]
     },
@@ -4149,7 +4989,9 @@
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
           },
-          "defendedBy": ["test/replay-selection.test.mjs"]
+          "defendedBy": [
+            "test/replay-selection.test.mjs"
+          ]
         }
       ]
     },
@@ -4275,10 +5117,10 @@
       "faults": [
         {
           "id": "F1",
-      "description": "Sharing is counted by runs rather than by distinct fault identities, so one fault's confirmations are reported as sharing.",
+          "description": "Sharing is counted by runs rather than by distinct fault identities, so one fault's confirmations are reported as sharing.",
           "faultClass": "condition-forced",
           "file": "src/probe/cost.mjs",
-      "find": "    sharedDefenders: defenders.filter((d) => d.faults.length > 1),",
+          "find": "    sharedDefenders: defenders.filter((d) => d.faults.length > 1),",
           "replace": "    sharedDefenders: defenders.filter((d) => d.runs > 1),",
           "producedBy": {
             "producer": "human",
@@ -4291,7 +5133,7 @@
           "description": "Every defender is reported as shared, drowning the one file that actually is.",
           "faultClass": "condition-forced",
           "file": "src/probe/cost.mjs",
-      "find": "    sharedDefenders: defenders.filter((d) => d.faults.length > 1),",
+          "find": "    sharedDefenders: defenders.filter((d) => d.faults.length > 1),",
           "replace": "    sharedDefenders: defenders,",
           "producedBy": {
             "producer": "human",
@@ -4552,7 +5394,9 @@
             "producer": "human",
             "by": "maintainer"
           },
-          "defendedBy": ["test/probe-records.test.mjs"]
+          "defendedBy": [
+            "test/probe-records.test.mjs"
+          ]
         }
       ]
     },
@@ -4790,7 +5634,9 @@
             "producer": "human",
             "by": "maintainer"
           },
-          "defendedBy": ["test/probe-error-boundary.test.mjs"]
+          "defendedBy": [
+            "test/probe-error-boundary.test.mjs"
+          ]
         }
       ]
     },
@@ -4821,7 +5667,9 @@
             "producer": "human",
             "by": "maintainer"
           },
-          "defendedBy": ["test/probe-error-boundary.test.mjs"]
+          "defendedBy": [
+            "test/probe-error-boundary.test.mjs"
+          ]
         }
       ]
     },
@@ -5527,7 +6375,9 @@
             "by": "maintainer",
             "at": "2026-09-18T00:00:00Z"
           },
-          "defendedBy": ["test/cli-unexpected-error.test.mjs"]
+          "defendedBy": [
+            "test/cli-unexpected-error.test.mjs"
+          ]
         }
       ],
       "tags": [
@@ -5746,7 +6596,9 @@
             "by": "maintainer",
             "at": "2026-09-19T00:00:00Z"
           },
-          "defendedBy": ["test/anchor-admission.test.mjs"]
+          "defendedBy": [
+            "test/anchor-admission.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -5773,7 +6625,9 @@
             "by": "maintainer",
             "at": "2026-09-19T00:00:00Z"
           },
-          "defendedBy": ["test/anchor-admission.test.mjs"]
+          "defendedBy": [
+            "test/anchor-admission.test.mjs"
+          ]
         }
       ],
       "tags": [
@@ -5912,7 +6766,9 @@
             "by": "maintainer",
             "at": "2026-09-19T00:00:00Z"
           },
-          "defendedBy": ["test/surface.test.mjs"]
+          "defendedBy": [
+            "test/surface.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -5926,7 +6782,9 @@
             "by": "maintainer",
             "at": "2026-09-19T00:00:00Z"
           },
-          "defendedBy": ["test/surface.test.mjs"]
+          "defendedBy": [
+            "test/surface.test.mjs"
+          ]
         },
         {
           "id": "F3",
@@ -5940,7 +6798,9 @@
             "by": "maintainer",
             "at": "2026-09-19T00:00:00Z"
           },
-          "defendedBy": ["test/surface.test.mjs"]
+          "defendedBy": [
+            "test/surface.test.mjs"
+          ]
         }
       ],
       "tags": [
@@ -5979,7 +6839,9 @@
             "by": "maintainer",
             "at": "2026-09-19T00:00:00Z"
           },
-          "defendedBy": ["test/brief.test.mjs"]
+          "defendedBy": [
+            "test/brief.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -6981,7 +7843,9 @@
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
           },
-          "defendedBy": ["test/discovery-config.test.mjs"]
+          "defendedBy": [
+            "test/discovery-config.test.mjs"
+          ]
         }
       ]
     },
@@ -7015,7 +7879,9 @@
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
           },
-          "defendedBy": ["test/discover.test.mjs"]
+          "defendedBy": [
+            "test/discover.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -7029,7 +7895,9 @@
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
           },
-          "defendedBy": ["test/probe-records.test.mjs"]
+          "defendedBy": [
+            "test/probe-records.test.mjs"
+          ]
         }
       ]
     },
@@ -7107,7 +7975,9 @@
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
           },
-          "defendedBy": ["test/discovery-config.test.mjs"]
+          "defendedBy": [
+            "test/discovery-config.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -7121,7 +7991,9 @@
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
           },
-          "defendedBy": ["test/discovery-config.test.mjs"]
+          "defendedBy": [
+            "test/discovery-config.test.mjs"
+          ]
         },
         {
           "id": "F3",
@@ -7135,7 +8007,9 @@
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
           },
-          "defendedBy": ["test/discovery-config.test.mjs"]
+          "defendedBy": [
+            "test/discovery-config.test.mjs"
+          ]
         },
         {
           "id": "F4",
@@ -7149,7 +8023,9 @@
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
           },
-          "defendedBy": ["test/discovery-config.test.mjs"]
+          "defendedBy": [
+            "test/discovery-config.test.mjs"
+          ]
         }
       ]
     },
@@ -7411,7 +8287,9 @@
             "producer": "agent",
             "by": "codex"
           },
-          "defendedBy": ["test/runner-output-bounds.test.mjs"]
+          "defendedBy": [
+            "test/runner-output-bounds.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -7424,7 +8302,9 @@
             "producer": "agent",
             "by": "codex"
           },
-          "defendedBy": ["test/runner-output-bounds.test.mjs"]
+          "defendedBy": [
+            "test/runner-output-bounds.test.mjs"
+          ]
         }
       ]
     },
@@ -7497,7 +8377,9 @@
             "producer": "agent",
             "by": "codex"
           },
-          "defendedBy": ["test/runner-worker-argv.test.mjs"]
+          "defendedBy": [
+            "test/runner-worker-argv.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -7510,7 +8392,9 @@
             "producer": "agent",
             "by": "codex"
           },
-          "defendedBy": ["test/runner-worker-argv.test.mjs"]
+          "defendedBy": [
+            "test/runner-worker-argv.test.mjs"
+          ]
         }
       ]
     },
@@ -7567,7 +8451,9 @@
             "producer": "agent",
             "by": "codex"
           },
-          "defendedBy": ["test/worker-policy.test.mjs"]
+          "defendedBy": [
+            "test/worker-policy.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -7590,10 +8476,19 @@
     {
       "id": "TG-DOCS-COVER-THE-CLI",
       "statement": "Every command the CLI dispatches and every --runner value it accepts is documented on its reference page; a new one without documentation fails the suite.",
-      "source": { "kind": "doc", "ref": "CONTRIBUTING.md#changing-documentation" },
+      "source": {
+        "kind": "doc",
+        "ref": "CONTRIBUTING.md#changing-documentation"
+      },
       "severity": "low",
-      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/docs.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/docs.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -7602,7 +8497,11 @@
           "file": "src/cli.mjs",
           "find": "  testguard concerns [dir]   the one-sentence scopes a sweep can be aimed by: where to look, and which shapes of break are relevant",
           "replace": "  testguard concernz [dir]   the one-sentence scopes a sweep can be aimed by: where to look, and which shapes of break are relevant",
-          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-10-10T00:00:00Z"
+          }
         },
         {
           "id": "F2",
@@ -7611,17 +8510,30 @@
           "file": "src/cli.mjs",
           "find": "  --runner <name>      vitest | jest | playwright | python | pytest | unittest | node-test | auto",
           "replace": "  --runner <name>      vitest | jest | playwright | python | pytest | unittest | node-test | deno | auto",
-          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-10-10T00:00:00Z"
+          }
         }
       ]
     },
     {
       "id": "TG-CONFIG-FILES-FAIL-LOUDLY",
       "statement": "A concerns or ignore file that does not parse, does not conform, or declares an entry that would do nothing fails the command that reads it (exit 2, naming the file); it is never read as \"nothing declared\", so a sweep cannot aim at nothing and pass, and an ignore entry cannot look approved while excusing nothing.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
       "severity": "high",
-      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/cli-surface.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/cli-surface.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -7630,7 +8542,11 @@
           "file": "src/supply/concerns.mjs",
           "find": "    const doc = readSpecDoc('concerns', p);",
           "replace": "    const doc = readSpecDoc('concerns', p, { source: '{\"schemaVersion\":1,\"concerns\":[]}' });",
-          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-10-10T00:00:00Z"
+          }
         },
         {
           "id": "F2",
@@ -7639,7 +8555,11 @@
           "file": "spec/schemas/ignore.schema.json",
           "find": "\"enum\": [\"path\", \"claim\", \"fault\"]",
           "replace": "\"enum\": [\"path\", \"claim\", \"fault\", \"fingerprint\"]",
-          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-10-10T00:00:00Z"
+          }
         },
         {
           "id": "F3",
@@ -7648,18 +8568,33 @@
           "file": "spec/lib/validate.mjs",
           "find": "        if (parts.length !== 2 || !parts.every((p) => IDENTIFIER.test(p))) errors.push(",
           "replace": "        if (false) errors.push(",
-          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-          "defendedBy": ["spec/conformance/schemas.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-10-10T00:00:00Z"
+          },
+          "defendedBy": [
+            "spec/conformance/schemas.test.mjs"
+          ]
         }
       ]
     },
     {
       "id": "TG-CLI-SAYS-WHAT-IT-DOES",
       "statement": "What the CLI prints about itself matches what it does: baseline --json prints a status document its own schema accepts, gate --explain names exactly the extensions the gate treats as source, and replay refuses --baseline rather than writing the calibration somewhere the caller did not ask.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md"
+      },
       "severity": "medium",
-      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/cli-surface.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/cli-surface.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -7668,7 +8603,11 @@
           "file": "src/commands/baseline.mjs",
           "find": "  const doc = { ...computeStatus({ projectDir, toolVersion: version }), baseline };",
           "replace": "  const doc = { ...computeStatus({ projectDir, toolVersion: version }), result: baseline };",
-          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-10-10T00:00:00Z"
+          }
         },
         {
           "id": "F2",
@@ -7677,7 +8616,11 @@
           "file": "src/gate/changed.mjs",
           "find": "  `Non-source files (anything but ${[...SOURCE_EXT].join(' ')}) are excluded before these patterns apply.`,",
           "replace": "  'Non-source files (anything but .js .mjs .cjs .ts .mts .cts .jsx .tsx) are excluded before these patterns apply.',",
-          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-10-10T00:00:00Z"
+          }
         },
         {
           "id": "F3",
@@ -7686,141 +8629,272 @@
           "file": "src/cli.mjs",
           "find": "  if (command === 'replay' && values.baseline !== undefined) {",
           "replace": "  if (false) {",
-          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-10-10T00:00:00Z"
+          }
         }
       ]
     },
     {
       "id": "TG-GITLAB-ARTIFACTS-UNDER-DIR",
       "statement": "The GitLab template's artifact paths carry the dir input, so the files a job writes under a subdirectory project are kept; GitLab resolves artifact paths from the repository root, not from the directory the script changed into.",
-      "source": { "kind": "spec", "ref": "docs/guides/ci/gitlab.md" },
+      "source": {
+        "kind": "spec",
+        "ref": "docs/guides/ci/gitlab.md"
+      },
       "severity": "high",
-      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/gitlab-template.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/gitlab-template.test.mjs"
+      ],
       "faults": [
         {
-          "id": "F1", "description": "The gate artifact path drops the dir prefix; with dir set to a subdirectory GitLab keeps no gate.json.",
-          "faultClass": "literal-changed", "file": "packaging/gitlab/testguard.gitlab-ci.yml",
+          "id": "F1",
+          "description": "The gate artifact path drops the dir prefix; with dir set to a subdirectory GitLab keeps no gate.json.",
+          "faultClass": "literal-changed",
+          "file": "packaging/gitlab/testguard.gitlab-ci.yml",
           "find": "    paths: [\"$[[ inputs.dir ]]/.testguard/gate.json\"]",
           "replace": "    paths: [\".testguard/gate.json\"]",
-          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-          "defendedBy": ["test/gitlab-template.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-10-10T00:00:00Z"
+          },
+          "defendedBy": [
+            "test/gitlab-template.test.mjs"
+          ]
         }
       ]
     },
     {
       "id": "TG-GITLAB-INSTALL-WITHOUT-LOCKFILE",
       "statement": "The GitLab template runs npm ci only when dir has an npm lockfile; a project without one, or a Python-only project without a package.json, is not failed by the install step, and the CLI is never added to package.json.",
-      "source": { "kind": "spec", "ref": "docs/guides/ci/gitlab.md" },
+      "source": {
+        "kind": "spec",
+        "ref": "docs/guides/ci/gitlab.md"
+      },
       "severity": "high",
-      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/gitlab-template.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/gitlab-template.test.mjs"
+      ],
       "faults": [
         {
-          "id": "F1", "description": "The install step runs npm ci whatever the project has, which fails every job of a Python-only project before TestGuard runs.",
-          "faultClass": "condition-forced", "file": "packaging/gitlab/testguard.gitlab-ci.yml",
+          "id": "F1",
+          "description": "The install step runs npm ci whatever the project has, which fails every job of a Python-only project before TestGuard runs.",
+          "faultClass": "condition-forced",
+          "file": "packaging/gitlab/testguard.gitlab-ci.yml",
           "find": "      if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then",
           "replace": "      if true; then",
-          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-          "defendedBy": ["test/gitlab-template.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-10-10T00:00:00Z"
+          },
+          "defendedBy": [
+            "test/gitlab-template.test.mjs"
+          ]
         }
       ]
     },
     {
       "id": "TG-ACTION-EVIDENCE-OUTPUT-IS-WRITTEN-FILE",
       "statement": "The GitHub Action's evidence output names the evidence file the run actually wrote (evidence.json, or evidence-provisional.json when confirm < 3) and is empty when the run wrote none; a pre-existing file the run did not rewrite is never named.",
-      "source": { "kind": "spec", "ref": "docs/guides/ci/github-actions.md#output" },
+      "source": {
+        "kind": "spec",
+        "ref": "docs/guides/ci/github-actions.md#output"
+      },
       "severity": "medium",
-      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/action.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/action.test.mjs"
+      ],
       "faults": [
         {
-          "id": "F1", "description": "The output names .testguard/evidence.json whatever the command wrote, so a provisional run or a gate points a later upload step at a file that is absent or stale.",
-          "faultClass": "literal-changed", "file": "action.yml",
+          "id": "F1",
+          "description": "The output names .testguard/evidence.json whatever the command wrote, so a provisional run or a gate points a later upload step at a file that is absent or stale.",
+          "faultClass": "literal-changed",
+          "file": "action.yml",
           "find": "        echo \"evidence=${EVIDENCE}\" >> \"$GITHUB_OUTPUT\"",
           "replace": "        echo \"evidence=$(pwd)/.testguard/evidence.json\" >> \"$GITHUB_OUTPUT\"",
-          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-          "defendedBy": ["test/action.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-10-10T00:00:00Z"
+          },
+          "defendedBy": [
+            "test/action.test.mjs"
+          ]
         },
         {
-          "id": "F2", "description": "Every evidence file present after the run is reported, so a cache-restored evidence.json from an earlier commit is named as this run's result.",
-          "faultClass": "condition-forced", "file": "action.yml",
+          "id": "F2",
+          "description": "Every evidence file present after the run is reported, so a cache-restored evidence.json from an earlier commit is named as this run's result.",
+          "faultClass": "condition-forced",
+          "file": "action.yml",
           "find": "          if ! grep -qxF -- \"$line\" <<<\"$BEFORE\"; then",
           "replace": "          if true; then",
-          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-          "defendedBy": ["test/action.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-10-10T00:00:00Z"
+          },
+          "defendedBy": [
+            "test/action.test.mjs"
+          ]
         }
       ]
     },
     {
       "id": "TG-ACTION-INPUTS-ARE-DATA",
       "statement": "The GitHub Action passes its inputs to the run script as environment variables, so an input value containing quotes or command substitution reaches the CLI verbatim and is never executed as shell.",
-      "source": { "kind": "spec", "ref": "docs/guides/ci/github-actions.md#output" },
+      "source": {
+        "kind": "spec",
+        "ref": "docs/guides/ci/github-actions.md#output"
+      },
       "severity": "high",
-      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/action.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/action.test.mjs"
+      ],
       "faults": [
         {
-          "id": "F1", "description": "The claims input is spliced into the script text again, so a value carrying a quote or $(...) runs as shell inside the workflow.",
-          "faultClass": "other", "file": "action.yml",
+          "id": "F1",
+          "description": "The claims input is spliced into the script text again, so a value carrying a quote or $(...) runs as shell inside the workflow.",
+          "faultClass": "other",
+          "file": "action.yml",
           "find": "        [ -n \"$TG_CLAIMS\" ] && ARGS+=(--claims \"$TG_CLAIMS\")",
           "replace": "        [ -n \"${{ inputs.claims }}\" ] && ARGS+=(--claims \"${{ inputs.claims }}\")",
-          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-          "defendedBy": ["test/action.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-10-10T00:00:00Z"
+          },
+          "defendedBy": [
+            "test/action.test.mjs"
+          ]
         }
       ]
     },
     {
       "id": "TG-PIP-WRAPPER-PINS-OWN-VERSION",
       "statement": "With no project-local install, the pip wrapper runs the npm CLI pinned to the wheel's own version, and refuses rather than run an unpinned CLI when it cannot read that version.",
-      "source": { "kind": "spec", "ref": "docs/installation.md#pip" },
+      "source": {
+        "kind": "spec",
+        "ref": "docs/installation.md#pip"
+      },
       "severity": "high",
-      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/python-wrapper.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/python-wrapper.test.mjs"
+      ],
       "faults": [
         {
-          "id": "F1", "description": "The npx fallback asks for @latest, so the CLI that runs is whatever npm published last, not the installed release.",
-          "faultClass": "literal-changed", "file": "testguard_cli/wrapper.py",
+          "id": "F1",
+          "description": "The npx fallback asks for @latest, so the CLI that runs is whatever npm published last, not the installed release.",
+          "faultClass": "literal-changed",
+          "file": "testguard_cli/wrapper.py",
           "find": "        return f\"{PACKAGE}@{version(PACKAGE)}\"",
           "replace": "        return f\"{PACKAGE}@latest\"",
-          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-          "defendedBy": ["test/python-wrapper.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-10-10T00:00:00Z"
+          },
+          "defendedBy": [
+            "test/python-wrapper.test.mjs"
+          ]
         },
         {
-          "id": "F2", "description": "Missing package metadata falls back to @latest instead of refusing.",
-          "faultClass": "literal-changed", "file": "testguard_cli/wrapper.py",
+          "id": "F2",
+          "description": "Missing package metadata falls back to @latest instead of refusing.",
+          "faultClass": "literal-changed",
+          "file": "testguard_cli/wrapper.py",
           "find": "    except PackageNotFoundError:\n        return None",
           "replace": "    except PackageNotFoundError:\n        return f\"{PACKAGE}@latest\"",
-          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-          "defendedBy": ["test/python-wrapper.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-10-10T00:00:00Z"
+          },
+          "defendedBy": [
+            "test/python-wrapper.test.mjs"
+          ]
         }
       ]
     },
     {
       "id": "TG-YAML-TEST-HELPER-READS-EVERY-DOCUMENT",
       "statement": "The tests' YAML helper returns every document in a file, so the GitLab template's job document is parsed and checked, not only its spec header.",
-      "source": { "kind": "manual", "ref": "test/helpers/yaml.mjs" },
+      "source": {
+        "kind": "manual",
+        "ref": "test/helpers/yaml.mjs"
+      },
       "severity": "medium",
-      "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/gitlab-template.test.mjs"],
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/gitlab-template.test.mjs"
+      ],
       "faults": [
         {
-          "id": "F1", "description": "The helper returns only the first YAML document, so the template's jobs are never parsed.",
-          "faultClass": "other", "file": "test/helpers/yaml.mjs",
+          "id": "F1",
+          "description": "The helper returns only the first YAML document, so the template's jobs are never parsed.",
+          "faultClass": "other",
+          "file": "test/helpers/yaml.mjs",
           "find": "export function parseYaml(path) {",
           "replace": "export function parseYaml(path) { return parseAll(path).slice(0, 1); }\nfunction parseAll(path) {",
-          "producedBy": { "producer": "agent", "by": "claude", "at": "2026-10-10T00:00:00Z" },
-          "defendedBy": ["test/gitlab-template.test.mjs"]
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-10-10T00:00:00Z"
+          },
+          "defendedBy": [
+            "test/gitlab-template.test.mjs"
+          ]
         }
       ]
     },
     {
       "id": "TG-INIT-REFUSES-BEFORE-WRITING",
       "statement": "init checks every option and every file it must merge into before its first write. A bad --ci-evidence value is a usage error (exit 3) and an unmergeable .claude/settings.json is a precondition failure (exit 2) naming the file and the JSON error; either way the project is left exactly as it was. It used to print 'this is a bug in testguard' with a stack trace after it had already written the skill, the hook and the AGENTS.md section.",
-      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "source": {
+        "kind": "manual",
+        "ref": "audit 2026-10-10 (init and the agent layer)"
+      },
       "severity": "medium",
-      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/init-preflight.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/init-preflight.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -7829,7 +8903,11 @@
           "file": "src/init/init.mjs",
           "find": "  if (ciEvidence !== undefined && !CI_PLATFORMS.includes(ciEvidence)) throw new InitUsageError(`--ci-evidence must be github or gitlab, not ${JSON.stringify(ciEvidence)}`);",
           "replace": "",
-          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-10-10T00:00:00Z"
+          }
         },
         {
           "id": "F2",
@@ -7838,18 +8916,34 @@
           "file": "src/init/init.mjs",
           "find": "    throw new PreconditionError(`${settingsPath} is not valid JSON (${e.message}); fix it before init can add the hook. Nothing was written.`, 'init-settings');",
           "replace": "    throw new Error(`${settingsPath} is not valid JSON (${e.message}); fix it before init can add the hook. Nothing was written.`);",
-          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-10-10T00:00:00Z"
+          }
         }
       ],
-      "tags": ["init", "audit"]
+      "tags": [
+        "init",
+        "audit"
+      ]
     },
     {
       "id": "TG-INIT-REPLACES-ANY-TESTGUARD-HOOK",
       "statement": "Re-running init leaves exactly one TestGuard session-start hook per project, in the position the earlier one had, whatever form an earlier release wrote it in; hooks for other projects and the user's own hooks are untouched. Matching only the current text and two npx forms meant any change to hookCommand() made the next init append a second hook, so every session briefed twice.",
-      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "source": {
+        "kind": "manual",
+        "ref": "audit 2026-10-10 (init and the agent layer)"
+      },
       "severity": "low",
-      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/init-hook-replace.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/init-hook-replace.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -7858,7 +8952,11 @@
           "file": "src/init/init.mjs",
           "find": "  const m = /(?:^|[\\s/])testguard(?:-cli)?(?:@[^\\s\"|;&]+)?\\s+brief\\s+--text\\b(?:\\s+([^\\s\"|;&]+))?/.exec(command);",
           "replace": "  const m = /npx\\s+(?:-y|--no-install)\\s+testguard(?:-cli)?(?:@[^\\s\"|;&]+)?\\s+brief\\s+--text\\b(?:\\s+([^\\s\"|;&]+))?/.exec(command);",
-          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-10-10T00:00:00Z"
+          }
         },
         {
           "id": "F2",
@@ -7867,18 +8965,34 @@
           "file": "src/init/init.mjs",
           "find": "      for (const { gi, hi } of extra.reverse()) groups[gi].hooks.splice(hi, 1);",
           "replace": "",
-          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-10-10T00:00:00Z"
+          }
         }
       ],
-      "tags": ["init", "audit"]
+      "tags": [
+        "init",
+        "audit"
+      ]
     },
     {
       "id": "TG-INIT-IGNORES-EVERY-WRITTEN-OUTPUT",
       "statement": "Every regenerated file a command writes under .testguard/ is in the .gitignore block init writes, checked against the paths the code itself builds rather than a second list; re-running init after an upgrade adds only the new lines, inside the existing block, once. sweep.json and sweep-evidence.json shipped without their lines and were offered for commit.",
-      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "source": {
+        "kind": "manual",
+        "ref": "audit 2026-10-10 (init and the agent layer)"
+      },
       "severity": "low",
-      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/init-ignores.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/init-ignores.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -7887,7 +9001,11 @@
           "file": "src/init/init.mjs",
           "find": "export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json', '.testguard/replay.json', '.testguard/calibration.json', '.testguard/ci-self-evidence.json', '.testguard/ci/', '.testguard/sweep.json', '.testguard/sweep-evidence.json'];",
           "replace": "export const GITIGNORE_LINES = ['.testguard/evidence.json', '.testguard/evidence-provisional.json', '.testguard/evidence-partial.json', '.testguard/brief.json', '.testguard/gate.json', '.testguard/scaffold-*.json', '.testguard/replay.json', '.testguard/calibration.json', '.testguard/ci-self-evidence.json', '.testguard/ci/'];",
-          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-10-10T00:00:00Z"
+          }
         },
         {
           "id": "F2",
@@ -7896,69 +9014,122 @@
           "file": "src/init/init.mjs",
           "find": "  return [...lines.slice(0, last + 1), ...missing, ...lines.slice(last + 1)].join('\\n');",
           "replace": "  return gi.replace(/\\s*$/, '\\n') + GITIGNORE_HEADER + '\\n' + missing.join('\\n') + '\\n';",
-          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-10-10T00:00:00Z"
+          }
         }
       ],
-      "tags": ["init", "audit"]
+      "tags": [
+        "init",
+        "audit"
+      ]
     },
     {
       "id": "TG-CI-HELPER-RUNS-THE-HOOKS-CLI",
       "statement": "fetch-ci-evidence.sh briefs with the same CLI the session-start hook runs (the project's node_modules/.bin, then the repository root's, then PATH), from the evidence file the GitHub Action or the GitLab template actually uploads (for GitLab, under the project's own path from the repository root, never another project's), and never from a file an earlier download left behind.",
-      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "source": {
+        "kind": "manual",
+        "ref": "audit 2026-10-10 (init and the agent layer)"
+      },
       "severity": "low",
-      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/ci-evidence-helper.github.test.mjs", "test/ci-evidence-helper.gitlab.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/ci-evidence-helper.github.test.mjs",
+        "test/ci-evidence-helper.gitlab.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
-          "defendedBy": ["test/ci-evidence-helper.github.test.mjs"],
+          "defendedBy": [
+            "test/ci-evidence-helper.github.test.mjs"
+          ],
           "description": "The project's own install is skipped, so a devDependency install is not found and the helper says no CLI exists or runs a different one.",
           "faultClass": "field-dropped",
           "file": "src/init/init.mjs",
           "find": "for c in ./node_modules/.bin/testguard \"\\${ROOT:+$ROOT/node_modules/.bin/testguard}\"; do",
           "replace": "for c in \"\\${ROOT:+$ROOT/node_modules/.bin/testguard}\"; do",
-          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-10-10T00:00:00Z"
+          }
         },
         {
           "id": "F2",
-          "defendedBy": ["test/ci-evidence-helper.github.test.mjs"],
+          "defendedBy": [
+            "test/ci-evidence-helper.github.test.mjs"
+          ],
           "description": "evidence.json, the file the action's evidence output names after a confirmed run, is not looked for, so the documented workflow's artifact briefs nothing.",
           "faultClass": "field-dropped",
           "file": "src/init/init.mjs",
           "find": "    ? ['evidence.json', 'evidence-provisional.json', 'ci-self-evidence.json']",
           "replace": "    ? ['evidence-provisional.json', 'ci-self-evidence.json']",
-          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-10-10T00:00:00Z"
+          }
         },
         {
           "id": "F3",
-          "defendedBy": ["test/ci-evidence-helper.gitlab.test.mjs"],
+          "defendedBy": [
+            "test/ci-evidence-helper.gitlab.test.mjs"
+          ],
           "description": "The download directory is not emptied first, so a failed or empty download briefs from the evidence an earlier run left there as if it were current.",
           "faultClass": "statement-deleted",
           "file": "src/init/init.mjs",
           "find": "rm -rf \"$OUT\" && mkdir -p \"$OUT\" || exit 0",
           "replace": "mkdir -p \"$OUT\" || exit 0",
-          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-10-10T00:00:00Z"
+          }
         },
         {
           "id": "F4",
-          "defendedBy": ["test/ci-evidence-helper.gitlab.test.mjs"],
+          "defendedBy": [
+            "test/ci-evidence-helper.gitlab.test.mjs"
+          ],
           "description": "The GitLab helper ignores the project's path from the repository root, so a project in a subdirectory finds nothing, or briefs from the root project's evidence in the same artifact.",
           "faultClass": "literal-changed",
           "file": "src/init/init.mjs",
           "find": "    : ['${PREFIX}.testguard/evidence.json', '${PREFIX}.testguard/evidence-provisional.json'];",
           "replace": "    : ['.testguard/evidence.json', '.testguard/evidence-provisional.json'];",
-          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-10-10T00:00:00Z"
+          }
         }
       ],
-      "tags": ["init", "audit"]
+      "tags": [
+        "init",
+        "audit"
+      ]
     },
     {
       "id": "TG-BRIEF-LABELS-RUNNER-CACHES",
       "statement": "The brief's install label names a package runner's cache (npx, pnpm dlx, bunx) as such, never as a local install, so a stale cached CLI is visible at session start. The npx cache sits under node_modules/ and was labelled 'local install'.",
-      "source": { "kind": "manual", "ref": "audit 2026-10-10 (init and the agent layer)" },
+      "source": {
+        "kind": "manual",
+        "ref": "audit 2026-10-10 (init and the agent layer)"
+      },
       "severity": "low",
-      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/brief.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/brief.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -7967,10 +9138,17 @@
           "file": "src/brief/brief.mjs",
           "find": "  [/[\\\\/]_npx[\\\\/]/, 'npx cache'],",
           "replace": "",
-          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-10-10T00:00:00Z"
+          }
         }
       ],
-      "tags": ["init", "audit"]
+      "tags": [
+        "init",
+        "audit"
+      ]
     },
     {
       "id": "TG-ENV-LOAD-FAILURE-IS-NEVER-REUSED",
@@ -8619,10 +9797,19 @@
     {
       "id": "TG-POLICY-FRESHNESS-BINDS-RUNNER-SOURCE",
       "statement": "Origin-policy freshness refuses evidence recorded by a runner from a different source (project, PATH, builtin) even when its name and version match.",
-      "source": { "kind": "spec", "ref": "spec/GATE-SEMANTICS.md#explicit-declared-origin-policy-result-contract" },
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#explicit-declared-origin-policy-result-contract"
+      },
       "severity": "medium",
-      "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" },
-      "defendedBy": ["test/policy-freshness.test.mjs"],
+      "producedBy": {
+        "producer": "human",
+        "by": "maintainer",
+        "at": "2026-10-10T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/policy-freshness.test.mjs"
+      ],
       "faults": [
         {
           "id": "F1",
@@ -8631,7 +9818,11 @@
           "file": "src/probe/policy-freshness.mjs",
           "find": "      && (recorded?.source ?? null) === (current?.source ?? null);",
           "replace": "      && true;",
-          "producedBy": { "producer": "human", "by": "maintainer", "at": "2026-10-10T00:00:00Z" }
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-10-10T00:00:00Z"
+          }
         }
       ]
     },
@@ -9076,7 +10267,7 @@
           "description": "A reused record with an indeterminate closure conforms.",
           "faultClass": "condition-forced",
           "file": "spec/lib/validate.mjs",
-          "find": "      if (closure === 'indeterminate' && r.reusedFrom) errors.push(",
+          "find": "      if (closure === 'indeterminate' && r.reusedFrom && r.carried !== 'inputs-changed') errors.push(",
           "replace": "      if (false && r.reusedFrom) errors.push(",
           "defendedBy": [
             "spec/conformance/dependency-closure.test.mjs"
@@ -10147,8 +11338,8 @@
           "description": "A different checker version is the same instrument.",
           "faultClass": "condition-forced",
           "file": "src/probe/typecheck.mjs",
-          "find": "  return recorded.commandHash === current.commandHash && recorded.version === current.version;",
-          "replace": "  return recorded.commandHash === current.commandHash;",
+          "find": "  if (recorded.commandHash !== current.commandHash || recorded.version !== current.version) return false;",
+          "replace": "  if (recorded.commandHash !== current.commandHash) return false;",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -10211,14 +11402,14 @@
           "description": "A clean verdict is carried forward without checking that the fault still type-checks.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "  if (typechecker && anchor?.status === 'ok') {",
+          "find": "  if (typechecker && anchor?.status === 'ok' && !digestVouches) {",
           "replace": "  if (typechecker && anchor?.status === 'ok' && !reusable) {",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
           },
           "defendedBy": [
-            "test/typecheck-reuse-program.test.mjs"
+            "test/typecheck-digest-fallback.test.mjs"
           ]
         }
       ]
@@ -13962,8 +15153,8 @@
           "description": "A reused verdict loses the id of the run it came from.",
           "faultClass": "field-dropped",
           "file": "src/probe/probe.mjs",
-          "find": "{ record, runId: doc.run.id }",
-          "replace": "{ record, runId: undefined }",
+          "find": "{ record, runId: doc.run.id, typecheck: doc.run.typecheck }",
+          "replace": "{ record, runId: undefined, typecheck: doc.run.typecheck }",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -14101,7 +15292,7 @@
     },
     {
       "id": "TG-INIT-WRITES-THE-FAST-HOOKS",
-      "statement": "init writes a pre-push block that probes --changed auto through the project install, then PATH, then the latest release; CI that probes the change and runs the full probe nightly; and init --upgrade rewrites only TestGuard blocks and skills nobody edited.",
+      "statement": "init writes a pre-push block that probes --changed auto through an installed TestGuard only (the project install, then PATH), never a fetch; CI that probes the change and runs the full probe nightly; and init --upgrade rewrites only TestGuard blocks and skills nobody edited.",
       "source": {
         "kind": "spec",
         "ref": "issue #270 (fast by default)"
@@ -14120,7 +15311,7 @@
           "description": "The pre-push hook probes every claim.",
           "faultClass": "argument-swapped",
           "file": "src/init/managed.mjs",
-          "find": "  \"$@\" probe --changed auto --quiet",
+          "find": "  \"$@\" probe --changed auto --when-no-base skip --quiet",
           "replace": "  \"$@\" probe --quiet",
           "producedBy": {
             "producer": "agent",
@@ -14129,11 +15320,11 @@
         },
         {
           "id": "F2",
-          "description": "The fallback CLI is pinned to an old release.",
+          "description": "The fallback CLI floats to the latest release.",
           "faultClass": "literal-changed",
           "file": "src/init/managed.mjs",
-          "find": "export const NPX_LATEST = 'npx -y testguard-cli@latest';",
-          "replace": "export const NPX_LATEST = 'npx -y testguard-cli@0.22.1';",
+          "find": "  return `npx -y testguard-cli@${version}`;",
+          "replace": "  return 'npx -y testguard-cli@latest';",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -14200,7 +15391,7 @@
           "description": "The brief text drops the advice.",
           "faultClass": "statement-deleted",
           "file": "src/brief/brief.mjs",
-          "find": "  if (brief.advice?.length) lines.push('', ...brief.advice.map((a) => `SPEED: ${a.message} → ${a.command}`));\n",
+          "find": "  if (brief.advice?.length) lines.push('', ...brief.advice.map((a) => `SPEED: ${a.message} \u2192 ${a.command}`));\n",
           "replace": "",
           "producedBy": {
             "producer": "agent",
@@ -14309,8 +15500,8 @@
           "description": "The worker index is never set.",
           "faultClass": "return-altered",
           "file": "src/probe/worker-env.mjs",
-          "find": "export const workerEnv = () => ({ TESTGUARD_WORKER: String(context.getStore() ?? 0) });",
-          "replace": "export const workerEnv = () => ({});",
+          "find": "  return { TESTGUARD_WORKER: String((store?.base ?? 0) + (store?.index ?? 0)) };",
+          "replace": "  return {};",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -14593,18 +15784,18 @@
           }
         },
         {
-            "id": "F9",
-            "description": "Records whose verdict was reused from an earlier probe are accepted, so the release evidence need not have measured this tree.",
-            "faultClass": "condition-forced",
-            "file": ".github/scripts/release-evidence.mjs",
-            "find": "r.reusedFrom !== undefined);",
-            "replace": "r.reusedFrom === 'never');",
-            "producedBy": {
-              "producer": "human",
-              "by": "maintainer",
-              "at": "2026-11-12T00:00:00Z"
-            }
+          "id": "F9",
+          "description": "Records whose verdict was reused from an earlier probe are accepted, so the release evidence need not have measured this tree.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/release-evidence.mjs",
+          "find": "r.reusedFrom !== undefined);",
+          "replace": "r.reusedFrom === 'never');",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
           }
+        }
       ]
     },
     {
@@ -15657,6 +16848,850 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SCOPED-PROBE-CONVERGES",
+      "statement": "A converging scoped probe writes the canonical evidence in claims-file order: the records it measured replace the old ones, every other record keeps its verdict and the run that first measured it and is marked with what the probe decided, and only a confirmed request without --ref, --no-reuse or an --out elsewhere converges.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (the fast path must converge)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/converge.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The canonical record stands in for the one just measured.",
+          "faultClass": "condition-forced",
+          "file": "src/evidence/carry.mjs",
+          "find": "      if (fresh.has(id)) { records.push(fresh.get(id)); continue; }",
+          "replace": "      if (false) { records.push(fresh.get(id)); continue; }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A record carried twice forgets the run that measured it.",
+          "faultClass": "other",
+          "file": "src/evidence/carry.mjs",
+          "find": "reusedFrom: record.reusedFrom ?? canonical.run.id, carried: decision",
+          "replace": "reusedFrom: canonical.run.id, carried: decision",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A provisional run converges.",
+          "faultClass": "condition-forced",
+          "file": "src/evidence/carry.mjs",
+          "find": "  if (provisional) return { converge: false, reason: 'the run is provisional (--confirm below 3)' };",
+          "replace": "  if (false) return { converge: false, reason: 'the run is provisional (--confirm below 3)' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Two runs in one second share an id.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/probe.mjs",
+          "find": "export const runId = (startedAt) => `run-${startedAt.replace(/[-:.]/g, '').slice(0, 18)}`;",
+          "replace": "export const runId = (startedAt) => `run-${startedAt.replace(/[-:.]/g, '').slice(0, 15)}`;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CARRY-NEEDS-UNCHANGED-INPUTS",
+      "statement": "A record is carried without a run only when its recorded inputs equal the current ones (the input half of the reuse rule) and the document passes the run-level reuse rule; any other TestGuard version or configuration carries nothing, and the refusal says why.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (the fast path must converge)"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/converge.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The target hash is not compared.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/attribution.mjs",
+          "find": "  return prior.inputs.targetHash === current.inputs.targetHash",
+          "replace": "  return true || prior.inputs.targetHash === current.inputs.targetHash",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Evidence from another TestGuard version is carried.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "  if (previous.tool?.version !== instrument.toolVersion || previous.run.instrument?.toolVersion !== instrument.toolVersion) return",
+          "replace": "  if (false) return",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONVERGED-PROBE-ENDS-FRESH",
+      "statement": "After a full probe and a committed change, probe --changed HEAD~1 updates the canonical evidence so status is fresh and next is no longer the full probe, and a later record whose inputs changed in a commit the selection did not cover is kept stale, never carried as fresh.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (the fast path must converge)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/converge-cli.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The merged document goes to the partial file.",
+          "faultClass": "other",
+          "file": "src/commands/probe.mjs",
+          "find": "      outPath = canonicalPath;",
+          "replace": "      outPath = partialPath;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The probe carries a record without comparing its inputs.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "        if (!inputsMatch(priorRecord, { claim, inputs, ...defenderSelection(claim, fault), resolved: defenders, contentHash })) return 'inputs-changed';",
+          "replace": "        if (false) return 'inputs-changed';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONVERGED-EVIDENCE-CONFORMS",
+      "statement": "The validator refuses a converged document whose carried record names no measuring run, whose selected claim has a carried record, or which a provisional run wrote.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (the fast path must converge)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "spec/conformance/convergence.test.mjs",
+        "test/converge.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A carried record of a selected claim is accepted.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "        if (r.carried && selected.has(r.claim.id)) errors.push(",
+          "replace": "        if (false) errors.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A carried record without reusedFrom is accepted.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (r.carried && !r.reusedFrom) errors.push(",
+          "replace": "      if (false) errors.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A provisional converged document is accepted.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (doc.run.provisional === true || doc.run.confirmRuns < 3) errors.push({ path: '/run/scope'",
+          "replace": "      if (false) errors.push({ path: '/run/scope'",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-BASELINE-REFUSES-STALE-CARRIED",
+      "statement": "baseline refuses a converged document that keeps records whose inputs changed, naming them, and status names each of those records stale so the two agree; baseline says how many records of a document it freezes were carried.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (the fast path must converge)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/converge.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A document with stale kept records is frozen.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/baseline.mjs",
+          "find": "  if (stale.length) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The carried share of a frozen document goes unsaid.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/baseline.mjs",
+          "find": "  if (carried) io.out(",
+          "replace": "  if (false) io.out(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "status trusts its own hashing over the probe and calls a kept record fresh.",
+          "faultClass": "condition-forced",
+          "file": "src/status/status.mjs",
+          "find": "    if (r.carried === 'inputs-changed') doc.stale.push(",
+          "replace": "    if (false) doc.stale.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TEMPLATES-PIN-WHAT-THEY-RUN",
+      "statement": "No template init writes can run a floating version: the fallback is the exact version that wrote it, GitHub Actions are pinned by commit SHA, init pins testguard-cli exactly in devDependencies and writes one dependency-update rule, and a floating version already in a hook or CI file is reported.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (templates pin what they run; the hook never starts a full probe)"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/init-pin.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Any version string is accepted as a pin.",
+          "faultClass": "guard-removed",
+          "file": "src/init/managed.mjs",
+          "find": "  if (!/^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$/.test(version ?? '')) throw new TypeError(`a template pins an exact version, not ${JSON.stringify(version)}`);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "checkout is pinned by a movable tag.",
+          "faultClass": "literal-changed",
+          "file": "src/init/managed.mjs",
+          "find": "  checkout: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',",
+          "replace": "  checkout: 'actions/checkout@v7',",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The devDependency floats.",
+          "faultClass": "literal-changed",
+          "file": "src/init/pin.mjs",
+          "find": "  pkg.devDependencies = { ...(pkg.devDependencies ?? {}), [PACKAGE]: version };",
+          "replace": "  pkg.devDependencies = { ...(pkg.devDependencies ?? {}), [PACKAGE]: 'latest' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A second npm rule is appended to a Dependabot file that has one.",
+          "faultClass": "condition-forced",
+          "file": "src/init/pin.mjs",
+          "find": "  if (!npm && lastTop && /^updates:\\s*$/.test(lastTop)) return",
+          "replace": "  if (lastTop && /^updates:\\s*$/.test(lastTop)) return",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A floating version is never reported.",
+          "faultClass": "condition-forced",
+          "file": "src/init/managed.mjs",
+          "find": "      if (floating) findings.push(",
+          "replace": "      if (false) findings.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "The pre-push hook fetches a TestGuard through npx when none is installed.",
+          "faultClass": "other",
+          "file": "src/init/managed.mjs",
+          "find": "  else echo \"testguard: not installed here, so this push was not probed (CI is the gate). Install it: ${install}\" >&2; exit 0",
+          "replace": "  else set -- npx -y testguard-cli@${version}",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-HOOK-NEVER-STARTS-A-FULL-PROBE",
+      "statement": "probe --changed auto --when-no-base skip probes nothing, writes nothing and exits 0 in one line when no base is found, fail refuses with kind no-base, and full (the default) says first that it probes every claim.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (templates pin what they run; the hook never starts a full probe)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/changed-auto-no-base.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A skip probes every claim instead.",
+          "faultClass": "statement-deleted",
+          "file": "src/commands/probe.mjs",
+          "find": "    if (decision.skip) { io.err(decision.message); return 0; }\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "--when-no-base fail falls back to a full probe.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/probe.mjs",
+          "find": "  if (noFullFallback) return",
+          "replace": "  if (false) return",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-WORKER-INDEX-IS-UNIQUE-ACROSS-COMMANDS",
+      "statement": "Two probe commands on one machine hand out different TESTGUARD_WORKER values: each adds TESTGUARD_WORKER_BASE or 100 times the lowest slot no live command holds, takes over a slot whose owner is gone, and releases it when done.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (worker index across commands; baseline trees serve the faults)"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/worker-env.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every command starts at 0.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/worker-env.mjs",
+          "find": "    return await context.run({ base: claim.slot * WORKER_SLOT_STRIDE, index: 0 }, fn);",
+          "replace": "    return await context.run({ base: 0, index: 0 }, fn);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A slot whose owner is gone is never taken over.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/worker-env.mjs",
+          "find": "      if (!lockIsStale(owner, { alive, host })) break;",
+          "replace": "      break;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-BASELINE-TREES-SERVE-THE-FAULTS",
+      "statement": "A fan-out reuses a baseline-phase scratch tree for a fault only while git sees it exactly as it was created, replaces any other, and removes kept trees the fault phase does not need.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (worker index across commands; baseline trees serve the faults)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/tree-reuse.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A tree is reused whatever git says about it.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/tree-reuse.mjs",
+          "find": "      try { clean = stateOf(tree) === tree.stateAtCreation; } catch { clean = false; }",
+          "replace": "      clean = true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Unneeded kept trees are never removed.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/tree-reuse.mjs",
+          "find": "  for (const tree of byWorker.values()) release(tree);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-KEPT-STALE-RECORDS-ARE-NEVER-CURRENT",
+      "statement": "A record a converging probe kept stale is never reuse and never current: run.reuse counts it as stale and the three counts add up, its claim reads could-not-verify / inputs-changed, and the assertion and origin policies are unavailable while it is there.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (orchestrator decision 1)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/converge.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A kept-stale record counts as reused.",
+          "faultClass": "condition-forced",
+          "file": "src/evidence/carry.mjs",
+          "find": "  const reused = records.filter((r) => r.reusedFrom && r.carried !== CARRIED.changed).length;",
+          "replace": "  const reused = records.filter((r) => r.reusedFrom).length;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A kept-stale record keeps its verdict in claim results.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/claim-results.mjs",
+          "find": "    if (record.carried === 'inputs-changed') record = { ...record, verdict: 'unverifiable', detail: { ...record.detail, reason: 'inputs-changed' } };\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The assertion policy passes over kept-stale records.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/assertion-policy.mjs",
+          "find": "  if (staleRecords.length) return { state: 'unavailable', exceptionOnlyKills, staleRecords };\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The origin policy accepts a kept-stale record.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/origin-policy.mjs",
+          "find": "    if (record.carried === 'inputs-changed') reasons.add('stale-inputs');\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-PROGRAM-DIGEST-VOUCHES",
+      "statement": "Under --typecheck one program digest per run (tsconfig, resolved configuration, every listed file; packages by name and version) stands in for a type check per reused or carried fault; a different program reuses nothing, and evidence without a digest is checked fault by fault once.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (orchestrator decision 2)"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-digest-pure.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A program file's content is left out of the digest.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/typecheck.mjs",
+          "find": "    entries.add(`file ${rel} ${hash}`);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Different program digests count as the same type check.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "  if (recorded.programDigest && current.programDigest) return recorded.programDigest === current.programDigest;",
+          "replace": "  if (recorded.programDigest && current.programDigest) return true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Every reused fault is type checked again.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "  if (typechecker && anchor?.status === 'ok' && !digestVouches) {",
+          "replace": "  if (typechecker && anchor?.status === 'ok') {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/typecheck-program-digest.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-CHANGED-SELECTS-DISCOVERY-INPUTS",
+      "statement": "probe --changed selects a claim with discovered defenders when one of its discovery inputs changed, found now or recorded in its evidence, and names the reason discovery.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #297"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-scope-discovery.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Current discovery inputs are ignored.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/scope.mjs",
+          "find": "      for (const file of detailed.dependencies) discovery.add(file);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Recorded discovery inputs are ignored.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/scope.mjs",
+          "find": "  const discovery = new Set(recorded);",
+          "replace": "  const discovery = new Set();",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A discovery match is not a reason to select.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/scope.mjs",
+          "find": "    else if (byDiscovery) reasons.set(claim.id, { claimId: claim.id, kind: 'discovery', file: byDiscovery });\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-UNREADABLE-REUSE-SOURCE-IS-REMEASURED",
+      "statement": "A reuse source this TestGuard cannot read as evidence (an older release's file under rules since tightened) is skipped with a warning and every fault is measured again; it never refuses the run.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301 item 3"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/converge.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An unreadable reuse source refuses the run.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/probe.mjs",
+          "find": "    try { return [readSpecDoc('evidence', path)]; }\n    catch (e) {",
+          "replace": "    try { return [readSpecDoc('evidence', path)]; }\n    catch (e) {\n      throw e;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The skipped source goes unsaid.",
+          "faultClass": "statement-deleted",
+          "file": "src/commands/probe.mjs",
+          "find": "      warn(`warning: ${path} cannot be read as evidence by this TestGuard (",
+          "replace": "      void (`warning: ${path} cannot be read as evidence by this TestGuard (",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SCOPED-RUN-JUDGES-ITS-SELECTION",
+      "statement": "A converging scoped run's exit and printed assertion policy judge only the records it measured, while the evidence file keeps the policy over every record written and the output counts the stale records it did not judge.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (review A of PR #298)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/converge.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The run is judged over the merged document.",
+          "faultClass": "variable-swap",
+          "file": "src/probe/assertion-policy.mjs",
+          "find": "  return { document, run: evaluateAssertionPolicy(measured), unjudged:",
+          "replace": "  return { document, run: document, unjudged:",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The stale records outside the selection go uncounted.",
+          "faultClass": "return-altered",
+          "file": "src/probe/assertion-policy.mjs",
+          "find": "unjudged: written.filter((r) => r.carried === 'inputs-changed').length };",
+          "replace": "unjudged: 0 };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PRE-PUSH-HOOK-SURVIVES-VERSION-SKEW",
+      "statement": "The managed pre-push hook, run with sh, never hands its flags to an installed TestGuard older than the template needs, refuses the push only on exit 1 or 2, lets exit 3 and a missing install through with one line, and honors TESTGUARD_SKIP_HOOK=1.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (review B of PR #298)"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/pre-push-hook.run.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The probe command is passed to any installed version.",
+          "faultClass": "condition-forced",
+          "file": "src/init/managed.mjs",
+          "find": "  if [ -z \"$have\" ] || ! printf",
+          "replace": "  if false && ! printf",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A usage error refuses the push.",
+          "faultClass": "return-altered",
+          "file": "src/init/managed.mjs",
+          "find": "so this push was not probed\" >&2; exit 0 ;;",
+          "replace": "so this push was not probed\" >&2; exit 1 ;;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Exit 2 lets the push through.",
+          "faultClass": "return-altered",
+          "file": "src/init/managed.mjs",
+          "find": "    0|1|2) exit $status ;;",
+          "replace": "    0|2) exit 0 ;;\n    1) exit 1 ;;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "TESTGUARD_SKIP_HOOK is ignored.",
+          "faultClass": "statement-deleted",
+          "file": "src/init/managed.mjs",
+          "find": "  if [ \"\\${TESTGUARD_SKIP_HOOK:-}\" = 1 ]; then echo \"testguard: TESTGUARD_SKIP_HOOK=1, so this push was not probed\" >&2; exit 0; fi\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-USAGE-ERROR-IS-ONE-LINE",
+      "statement": "A usage error (an unknown option or command) prints the error and \"Run 'testguard --help' for usage.\", never the whole help.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (review of PR #298)"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/cli-surface.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An unknown option prints the whole help.",
+          "faultClass": "other",
+          "file": "src/cli.mjs",
+          "find": "    io.err(e.message);\n    io.err(\"Run 'testguard --help' for usage.\");",
+          "replace": "    io.err(e.message);\n    io.err(USAGE);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An unknown command prints the whole help.",
+          "faultClass": "other",
+          "file": "src/cli.mjs",
+          "find": "    io.err(`unknown command: ${command}`);\n    io.err(\"Run 'testguard --help' for usage.\");",
+          "replace": "    io.err(`unknown command: ${command}`);\n    io.err(USAGE);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
           }
         }
       ]

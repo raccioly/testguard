@@ -93,7 +93,7 @@ describe('probe --typecheck reproduces the TypeScript fixture', () => {
   });
 
   it('names the checker in run.typecheck and the document conforms to the spec', () => {
-    expect(evidence.run.typecheck).toEqual({ commandHash: expect.stringMatching(/^[0-9a-f]{64}$/), version: '5.9.3' });
+    expect(evidence.run.typecheck).toEqual({ commandHash: expect.stringMatching(/^[0-9a-f]{64}$/), version: '5.9.3', programDigest: expect.stringMatching(/^[0-9a-f]{64}$/) });
     expect(validate('evidence', evidence)).toEqual({ ok: true, errors: [] });
   });
 

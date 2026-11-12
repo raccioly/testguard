@@ -410,8 +410,10 @@ npx testguard-cli probe --claim AUTH-ADMIN-001 # probe one claim (repeat or comm
 npx testguard-cli admit test/auth.test.mjs --claim AUTH-ADMIN-001   # judge one test against one claim
 ```
 
-`probe --claim` writes `.testguard/evidence-partial.json`, so a subset never
-masquerades as the full run. While iterating, `--no-escalate` and
+`probe --claim` updates `.testguard/evidence.json` with what it measured and
+carries every other record only when its inputs are unchanged, marking each one
+(`carried`), so a subset never masquerades as a full run. A provisional run
+writes `.testguard/evidence-partial.json` instead. While iterating, `--no-escalate` and
 `--confirm 1` make a fast provisional pass; finish with the defaults.
 
 ## admit: the two-gate rule

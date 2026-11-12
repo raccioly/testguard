@@ -145,6 +145,7 @@ where the runner can report one.
 | `workers-2`, `workers-4` | `--fault-workers 2` / `4` | key, reference (map and order) |
 | `typecheck` | `--typecheck` (TypeScript subjects) | key with its type-check overrides, reference elsewhere |
 | `changed` | `--changed HEAD~1` over scripted commits, then an unresolvable reference | keyed selections, key and reference for what is selected, exit 2 for the bad reference |
+| `converge` | a full probe into the canonical evidence, then the `changed` commits each followed by `--changed HEAD~1` with no `--out` | every scoped run converges; no record left stale; the merged document's verdict map equals a from-scratch probe of the same commit; key |
 | `partial` | `--command-budget 1000 --partial-on-budget` | every fault named in order; budget exhausted and its counts agree; not-reached records empty; whatever was reached matches the key |
 | `scratch` | `--scratch-dir` with node_modules a read-only copy (where the subject's own runner can run read-only; see `readOnlyNodeModules` in `subject.json`) | key, reference; node_modules unchanged; scratch directory left empty except the documented `testguard-locks/` |
 | `assertion-kill` | `--require-assertion-kill` | key, reference; the policy names exactly the keyed exception-only kills |

@@ -2,7 +2,7 @@
 // from the machine and is recorded; a partial run reuses the last full probe;
 // `--changed auto` with no base probes everything instead of nothing.
 import { describe, it, expect } from 'vitest';
-import { readFileSync, rmSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { probeCommand } from '../src/commands/probe.mjs';
 import { partialBudgetProject } from './helpers/partial-budget-project.mjs';
@@ -62,8 +62,11 @@ describe('a partial run reuses the last full probe', () => {
       const canonical = evidenceAt(project, 'evidence.json');
       const partial = await run(project, { claim: ['C2', 'C3'] });
       expect(partial.code).toBe(0);
-      const doc = evidenceAt(project, 'evidence-partial.json');
-      expect(doc.records.map((rec) => rec.reusedFrom)).toEqual([canonical.run.id, canonical.run.id]);
+      // The run converges into the canonical file (#293); its two selected records are the reused ones.
+      const doc = evidenceAt(project, 'evidence.json');
+      const selected = doc.records.filter((rec) => ['C2', 'C3'].includes(rec.claim.id));
+      expect(selected.map((rec) => [rec.reusedFrom, rec.carried])).toEqual([[canonical.run.id, undefined], [canonical.run.id, undefined]]);
+      expect(doc.records.filter((rec) => rec.carried).length).toBe(doc.records.length - 2);
       // One live run of each defender set licensed the carry-forward; no fault was applied.
       expect(doc.run.measurements.runnerInvocations).toBe(2);
       expect(doc.run.measurements.reuseBaselineRuns).toBe(2);
@@ -113,4 +116,23 @@ describe('--changed auto', () => {
       expect(evidenceAt(project, 'evidence.json').records).toHaveLength(4);
     } finally { rmSync(project.dir, { recursive: true, force: true }); }
   }), 60_000);
+});
+
+describe('an --out file this TestGuard cannot read (#301)', () => {
+  it('is re-measured and replaced, never a refusal', async () => {
+    const project = partialBudgetProject();
+    try {
+      const full = await run(project, {});
+      expect(full.code).toBe(0);
+      // What a 0.23 fan-out wrote: a kill with no run measured alone, which this validator refuses.
+      const doc = evidenceAt(project, 'evidence.json');
+      doc.run.faultWorkers = 2;
+      for (const record of doc.records) for (const r of record.detail.probeRuns ?? []) delete r.alone;
+      writeFileSync(join(project.dir, '.testguard', 'evidence.json'), JSON.stringify(doc));
+      const again = await run(project, {});
+      expect(again.code).toBe(0);
+      expect(again.err.join('\n')).toMatch(/cannot be read as evidence by this TestGuard .*fault fan-out needs at least one probe run measured alone.*measured again/);
+      expect(evidenceAt(project, 'evidence.json').run.reuse.reused).toBe(0);
+    } finally { rmSync(project.dir, { recursive: true, force: true }); }
+  }, 60_000);
 });

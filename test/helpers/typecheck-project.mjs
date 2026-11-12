@@ -81,11 +81,13 @@ export function stubProject({ src = SRC } = {}) {
   put('node_modules/typescript/package.json', JSON.stringify({ name: 'typescript', version: '9.9.9', bin: { tsc: 'bin/tsc' } }));
   put('node_modules/typescript/bin/tsc', `
 const fs = require('node:fs');
-if (process.argv.includes('--listFilesOnly')) { const here = process.cwd() + '/'; process.stdout.write([here + 'src/a.ts'].concat(fs.existsSync('src/other.ts') ? [here + 'src/other.ts'] : []).join('\\n') + '\\n'); process.exit(0); }
+fs.appendFileSync(process.env.TG_TSC_LOG || '/dev/null', JSON.stringify(process.argv.slice(2)) + '\\n');
+if (process.argv.includes('--listFilesOnly')) { const here = process.cwd() + '/'; process.stdout.write([here + 'src/a.ts'].concat(fs.existsSync('src/other.ts') ? [here + 'src/other.ts'] : [], fs.existsSync('types/ambient.d.ts') ? [here + 'types/ambient.d.ts'] : []).join('\\n') + '\\n'); process.exit(0); }
 if (process.argv.includes('--showConfig')) { process.stdout.write('{"compilerOptions":{}}'); process.exit(0); }
 const source = fs.readFileSync('src/a.ts', 'utf8');
 if (source.includes('SLOW')) setTimeout(() => {}, 60000);
 else if (source.includes('x + 2') && fs.existsSync('src/other.ts')) { process.stdout.write('src/other.ts(1,1): error TS2305: the whole program changed\\n'); process.exit(2); }
+else if (source.includes('x - 1') && fs.existsSync('types/ambient.d.ts') && fs.readFileSync('types/ambient.d.ts', 'utf8').includes('STRICT')) { process.stdout.write('types/ambient.d.ts(1,1): error TS2430: an ambient declaration nothing imports\\n'); process.exit(2); }
 else if (source.includes('BAD')) { process.stdout.write('src/a.ts(2,3): error TS2322: bad replacement\\n'); process.exit(2); }
 else process.exit(0);
 `);

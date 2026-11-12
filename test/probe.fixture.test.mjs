@@ -257,11 +257,15 @@ describe('probe reproduces the known-answer fixture', () => {
       const before = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json')).records.length;
       // REDACT-003 is deliberately repeated: it must be collapsed, not probed twice.
       expect(await main(['probe', scratch, '--claim', 'REDACT-003', '--claim', 'REDACT-002,REDACT-003', '--budget', '30000', '--quiet', '--no-escalate'], io)).toBe(0);
-      const partial = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence-partial.json'));
-      expect(partial.records.map((r) => r.claim.id)).toEqual(['REDACT-003', 'REDACT-002']);
-      expect(readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json')).records).toHaveLength(before);
-      expect(lines.out.join('\n')).toContain('partial: 2 claims requested, 2 probed: --claim REDACT-003,REDACT-002');
-      expect(validate('evidence', partial).ok).toBe(true);
+      // A confirmed scoped run converges into the canonical file (#293): the
+      // selection is measured in --claim order, the rest is carried or kept.
+      const merged = readSpecDoc('evidence', join(scratch, '.testguard', 'evidence.json'));
+      expect(merged.run.scope.requestedClaims).toEqual(['REDACT-003', 'REDACT-002']);
+      expect(merged.run.scope.selectedClaims).toEqual(['REDACT-003', 'REDACT-002']);
+      expect(merged.records.filter((r) => !r.carried).map((r) => r.claim.id)).toEqual(['REDACT-002', 'REDACT-003']);
+      expect(merged.records).toHaveLength(before);
+      expect(lines.out.join('\n')).toMatch(/converged: \d+ measured, 2 claims requested, 2 probed: --claim REDACT-003,REDACT-002/);
+      expect(validate('evidence', merged).ok).toBe(true);
     }, 60_000);
 
     it('partial --json names requested and probed counts and ids; an empty selection is a usage error', async () => {
