@@ -3,9 +3,14 @@ import { join, dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { PreconditionError } from '../probe/worktree.mjs';
+import { TEMPLATE_VERSION, prePushScript, huskyBlock, githubWorkflow, gitlabCi, installStep, markSkill, skillState, parseManagedBlocks, replaceManagedBlock, scanInstalled, renderFinding } from './managed.mjs';
 
 const TEMPLATES = join(dirname(fileURLToPath(import.meta.url)), 'templates');
-const AGENTS_BEGIN = '<!-- testguard:begin -->';
+/** The hash of every skill template shipped before template markers: an installed copy matching one is unmodified. */
+const SKILL_HISTORY = JSON.parse(readFileSync(join(TEMPLATES, 'skill-history.json'), 'utf8')).sha256;
+const AGENTS_BEGIN = `<!-- testguard:begin template=${TEMPLATE_VERSION} -->`;
+/** Every release's opening marker: before #270 it carried no template number (template 1). */
+const AGENTS_BEGIN_RE = /<!-- testguard:begin(?: template=(\d+))? -->/;
 const AGENTS_END = '<!-- testguard:end -->';
 /** Where fetch-ci-evidence.sh downloads CI's artifact, relative to the project. */
 export const CI_DOWNLOAD_DIR = '.testguard/ci';
@@ -70,11 +75,17 @@ Before writing or changing tests, run \`testguard status --json [dir]\` and foll
 The full operating loop and the verdict table are in \`.claude/skills/testguard/SKILL.md\`.
 Never make a fault die by editing \`testguard.claims.json\`; write the test. Claim edits are recorded in the evidence.
 
+The fast loop (faults already run in parallel, and every kill is confirmed by a run alone):
+- After changing code: \`testguard probe --changed auto\` probes only the claims your change can affect.
+- While writing one test: \`testguard probe --claim <ID> --confirm 1\` (provisional), then \`testguard admit <test-file> --claim <ID>\` before committing.
+- Run the full probe (\`testguard probe\`) only when asked, or in the nightly job.
+- Slow? \`testguard status --json\` lists \`advice\`, each line with the command to run.
+
 Once per AI session, identify the exact CLI used (project-local first, then repository-root, then PATH) and read its \`--version\`.
 If network policy permits, check \`npm view testguard-cli dist-tags.latest --json --fetch-retries=0 --fetch-timeout=5000\` once; this is optional AI advice, not a CLI or hook network call.
 Compare stable versions numerically by SemVer; do not downgrade or replace a prerelease/development checkout. If a newer stable version exists, suggest it and ask before updating, respecting pins and the original package manager.
 Never install automatically or alter lockfiles/CI pins without approval. On an unavailable check, continue without claiming up-to-date; keep advice separate from evidence, verdicts and exit codes. Do not repeat a declined suggestion this session.
-Existing copied skills and sections are preserved by ordinary init; review and merge template changes manually, or use \`init --force\` only with approval to overwrite the skill.
+After an update, \`testguard init --upgrade\` refreshes the skill, the hooks and this section where they are unmodified TestGuard templates, and reports anything edited by hand.
 
 ${lines.join('\n')}
 ${AGENTS_END}`;
@@ -215,8 +226,9 @@ exit 0
 };
 const CI_PLATFORMS = ['github', 'gitlab'];
 
-export function initProject({ projectDir, force = false, here = false, ciEvidence, mcp = false }) {
+export function initProject({ projectDir, force = false, here = false, ciEvidence, mcp = false, upgrade = false, ci, toolVersion = '0.0.0' }) {
   if (ciEvidence !== undefined && !CI_PLATFORMS.includes(ciEvidence)) throw new InitUsageError(`--ci-evidence must be github or gitlab, not ${JSON.stringify(ciEvidence)}`);
+  if (ci !== undefined && !CI_PLATFORMS.includes(ci)) throw new InitUsageError(`--ci must be github or gitlab, not ${JSON.stringify(ci)}`);
   projectDir = realpathSync(resolve(projectDir));
   const root = here ? null : gitRoot(projectDir);
   const agentRoot = root ?? projectDir;
@@ -238,12 +250,20 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
 
   const skillDir = join(agentRoot, '.claude', 'skills', 'testguard');
   const skillPath = join(skillDir, 'SKILL.md');
+  const skillTemplate = readFileSync(join(TEMPLATES, 'SKILL.md'), 'utf8');
+  const outdated = [];
   if (!existsSync(skillPath) || force) {
     const replaced = force && existsSync(skillPath);
-    write(skillPath, readFileSync(join(TEMPLATES, 'SKILL.md'), 'utf8'));
+    write(skillPath, markSkill(skillTemplate));
     done.push(`${rel(skillPath)}${replaced ? ' (replaced)' : ''}`);
   } else {
-    skipped.push(`${rel(skillPath)} exists (use --force to replace)`);
+    // An unmodified older skill is TestGuard's to refresh; an edited one is the
+    // project's, and only --force replaces it (#270).
+    const state = skillState(readFileSync(skillPath, 'utf8'), skillTemplate, SKILL_HISTORY);
+    if (state === 'current') skipped.push(`${rel(skillPath)} is the current template`);
+    else if (state === 'old' && upgrade) { write(skillPath, markSkill(skillTemplate)); done.push(`${rel(skillPath)} (upgraded to template ${TEMPLATE_VERSION})`); }
+    else if (state === 'old') outdated.push(`${rel(skillPath)}: an older skill template, unmodified — testguard init --upgrade rewrites it`);
+    else skipped.push(`${rel(skillPath)} exists and was edited (use --force to replace it with the current template)`);
   }
 
   settings.hooks ??= {};
@@ -281,14 +301,20 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
 
   const agentsPath = join(agentRoot, 'AGENTS.md');
   const agents = existsSync(agentsPath) ? readFileSync(agentsPath, 'utf8') : '';
-  const begin = agents.indexOf(AGENTS_BEGIN);
+  const beginMatch = AGENTS_BEGIN_RE.exec(agents);
+  const begin = beginMatch ? beginMatch.index : -1;
   const end = agents.indexOf(AGENTS_END);
   if (begin !== -1 && end !== -1) {
     const block = agents.slice(begin, end + AGENTS_END.length);
     const entries = [...block.matchAll(/^- (?:This project|`([^`]+)\/`)/gm)].map((m) => m[1] ?? '.');
     const legacyBlock = entries.length === 0; // a pre-0.6 section with no project list
-    if (entries.includes(dir)) {
+    const template = Number(beginMatch[1] ?? 1);
+    if (entries.includes(dir) && template < TEMPLATE_VERSION && upgrade) {
+      write(agentsPath, agents.slice(0, begin) + agentsBlock(entries) + agents.slice(end + AGENTS_END.length));
+      done.push(`AGENTS.md: TestGuard section upgraded to template ${TEMPLATE_VERSION}`);
+    } else if (entries.includes(dir)) {
       skipped.push(`AGENTS.md already has the TestGuard section for ${dir === '.' ? 'this project' : dir}`);
+      if (template < TEMPLATE_VERSION) outdated.push(`AGENTS.md: the TestGuard section is template ${template} — testguard init --upgrade rewrites it`);
     } else {
       write(agentsPath, agents.slice(0, begin) + agentsBlock([...entries, dir]) + agents.slice(end + AGENTS_END.length));
       done.push(legacyBlock ? `AGENTS.md: TestGuard section rewritten to list ${dir}` : `AGENTS.md: TestGuard section now lists ${dir}`);
@@ -326,6 +352,60 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
     }
   }
 
+  // ---- the fast path: a pre-push hook, and CI on request (#270) ----
+  const hookPath = join(projectDir, '.testguard', 'hooks', 'pre-push');
+  const handled = new Set(); // files whose TestGuard block this run judged itself
+  const refresh = (path, text, label, name) => {
+    handled.add(rel(path));
+    if (!existsSync(path)) { write(path, text, { mode: 0o755 }); done.push(label); return; }
+    const current = readFileSync(path, 'utf8');
+    const block = parseManagedBlocks(current).find((b) => b.name === name);
+    if (current === text) { skipped.push(`${rel(path)} is the current template`); return; }
+    if (force || (upgrade && block && !block.modified)) { write(path, text, { mode: 0o755 }); done.push(`${label} (upgraded to template ${TEMPLATE_VERSION})`); return; }
+    if (block && block.template < TEMPLATE_VERSION && !block.modified) outdated.push(`${rel(path)}: template ${block.template}, unmodified — testguard init --upgrade rewrites it`);
+    else if (block?.modified) skipped.push(`${rel(path)} was edited by hand (use --force to replace it with the current template)`);
+    else skipped.push(`${rel(path)} exists and is not TestGuard's; left alone`);
+  };
+  refresh(hookPath, prePushScript(), `${rel(hookPath)}: pre-push → probe --changed auto (fault workers auto; the full probe is the nightly job)`, 'pre-push');
+  const huskyDir = join(agentRoot, '.husky');
+  if (existsSync(huskyDir)) {
+    const huskyPath = join(huskyDir, 'pre-push');
+    const block = huskyBlock(dir);
+    const existing = existsSync(huskyPath) ? readFileSync(huskyPath, 'utf8') : '';
+    const ours = parseManagedBlocks(existing).find((b) => b.name === 'pre-push');
+    handled.add(rel(huskyPath));
+    if (!ours) {
+      write(huskyPath, (existing ? existing.replace(/\s*$/, '\n') : '') + block + '\n', { mode: 0o755 });
+      done.push(`${rel(huskyPath)}: runs ${dir === '.' ? '' : `${dir}/`}.testguard/hooks/pre-push`);
+    } else if (existing.includes(block)) {
+      skipped.push(`${rel(huskyPath)} already runs the TestGuard pre-push hook`);
+    } else if ((upgrade && !ours.modified) || force) {
+      write(huskyPath, replaceManagedBlock(existing, 'pre-push', block), { mode: 0o755 });
+      done.push(`${rel(huskyPath)}: TestGuard block upgraded to template ${TEMPLATE_VERSION}`);
+    } else {
+      outdated.push(`${rel(huskyPath)}: the TestGuard block is template ${ours.template}${ours.modified ? ', edited by hand (--force replaces it)' : ' — testguard init --upgrade rewrites it'}`);
+    }
+  } else {
+    notes.push(`Enable the pre-push hook (git keeps hooks per clone): ln -s "$(git rev-parse --show-toplevel)/${dir === '.' ? '' : `${dir}/`}.testguard/hooks/pre-push" "$(git rev-parse --git-path hooks)/pre-push" — or call it from your hook manager.`);
+  }
+  if (ci !== undefined) {
+    const install = installStep(projectDir);
+    if (ci === 'github') {
+      const wf = join(agentRoot, '.github', 'workflows', dir === '.' ? 'testguard.yml' : `testguard-${dir.replace(/[^A-Za-z0-9_-]+/g, '-')}.yml`);
+      refresh(wf, githubWorkflow({ dir, install }) + '\n', `${rel(wf)}: pull requests probe --changed auto; nightly and manual runs probe every claim; evidence cached`, 'github-workflow');
+    } else {
+      const gl = join(projectDir, 'testguard.gitlab-ci.yml');
+      refresh(gl, gitlabCi({ dir, install }) + '\n', `${rel(gl)}: include it from .gitlab-ci.yml; merge requests probe --changed auto, scheduled pipelines probe every claim`, 'gitlab-ci');
+    }
+  }
+  // Hooks and CI files this run does not write: the ones that still run
+  // TestGuard the slow or stale way, reported with what fixes them.
+  const writing = new Set(writes.map((w) => rel(w.path)));
+  for (const f of scanInstalled({ root: gitRoot(agentRoot) ?? agentRoot, toolVersion })) {
+    if (f.managed && (writing.has(f.file) || handled.has(f.file))) continue;
+    outdated.push(renderFinding(f));
+  }
+
   // ---- every check passed: write ----
   for (const w of writes) {
     mkdirSync(dirname(w.path), { recursive: true });
@@ -345,5 +425,5 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
     };
     notes.push('MCP: five read-only tools (status, brief, claims, evidence, next_command). Nothing there runs a probe.');
   }
-  return { done, skipped, warnings, agentRoot, projectDir, dir, ...(mcpConfig ? { mcpConfig } : {}) };
+  return { done, skipped, warnings, outdated, notes, agentRoot, projectDir, dir, ...(mcpConfig ? { mcpConfig } : {}) };
 }

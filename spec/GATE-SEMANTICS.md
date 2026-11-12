@@ -1416,12 +1416,24 @@ therefore uses one. Nested built-in runners retain their one-worker default.
 
 ## Fault fan-out
 
-`probe --fault-workers <n>` (default 1) probes up to n faults at once. Each
+`probe --fault-workers <n|auto>` probes up to n faults at once. Each
 fault in flight has its own scratch worktree at the probed commit; no two
-faults ever share a tree, so it is refused with `--in-place` (a usage error,
-exit 3, at the CLI; a precondition error through the API). n = 1 is the serial
-run exactly: the same invocations in the same order, and evidence without
-`run.faultWorkers`.
+faults ever share a tree, so an explicit n above one is refused with
+`--in-place` (a usage error, exit 3, at the CLI; a precondition error through
+the API). n = 1 is the serial run exactly: the same invocations in the same
+order, and evidence without `run.faultWorkers`.
+
+**The width (#270).** The CLI resolves n in this order: `--serial` (the flag
+as typed, never the derived one-runner-worker default) means one fault at a
+time and is refused beside `--fault-workers` above one; then
+`--fault-workers <n|auto>`; then `TESTGUARD_FAULT_WORKERS` (empty is unset);
+then `auto`. `auto` is `min(4, floor(cpus / 2))`, at least one, where cpus is
+`os.availableParallelism()`; `--in-place` resolves it to one. When other test
+runners are already running as the probe starts (the contention check), an
+automatic n is halved (at least one) and the probe says so; a chosen n is
+kept. The evidence records `run.faultWorkersSource` (`auto`, `flag`, `env`,
+`serial`, `in-place`) and, for `auto` only, `run.cpus`. The library API
+defaults to one and records no source unless its caller passes one.
 
 1. **Plan, then measure.** Every fault is first planned in claim/fault order
    on the first scratch tree with no fault applied anywhere: defender
@@ -1449,14 +1461,18 @@ run exactly: the same invocations in the same order, and evidence without
 4. **Order.** Records and the per-record progress stream (`onProgress`,
    `--progress ndjson` verdicts) follow claim/fault order whatever order the
    trees finish in. Apart from timings (`durationMs`, `run.measurements`),
-   `run.faultWorkers`, `detail.remeasuredSerially` and
-   `detail.baselineRemeasuredSerially`, the evidence has the
-   content a serial run of the same commit would have. Per-stage progress lines
-   from different trees interleave.
+   `run.faultWorkers`, `run.faultWorkersSource`, `run.cpus`,
+   `probeRuns[].alone`, `detail.remeasuredSerially`,
+   `detail.baselineRemeasuredSerially` and `detail.notParallelSafe`, the
+   evidence has the content a serial run of the same commit would have.
+   Per-stage progress lines from different trees interleave.
 5. **Contention is not a verdict.** Per-run budgets (`--budget`) do not scale
    with the fan-out. A record measured while another fault was in flight whose
-   verdict is `timeout`, or `flaky-defender` with reason `inconsistent-probe`,
-   is not reported from that measurement: after the fan-out it is measured
+   verdict is `timeout`, `flaky-defender` with reason `inconsistent-probe`,
+   `fault-invalid` with reason `suite-failed-to-load`, or `survived` with
+   reason `killed-by-undeclared-tests` (the wider suite's run is the one most
+   exposed to neighbours, and its attribution names killers), is not reported
+   from that measurement: after the fan-out it is measured
    again with nothing else in flight, in a fresh scratch tree (the contended
    run may have left state in its own), reusing its frozen baseline, and the
    serial measurement is what the record reports, whatever its verdict, with
@@ -1466,9 +1482,20 @@ run exactly: the same invocations in the same order, and evidence without
    `remeasuredSerially` and `baselineRemeasuredSerially` on a document without
    `run.faultWorkers` above one, and `run.faultWorkers` together with
    `mode: "in-place"`.
-6. **Reuse.** `run.faultWorkers` is recorded only above one. A measurement
-   under a fan-out never stands in for a serial run or for a different
-   fan-out; a serial measurement (no `run.faultWorkers`) may stand in for any.
+6. **Reuse.** `run.faultWorkers` is recorded only above one. Every fan-out of
+   one tool version is guarded alike (rule 11), so its width is not part of
+   what was measured: a measurement under a fan-out stands in for a fan-out of
+   any width, and for a run whose one fault at a time was not asked for (an
+   automatic width of one). It never stands in for a run that asked for one
+   fault at a time (`--serial`, or one by `--fault-workers` or
+   `TESTGUARD_FAULT_WORKERS`). A serial measurement (no `run.faultWorkers`)
+   may stand in for any. A reused record keeps the marks of the run that
+   measured it (`alone`, `remeasuredSerially`, `notParallelSafe`), whatever
+   the current run's width; validators judge those marks only on records this
+   run measured. A run probing a selection (`--claim`, `--changed`) reads the
+   canonical evidence as a reuse source beside its own output file; each
+   document must pass the reuse rules on its own, and where both hold a fault
+   the one that finished later is used.
 7. **Contention advice.** The contention warning names `--fault-workers` when
    the probe fans out, and the probe warns before the first run when n times
    the runner's worker count exceeds the CPUs available to the process.
@@ -1494,4 +1521,52 @@ run exactly: the same invocations in the same order, and evidence without
    working directory. `node_modules` is linked into every tree as for one, so
    the disk cost is one checkout per tree. Tests that bind a fixed port, share
    an external database or write outside the project tree can collide across
-   trees; whether to fan out is the project's decision.
+   trees; rule 11 is what keeps such a collision from becoming a verdict.
+11. **Every kill rests on a run alone (#270).** A fan-out is on by default, so
+   it may not depend on the suite being hermetic. A suite that shares a fixed
+   port, a database or a temp path across trees can fail N/N beside another
+   fault although the fault changes nothing it asserts: a kill that did not
+   happen. So:
+   - Every probe run measured in a fan-out records `alone: true` exactly when
+     no other fault's measurement (apply to restore) was in flight at any
+     moment between its start and its end.
+   - Before its last probe run, a fault whose runs so far were all kills,
+     none alone, while another fault is in flight, stops and restores. After
+     the fan-out, in claim/fault order, in one fresh scratch tree with nothing
+     else in flight, the fault is applied again and its last run is taken
+     alone (counted in `run.measurements.aloneConfirmRuns`, timed in
+     `aloneConfirmMs`). A fault whose N kills turned out to have no run alone
+     after all (another fault began during the last) sets the last run aside
+     and is confirmed the same way. `probeRuns` stays N runs long, so the
+     guard costs a hermetic suite no extra run, only the confirmations' lost
+     concurrency.
+   - A run alone that passes while a run beside other faults did not is a
+     **disagreement**: the red was the neighbours'. It never reaches the
+     verdict function as `inconsistent-probe`. The fault is measured again,
+     alone and in full (rule 5's re-measure), and its defender set is **not
+     parallel-safe** for the rest of the run. So is a set whose baseline was
+     red beside other sets and green alone (rule 2). The probe warns once per
+     such set, naming its files.
+   - Every fault of a set already not parallel-safe when the fan-out starts
+     is probed after it, alone, in one scratch tree, as a serial run would.
+     Every kill in a set that became not parallel-safe and does not rest
+     only on runs alone is measured again, alone and in full. Each record
+     of such a set says `detail.notParallelSafe: true`.
+   - Nothing above is published, or survives a command budget that runs
+     out, before it is decided: a deferred kill or a disagreement held when
+     `--partial-on-budget` stops the run is reported `not-reached`.
+   - A negative control or survivor measured beside other faults can only
+     lean towards red, which keeps a survivor a survivor: the pessimistic
+     side, so neither is re-measured.
+   **What a fan-out kill rests on.** N red runs, at least one alone. In a set
+   that never showed interference the other runs count as a serial run's
+   would. If the set does interfere, the run alone disagrees and the set is
+   held to N runs alone — unless every contended run was failed by a
+   neighbour *and* the run alone failed by the defenders' own flakiness on a
+   fault they do not detect, a coincidence that a baseline green N runs out
+   of N bounds. A validator rejects a fan-out document in which a measured
+   `killed` record has no probe run alone, or in which a record with
+   `remeasuredSerially`, or a `killed` record with `notParallelSafe`, has a
+   run that was not alone; `alone`, `notParallelSafe` and the guard's
+   measurements are rejected on records and runs of a document without a
+   fan-out, unless the record is reused.

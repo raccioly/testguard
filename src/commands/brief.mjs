@@ -40,7 +40,7 @@ export async function briefCommand({ projectDir, values, version }, io) {
   }
   // Where this binary came from, so a stale install is visible in the session-start context.
   const install = installLabel(process.argv[1]);
-  const brief = buildBrief(evidence, baseline, { max, next: status?.next, changes: status?.changes, install });
+  const brief = buildBrief(evidence, baseline, { max, next: status?.next, changes: status?.changes, install, advice: status?.advice });
   if (!values.text && !values.markdown) writeSpecDoc('brief', values.out ? resolve(values.out) : join(projectDir, '.testguard', 'brief.json'), brief);
   if (values.markdown) io.out(renderBriefMarkdown({ ...brief, provisional: Boolean(evidence.run.provisional) }, { hasBaseline: Boolean(baseline), total: evidence.records.length, install }).trimEnd());
   else io.out(values.json ? JSON.stringify(brief, null, 2) : brief.text.trimEnd());

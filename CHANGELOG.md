@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Fast by default (#270).** `probe` now runs `--fault-workers auto`: half
+  the CPUs, at most 4, one on a one- or two-CPU machine, halved when other test
+  runners are already busy. `--fault-workers <n>`, `TESTGUARD_FAULT_WORKERS`
+  and `--serial` override it, and `--serial` now also means one fault at a time
+  (it used to mean only one runner worker, which was already the default).
+  The evidence records how the width was chosen (`run.faultWorkersSource`,
+  and `run.cpus` for auto). The library `probe()` still defaults to one.
+  To get the old behavior back: `probe --serial`, or
+  `TESTGUARD_FAULT_WORKERS=1`.
+- **A fan-out never reports a kill that did not happen.** Every kill measured
+  beside other faults rests on at least one probe run with no other fault in
+  flight (`probeRuns[].alone`), taken after the fan-out in a tree of its own.
+  A run alone that passes where a contended one failed marks the defender
+  set **not parallel-safe** (`detail.notParallelSafe`, and a warning naming
+  its files): the fault, and every kill in that set, is measured again alone.
+  So is a set whose baseline was red beside other sets and green alone. A
+  suite that binds a fixed port no longer turns into false kills. The guard's
+  cost is in `run.measurements` (`aloneConfirmRuns`, `aloneConfirmMs`,
+  `remeasuredFaults`, `remeasureMs`). Contended `killed-by-undeclared-tests`
+  attributions and `suite-failed-to-load` are re-measured alone too.
+- **A fan-out stands in for a fan-out of any width** in verdict reuse, so a
+  laptop at 4 and CI at 2 share evidence. It still never stands in for a run
+  that asked for one fault at a time.
+- **`probe --changed` and `--claim` also reuse the last full probe's
+  verdicts** (the canonical `.testguard/evidence.json`), under the same reuse
+  rules. That is what makes a pre-push probe of a small change cheap.
+
+### Added
+
+- **`probe --changed auto`** finds the base offline: the CI base branch, the
+  remote default branch, a differently named upstream, then the branch's own
+  upstream (the commits not pushed yet). With none, it probes every claim.
+
 ### Fixed
 
 - **The self-probe cost gate no longer credits a runner that slowed down

@@ -91,9 +91,9 @@ export function detectContention({ self = process.pid, alive = defaultAlive, ...
 }
 
 /**
- * What would actually change this run. `--serial` is the same as `--workers 1`,
- * which is the default, so advising it to a run that is already serial offers
- * a flag that changes nothing; a custom command's concurrency is its own. A
+ * What would actually change this run. `--serial` is one runner worker and one
+ * fault at a time (#270), so advising it to a run that already runs one test
+ * process at a time offers a flag that changes nothing; a custom command's concurrency is its own. A
  * fan-out (`--fault-workers` above 1) multiplies whatever each suite costs, so
  * it is the first thing to lower; its timeouts and inconsistent probes are
  * measured again serially before they are reported, which costs time, not
@@ -104,8 +104,12 @@ function contentionAdvice({ serial = true, workers = 1, custom = false, faultWor
     ? ` This probe also runs ${faultWorkers} faults at once; lower --fault-workers ${faultWorkers} first — a timeout or inconsistent probe measured under the fan-out is re-measured serially before it is reported, so contention costs time here, not verdicts.`
     : '';
   if (custom) return 'Wait for it to finish; a --runner-cmd manages its own concurrency, so make that command run one test file at a time if it does not already.' + fanOut;
-  if (serial || workers <= 1) return 'Wait for it to finish: this probe already runs one test file at a time (--workers 1), so --serial would change nothing.' + fanOut;
-  return `Wait for it to finish, or lower --workers ${workers} (or pass --serial) to run one test file at a time.` + fanOut;
+  if (serial || workers <= 1) {
+    return (faultWorkers > 1
+      ? 'Wait for it to finish, or pass --serial to run one test process at a time.'
+      : 'Wait for it to finish: this probe already runs one test process at a time.') + fanOut;
+  }
+  return `Wait for it to finish, or lower --workers ${workers} (or pass --serial) to run one test process at a time.` + fanOut;
 }
 
 /** One line for the operator: what is running, what it costs, and what would help. */

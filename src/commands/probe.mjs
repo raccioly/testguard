@@ -6,7 +6,7 @@ import { writeSpecDoc, readSpecDoc } from '../evidence/writer.mjs';
 import { gate } from '../baseline/baseline.mjs';
 import { renderRecord, renderSummary, sortForReport, PROVISIONAL_WARNING, renderOriginPolicy } from '../render.mjs';
 import { computeStatus } from '../status/status.mjs';
-import { resolveChangedRef, withChangedRef } from '../gate/changed.mjs';
+import { resolveChangedRef, resolveAutoChangedRef, withChangedRef } from '../gate/changed.mjs';
 import { costReport, renderCost } from '../probe/cost.mjs';
 import { progressMode, stageReporter, clearStageLine, recordEvent, isProgressMode, progressStream } from '../probe/progress.mjs';
 import { validate } from '../../spec/lib/validate.mjs';
@@ -18,6 +18,9 @@ import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
 import { runnerOptions } from './runner-options.mjs';
 import { resolveFaultWorkers } from '../probe/fan-out.mjs';
 import { availableParallelism } from 'node:os';
+import { computeAdvice, renderAdvice } from '../status/advice.mjs';
+import { resolveProbeScope } from '../probe/scope.mjs';
+import { repoRoot } from '../git.mjs';
 import { selectByChange, measuredScope, renderNoSelection, renderUnmatched, scopedView, renderScopedView } from './probe-scope.mjs';
 import { claimResults } from '../probe/claim-results.mjs';
 import { partialExit, partialEvidencePath, isNotReached } from '../probe/partial-budget.mjs';
@@ -25,6 +28,30 @@ export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testgu
 
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
 export const baselinePath = (projectDir) => join(projectDir, '.testguard', 'baseline.json');
+
+/** One line on how wide the run was and what its guard cost, for a fan-out. */
+export function renderFanOut(run) {
+  if (!(run.faultWorkers > 1)) return undefined;
+  const m = run.measurements ?? {};
+  const how = run.faultWorkersSource === 'auto' ? `auto, ${run.cpus} CPUs` : run.faultWorkersSource ?? 'requested';
+  const s = (ms) => `${((ms ?? 0) / 1000).toFixed(1)}s`;
+  return `fan-out: ${run.faultWorkers} faults at a time (${how}); ${m.aloneConfirmRuns ?? 0} kill${m.aloneConfirmRuns === 1 ? '' : 's'} confirmed by a run alone (${s(m.aloneConfirmMs)}), ${m.remeasuredFaults ?? 0} fault${m.remeasuredFaults === 1 ? '' : 's'} measured again alone (${s(m.remeasureMs)}).`;
+}
+
+/** The speed advice for the run that just finished: the status rules, with the change measured from the base `--changed auto` would use. */
+function probeAdvice({ projectDir, claims, evidence, scoped, version, cpus }) {
+  let changed;
+  if (!scoped) {
+    try {
+      const auto = resolveAutoChangedRef({ projectDir });
+      const scope = auto && resolveProbeScope({ projectDir, claims, ref: auto.ref, timeoutMs: 10_000 });
+      if (scope && scope.outcome !== 'undetermined') changed = { selected: scope.selected.length, total: claims.claims.length, ref: auto.ref };
+    } catch { changed = undefined; }
+  }
+  let root;
+  try { root = repoRoot(projectDir); } catch { root = undefined; }
+  return computeAdvice({ evidence, cpus, changed, root, toolVersion: version });
+}
 
 /** Every repeated/comma-separated --claim value, in first-seen order. */
 export function claimSelection(values) {
@@ -151,6 +178,18 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   }
   let only = requested;
   let changedScope;
+  // `--changed auto` (#270): the base found offline, as a pre-push hook and a
+  // CI job need it. Nothing to compare against is a full probe, never a skip.
+  if (values.changed === 'auto') {
+    const auto = resolveAutoChangedRef({ projectDir });
+    if (auto) {
+      if (!values.quiet) io.err(`--changed auto: comparing against ${auto.ref} (${auto.from})`);
+      values = { ...values, changed: auto.ref };
+    } else {
+      io.err('--changed auto: no base to compare against (no CI base branch, no remote default branch, no upstream), so every claim is probed');
+      values = { ...values, changed: undefined };
+    }
+  }
   if (values.changed !== undefined) {
     const selection = selectByChange({ projectDir, claims, ref: values.changed, includeDirty: values['include-dirty'], only: requested, failOnEmpty: values['fail-on-empty-selection'] });
     if (selection.outcome !== 'selected') {
@@ -324,6 +363,12 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     io.out('');
   }
   if (changedScope) for (const line of renderUnmatched(changedScope)) io.out(line);
+  if (!values.quiet) {
+    const fanOutLine = renderFanOut(evidence.run);
+    if (fanOutLine) io.out(fanOutLine);
+    // Where this run left speed on the table (#270), with the command.
+    for (const line of renderAdvice(probeAdvice({ projectDir, claims, evidence, scoped: Boolean(scope), version, cpus: deps.cpus ?? availableParallelism() }))) io.out(line);
+  }
   io.out(`evidence: ${outPath}${scope ? ` (partial: ${[scope.requestedClaims ? `${scope.requestedCount} claim${scope.requestedCount === 1 ? '' : 's'} requested` : null, scope.changed ? `${scope.selectedCount} selected by --changed ${scope.changed.ref}` : null, `${scope.probedCount} probed`].filter(Boolean).join(', ')}${scope.requestedClaims ? `: --claim ${scope.requestedClaims.join(',')}` : ''}; not the canonical evidence file)` : exhausted ? ' (incomplete: command budget exhausted; not the canonical evidence file)' : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
   return exitCode;

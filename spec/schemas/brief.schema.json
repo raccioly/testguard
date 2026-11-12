@@ -37,6 +37,20 @@
       },
       "additionalProperties": false
     },
+    "advice": {
+      "description": "The status document's speed advice (#270), carried so a session-start brief says how to go faster: one line each with the exact command. Informational only; never changes `next`.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "message", "command"],
+        "properties": {
+          "id": { "enum": ["serial-on-multicore", "full-probe-where-changed-would-do", "nothing-reused", "hook-outdated"] },
+          "message": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "command": { "type": "string", "pattern": "^testguard ", "maxLength": 256 }
+        },
+        "additionalProperties": false
+      }
+    },
     "next": {
       "description": "The one action that moves the project forward, as computed by the status document; the brief carries it so an agent reading its session-start context knows what to do, not only what is wrong.",
       "type": "object",

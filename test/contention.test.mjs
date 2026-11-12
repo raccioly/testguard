@@ -61,7 +61,7 @@ describe('contentionWarning', () => {
     const w = contentionWarning(detectContention({ platform: 'darwin', run: fakePs(PS), self: 505, alive: () => true }));
     expect(w).toContain('2 test runners are already running (pid 501, pid 502)');
     expect(w).toMatch(/TIMEOUT or FLAKY-DEFENDER — verdicts about the load, not the claim/);
-    expect(w).toContain('--serial');
+    expect(w).toMatch(/one test process at a time/);
   });
 });
 
@@ -104,7 +104,12 @@ describe('the contention advice is something that would change the run', () => {
     const w = contentionWarning(c, { serial: true, workers: 1 });
     expect(w).toMatch(/Wait for it to finish/);
     expect(w).not.toMatch(/pass --serial/);
-    expect(w).toMatch(/already runs one test file at a time/);
+    expect(w).toMatch(/already runs one test process at a time/);
+  });
+  it('a fan-out is told that --serial runs one test process at a time (#270)', () => {
+    const w = contentionWarning(c, { serial: true, workers: 1, faultWorkers: 4 });
+    expect(w).toMatch(/pass --serial to run one test process at a time/);
+    expect(w).toMatch(/lower --fault-workers 4/);
   });
   it('a run that raised --workers is told how to lower it', () => {
     const w = contentionWarning(c, { serial: false, workers: 4 });

@@ -206,7 +206,7 @@ describe('preconditions', () => {
     expect(await probeCommand({ projectDir: '/nonexistent', values: { ...values, 'fault-workers': 'many' }, version: '0.0.0' }, io)).toBe(3);
     expect(err).toEqual([
       '--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place',
-      '--fault-workers must be a positive safe integer',
+      '--fault-workers must be a positive integer or auto (got "many")',
     ]);
   });
 });
