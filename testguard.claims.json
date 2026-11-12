@@ -13102,6 +13102,51 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-VITEST-RUN-SELECTS-ITS-PROJECTS",
+      "statement": "Against the installed vitest, a defender listed under a project passes or fails in that project's own environment only: another project's file whose path contains it never runs in its place, and a file under two projects fails if either run fails (#277).",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 13"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/vitest-projects.run.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Project membership is ignored and the defenders run in one invocation filtered by path.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/vitest.mjs",
+          "find": "  if (groups.length <= 1 && !groups[0]?.project) return runOnce(opts);",
+          "replace": "  return runOnce(opts);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Each per-project run is started without its project's selector.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/runners/vitest.mjs",
+          "find": "argv: (files, outFile) => argvFor(opts.projectDir, files, outFile, { ...opts, project })",
+          "replace": "argv: (files, outFile) => argvFor(opts.projectDir, files, outFile, opts)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
     }
   ]
 }

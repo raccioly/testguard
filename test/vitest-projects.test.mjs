@@ -58,9 +58,12 @@ describe('reading vitest list output, recorded from vitest 3, 4 and 5', () => {
   }
 
   it('keeps a whole line that names an existing file, such as a [slug] directory', () => {
-    const exists = (path) => path === '[slug]/page.test.mjs';
-    expect(vitest.parseDiscoveryOutput('[slug]/page.test.mjs\n[ui] tests/a.test.mjs\n', exists)).toEqual([
+    // `[slug]/x` never looks like a prefix; `[draft] notes.test.mjs` does, and
+    // is still the file of that name when one exists.
+    const exists = (path) => path === '[draft] notes.test.mjs';
+    expect(vitest.parseDiscoveryOutput('[slug]/page.test.mjs\n[draft] notes.test.mjs\n[ui] tests/a.test.mjs\n', exists)).toEqual([
       { file: '[slug]/page.test.mjs' },
+      { file: '[draft] notes.test.mjs' },
       { file: 'tests/a.test.mjs', project: 'ui' },
     ]);
   });
