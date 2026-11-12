@@ -131,7 +131,7 @@
     {
       "kind": "path",
       "pattern": "test/admit.test.mjs",
-      "reason": "Changed only to pin the fixture git options (FIXTURE_GIT from test/helpers/git.mjs) so the suite no longer depends on the machine's global git config; no assertion changed. It defended no claim before this change and defends none now. The excuse expires so the next real edit to this file states the claim it defends instead of riding on this one.",
+      "reason": "End-to-end acceptance of `testguard admit` on the known-answer fixture (seven tests, 12 s locally and 17-22 s in CI). The claims it defends were found by probing every claim with a fault in src/admit or src/commands/admit with this file as the only defender: it kills TG-ADMIT-NEEDS-ALL-KILLED/F1 and TG-REPEATED-CLAIMS-ARE-ALL-PROBED/F6, and nothing else. Both are defended by fast files (test/admit-decision.test.mjs, which now also holds the decision's rules this file used to carry, and test/claim-options.test.mjs). Naming this file as a defender would run it six times per fault, 100 to 130 s against the 100 s per-claim ceiling, for no kill the fast files do not already make, which is the cost the 67-87 s TG-ADMIT-NEEDS-ALL-KILLED history is about. It stays mandatory in npm test and CI. The excuse still expires so a later edit re-examines it.",
       "by": "maintainer",
       "at": "2026-10-10T17:00:00Z",
       "expires": "2026-12-31T00:00:00Z"
@@ -195,7 +195,7 @@
     {
       "kind": "path",
       "pattern": "test/probe.python.test.mjs",
-      "reason": "Changed only to pin the fixture git options (FIXTURE_GIT from test/helpers/git.mjs) so the suite no longer depends on the machine's global git config; no assertion changed. It defended no claim before this change and defends none now. The excuse expires so the next real edit to this file states the claim it defends instead of riding on this one.",
+      "reason": "Acceptance oracle for the full known-answer Python probe (about 20 s a run, most of it one deliberately hung defender), under both the unittest and pytest engines. The claims it defends were found by probing every claim with a fault in src/probe/runners/python.mjs or src/probe/pyimports.mjs with this file as the only defender: it kills TG-PYTHON-COLLECTION-ERROR-NEVER-KILLS/F1, TG-PYTHON-ATTRIBUTE-PATCH-IS-STILL-A-DEFENDER/F1 and TG-PINNED-RUNNER-KEEPS-ITS-CAPABILITIES/F1. The first two now name test/probe-python-claims.test.mjs, and the third keeps test/negative-control-capabilities.test.mjs, which probes just those two fixture claims in a second or two. Naming this file would repeat a 20 s probe six times per fault, 120 s against the 100 s per-claim ceiling. It stays mandatory in npm test and CI (the python job also runs it under pytest). The excuse still expires so a later edit re-examines it.",
       "by": "maintainer",
       "at": "2026-10-10T17:00:00Z",
       "expires": "2026-12-31T00:00:00Z"

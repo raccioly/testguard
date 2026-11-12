@@ -3,7 +3,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 import { validate } from '../../spec/lib/validate.mjs';
 import { sha256 } from '../util/hash.mjs';
 
-export class ClaimsError extends Error {}
+export class ClaimsError extends Error { kind = 'claims-file'; }
 
 export const defaultClaimsPath = (projectDir) => join(projectDir, 'testguard.claims.json');
 

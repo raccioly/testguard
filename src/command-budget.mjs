@@ -18,7 +18,9 @@ import { performance } from 'node:perf_hooks';
  * `--partial-on-budget` can tell "the time ran out" from every other
  * precondition failure by identity and never by guessing from the clock.
  */
-export class BudgetExhaustedError extends PreconditionError {}
+export class BudgetExhaustedError extends PreconditionError {
+  constructor(message) { super(message, 'budget-exhausted'); }
+}
 
 export class CommandBudget {
   constructor(limitMs, { now = () => performance.now() } = {}) {

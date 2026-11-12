@@ -155,7 +155,7 @@
       "additionalProperties": false
     },
     "run": {
-      "description": "Present on probe --json: the validated status document plus the invocation's result. A measured run carries id, evidence, provisional, records and newSinceBaseline, and claims[] (optional in the schema so documents written before it existed stay valid; `probe --json` always writes it). An invocation that selected no claim (--changed matched nothing) or could not tell what changed measured nothing: it carries only exitCode and scope, and names no evidence because none was written. scope is present for a --claim or --changed run.",
+      "description": "Present on probe --json: the validated status document plus the invocation's result. A measured run carries id, evidence, provisional, records and newSinceBaseline, and claims[] (optional in the schema so documents written before it existed stay valid; `probe --json` always writes it). An invocation that selected no claim (--changed matched nothing) or could not tell what changed measured nothing: it carries only exitCode and scope, and names no evidence because none was written. scope is present for a --claim or --changed run; a measured one also carries scope.state and scope.next, the answer for the selection alone.",
       "type": "object",
       "required": ["exitCode"],
       "allOf": [
@@ -231,9 +231,17 @@
               "type": "integer",
               "minimum": 0
             },
-            "changed": { "$ref": "#/$defs/changedScope" }
+            "changed": { "$ref": "#/$defs/changedScope" },
+            "state": {
+              "description": "The state of the selection alone: the same state machine as the document's top-level `state`, run over only the probed claims and their evidence. The top-level `state` stays the whole claims file's, so a broken anchor on a claim this invocation did not select is visible there and never here. Present on a measured --claim or --changed run, together with `next`.",
+              "$ref": "#/properties/state"
+            },
+            "next": {
+              "description": "The one action that moves the selection forward; a target it names is always a probed claim. Unclaimed changes and the claimed surface belong to the whole file and are never reported here.",
+              "$ref": "#/properties/next"
+            }
           },
-          "dependentRequired": { "requestedClaims": ["requestedCount"], "requestedCount": ["requestedClaims"] },
+          "dependentRequired": { "requestedClaims": ["requestedCount"], "requestedCount": ["requestedClaims"], "state": ["next"], "next": ["state"] },
           "additionalProperties": false
         }
       },

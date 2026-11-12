@@ -1,4 +1,4 @@
-import { chmodSync, lstatSync, mkdirSync, readdirSync } from 'node:fs';
+import { chmodSync, lstatSync, mkdirSync, readdirSync, realpathSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -34,9 +34,14 @@ export function changes(before, after) {
   return { created, removed, modified };
 }
 
-/** `cp -R`, never a symlink: a chmod on the copy must not reach the original. Symlinks inside (`.bin`) stay symlinks. */
+/**
+ * `cp -R`, never a symlink: a chmod on the copy must not reach the original.
+ * Symlinks inside (`.bin`) stay symlinks, but a SOURCE that is itself a link
+ * (a node_modules linked into a git worktree) is followed: `cp -R` of a link
+ * copies the link, and the "copy" then has no packages in it.
+ */
 export function copyTree(from, to) {
-  const r = spawnSync('cp', ['-R', from, to], { encoding: 'utf8' });
+  const r = spawnSync('cp', ['-R', realpathSync(from), to], { encoding: 'utf8' });
   if (r.status !== 0) throw new Error(`cp -R ${from} ${to}: ${r.stderr}`);
 }
 

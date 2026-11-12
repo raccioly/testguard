@@ -54,6 +54,18 @@ describe('copyTree and chmodTree', () => {
     expect(lstatSync(join(d, 'a', 'pkg', 'f')).mode & 0o222).not.toBe(0);
   });
 
+  it('copies the CONTENTS of a source that is itself a symlink (a node_modules linked into a git worktree), never the link', () => {
+    const d = dir();
+    mkdirSync(join(d, 'real', 'vitest'), { recursive: true });
+    writeFileSync(join(d, 'real', 'vitest', 'package.json'), '{}');
+    symlinkSync(join(d, 'real'), join(d, 'node_modules'));
+    copyTree(join(d, 'node_modules'), join(d, 'copy'));
+    expect(lstatSync(join(d, 'copy')).isSymbolicLink()).toBe(false);
+    expect(lstatSync(join(d, 'copy', 'vitest', 'package.json')).isFile()).toBe(true);
+    chmodTree(join(d, 'copy'), 'ro');
+    expect(lstatSync(join(d, 'real', 'vitest', 'package.json')).mode & 0o222).not.toBe(0);
+  });
+
   it('removes write bits only: an executable stays executable, a read-only tree can be made writable again', () => {
     const d = dir();
     mkdirSync(join(d, 'bin'));

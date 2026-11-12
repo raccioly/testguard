@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:claimspec:v1:error",
+  "title": "claimspec v1 — error",
+  "description": "What a command writes to stdout under --json when it refuses to run (exit 2) or is invoked wrongly (exit 3), so a caller handles one shape whatever the cause. The human message is also on stderr. A command that already writes a document for the refusal (an undetermined --changed writes the status document, with run.exitCode 2) is not given a second one. A caller reads `error` first: when it is present nothing was measured.",
+  "type": "object",
+  "required": ["schemaVersion", "tool", "error"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "tool": { "$ref": "urn:claimspec:v1:common#/$defs/tool" },
+    "error": {
+      "type": "object",
+      "required": ["kind", "message", "exitCode"],
+      "properties": {
+        "kind": {
+          "description": "Stable name of the cause. Exit 3: `usage` (a request wrong whatever the repository holds: a bad value, an unknown option, flags that cannot be combined). Exit 2: `claims-file` (the claims file is missing or invalid), `git` (git failed), `spec-document` (a spec document on disk does not conform), `refused` (a command declined and said why on stderr), `internal` (a defect in testguard, not in the project) and the precondition kinds, each a named way the run cannot be made safely: see PRECONDITION_KINDS in src/probe/precondition-error.mjs.",
+          "enum": [
+            "budget-exhausted", "claim-unknown", "claims-file-invalid", "defender-ambiguous", "defender-excluded", "defender-misrouted",
+            "defender-outside-universe", "dirty-tree", "discovery-failed", "fault-unknown", "file-missing", "init-settings",
+            "module-shadowed", "no-commits", "no-fix-commits", "path-outside-project", "ref-unresolved", "runner-unresolvable",
+            "scratch-dir", "typecheck-red-baseline", "typecheck-timeout", "typecheck-unavailable",
+            "claims-file", "git", "spec-document", "refused", "usage", "internal"
+          ]
+        },
+        "message": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "exitCode": { "enum": [2, 3] }
+      },
+      "if": { "properties": { "kind": { "const": "usage" } }, "required": ["kind"] },
+      "then": { "properties": { "exitCode": { "const": 3 } } },
+      "else": { "properties": { "exitCode": { "const": 2 } } },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

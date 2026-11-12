@@ -25,7 +25,8 @@ const evidence = (seconds) => {
   }));
   return write(`evidence-${seconds}.json`, { records });
 };
-const measurement = (medianMs, workload = budget.reference.workload) => write(`ref-${medianMs}-${workload}.json`, { workload, medianMs });
+// A measurement from the runner class the baseline was taken on, unless the caller says it ran elsewhere.
+const measurement = (medianMs, workload = budget.reference.workload, runner = { cpus: budget.reference.cpus, platform: budget.reference.platform }) => write(`ref-${medianMs}-${workload}-${runner.cpus}-${runner.platform}.json`, { workload, medianMs, ...runner });
 const gate = (evidencePath, ...flags) => spawnSync(process.execPath, [join(ROOT, '.github/scripts/check-cost-budget.mjs'), evidencePath, ...flags], { encoding: 'utf8', cwd: dir, env: { ...process.env, GITHUB_STEP_SUMMARY: '' } });
 const atBaseline = budget.reference.baselineMs;
 // Well under both ceilings, so only the reference can decide the outcome.
@@ -62,6 +63,29 @@ describe('check-cost-budget.mjs fails closed on its reference', () => {
     expect(r.stdout).toContain('COST REFERENCE MISSING');
   });
 
+  it('fails closed when the measurement came from another CPU count or platform than the baseline, naming both, and when it does not say', () => {
+    const laptop = { cpus: budget.reference.cpus + 14, platform: 'darwin' };
+    const wrong = gate(evidence(1), '--reference-before', measurement(atBaseline, undefined, laptop), '--reference-after', measurement(atBaseline, undefined, laptop));
+    expect(wrong.status).toBe(1);
+    expect(wrong.stdout).toContain('COST REFERENCE RUNNER MISMATCH');
+    expect(wrong.stdout).toContain(`${budget.reference.cpus} CPUs (${budget.reference.platform})`);
+    expect(wrong.stdout).toContain(`${laptop.cpus} CPUs (darwin)`);
+    expect(wrong.stdout).toMatch(/"failures":\["reference-runner-mismatch"\]/);
+    const unsaid = gate(evidence(1), '--reference-before', write('ref-unsaid.json', { workload: budget.reference.workload, medianMs: atBaseline }), '--reference-after', measurement(atBaseline));
+    expect(unsaid.status).toBe(1);
+    expect(unsaid.stdout).toContain('COST REFERENCE RUNNER MISMATCH');
+  });
+
+  it('a drifted run is read at the faster reading through the script too', () => {
+    const raw = budget.seconds * 0.9;
+    const stable = gate(evidence(raw), '--reference-before', measurement(atBaseline * 1.2), '--reference-after', measurement(atBaseline * 1.2));
+    const drifted = gate(evidence(raw), '--reference-before', measurement(atBaseline * 0.85), '--reference-after', measurement(atBaseline * 1.6));
+    expect(stable.status).toBe(0);
+    expect(drifted.status).toBe(1);
+    expect(drifted.stdout).toMatch(/pessimistic reading/);
+    expect(drifted.stdout).toMatch(/"factorBasis":"pessimistic"/);
+  });
+
   it('fails an absurd factor even though the raw seconds are tiny', () => {
     const r = gate(evidence(1), '--reference-before', measurement(atBaseline * 4), '--reference-after', measurement(atBaseline * 4));
     expect(r.status).toBe(1);
@@ -82,6 +106,8 @@ describe('the budget file records how its reference was taken', () => {
   it('names the workload the script measures and a positive baseline, range and drift limit', () => {
     expect(budget.reference.workload).toBe(WORKLOAD);
     expect(budget.reference.baselineMs).toBeGreaterThan(0);
+    expect(Number.isInteger(budget.reference.cpus) && budget.reference.cpus > 0).toBe(true);
+    expect(budget.reference.platform).toMatch(/^[a-z0-9]+$/);
     expect(budget.reference.factorRange[0]).toBeLessThan(1);
     expect(budget.reference.factorRange[1]).toBeGreaterThan(1);
     expect(budget.reference.maxDrift).toBeGreaterThan(1);
@@ -91,7 +117,8 @@ describe('the budget file records how its reference was taken', () => {
 describe('measure-reference.mjs', () => {
   it('starts the fixed project the asked number of times and reports the median of exactly those samples', () => {
     const r = measureReference({ runs: 3 });
-    expect(r).toMatchObject({ workload: WORKLOAD, runs: 3 });
+    expect(r).toMatchObject({ workload: WORKLOAD, runs: 3, platform: process.platform });
+    expect(Number.isInteger(r.cpus) && r.cpus > 0).toBe(true);
     expect(r.samplesMs).toHaveLength(3);
     expect(r.samplesMs.every((x) => x > 0)).toBe(true);
     expect(r.medianMs).toBe(median(r.samplesMs));

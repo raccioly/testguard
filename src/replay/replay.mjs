@@ -37,7 +37,7 @@ export function findFixCommits({ dir, range, projectDir }) {
   try {
     log = git(['log', '--no-merges', '--format=%H%x1f%s', range], dir);
   } catch (e) {
-    if (e instanceof GitError) throw new PreconditionError(`cannot read the range ${range}: ${e.message.split('\n')[0]}`);
+    if (e instanceof GitError) throw new PreconditionError(`cannot read the range ${range}: ${e.message.split('\n')[0]}`, 'ref-unresolved');
     throw e;
   }
   const out = [];
@@ -105,13 +105,13 @@ async function replayIn({
   commandBudget?.assertOpen();
   projectDir = realpathSync(resolve(projectDir));
   const root = repoRoot(projectDir);
-  if (!headSha(root)) throw new PreconditionError('repository has no commits; there is nothing to replay');
+  if (!headSha(root)) throw new PreconditionError('repository has no commits; there is nothing to replay', 'no-commits');
 
   const found = findFixCommits({ dir: root, range, projectDir });
   const { unique, duplicates } = dedupeByPatch({ dir: root, commits: found });
   const selected = limit ? unique.slice(0, limit) : unique;
   if (selected.length === 0) {
-    throw new PreconditionError(`no fix commits in ${range}: a fix commit changes source and a test together. Widen the range, or this history has none.`);
+    throw new PreconditionError(`no fix commits in ${range}: a fix commit changes source and a test together. Widen the range, or this history has none.`, 'no-fix-commits');
   }
 
   const startedAt = new Date().toISOString();
@@ -130,7 +130,7 @@ async function replayIn({
         const budgetFor = () => commandBudget?.runBudget(budgetMs) ?? budgetMs;
         const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, python, name: runnerName, budgetMs: budgetFor(), budgetFor });
         commandBudget?.assertOpen();
-        if (sel.error) throw new PreconditionError(`test runner is not resolvable in the scratch worktree (${sel.error}). Pass --node-modules <path>.`);
+        if (sel.error) throw new PreconditionError(`test runner is not resolvable in the scratch worktree (${sel.error}). Pass --node-modules <path>.`, 'runner-unresolvable');
         runnerUsed = sel.runner;
         runnerVersion = sel.version;
         const manifests = new Map([[runnerUsed, sel.manifest]]);
@@ -146,7 +146,7 @@ async function replayIn({
           try {
             manifests.set(candidate, await discoverRunnerManifest(candidate, check, iso.projectDir, budgetFor()));
           } catch (error) {
-            throw new PreconditionError(`${candidate.name}: test discovery failed: ${error.message}`);
+            throw new PreconditionError(`${candidate.name}: test discovery failed: ${error.message}`, 'discovery-failed');
           }
         }
         universe = buildReplayRunnerUniverse(runnerUsed, manifests);
@@ -194,7 +194,7 @@ export function buildReplayRunnerUniverse(primary, manifests) {
     for (const file of manifest.files) {
       const previous = ownerByFile.get(file);
       if (previous && previous !== primary && previous !== owner) {
-        throw new PreconditionError(`${file} was listed by both ${previous.name} and ${owner.name}; TestGuard cannot choose which configured runner owns it.`);
+        throw new PreconditionError(`${file} was listed by both ${previous.name} and ${owner.name}; TestGuard cannot choose which configured runner owns it.`, 'defender-ambiguous');
       }
       ownerByFile.set(file, owner);
     }
@@ -210,7 +210,7 @@ export function partitionReplayDefenders(files, primary, universe) {
   const groups = new Map([[primary, []]]);
   for (const file of files) {
     const owner = universe.ownerOf(file);
-    if (!owner) throw new PreconditionError(`${file} is not in any resolved runner's configured test universe`);
+    if (!owner) throw new PreconditionError(`${file} is not in any resolved runner's configured test universe`, 'defender-outside-universe');
     if (!groups.has(owner)) groups.set(owner, []);
     groups.get(owner).push(file);
   }
@@ -229,7 +229,7 @@ async function replayOne({ fix, iso, root, projectDir, python, confirmRuns, budg
   const isoRoot = realpathSync(iso.projectDir);
   const inside = (p) => {
     const abs = realpathSync(dirname(p)) + '/' + basename(p);
-    if (!abs.startsWith(isoRoot + '/')) throw new PreconditionError(`refusing to touch ${p}: outside the scratch worktree ${isoRoot}`);
+    if (!abs.startsWith(isoRoot + '/')) throw new PreconditionError(`refusing to touch ${p}: outside the scratch worktree ${isoRoot}`, 'path-outside-project');
     return abs;
   };
   const base = { commit: fix.commit, patchId: fix.patchId, subject: fix.subject, source: fix.source, removedTests: fix.tests };

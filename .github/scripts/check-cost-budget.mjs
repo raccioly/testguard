@@ -67,7 +67,7 @@ console.log(text);
 // read back out of a log without parsing prose.
 console.log(`cost-measurement ${JSON.stringify({
   rawSeconds: Math.round(decision.rawMs / 100) / 10,
-  ...(decision.reference ? { referenceBeforeMs: decision.reference.beforeMs, referenceAfterMs: decision.reference.afterMs, speedFactor: decision.reference.speedFactor } : {}),
+  ...(decision.reference ? { referenceBeforeMs: decision.reference.beforeMs, referenceAfterMs: decision.reference.afterMs, speedFactor: decision.reference.speedFactor, factorBasis: decision.reference.factorBasis } : {}),
   normalizedSeconds: Math.round(decision.totalMs / 100) / 10,
   basis: decision.basis,
   faults: report.records,

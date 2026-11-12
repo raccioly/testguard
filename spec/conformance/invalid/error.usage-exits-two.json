@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.1.0"
+  },
+  "error": {
+    "kind": "usage",
+    "message": "--workers must be a positive safe integer",
+    "exitCode": 2
+  }
+}

@@ -93,7 +93,7 @@ describe('bounded runner resources', () => {
       expect(running(pid)).toBe(true);
       parent.kill(signal);
       await waitFor(() => parent.exitCode !== null);
-      expect(parent.exitCode).toBe(130);
+      expect(parent.exitCode).toBe(signal === 'SIGTERM' ? 143 : 130);
       expect(running(pid)).toBe(false);
       expect(readFileSync(stoppedPath, 'utf8')).toBe('false');
       expect(readFileSync(restoredPath, 'utf8')).toBe('original');

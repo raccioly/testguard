@@ -244,6 +244,7 @@ fingerprint derivation, N-run agreement and interval arithmetic.
 | Schema | What it describes |
 |---|---|
 | [`annotations`](../../spec/schemas/annotations.schema.json) | The `claims --annotate` preview or apply result: targets, refusals and recoverable partial failures. Authoring, never verification. |
+| [`error`](../../spec/schemas/error.schema.json) | What a command writes to stdout under `--json` when it refuses (exit 2) or is invoked wrongly (exit 3): `{kind, message, exitCode}`. Nothing was measured. |
 | [`authoring-input`](../../spec/schemas/authoring-input.schema.json) | The metadata-only report of `scaffold --from-document` or `--from-fix`. No source text, no claims. |
 | [`baseline`](../../spec/schemas/baseline.schema.json) | Frozen fingerprints of existing findings, suppressed up to their count. |
 | [`brief`](../../spec/schemas/brief.schema.json) | What to tell an agent before it writes code: ranked, capped, with the next action. |

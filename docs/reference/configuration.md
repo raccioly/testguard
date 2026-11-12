@@ -288,15 +288,29 @@ workload (`.github/scripts/measure-reference.mjs`: it starts `node --test` on
 a tiny project nine times and takes the median) immediately before and after
 the self-probe. The factor is the mean of those two medians over the
 `reference.baselineMs` recorded in the file, and the check prints the raw
-seconds, both medians, the factor and the normalized seconds every time.
+seconds, both medians, the factor and the normalized seconds every time. When
+the two medians differ by more than `reference.maxDrift` (the runner's speed
+moved during the probe) the factor is instead the **faster** median over the
+baseline, the pessimistic reading: a mean would credit a runner that slowed
+down mid-run for speed it did not have throughout (170 ms then 320 ms turned
+4588 normalized seconds into 3184). The output says which reading it used.
+
+The reference tracks probe speed within one class of machine, not across
+classes: an 18-core laptop read 177 ms, inside the CI range of 166 to 238 ms,
+and runs the probe far faster than CI. So `reference.cpus` and
+`reference.platform` record the runner class the baseline was taken on, each
+measurement records the CPU count and platform it ran on, and a measurement
+from another class (or one that does not say) fails the check with
+`reference-runner-mismatch`, naming both. Taking a baseline on another class
+means a new `baselineMs`, `cpus`, `platform` and ceiling together.
 
 It fails closed. A missing measurement, a measurement of a different
-workload, or a factor outside `reference.factorRange` fails the check and says
-which; it never falls back to raw seconds. If the two medians differ by more
-than `reference.maxDrift` (the runner's speed moved during the probe), or the
-probe reused verdicts recorded on other runners, the run is low confidence: it
-can still pass, but a low-confidence run over a ceiling fails instead of being
-excused by a correction it cannot trust. Changing the workload means changing
+workload or runner class, or a factor outside `reference.factorRange` fails the
+check and says which; it never falls back to raw seconds. If the two medians
+differ by more than `reference.maxDrift`, or the probe reused verdicts recorded
+on other runners, the run is low confidence: it can still pass, but a
+low-confidence run over a ceiling fails instead of being excused by a
+correction it cannot trust. Changing the workload means changing
 its name in the script and re-taking the baseline in the same pull request.
 
 ## Where TestGuard writes
