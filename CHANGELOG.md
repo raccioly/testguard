@@ -79,6 +79,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A spread, computed key, accessor or a `require` hidden inside an expression
   stays uncertain. `import type from 'x'` (a default import named `type`) was
   read as type-only and left `x` out of the closure; it is now followed.
+
+## [0.23.0] - 2026-11-12
+
+Automated weekly release — everything merged since `v0.22.1`.
+
+### Changed
+
+- fix: defects found by independent verification of 0.22.1 (#262)
+- ci: normalize the self-probe cost ceiling by a reference workload (#255) (#257)
+- chore(deps): bump the all-actions group with 6 updates (#230)
+- chore(deps): bump @vitest/mocker and vitest in /fixtures/known-answer-playwright (#225)
+- ci: bounds that follow the suite's size, not one runner's speed (#256)
+- chore: bump DocGuard to 0.47.0 (#219)
+- test: bring the suite back under its runtime budget (#254)
+- chore(homebrew): sha256 for v0.22.1 (#253)
+
+
+### Fixed
+
 - **The self-probe cost gate no longer credits a runner that slowed down
   mid-run.** When the reference medians before and after the probe differ by
   more than `reference.maxDrift`, the speed factor is the faster reading, not the
