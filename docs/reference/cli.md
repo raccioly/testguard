@@ -100,7 +100,7 @@ the same document, so they cannot disagree. It writes nothing.
 is the exact shell line to run.
 
 `advice` lists where the project is leaving speed on the table, one line each
-with the command to run: `serial-on-multicore`, `full-probe-where-changed-would-do`,
+with the command to run: `serial-on-multicore`, `full-probe-where-changed-would-do`, `slow-defenders-dominate`,
 `nothing-reused`, `hook-outdated`. It is informational (it never changes
 `state`, `next` or the exit code) and reads only files on disk. The text form
 prints each as a `speed` line.

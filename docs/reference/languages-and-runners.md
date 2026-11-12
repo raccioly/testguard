@@ -165,8 +165,29 @@ with the report written to a file named through
 retry — makes the run **not** green; across N runs it becomes
 `FLAKY-DEFENDER`. A `timedOut` test is a timeout and never a kill.
 
+**Servers the specs talk to (`webServer`).** TestGuard sets `CI=1` for every
+runner process, and the Playwright CLI evaluates the config in that same
+process, so `reuseExistingServer: !process.env.CI` is `false` under a probe.
+With a server from another checkout already on the port, Playwright then
+refuses to start, the run is an `error`, and the record is `unverifiable`
+(`defenders-failed-to-load`) with Playwright's own line in `detail.message`
+("... is already used ..."). A config that reuses a server regardless of `CI`
+(`reuseExistingServer: true`) runs the scratch tree's specs against the other
+checkout's server; the fault never reaches it, the negative control stays
+green, and the record is `unverifiable` (`subject-not-executed`) with a
+`detail.message` that names the reused server. It is never `survived` or
+`killed`. The supported setup:
+
+- derive the port from `TESTGUARD_WORKER` (`4173 + Number(process.env.TESTGUARD_WORKER ?? 0)`), so
+  the trees of a fault fan-out never share a server;
+- never reuse an existing server under probe: `reuseExistingServer: false`
+  when `TESTGUARD_WORKER` is set, or `!process.env.CI` (which holds under a probe);
+- start the server from the config's own directory, so it serves the probed tree.
+
 **Proof.** [`fixtures/known-answer-playwright`](../../fixtures/known-answer-playwright/README.md)
-mixes Vitest and browserless Playwright defenders in one project.
+mixes Vitest and browserless Playwright defenders in one project;
+[`fixtures/foreign-server-playwright`](../../fixtures/foreign-server-playwright/README.md)
+puts a foreign server on the port the config uses.
 
 ## `node-test`
 

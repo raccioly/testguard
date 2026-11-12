@@ -13,7 +13,7 @@ const paths = (doc) => validate('status', doc).errors.map((e) => e.path);
 describe('status advice', () => {
   it('a status with advice lines conforms', () => {
     const doc = load('examples', 'status-advice.json');
-    expect(doc.advice.map((a) => a.id)).toEqual(['serial-on-multicore', 'hook-outdated']);
+    expect(doc.advice.map((a) => a.id)).toEqual(['serial-on-multicore', 'slow-defenders-dominate', 'hook-outdated']);
     expect(validate('status', doc).errors).toEqual([]);
   });
 
@@ -27,14 +27,18 @@ describe('status advice', () => {
 });
 
 describe('advice is the line its rule produces', () => {
+  it('the slow-defender advice points at the per-claim cost report, nothing else (#291)', () => {
+    expect(paths(load('invalid', 'status.advice-slow-defenders-wrong-command.json'))).toEqual(['/advice/0/command']);
+  });
+
   it('the change-scoped probe is advised only where the next step is a probe', () => {
     expect(paths(load('invalid', 'status.advice-changed-without-a-probe-next.json'))).toEqual(['/advice/1/id']);
   });
 
   it('an outdated hook is fixed by init --upgrade, and the change-scoped advice names probe --changed', () => {
     const doc = load('examples', 'status-advice.json');
-    doc.advice[1].command = 'testguard init';
-    expect(paths(doc)).toEqual(['/advice/1/command']);
+    doc.advice[2].command = 'testguard init';
+    expect(paths(doc)).toEqual(['/advice/2/command']);
   });
 
   it('a brief carries the same advice under the same rules', () => {
