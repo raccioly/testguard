@@ -203,6 +203,13 @@
     },
     {
       "kind": "path",
+      "pattern": "test/probe-fixed-port-serial.test.mjs",
+      "reason": "The measured serial answer for the fixed-port project (#270): the oracle that test/probe-fixed-port.test.mjs holds the fan-out to, re-derived on every npm test instead of written down. It asserts no behavior of its own beyond serial probing, which every known-answer fixture already defends; the fan-out guard it calibrates is claimed as TG-FAN-OUT-NEVER-REPORTS-A-NEIGHBOURS-KILL.",
+      "by": "claude",
+      "at": "2026-11-12T04:00:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/probe-partial-budget.test.mjs",
       "reason": "Acceptance for --partial-on-budget: it probes a generated four-claim project (serial, --fault-workers 3, a budget-capped hang, a reuse round trip, and the command in-process) with an injected clock, about twenty seconds in total. Mandatory in npm test and CI. The behavior it exercises is claimed where it lives and defended by fast pure tests: TG-PARTIAL-BUDGET-NEVER-REPORTS-UNMEASURED-AS-MEASURED, TG-NOT-REACHED-RECORD-IS-NEVER-REUSED, TG-COMMAND-BUDGET-EXPIRY-IS-TOLD-BY-IDENTITY-AND-A-CUT-RUN-IS-THE-DEADLINE and TG-EXHAUSTED-EVIDENCE-IS-CROSS-CHECKED name test/partial-budget.test.mjs and the conformance suite; naming this file would re-run all of it for every fault.",
       "by": "claude",

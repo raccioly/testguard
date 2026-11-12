@@ -8,7 +8,7 @@ import {
   autoFaultWorkers, resolveFaultWorkers, createOverlapTracker, deferLastRun, mustConfirmAlone, aloneDisagrees,
   needsSerialRemeasure, contentionRoundDown,
 } from '../src/probe/fan-out.mjs';
-import { sameFaultWorkers, reusableRun } from '../src/probe/probe.mjs';
+import { sameFaultWorkers, reusableRun, fanOutPolicy, serialRequested } from '../src/probe/probe.mjs';
 
 const fail = { outcome: 'fail', tests: 1, failures: 1, assertionFailures: 1, durationMs: 1 };
 const pass = { outcome: 'pass', tests: 1, failures: 0, durationMs: 1 };
@@ -184,5 +184,22 @@ describe('reuse across fan-out widths', () => {
     expect(reusableRun(previous, { ...ask, faultWorkers: 2 })).toBe(true);
     expect(reusableRun(previous, ask)).toBe(true);
     expect(reusableRun(previous, { ...ask, serialRequested: true })).toBe(false);
+  });
+});
+
+describe('what the evidence records about the width', () => {
+  it('the source always, the CPUs only for auto', () => {
+    expect(fanOutPolicy({ faultWorkersSource: 'auto', cpus: 8 })).toEqual({ faultWorkersSource: 'auto', cpus: 8 });
+    expect(fanOutPolicy({ faultWorkersSource: 'flag', cpus: 8 })).toEqual({ faultWorkersSource: 'flag' });
+    expect(fanOutPolicy({})).toEqual({});
+  });
+
+  it('only one fault at a time that somebody asked for refuses a fan-out\'s evidence', () => {
+    expect(serialRequested(1, 'serial')).toBe(true);
+    expect(serialRequested(1, 'flag')).toBe(true);
+    expect(serialRequested(1, 'env')).toBe(true);
+    expect(serialRequested(1, 'auto')).toBe(false);
+    expect(serialRequested(1, 'in-place')).toBe(false);
+    expect(serialRequested(4, 'flag')).toBe(false);
   });
 });

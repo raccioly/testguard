@@ -6,6 +6,7 @@ import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { probeCommand } from '../src/commands/probe.mjs';
 import { partialBudgetProject } from './helpers/partial-budget-project.mjs';
+import { computeStatus } from '../src/status/status.mjs';
 
 const base = { confirm: '3', budget: '20000', workers: '1', runner: 'node-test', severity: 'low', quiet: true, progress: 'none', 'no-escalate': true };
 const run = async (project, values, deps = {}) => {
@@ -35,15 +36,19 @@ describe('the CLI default width', () => {
     }
   }, 60_000);
 
-  it('--serial is one fault at a time, and says so', async () => {
+  it('--serial is one fault at a time, says so, and status says what that costs', async () => {
     const project = partialBudgetProject();
     try {
-      const r = await run(project, { claim: ['C1'], serial: true }, { cpus: 16 });
+      const r = await run(project, { serial: true, quiet: false }, { cpus: 16 });
       expect(r.code).toBe(0);
-      const doc = evidenceAt(project, 'evidence-partial.json');
+      const doc = evidenceAt(project, 'evidence.json');
       expect(doc.run.faultWorkersSource).toBe('serial');
       expect(doc.run.faultWorkers).toBeUndefined();
       expect(doc.run.cpus).toBeUndefined();
+      // The end of the run and the status document both name the faster command.
+      expect(r.out.join('\n')).toMatch(/speed {5}The last probe ran with --serial on a machine with 16 CPUs.* → testguard probe/);
+      const status = computeStatus({ projectDir: project.dir, toolVersion: '0.0.0-test', cpus: 16 });
+      expect(status.advice).toEqual([expect.objectContaining({ id: 'serial-on-multicore', command: 'testguard probe' })]);
     } finally { rmSync(project.dir, { recursive: true, force: true }); }
   }, 60_000);
 });
