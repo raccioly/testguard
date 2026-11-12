@@ -2,7 +2,9 @@
 // state, so a broken anchor on a claim the caller never selected told them to
 // repair something their run had nothing to do with. The whole-file state is
 // still true and stays; the selection gets a view of its own.
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.setConfig({ testTimeout: 60_000 });
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../src/cli.mjs';

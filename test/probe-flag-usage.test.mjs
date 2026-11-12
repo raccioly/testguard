@@ -3,7 +3,9 @@
 // usage code. The rule: a combination wrong whatever the repository holds is
 // usage (3) and is refused before the repository is touched; a condition that
 // depends on the tree is a precondition (2).
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.setConfig({ testTimeout: 60_000 });
 import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';

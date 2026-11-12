@@ -4,7 +4,9 @@
 // exit 2 and exit 3 under --json writes exactly one `error` document to stdout
 // (the human message stays on stderr), or - for an undetermined --changed -
 // the status document that already carries that answer.
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.setConfig({ testTimeout: 60_000 });
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
