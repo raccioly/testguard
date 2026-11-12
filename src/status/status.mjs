@@ -205,6 +205,9 @@ function computeStatusCore({ projectDir, toolVersion, generatedAt = new Date().t
   if (!only && evidence.originPolicy) doc.originPolicy = evaluateOriginPolicy({ claims, evidence, eligibleKinds: evidence.originPolicy.eligibleKinds, fresh: false });
   // A verdict is about a commit. When the evidence describes a different one,
   // say both: "looks right and is not" is the failure mode this prevents.
+  // A converged document (#293): say how much of it no defender ran for.
+  const carried = evidence.records.filter((r) => r.carried === 'inputs-match').length;
+  if (carried) doc.notes.push(`${carried} record${carried === 1 ? ' was' : 's were'} carried from ${fullEvidence.run.scope?.carriedFrom ?? 'an earlier run'} by a scoped probe: inputs unchanged, defenders not run, environment not re-checked since; the full probe (testguard probe) re-verifies them`);
   doc.evidenceHead = evidence.run.repo.snapshot ?? evidence.run.repo.head;
   const localHead = (() => { try { return headSha(projectDir); } catch { return null; } })();
   if (localHead) doc.head = localHead;

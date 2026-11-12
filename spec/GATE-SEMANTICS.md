@@ -421,6 +421,8 @@ check order is this rule.
    it. Reuse trusts the previous evidence file: a hand-written record whose
    hashes match is indistinguishable from a measured one. **A gate over
    authors who can write the evidence file must run with `--no-reuse`.**
+   `--no-reuse` also turns off convergence's carrying (see
+   [Convergence](#convergence)).
 
    Evidence is written atomically — an exclusive temporary file in the same
    directory, then a rename — so a run killed mid-write leaves the previous
@@ -1332,8 +1334,89 @@ change whose files are listed there says nothing about those files.
 `--include-dirty`), so it is refused with `--ref` and `--in-place` (exit `3`):
 the selection would describe another tree than the one measured.
 
-A `--changed` run is partial evidence: it writes `evidence-partial.json`, never
-the canonical file, and is never a baseline.
+A `--changed` run's selection is partial evidence. When the run may converge
+(see [Convergence](#convergence)) it updates the canonical file; otherwise it
+writes `evidence-partial.json`, which is never a baseline.
+
+## Convergence
+
+A scoped probe (`--claim`, or `--changed` with a determined selection) updates
+the canonical evidence `.testguard/evidence.json` instead of leaving it to the
+next full probe (#293). The written document holds, in claims-file order:
+
+- **measured**: the records of the selected claims, as this run measured them
+  (a record this run reused under rule 8, after its live baseline, counts as
+  measured here: its claim was selected);
+- **carried** (`carried: "inputs-match"`, with `reusedFrom`): for every other
+  fault with a record in the canonical evidence, that record unchanged, when
+  the probe finds in the tree it probed (HEAD, or the snapshot under
+  `--include-dirty`) exactly the inputs the record was measured with. That
+  check is the input half of rule 8's reuse rule (target, defenders, test
+  universe, discovery, import closure, fault content, claim metadata), plus
+  the same run-level rule (tool version and instrument digest, N, worker
+  policy, runner, type-check command). Under `--typecheck`, the fault is type
+  checked once more and is carried only if `detail.typecheck` agrees. What it
+  leaves out is the live baseline: no defender runs for a carried record;
+- **kept stale** (`carried: "inputs-changed"`, with `reusedFrom`): every other
+  record, unchanged. It describes another tree. It is kept so that `status`
+  still names it stale with the verdict it had (`changedFaults` and
+  `review-fault-change` depend on that verdict), never as a statement about
+  this tree.
+
+A fault with no earlier record stays absent, so `status` still says it was
+never probed. `run.reuse` counts `carried` and `stale` (both part of `reused`).
+`run.scope` names `selectedClaims`, `requestedClaims` for `--claim`, the
+`changed` ref, base and head for `--changed`, and `carriedFrom`: the run whose
+document the other records came from. A carried record keeps the verdict it
+had, and convergence never upgrades one.
+
+**What a carried record vouches for.** Its recorded inputs equal the tree this
+run probed, under the same instrument. It does not vouch for anything no hash
+sees (installed packages, the interpreter, a data file a test reads): that was
+last checked by the run that measured it. **The full probe stays the periodic
+re-verification**, and `status` notes how many records were carried.
+
+**When the canonical file is not touched.** The run writes
+`evidence-partial.json` as before, and says why, when any of these holds:
+
+- it is provisional (`--confirm` below 3);
+- its command budget ran out;
+- it probes `--ref`;
+- it runs with `--no-reuse`;
+- `--out` names another file;
+- there is no canonical evidence yet;
+- the canonical evidence fails the run-level rule (any other TestGuard version
+  or configuration digest carries nothing);
+- another command wrote the canonical file while this one ran.
+
+An undetermined `--changed` writes nothing at all. `--no-reuse` disables
+carrying for the same reason it disables reuse: a gate over authors who can
+write the evidence file must not trust a record it did not measure.
+
+**Exit code and policies.** The findings gate and `run.claims[]` still read
+only the measured records, so a scoped run's exit code keeps meaning "the
+selection". The written document carries no origin or assertion policy from
+the document it replaced. `--require-assertion-kill` is evaluated over every
+record written, so a carried kill without a recorded `killKind` fails it.
+`--require-origin` still refuses `--claim` and `--changed`, so a carried
+record never contributes to an origin-policy pass.
+
+**Baseline.** `baseline` keeps refusing a provisional or budget-cut document,
+and also refuses a document holding any `inputs-changed` record, naming them.
+When it freezes a document with carried records, it says how many.
+
+Validators reject:
+
+- a `carried` record without `reusedFrom`, or with this run's id;
+- carried records in a document without `run.scope`;
+- a carried record whose claim was selected;
+- a record without `carried` whose claim was not selected;
+- `run.scope` on a provisional or budget-cut run;
+- `run.reuse` counts that disagree with the records.
+
+`probe --json` reports `run.converged`: `into` (the canonical file),
+`carriedFrom`, `carried` and the `stale` fault ids, or `into: null` with the
+`reason`.
 
 ## Per-claim results
 

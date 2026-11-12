@@ -4,6 +4,7 @@ import { readSpecDoc, writeSpecDoc } from '../evidence/writer.mjs';
 import { buildBaseline, restampBaseline } from '../baseline/baseline.mjs';
 import { evidencePath, baselinePath } from './probe.mjs';
 import { computeStatus } from '../status/status.mjs';
+import { staleCarried } from '../evidence/carry.mjs';
 import { validate } from '../../spec/lib/validate.mjs';
 import { isGitIgnored, GITIGNORE_LINES, COMMITTED_OUTPUTS } from '../init/init.mjs';
 
@@ -50,6 +51,14 @@ export async function baselineCommand({ projectDir, values, version }, io) {
     io.err(`error: ${evPath} is incomplete (the command budget of ${evidence.run.budget.limitMs}ms ran out; ${evidence.run.budget.notReached} fault${evidence.run.budget.notReached === 1 ? '' : 's'} not reached). A baseline is never frozen from it. Re-run probe with a larger --command-budget.`);
     return 2;
   }
+  // A converged document (#293) may keep records whose inputs no longer match
+  // the tree it describes; freezing one would make a verdict about another
+  // tree the accepted contract.
+  const stale = staleCarried(evidence);
+  if (stale.length) {
+    io.err(`error: ${evPath} keeps ${stale.length} record${stale.length === 1 ? '' : 's'} whose inputs changed after ${stale.length === 1 ? 'it was' : 'they were'} measured (carried: inputs-changed): ${stale.slice(0, 10).join(', ')}${stale.length > 10 ? ', …' : ''}. A baseline is frozen only from records that describe this tree. Probe them (testguard probe --claim <id>) or run the full probe first.`);
+    return 2;
+  }
   const outPath = values.out ? resolve(values.out) : baselinePath(projectDir);
   if (values.restamp) {
     if (!existsSync(outPath)) {
@@ -72,6 +81,8 @@ export async function baselineCommand({ projectDir, values, version }, io) {
     io.out(statusWith(projectDir, version, { path: outPath, frozen: n }));
     return 0;
   }
+  const carried = evidence.run.reuse?.carried ?? 0;
+  if (carried) io.out(`note: ${carried} of the ${evidence.records.length} records were carried from ${evidence.run.scope.carriedFrom} by a scoped run with unchanged inputs and no run of their defenders; the full probe re-verifies them.`);
   io.out(`baseline: ${n} unproven finding${n === 1 ? '' : 's'} frozen at ${baseline.head.slice(0, 12)}${baseline.snapshot ? ` (working-tree snapshot ${baseline.snapshot.slice(0, 7)}; after you commit, a clean probe + \`baseline --restamp\` moves head to that commit)` : baseline.dirty ? ' (working tree was dirty)' : ''}${evidence.run.provisional ? ' — FROM PROVISIONAL EVIDENCE (--allow-provisional)' : ''} → ${outPath}`);
   io.out('Commit this file; from now on only new findings gate.');
   const missing = unignoredOutputs(projectDir);
