@@ -18,6 +18,7 @@ import { dirname, join, relative } from 'node:path';
 
 // `.git` too: a project outside the corpus is a real checkout, and its copy
 // gets a fresh repository of its own.
+export const RUNNER_CACHES = new Set(['.vite', '.vite-temp', '.vitest-cache']);
 const ALWAYS_SKIPPED = /(^|\/)(\.git|\.venv|\.out|__pycache__|\.testguard|test-results|playwright-report)(\/|$)/;
 
 export class LayoutError extends Error {}
@@ -99,6 +100,10 @@ export function linkDependencies(subject, dir, { nodeModules } = {}) {
     // #279: node_modules is a real directory, every entry a symlink into another checkout's install.
     mkdirSync(join(dir, 'node_modules'));
     for (const entry of readdirSync(source)) {
+      // A runner's own cache is not an installed package: linked, the subject's
+      // runner would write through it into the other checkout (vitest does,
+      // with no tool involved). Each copy gets its own.
+      if (RUNNER_CACHES.has(entry)) continue;
       if (entry.startsWith('@') && lstatSync(join(source, entry)).isDirectory()) {
         mkdirSync(join(dir, 'node_modules', entry));
         for (const sub of readdirSync(join(source, entry))) symlinkSync(join(source, entry, sub), join(dir, 'node_modules', entry, sub));

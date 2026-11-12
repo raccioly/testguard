@@ -93,7 +93,9 @@ it judges see the same tree:
   that exist only as such copies.
 - `nodeModulesLayout: "linked-entries"`: each copy gets a real `node_modules`
   whose entries are symlinks into the subject's install, as a worktree whose
-  install belongs to another checkout has (#279).
+  install belongs to another checkout has (#279). Runner caches (`.vite`,
+  `.vite-temp`, `.vitest-cache`) are never linked: vitest writes into them on
+  every run, and through a link that write would land in the other checkout.
 
 Every probe the harness runs, in every mode, refusals and exit-2 runs
 included, also checks **subject-untouched** (`lib/untouched.mjs`): before and
@@ -190,12 +192,11 @@ summary, with the base branch's numbers beside it when the base has one.
 
 | Issue | Subject | What |
 |---|---|---|
-| #263 | `node-test-floorplan` | A fault in a workspace package, defended by a sibling package's test through the `node_modules` link, reads `unverifiable`/`subject-not-executed`: the scratch worktree's link resolves to the original checkout. Known failure for `LSHAPE-ESTIMATE-USES-CORE-AREA/F1`, `/F2`. |
-| #264 | `ts-vitest-stock` | A vitest alias written `fileURLToPath(new URL('./src', import.meta.url))` makes `probe` refuse the whole project (exit 2). The subject uses the equivalent `join()` form so it measures everything else. |
-| #266 | `js-jest-newsletter` | `module.exports = { X: call() }` in `src/errors.js` makes every closure indeterminate: nothing is reused and `--changed` selects every claim (a safe superset). Known failure for the `footer-source` selection. |
-| #267 | `ts-vitest-stock` | `export interface` marks a module `unsupported-syntax`, so every closure is indeterminate: nothing is reused and `--changed` selects every claim (a safe superset). Known failure for the `adjustments-test` selection. |
-| #268 | `node-test-floorplan` | `--changed` after an edit to `packages/geometry/src/units.js` selects only the 4 geometry claims and misses the 4 planner claims that import it through `@floorplan/geometry`: an **unsound** selection (stale verdicts stand). Known failure for the `geometry-source` selection. |
-| #263 | `node-test-catalog3` (both layouts) | Same cause as the #263 row above, with three packages: core faults defended by the search and report tests read `subject-not-executed`, or `killed-by-undeclared-tests` where a relative import reaches the probed file but the package link does not. Known for five faults per layout. |
+| #263 | `node-test-floorplan` | A fault in a workspace package, defended by a sibling package's test through the `node_modules` link, reads `unverifiable`/`subject-not-executed`: the scratch worktree's link resolves to the original checkout. Known failure for `LSHAPE-ESTIMATE-USES-CORE-AREA/F1`, `/F2`. **Fixed by #276**; the subject now matches its key. |
+| #264 | `ts-vitest-stock` | A vitest alias written `fileURLToPath(new URL('./src', import.meta.url))` makes `probe` refuse the whole project (exit 2). The subject uses the equivalent `join()` form so it measures everything else. **Fixed by #276**; the subject now matches its key. |
+| #266 | `js-jest-newsletter` | `module.exports = { X: call() }` in `src/errors.js` makes every closure indeterminate: nothing is reused and `--changed` selects every claim (a safe superset). Known failure for the `footer-source` selection. **Fixed by #276**; the subject now matches its key. |
+| #267 | `ts-vitest-stock` | `export interface` marks a module `unsupported-syntax`, so every closure is indeterminate: nothing is reused and `--changed` selects every claim (a safe superset). Known failure for the `adjustments-test` selection. **Fixed by #276**; the subject now matches its key. |
+| #268 | `node-test-floorplan` | `--changed` after an edit to `packages/geometry/src/units.js` selects only the 4 geometry claims and misses the 4 planner claims that import it through `@floorplan/geometry`: an **unsound** selection (stale verdicts stand). Known failure for the `geometry-source` selection. **Fixed by #276**; the subject now matches its key. |
 | #282 | `js-vitest-booking` | Escalation names no undeclared killer when an unrelated test file fails to load: three tests fail by assertion in every whole-suite run, but the run's outcome is `error`. Known for `RATES-AND-PEAK-WINDOW/F1`, `/F2`. |
 | #265 | `js-jest-newsletter` | GATE-SEMANTICS does not order `nocover` against an invalid anchor; the tool says `nocover`, the key says `anchor-ambiguous`. Known failure for `SCHEDULE-VALIDATION/F1` until the spec settles it. |
 
