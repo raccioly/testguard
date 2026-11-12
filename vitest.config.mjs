@@ -17,7 +17,7 @@ export default defineConfig({
     // tool's own tests, never collected directly. Agent-managed worktrees are
     // separate checkouts too: collecting them makes this tree's result depend
     // on unrelated, potentially unfinished work.
-    exclude: [...configDefaults.exclude, 'fixtures/**', '.claude/**'],
+    exclude: [...configDefaults.exclude, 'fixtures/**', 'corpus/**', '.claude/**'],
     // The suite is already parallel (maxWorkers above), and dozens of its
     // tests run whole probes. Under the CLI's default `--fault-workers auto`
     // each of those would fan out across more scratch trees on top, measuring

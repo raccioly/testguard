@@ -1,0 +1,297 @@
+{
+  "confirmRuns": 3,
+  "derivedWith": "node corpus/derive.mjs (applies each fault by hand to a scratch copy and runs the subject's own runner; never TestGuard). Verdicts written by hand in provenance/judgments.json.",
+  "expected": {
+    "ESCAPE-BY-DEFAULT/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Baseline green 3/3; with '<' escaped to '&gt;' the escaping tests fail by expect() assertion in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/jest test/template.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "8a8caeda2abc2f0132b9bf97e2b238d4321d68c24b3636f44d9d0853a8c95121",
+        "derivedAt": "2026-11-11T23:13:45.852Z"
+      }
+    },
+    "ESCAPE-BY-DEFAULT/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Baseline green 3/3; escaping raw values fails the triple-brace tests by assertion in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/jest test/template.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "4e67d77b7ccfa58bc22d0af77892d4f1870b1719ca2e64890cfd6a638c1c8f08",
+        "derivedAt": "2026-11-11T23:13:47.646Z"
+      }
+    },
+    "ESCAPE-BY-DEFAULT/F3": {
+      "verdict": "fault-invalid",
+      "reason": "replacement-does-not-compile",
+      "why": "The replacement leaves two adjacent string literals in an object literal; jest reports 'Test suite failed to run' (a SyntaxError) in all three runs. A suite that cannot load is not a kill.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/jest test/template.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath"
+        },
+        "observed": "baseline GGG; probe LLL",
+        "outputHash": "74a3880506a8091475db1b12bbbe1d101503878b661cb24e4d837f2f989a3420",
+        "derivedAt": "2026-11-11T23:13:49.497Z"
+      }
+    },
+    "MISSING-VALUE-HANDLING/F1": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "With presence judged by truthiness, an empty-string value throws MissingValueError inside render; the empty-string test fails with that exception, never an assertion, in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/jest test/template.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "102c4da9f9d3e710e6be3add924d3b32cbbd2d0d902880c90990c0c832caa106",
+        "derivedAt": "2026-11-11T23:13:51.256Z"
+      }
+    },
+    "MISSING-VALUE-HANDLING/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The exact-message assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/jest test/template.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "95cd3699478c4c2fa2c6853236ef00d8adf0042683dbb7ec27f18a034c185164",
+        "derivedAt": "2026-11-11T23:13:53.008Z"
+      }
+    },
+    "UNCLOSED-PLACEHOLDER-ERROR/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The position assertions ('position 3', 'position 8', ...) fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/jest test/template.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "cbf26dbcaf53392959542a6f4b867c7aa76ac1ead03a5fb5d1db6d7f703bb043",
+        "derivedAt": "2026-11-11T23:13:54.816Z"
+      }
+    },
+    "UNCLOSED-PLACEHOLDER-ERROR/F2": {
+      "verdict": "unverifiable",
+      "reason": "anchor-missing",
+      "why": "`const closing = raw ? ...` occurs 0 times in src/template.js (the source names it `closer`).",
+      "derivation": {
+        "commands": null,
+        "observed": "anchor: 0 hits, expected 1",
+        "outputHash": "266b10d1856181e1e8dc4d4d8b10ae708fd07aa21abd3c3608821fb3acf7fb4a",
+        "derivedAt": "2026-11-11T23:13:54.821Z"
+      }
+    },
+    "SLUG-FORMAT/F1": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "The hollow slug test asserts nothing, but `.toLowerCaseAll()` throws a TypeError for every title, so every test fails by exception in all three runs: the suite reaches the code without checking it.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/jest test/slug.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "29a530fb975ccc0f00abeb26545f19ecdcf130168a8841b5967859e4616d0b45",
+        "derivedAt": "2026-11-11T23:13:56.561Z"
+      }
+    },
+    "SLUG-FORMAT/F2": {
+      "verdict": "survived",
+      "why": "The hollow slug test stays green 3/3 with trailing hyphens kept. The negative control (slug.js unparseable) turns the defender red, so it does execute the code. The whole suite 3/3: no test fails in every run.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/jest test/slug.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath",
+          "wholeSuite": "node_modules/.bin/jest test/footer.test.js test/rates.test.js test/reading.test.js test/slug.test.js test/template.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "1198e544bac910c78a0e284d2fc2b1f0fcb96fc0175270707a3204d8afa00559",
+        "derivedAt": "2026-11-11T23:13:59.423Z"
+      }
+    },
+    "SLUG-LIMIT/F1": {
+      "verdict": "survived",
+      "why": "Hollow defender green 3/3; control red (reached); no test in the whole suite fails in every run.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/jest test/slug.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath",
+          "wholeSuite": "node_modules/.bin/jest test/footer.test.js test/rates.test.js test/reading.test.js test/slug.test.js test/template.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "1198e544bac910c78a0e284d2fc2b1f0fcb96fc0175270707a3204d8afa00559",
+        "derivedAt": "2026-11-11T23:14:02.326Z"
+      }
+    },
+    "SLUG-LIMIT/F2": {
+      "verdict": "survived",
+      "why": "Hollow defender green 3/3 with a limit of 0 accepted; control red; no whole-suite killer.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/jest test/slug.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath",
+          "wholeSuite": "node_modules/.bin/jest test/footer.test.js test/rates.test.js test/reading.test.js test/slug.test.js test/template.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "1198e544bac910c78a0e284d2fc2b1f0fcb96fc0175270707a3204d8afa00559",
+        "derivedAt": "2026-11-11T23:14:05.241Z"
+      }
+    },
+    "COUNT-WORDS/F1": {
+      "verdict": "timeout",
+      "why": "With `while (true) {}` in countWords the declared defender never finishes; all three runs were killed at the 10 s budget. A timeout is not a kill.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/jest test/reading.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath"
+        },
+        "observed": "baseline GGG; probe TTT",
+        "outputHash": "b7a1a74568554ece4f432c1cb522e8c30d2cf426d5d517f439f51f52b6515879",
+        "derivedAt": "2026-11-11T23:15:36.144Z"
+      }
+    },
+    "COUNT-WORDS/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Splitting on ' ' miscounts the spec example and the tab case; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/jest test/reading.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "3d14466f54431fdaa31acb900054f111d1517e714b0bf75c5687aced38b5ccd5",
+        "derivedAt": "2026-11-11T23:15:38.007Z"
+      }
+    },
+    "READING-TIME-MINUTES/F1": {
+      "verdict": "unverifiable",
+      "reason": "subject-not-executed",
+      "why": "The declared defender test/rates.test.js never imports src/: green 3/3 with the fault, and still green with src/reading.js made unparseable (negative control). The whole suite kills it (test/reading.test.js fails every run), but GATE-SEMANTICS rule 12 makes a would-be survivor whose defenders never execute the subject unverifiable.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/jest test/rates.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath",
+          "wholeSuite": "node_modules/.bin/jest test/footer.test.js test/rates.test.js test/reading.test.js test/slug.test.js test/template.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath"
+        },
+        "observed": "baseline GGG; probe GGG; negative control green; whole suite: 4 test(s) fail every run",
+        "outputHash": "5f76b4dbdd573f30ab6de9938d6809bfad7d4e715185c3a95e7dd3de956da838",
+        "derivedAt": "2026-11-11T23:15:40.850Z"
+      }
+    },
+    "READING-TIME-MINUTES/F2": {
+      "verdict": "unverifiable",
+      "reason": "subject-not-executed",
+      "why": "As F1: the declared defender never executes reading.js (control green); test/reading.test.js would kill it.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/jest test/rates.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath",
+          "wholeSuite": "node_modules/.bin/jest test/footer.test.js test/rates.test.js test/reading.test.js test/slug.test.js test/template.test.js --json --outputFile=<report> --runInBand --ci --runTestsByPath"
+        },
+        "observed": "baseline GGG; probe GGG; negative control green; whole suite: 2 test(s) fail every run",
+        "outputHash": "8831498d5b81ce74cef14723a7d0a6173b872101c65280c16822d48c496c077a",
+        "derivedAt": "2026-11-11T23:15:43.678Z"
+      }
+    },
+    "SCHEDULE-VALIDATION/F1": {
+      "verdict": "unverifiable",
+      "reason": "anchor-ambiguous",
+      "why": "'at least one send day is required' occurs twice in src/schedule.js; expectHits is 1.",
+      "derivation": {
+        "commands": null,
+        "observed": "anchor: 2 hits, expected 1",
+        "outputHash": "446a52738cf6b241227abfade4ad0b97a0a265c043a66649043ae55fe86b5161",
+        "derivedAt": "2026-11-11T23:15:43.685Z"
+      }
+    },
+    "SCHEDULE-VALIDATION/F2": {
+      "verdict": "nocover",
+      "why": "No defendedBy; no test file names or imports src/schedule.js (the test author was told to write none).",
+      "derivation": {
+        "commands": null,
+        "observed": "no defendedBy; test files naming the target: []",
+        "outputHash": "86aadc65e23a42d24eab6bc685577bb87d91126f366fb7012bf1d83e71e462cc",
+        "derivedAt": "2026-11-11T23:15:43.692Z"
+      }
+    },
+    "FOOTER-BY-AUDIENCE/F1": {
+      "verdict": "nocover",
+      "why": "No defendedBy; the only test that imports src/footer.js replaces it with jest.mock and asserts on the mock. A mock of the module cannot detect a fault in it, so it is not a defender.",
+      "derivation": {
+        "commands": null,
+        "observed": "no defendedBy; test files naming the target: [\"test/footer.test.js\"]",
+        "outputHash": "6668a1a53c3d4c6aa981590fddaa8ca297d8568088256441287bb402865d4472",
+        "derivedAt": "2026-11-11T23:15:43.698Z"
+      }
+    },
+    "FOOTER-BY-AUDIENCE/F2": {
+      "verdict": "nocover",
+      "why": "As F1.",
+      "derivation": {
+        "commands": null,
+        "observed": "no defendedBy; test files naming the target: [\"test/footer.test.js\"]",
+        "outputHash": "6668a1a53c3d4c6aa981590fddaa8ca297d8568088256441287bb402865d4472",
+        "derivedAt": "2026-11-11T23:15:43.705Z"
+      }
+    }
+  },
+  "modes": {
+    "reuse-edit": {
+      "why": "src/errors.js is imported by every source module, so a change to it (here a comment) must re-measure every fault: the targets' own hashes do not change, only their import closure does.",
+      "edits": [
+        {
+          "file": "src/errors.js",
+          "find": "function define(name) {",
+          "replace": "// corpus: a scripted change, behavior-neutral\nfunction define(name) {"
+        }
+      ],
+      "expected": {},
+      "mustRemeasure": [
+        "ESCAPE-BY-DEFAULT/F1",
+        "ESCAPE-BY-DEFAULT/F2",
+        "ESCAPE-BY-DEFAULT/F3",
+        "MISSING-VALUE-HANDLING/F1",
+        "MISSING-VALUE-HANDLING/F2",
+        "UNCLOSED-PLACEHOLDER-ERROR/F1",
+        "SLUG-FORMAT/F1",
+        "SLUG-FORMAT/F2",
+        "SLUG-LIMIT/F1",
+        "SLUG-LIMIT/F2",
+        "COUNT-WORDS/F1",
+        "COUNT-WORDS/F2",
+        "READING-TIME-MINUTES/F1",
+        "READING-TIME-MINUTES/F2",
+        "SCHEDULE-VALIDATION/F2",
+        "FOOTER-BY-AUDIENCE/F1",
+        "FOOTER-BY-AUDIENCE/F2"
+      ]
+    },
+    "changed": {
+      "why": "Selections derived by reading the imports.",
+      "steps": [
+        {
+          "name": "footer-source",
+          "edits": [
+            {
+              "file": "src/footer.js",
+              "find": "const { UnknownRecipientError } = require('./errors');",
+              "replace": "// corpus: a scripted change, behavior-neutral\nconst { UnknownRecipientError } = require('./errors');"
+            }
+          ],
+          "expectedClaims": [
+            "FOOTER-BY-AUDIENCE"
+          ],
+          "why": "Only FOOTER-BY-AUDIENCE targets src/footer.js; no other claim's target or defender imports it (the only test that names it mocks it and defends nothing)."
+        }
+      ],
+      "badRef": {
+        "ref": "refs/heads/corpus-no-such-branch",
+        "exit": 2,
+        "why": "An unresolvable reference is a precondition failure."
+      }
+    }
+  }
+}

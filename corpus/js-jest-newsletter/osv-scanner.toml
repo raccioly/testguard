@@ -1,0 +1,17 @@
+# Corpus subject (#258): jest 30.5.2's own transitive dev dependencies, the
+# same versions the root package-lock.json already carries on main. Nothing here
+# is installed by users: corpus/ is excluded from the published package, and
+# these packages only run the subject's tests inside the corpus job. deepmerge
+# has no fixed release; glob 14 and minimatch 11 are majors jest 30 does not
+# accept. Re-evaluate when jest moves.
+[[IgnoredVulns]]
+id = "GHSA-gcqx-w48m-w2h4"
+reason = "deepmerge 4.3.1, transitive dev dependency of jest 30.5.2 in a test-only corpus subject; no fixed version exists."
+
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+reason = "glob 10.5.0/13.0.7, transitive dev dependency of jest 30.5.2 in a test-only corpus subject; the fix is a major jest does not accept."
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+reason = "minimatch 9.0.9/10.2.6, transitive dev dependency of jest 30.5.2 in a test-only corpus subject; the fix is a major jest does not accept."

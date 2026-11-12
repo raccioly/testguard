@@ -1,0 +1,348 @@
+{
+  "confirmRuns": 3,
+  "derivedWith": "node corpus/derive.mjs (applies each fault by hand to a scratch copy and runs the subject's own runner; never TestGuard). Verdicts written by hand in provenance/judgments.json.",
+  "expected": {
+    "RECT-AREA-PERIMETER/F1": {
+      "verdict": "fault-invalid",
+      "reason": "replacement-does-not-compile",
+      "why": "`2 * (this.width + ;` is a SyntaxError: the test file fails to load in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/geometry/test/shapes.test.js"
+        },
+        "observed": "baseline GGG; probe LLL",
+        "outputHash": "d89d0998488b974212ce3f7996f6fb34c44256f7b88c1b9ca6ec088bfca77d23",
+        "derivedAt": "2026-11-11T23:17:10.148Z"
+      }
+    },
+    "RECT-AREA-PERIMETER/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Area assertions fail (assert.equal) in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/geometry/test/shapes.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "4219b3d3bb13305d88155045afbdff84d96a50ba6704cd636d4bee7f09166cce",
+        "derivedAt": "2026-11-11T23:17:10.715Z"
+      }
+    },
+    "SHAPE-REJECTS-INVALID/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "assert.throws on the zero cases fails in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/geometry/test/shapes.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "af0909f3c65b92232b8b4cd02d398353a9df11c5df14616e76de96ae1dd97bba",
+        "derivedAt": "2026-11-11T23:17:11.268Z"
+      }
+    },
+    "SHAPE-REJECTS-INVALID/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The notch-width-equal case no longer throws: assert.throws fails in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/geometry/test/shapes.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "d204fba33fe5ded57b31ea1b4d528f1076371315f4e822c26ca3b029284b336b",
+        "derivedAt": "2026-11-11T23:17:11.826Z"
+      }
+    },
+    "LENGTH-CONVERSION/F1": {
+      "verdict": "unverifiable",
+      "reason": "anchor-ambiguous",
+      "why": "`value * factor(from, to)` occurs twice in units.js; expectHits is 1.",
+      "derivation": {
+        "commands": null,
+        "observed": "anchor: 2 hits, expected 1",
+        "outputHash": "446a52738cf6b241227abfade4ad0b97a0a265c043a66649043ae55fe86b5161",
+        "derivedAt": "2026-11-11T23:17:11.837Z"
+      }
+    },
+    "LENGTH-CONVERSION/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Conversion assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/geometry/test/units.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "fd3f9159c7fd1fd9ce21e5ff1cb87c1973e92603732fd559a8e4afba0ab52e90",
+        "derivedAt": "2026-11-11T23:17:12.337Z"
+      }
+    },
+    "LENGTH-CONVERSION/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Truncation gives 39.37; the assertion fails in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/geometry/test/units.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "0f9348eb9cb67a8c20219c291ea06f51e55161d5dfd005b68c10856d41ce6848",
+        "derivedAt": "2026-11-11T23:17:12.817Z"
+      }
+    },
+    "OVERLAP-INTERIOR-ONLY/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Edge-touching now overlaps; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/geometry/test/units.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "dee20bc37d7e7af6b601ccf1372ac6931032f0bbd86a67cfe5fcd54fd70eafd4",
+        "derivedAt": "2026-11-11T23:17:13.302Z"
+      }
+    },
+    "OVERLAP-INTERIOR-ONLY/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Far-apart rectangles report overlap; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/geometry/test/units.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "dcd1f51bd6811bf41b41a8fc5fe73951a69efb3052769813d41c5a8414b6ab7f",
+        "derivedAt": "2026-11-11T23:17:13.953Z"
+      }
+    },
+    "OVERLAP-INTERIOR-ONLY/F3": {
+      "verdict": "unverifiable",
+      "reason": "anchor-missing",
+      "why": "`b.y + b.h` does not occur in units.js (the source says b.height).",
+      "derivation": {
+        "commands": null,
+        "observed": "anchor: 0 hits, expected 1",
+        "outputHash": "266b10d1856181e1e8dc4d4d8b10ae708fd07aa21abd3c3608821fb3acf7fb4a",
+        "derivedAt": "2026-11-11T23:17:13.963Z"
+      }
+    },
+    "PLACE-ROOM-REJECTIONS/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "assert.throws(RoomOverlap) fails in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/planner/test/layout.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "219af0eba60307335a1b9d02d104a3373553f79a9dc452838429108a03790631",
+        "derivedAt": "2026-11-11T23:17:14.438Z"
+      }
+    },
+    "PLACE-ROOM-REJECTIONS/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The exact-message assertion fails in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/planner/test/layout.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "219af0eba60307335a1b9d02d104a3373553f79a9dc452838429108a03790631",
+        "derivedAt": "2026-11-11T23:17:14.967Z"
+      }
+    },
+    "PLACE-ROOM-REJECTIONS/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The duplicate name is accepted; assert.throws(DuplicateRoom) fails in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/planner/test/layout.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "6cf6dbf651742c1208f6354c33243b506ac9d7572f06d1fe2e3fc8761a196930",
+        "derivedAt": "2026-11-11T23:17:15.433Z"
+      }
+    },
+    "LOT-SETBACK/F1": {
+      "verdict": "survived",
+      "why": "layout.test.js never passes a setback: green 3/3. Control red (it executes plan.js). No test in the whole suite fails in every run.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/planner/test/layout.test.js",
+          "wholeSuite": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/geometry/test/shapes.test.js packages/geometry/test/units.test.js packages/planner/test/estimate.test.js packages/planner/test/layout.test.js packages/planner/test/summary.test.js"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "cdaa425dd5e6adced8687520fcf8c356b4c796780c7ad71f25f9a4634de55565",
+        "derivedAt": "2026-11-11T23:17:16.201Z"
+      }
+    },
+    "LOT-SETBACK/F2": {
+      "verdict": "survived",
+      "why": "As F1: a negative setback is never tried.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/planner/test/layout.test.js",
+          "wholeSuite": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/geometry/test/shapes.test.js packages/geometry/test/units.test.js packages/planner/test/estimate.test.js packages/planner/test/layout.test.js packages/planner/test/summary.test.js"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "cdaa425dd5e6adced8687520fcf8c356b4c796780c7ad71f25f9a4634de55565",
+        "derivedAt": "2026-11-11T23:17:17.338Z"
+      }
+    },
+    "LSHAPE-ESTIMATE-USES-CORE-AREA/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The fault is in packages/geometry/src/shapes.js; the declared defender packages/planner/test/estimate.test.js imports LShape by package name (@floorplan/geometry, a workspace link to packages/geometry) and its area assertion fails in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/planner/test/estimate.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "8460c1fe8d563daaff6e5b0d0f6423334f84d5306ab9c6405407773838ce4882",
+        "derivedAt": "2026-11-11T23:17:17.812Z"
+      }
+    },
+    "LSHAPE-ESTIMATE-USES-CORE-AREA/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "As F1, through the workspace link: area 64 instead of 68, assertion fails 3/3.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/planner/test/estimate.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "8460c1fe8d563daaff6e5b0d0f6423334f84d5306ab9c6405407773838ce4882",
+        "derivedAt": "2026-11-11T23:17:18.279Z"
+      }
+    },
+    "LSHAPE-ESTIMATE-USES-CORE-AREA/F3": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "Passing the shape object now raises InvalidDimension inside estimateFlooring before any assert runs: the test fails by exception in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/planner/test/estimate.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "b1f21e4fb8946e9c064701c8e6646f0adb2b96ad057b477b3a5fd456cc500f40",
+        "derivedAt": "2026-11-11T23:17:18.847Z"
+      }
+    },
+    "SUMMARY-TOTALS-AND-NAMES/F1": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "The hollow summary test asserts nothing, but r.size is undefined so summarize throws a TypeError for every non-empty plan: exception in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/planner/test/summary.test.js"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "8f25a7ccee6ae7dfee75620041d9315626d02780a5a0fe2ea3650c04af5f6b54",
+        "derivedAt": "2026-11-11T23:17:19.309Z"
+      }
+    },
+    "SUMMARY-TOTALS-AND-NAMES/F2": {
+      "verdict": "survived",
+      "why": "Hollow defender green 3/3; control red (it executes estimate.js); no whole-suite killer.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/planner/test/summary.test.js",
+          "wholeSuite": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/geometry/test/shapes.test.js packages/geometry/test/units.test.js packages/planner/test/estimate.test.js packages/planner/test/layout.test.js packages/planner/test/summary.test.js"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "d66ee6aeac1163bd5b354cf35908d47091c02e8642ffc62a4867d1ca96d8506f",
+        "derivedAt": "2026-11-11T23:17:20.118Z"
+      }
+    },
+    "SUMMARY-TOTALS-AND-NAMES/F3": {
+      "verdict": "survived",
+      "why": "As F2.",
+      "derivation": {
+        "commands": {
+          "defenders": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/planner/test/summary.test.js",
+          "wholeSuite": "node --test --test-reporter=junit --test-reporter-destination=<report> packages/geometry/test/shapes.test.js packages/geometry/test/units.test.js packages/planner/test/estimate.test.js packages/planner/test/layout.test.js packages/planner/test/summary.test.js"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "d66ee6aeac1163bd5b354cf35908d47091c02e8642ffc62a4867d1ca96d8506f",
+        "derivedAt": "2026-11-11T23:17:20.923Z"
+      }
+    }
+  },
+  "modes": {
+    "reuse-edit": {
+      "why": "packages/geometry/src/errors.js is imported by shapes.js and units.js, the targets of every geometry fault, so a comment there must re-measure them. The planner reaches it only through the workspace package link (@floorplan/geometry), which GATE-SEMANTICS rule 8 leaves outside the hashed closure and covers by the live baseline instead, so nothing is required of the planner-only faults.",
+      "edits": [
+        {
+          "file": "packages/geometry/src/errors.js",
+          "find": "export class InvalidDimension extends Error {",
+          "replace": "// corpus: a scripted change, behavior-neutral\nexport class InvalidDimension extends Error {"
+        }
+      ],
+      "expected": {},
+      "mustRemeasure": [
+        "RECT-AREA-PERIMETER/F1",
+        "RECT-AREA-PERIMETER/F2",
+        "SHAPE-REJECTS-INVALID/F1",
+        "SHAPE-REJECTS-INVALID/F2",
+        "LENGTH-CONVERSION/F2",
+        "LENGTH-CONVERSION/F3",
+        "OVERLAP-INTERIOR-ONLY/F1",
+        "OVERLAP-INTERIOR-ONLY/F2",
+        "LSHAPE-ESTIMATE-USES-CORE-AREA/F1",
+        "LSHAPE-ESTIMATE-USES-CORE-AREA/F2"
+      ]
+    },
+    "changed": {
+      "why": "Selections derived by reading the imports. The planner imports the geometry core by package name; the workspace link makes packages/geometry part of what every planner claim runs.",
+      "steps": [
+        {
+          "name": "planner-source",
+          "edits": [
+            {
+              "file": "packages/planner/src/estimate.js",
+              "find": "const WASTE = { tile: 1.1, carpet: 1.05 };",
+              "replace": "// corpus: a scripted change, behavior-neutral\nconst WASTE = { tile: 1.1, carpet: 1.05 };"
+            }
+          ],
+          "expectedClaims": [
+            "LOT-SETBACK",
+            "LSHAPE-ESTIMATE-USES-CORE-AREA",
+            "PLACE-ROOM-REJECTIONS",
+            "SUMMARY-TOTALS-AND-NAMES"
+          ],
+          "why": "Every planner test imports ../src/index.js, which re-exports estimate.js; no geometry target or test imports the planner."
+        },
+        {
+          "name": "geometry-source",
+          "edits": [
+            {
+              "file": "packages/geometry/src/units.js",
+              "find": "const METERS = ",
+              "replace": "// corpus: a scripted change, behavior-neutral\nconst METERS = "
+            }
+          ],
+          "expectedClaims": [
+            "LENGTH-CONVERSION",
+            "LOT-SETBACK",
+            "LSHAPE-ESTIMATE-USES-CORE-AREA",
+            "OVERLAP-INTERIOR-ONLY",
+            "PLACE-ROOM-REJECTIONS",
+            "RECT-AREA-PERIMETER",
+            "SHAPE-REJECTS-INVALID",
+            "SUMMARY-TOTALS-AND-NAMES"
+          ],
+          "why": "units.js is re-exported by the geometry index that the geometry tests import, and the planner imports it through @floorplan/geometry (plan.js uses overlaps, estimate.js uses convertArea): a change there can affect every claim."
+        }
+      ],
+      "badRef": {
+        "ref": "refs/heads/corpus-no-such-branch",
+        "exit": 2,
+        "why": "An unresolvable reference is a precondition failure."
+      }
+    }
+  }
+}

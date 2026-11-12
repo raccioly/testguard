@@ -1,0 +1,6 @@
+{
+  "name": "floorplan-workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/geometry", "packages/planner"]
+}

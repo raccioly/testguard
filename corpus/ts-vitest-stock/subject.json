@@ -1,0 +1,27 @@
+{
+  "runner": "vitest",
+  "install": "npm",
+  "testFiles": "^test/.*\\.test\\.ts$",
+  "budgetMs": 60000,
+  "typecheck": true,
+  "probeArgs": [
+    "--runner",
+    "vitest"
+  ],
+  "noise": [
+    {
+      "add": "src/unused-banner.ts",
+      "content": "// corpus metamorphic noise: an unrelated module nothing imports\nexport const BANNER = 'corpus';\n"
+    },
+    {
+      "rename": [
+        "SPEC.md",
+        "docs/SPEC.md"
+      ]
+    }
+  ],
+  "readOnlyNodeModules": {
+    "applies": false,
+    "why": "Vite bundles vitest.config.ts into node_modules/.vite-temp before any test runs, so the subject's own runner fails with EACCES against a read-only node_modules (checked by running node_modules/.bin/vitest by hand). The scratch mode here uses --scratch-dir with the writable node_modules; js-jest-newsletter covers the read-only case."
+  }
+}

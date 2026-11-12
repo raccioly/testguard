@@ -1,0 +1,8 @@
+diff --git a/src/probe/probe.mjs b/src/probe/probe.mjs
+index 9c5dcef..2ad10c4 100644
+--- a/src/probe/probe.mjs
++++ b/src/probe/probe.mjs
+@@ -1166,3 +1166,2 @@ async function measureFault(state, tree) {
+     } finally {
+-      mutation.restore();
+       // The restore found nothing to put back. In worktree mode that is a

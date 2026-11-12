@@ -22,6 +22,10 @@ try {
   mkdirSync(packDir);
   run(npm, ['pack', '--pack-destination', packDir, '--ignore-scripts'], root);
   const tgz = join(packDir, readdirSync(packDir).find((f) => f.endsWith('.tgz')));
+  // The benchmark corpus (#258) carries whole subject projects; none of it ships.
+  const packed = run('tar', ['-tzf', tgz], packDir).split('\n').filter(Boolean);
+  const leaked = packed.filter((f) => /^package\/(corpus|fixtures|bench|test)\//.test(f));
+  if (leaked.length) throw new Error(`the package carries repository-only files: ${leaked.slice(0, 5).join(', ')}`);
 
   const consumer = join(scratch, 'consumer');
   cpSync(join(root, 'fixtures', 'known-answer'), consumer, { recursive: true, filter: (s) => !/node_modules|\.flake-counter|\.testguard/.test(s) });

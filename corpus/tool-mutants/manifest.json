@@ -1,0 +1,191 @@
+{
+  "why": "Each patch is a realistic regression in src/. The harness applies it to a scratch copy of the tool and runs the named subjects and modes (the reference mode always first), stopping at the first red check. A mutant nothing turns red is a gap in the corpus. Patches are cut with -U1 so unrelated edits to src/ rarely break them; test/corpus-mutants.test.mjs fails the moment one no longer applies.",
+  "mutants": [
+    {
+      "name": "timeout-counted-as-kill",
+      "patch": "timeout-counted-as-kill.patch",
+      "description": "The runner reports a run killed at its budget as an ordinary failing test, so a fault that hangs reads as an exception-only kill (GATE-SEMANTICS rule 3). The evidence stays valid; only the key can catch it.",
+      "targets": [
+        {
+          "subject": "js-jest-newsletter",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mixed-result-counted-as-kill",
+      "patch": "mixed-result-counted-as-kill.patch",
+      "description": "When the probe runs disagree, each passing run is retried (up to twice) until it fails, so a nondeterministic response is recorded as N failing runs and reads as a kill (rule 4). The evidence stays valid; only the key can catch it. The shape a bail-on-first-failure or warm-runner change could take.",
+      "targets": [
+        {
+          "subject": "py-pytest-circulation",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "baseline-not-required-green",
+      "patch": "baseline-not-required-green.patch",
+      "description": "A baseline that is green only some of the time is accepted (rule 1).",
+      "targets": [
+        {
+          "subject": "py-pytest-circulation",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "fault-not-restored",
+      "patch": "fault-not-restored.patch",
+      "description": "A fault is left in the tree after it is measured, so the next fault runs on top of it.",
+      "targets": [
+        {
+          "subject": "ts-vitest-stock",
+          "modes": [
+            "reference"
+          ]
+        },
+        {
+          "subject": "js-jest-newsletter",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "reuse-ignores-import-closure",
+      "patch": "reuse-ignores-import-closure.patch",
+      "description": "Reuse ignores dependencyHashes: a change to a file the target or defenders import no longer forces a re-measure (rule 8).",
+      "targets": [
+        {
+          "subject": "node-test-floorplan",
+          "modes": [
+            "reuse"
+          ]
+        },
+        {
+          "subject": "py-pytest-circulation",
+          "modes": [
+            "reuse"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "reuse-ignores-tool-version",
+      "patch": "reuse-ignores-tool-version.patch",
+      "description": "Evidence written by another TestGuard version is carried forward (rule 8, the instrument).",
+      "targets": [
+        {
+          "subject": "node-test-floorplan",
+          "modes": [
+            "reuse"
+          ]
+        },
+        {
+          "subject": "py-pytest-circulation",
+          "modes": [
+            "reuse"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "typecheck-skipped",
+      "patch": "typecheck-skipped.patch",
+      "description": "--typecheck reports every fault as clean without running the checker (rule 16).",
+      "targets": [
+        {
+          "subject": "ts-vitest-stock",
+          "modes": [
+            "typecheck"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "not-reached-fault-dropped",
+      "patch": "not-reached-fault-dropped.patch",
+      "description": "Under --partial-on-budget a fault the budget never reached is dropped from the evidence instead of being recorded unverifiable/not-reached-within-budget.",
+      "targets": [
+        {
+          "subject": "js-jest-newsletter",
+          "modes": [
+            "partial"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "fan-out-shares-one-tree",
+      "patch": "fan-out-shares-one-tree.patch",
+      "description": "--fault-workers runs several faults at once in the same scratch tree instead of one tree per fault.",
+      "targets": [
+        {
+          "subject": "ts-vitest-stock",
+          "modes": [
+            "workers-4"
+          ]
+        },
+        {
+          "subject": "js-jest-newsletter",
+          "modes": [
+            "workers-4"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "negative-control-skipped",
+      "patch": "negative-control-skipped.patch",
+      "description": "The negative control is never run on a would-be survivor, so a survivor whose defenders never execute the subject stays survived (rule 12). The record stays valid (no control recorded); only the key can catch it.",
+      "targets": [
+        {
+          "subject": "js-jest-newsletter",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "changed-git-failure-is-empty",
+      "patch": "changed-git-failure-is-empty.patch",
+      "description": "--changed treats a reference git cannot resolve as an empty change (exit 0, nothing probed) instead of a precondition failure.",
+      "targets": [
+        {
+          "subject": "js-jest-newsletter",
+          "modes": [
+            "changed"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "exception-only-reported-as-assertion",
+      "patch": "exception-only-reported-as-assertion.patch",
+      "description": "The jest/vitest report parser counts a failure the runner identified as an exception as an assertion, so a hollow suite's exception-only kill is recorded as an assertion kill and --require-assertion-kill passes it (rule 3). The evidence stays valid; only the key can catch it.",
+      "targets": [
+        {
+          "subject": "js-jest-newsletter",
+          "modes": [
+            "reference"
+          ]
+        },
+        {
+          "subject": "ts-vitest-stock",
+          "modes": [
+            "assertion-kill"
+          ]
+        }
+      ]
+    }
+  ]
+}

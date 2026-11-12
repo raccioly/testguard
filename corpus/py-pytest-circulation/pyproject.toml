@@ -1,0 +1,9 @@
+[project]
+name = "corpus-circulation"
+version = "0.0.0"
+description = "Corpus subject: a Python package under pytest. See SPEC.md and PROVENANCE.md."
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -80,10 +80,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   commands — and the status document's `advice`.
 - **The GitHub Action has a `changed` input** for `probe` (`auto` or a ref),
   and its `evidence` output also names `evidence-partial.json`.
-
 - **`probe --changed auto`** finds the base offline: the CI base branch, the
   remote default branch, a differently named upstream, then the branch's own
   upstream (the commits not pushed yet). With none, it probes every claim.
+- **A benchmark corpus with independent answer keys (#258, repository only, not
+  in the package).** `npm run corpus` runs four subject projects (vitest with
+  strict TypeScript, jest, pytest, a node:test workspace) under every probe
+  mode and compares each verdict with a key derived by hand without TestGuard,
+  with the serial reference run, and with transformed copies of the subject;
+  `--tool-mutants` requires twelve deliberately broken builds to go red. It
+  found #263, #264, #265, #266, #267 and #268.
 
 ## [0.23.0] - 2026-11-12
 
