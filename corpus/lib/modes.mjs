@@ -26,6 +26,7 @@ function runSummary(label, r) {
   // The tool wrote no evidence: a refusal (its own validator, a precondition)
   // or a crash. Reported as that, with the tool's reason, never as N wrong verdicts.
   if (!r.evidence) out.noEvidence = refusalReason(r);
+  if (r.untouched) out.untouched = { emptySnapshot: r.untouched.emptySnapshot, changes: r.untouched.changes.slice(0, 20), changed: r.untouched.changes.length };
   return out;
 }
 
@@ -41,6 +42,13 @@ function result(mode, subject, { runs, key = null, diff = null, checks = [], err
   const extra = [...checks];
   for (const run of runs) {
     if (run.noEvidence && !run.expectNoEvidence) extra.push(check('tool-wrote-evidence', false, { run: run.label, ...run.noEvidence }));
+  }
+  // Critical, never excusable: the tool modified the project it measured.
+  for (const run of runs) {
+    if (!run.untouched) { extra.push(check('subject-untouched', false, { run: run.label, note: 'no snapshot was taken' })); continue; }
+    if (run.untouched.emptySnapshot) extra.push(check('subject-untouched', false, { run: run.label, note: 'the snapshot was empty: nothing was compared' }));
+    else if (run.untouched.changed > 0) extra.push({ ...check('subject-untouched', false, { run: run.label, ...run.untouched }), critical: true, summary: `tool modified the subject: ${run.untouched.changes.map((c) => c.path).join(', ')}` });
+    else extra.push(check('subject-untouched', true, { run: run.label }));
   }
   if (!error && measured === 0 && !checks.some((c) => c.allowEmpty)) extra.push(check('measured-something', false, 'the mode produced no records: an empty comparison is a failure'));
   const ok = !error && (!key || (key.wrong === 0 && key.critical === 0)) && (!diff || diff.equal) && extra.every((c) => c.ok);

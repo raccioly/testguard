@@ -45,7 +45,7 @@ export function buildScorecard({ toolRoot, results, mutants, machine }) {
       faults: r.key ? { total: r.key.total, right: r.key.right, wrong: r.key.wrong, critical: r.key.critical, known: r.key.known } : null,
       mismatches: r.key?.mismatches ?? [],
       differential: r.differential ? { equal: r.differential.equal, compared: r.differential.compared, orderEqual: r.differential.orderEqual, mismatches: r.differential.mismatches } : null,
-      checks: r.checks.map((c) => ({ check: c.check, ok: c.ok, detail: c.detail ?? null })),
+      checks: r.checks.map((c) => ({ check: c.check, ok: c.ok, detail: c.detail ?? null, ...(c.critical ? { critical: true, summary: c.summary } : {}) })),
       runs: r.runs,
       runnerInvocations: inv,
       seconds: Math.round(ms / 100) / 10,
@@ -57,6 +57,7 @@ export function buildScorecard({ toolRoot, results, mutants, machine }) {
   });
   const totals = rows.reduce((t, r) => {
     if (r.faults) { t.right += r.faults.right; t.wrong += r.faults.wrong; t.critical += r.faults.critical; t.known += r.faults.known; }
+    t.critical += r.checks.filter((c) => c.critical && !c.ok).length;
     if (r.differential && !r.differential.equal) t.differentialMismatches++;
     t.noEvidence += r.noEvidence.length;
     return t;
@@ -100,6 +101,7 @@ export function mergeScorecards(docs) {
   const mutantResults = docs.flatMap((d) => d.mutants?.results ?? []);
   const totals = rows.reduce((t, r) => {
     if (r.faults) { t.right += r.faults.right; t.wrong += r.faults.wrong; t.critical += r.faults.critical; t.known += r.faults.known; }
+    t.critical += r.checks.filter((c) => c.critical && !c.ok).length;
     if (r.differential && !r.differential.equal) t.differentialMismatches++;
     t.noEvidence += (r.noEvidence ?? []).length;
     return t;
@@ -153,6 +155,13 @@ export function renderMarkdown(doc, { base = null } = {}) {
       const fmt = (v) => (v ? `${v.verdict}${v.reason ? ` (${v.reason})` : ''}${v.killKind ? ` [${v.killKind}]` : ''}` : 'not reported');
       for (const m of mism) lines.push(`| ${m.subject} | ${m.mode} | ${m.fault} | ${fmt(m.expected)} | ${fmt(m.observed)} | ${m.critical ? '**CRITICAL**' : m.knownIssue ? `known: #${m.knownIssue}` : '**wrong**'} |`);
     }
+  }
+  const modified = doc.rows.flatMap((r) => r.checks.filter((c) => c.critical && !c.ok).map((c) => ({ ...c, subject: r.subject, mode: r.mode })));
+  if (modified.length) {
+    lines.push('');
+    lines.push('**CRITICAL: the tool modified the subject it measured**');
+    lines.push('');
+    for (const c of modified) lines.push(`- ${c.subject} / ${c.mode} (${c.detail?.run}): ${String(c.summary).replace(/\|/g, '\\|').slice(0, 400)}`);
   }
   const refused = doc.rows.flatMap((r) => (r.noEvidence ?? []).map((n) => ({ ...n, subject: r.subject, mode: r.mode })));
   if (refused.length) {

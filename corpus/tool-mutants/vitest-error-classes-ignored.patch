@@ -1,8 +1,8 @@
 diff --git a/src/probe/runners/vitest.mjs b/src/probe/runners/vitest.mjs
 --- a/src/probe/runners/vitest.mjs
 +++ b/src/probe/runners/vitest.mjs
-@@ -65,3 +65,3 @@
+@@ -154,3 +154,3 @@
    try {
--    return await runProcess({ ...opts, env: { ...opts.env, TESTGUARD_VITEST_KINDS: sidecar }, parse: (report, durationMs) => parseReport(report, durationMs, readKinds()), argv: (files, outFile) => argvFor(opts.projectDir, files, outFile, opts) });
-+    return await runProcess({ ...opts, env: { ...opts.env, TESTGUARD_VITEST_KINDS: sidecar }, parse: (report, durationMs) => parseReport(report, durationMs, undefined), argv: (files, outFile) => argvFor(opts.projectDir, files, outFile, opts) });
+-    return await runProcess({ ...opts, env: { ...opts.env, TESTGUARD_VITEST_KINDS: sidecar }, parse: (report, durationMs) => parseReport(report, durationMs, readKinds()), argv: (files, outFile) => argvFor(opts.projectDir, files, outFile, { ...opts, project }) });
++    return await runProcess({ ...opts, env: { ...opts.env, TESTGUARD_VITEST_KINDS: sidecar }, parse: (report, durationMs) => parseReport(report, durationMs, undefined), argv: (files, outFile) => argvFor(opts.projectDir, files, outFile, { ...opts, project }) });
    } finally { rmSync(sidecar, { force: true }); }

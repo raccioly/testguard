@@ -110,32 +110,6 @@
       "issue": 268
     },
     {
-      "subject": "js-vitest-projects-habits",
-      "check": "tool-wrote-evidence",
-      "expected": {
-        "evidence": "every fault probed and killed as keyed"
-      },
-      "observed": {
-        "exit": 2,
-        "kind": "runner-unresolvable",
-        "reasonIncludes": "native test discovery path does not exist: [streaks] test/shared.test.js"
-      },
-      "issue": 277
-    },
-    {
-      "subject": "js-vitest-mergeconfig-ledger",
-      "check": "tool-wrote-evidence",
-      "expected": {
-        "evidence": "every fault probed as keyed"
-      },
-      "observed": {
-        "exit": 2,
-        "kind": "runner-unresolvable",
-        "reasonIncludes": "module config dependency vite exceeded 1048576 bytes"
-      },
-      "issue": 278
-    },
-    {
       "subject": "js-vitest-booking",
       "fault": "RATES-AND-PEAK-WINDOW/F1",
       "expected": {

@@ -79,7 +79,7 @@ jobs:
           - name: mutants-scope
             args: --tool-mutants --mutant not-reached-fault-dropped --mutant changed-git-failure-is-empty
           - name: mutants-kinds
-            args: --tool-mutants --mutant mixed-kill-kind-read-as-assertion --mutant defenders-load-error-read-as-flaky --mutant vitest-error-classes-ignored --mutant unittest-error-read-as-assertion
+            args: --tool-mutants --mutant mixed-kill-kind-read-as-assertion --mutant discovery-writes-into-project --mutant defenders-load-error-read-as-flaky --mutant vitest-error-classes-ignored --mutant unittest-error-read-as-assertion
           - name: mutants-browser
             args: --tool-mutants --mutant playwright-timeout-read-as-failure
             browser: true

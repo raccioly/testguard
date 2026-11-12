@@ -95,6 +95,16 @@ it judges see the same tree:
   whose entries are symlinks into the subject's install, as a worktree whose
   install belongs to another checkout has (#279).
 
+Every probe the harness runs, in every mode, refusals and exit-2 runs
+included, also checks **subject-untouched** (`lib/untouched.mjs`): before and
+after the probe it snapshots the repository the tool was pointed at
+(`git status --porcelain --ignored`, a content hash of every tracked file, and
+the names and link targets of every `node_modules` level), and any difference
+is a **critical** failure the scorecard names as "tool modified the subject:
+<path>". No known-failure entry can excuse it, and an empty snapshot is a
+failure too. vite and vitest's own caches inside a real `node_modules`
+directory are the only entries left out.
+
 Every mode also checks **install-unchanged**: the subject's own install is
 hashed (file bytes and link targets) before the subject's first mode and after
 each one. For `linked-entries` the hash is byte for byte. Where a copy's
@@ -115,8 +125,8 @@ so those three entries are left out and everything else must be unchanged.
 | `js-vitest-booking` | vitest | `src/format` is a symlink to `lib/format`; one fault is written through the link | a declared defender that cannot load (`defenders-failed-to-load`), a partial defender with undeclared killers |
 | `ts-vitest-converter` | vitest | strict TypeScript; plugins loaded by a computed `import()`; `vi.mock` of a collaborator | a check helper that alternates `expect`/`throw` per run (the `mixed` kill kind), exception-only kills, a type-check-only fault, a reuse edit reachable only through the computed import (rule 8: never reused) |
 | `node-test-catalog3` | node:test | three-package workspace in npm and pnpm layouts; tests reach `@shelf/core` through the link and through a relative path; an ignored `.build/vendor` copy of core (#272) | faults in core defended only by sibling packages' tests, partial, `--changed` over docs-only and one-file commits |
-| `js-vitest-projects-habits` | vitest | `test.projects` with two projects and a file in both (#277) | every fault keyed as derived by hand; partial with undeclared killers |
-| `js-vitest-mergeconfig-ledger` | vitest | `vitest.config.js` built with `mergeConfig` from `vite` (#278); `linked-entries` install (#279) | partial |
+| `js-vitest-projects-habits` | vitest | `test.projects` with two projects and a file in both (#277, fixed by #280) | every fault keyed as derived by hand; partial with undeclared killers |
+| `js-vitest-mergeconfig-ledger` | vitest | `vitest.config.js` built with `mergeConfig` from `vite` (#278, fixed by #280); `linked-entries` install (#279) | partial |
 
 Every PR 1 subject also carries a fault that does not parse, a missing anchor
 and an ambiguous anchor; the PR 2 subjects carry a fault that does not parse
@@ -152,7 +162,7 @@ skipped, a git failure read as an empty change, an exception-only kill
 reported as an assertion, a baseline that need not be green, a mixed kill
 kind read as assertion, a defender that cannot load read as flaky, vitest's
 error classes dropped, a Playwright timeout read as a failure, unittest's
-error channel read as an assertion). `--tool-mutants`
+error channel read as an assertion, discovery writing into the project). `--tool-mutants`
 applies each to a scratch copy of the tool and runs the subjects and modes its
 manifest entry names, stopping at the first red check. The scorecard reports
 N of M caught; a mutant nothing catches is a gap in the corpus. A mutant must be
@@ -185,8 +195,6 @@ summary, with the base branch's numbers beside it when the base has one.
 | #266 | `js-jest-newsletter` | `module.exports = { X: call() }` in `src/errors.js` makes every closure indeterminate: nothing is reused and `--changed` selects every claim (a safe superset). Known failure for the `footer-source` selection. |
 | #267 | `ts-vitest-stock` | `export interface` marks a module `unsupported-syntax`, so every closure is indeterminate: nothing is reused and `--changed` selects every claim (a safe superset). Known failure for the `adjustments-test` selection. |
 | #268 | `node-test-floorplan` | `--changed` after an edit to `packages/geometry/src/units.js` selects only the 4 geometry claims and misses the 4 planner claims that import it through `@floorplan/geometry`: an **unsound** selection (stale verdicts stand). Known failure for the `geometry-source` selection. |
-| #277 | `js-vitest-projects-habits` | vitest `test.projects`: `probe` exits 2 at discovery (`native test discovery path does not exist: [streaks] test/shared.test.js`). Known no-evidence failure. |
-| #278 | `js-vitest-mergeconfig-ledger` | A vitest config importing `vite` for `mergeConfig`: `probe` exits 2 at discovery (`module config dependency vite exceeded 1048576 bytes`). Known no-evidence failure. |
 | #263 | `node-test-catalog3` (both layouts) | Same cause as the #263 row above, with three packages: core faults defended by the search and report tests read `subject-not-executed`, or `killed-by-undeclared-tests` where a relative import reaches the probed file but the package link does not. Known for five faults per layout. |
 | #282 | `js-vitest-booking` | Escalation names no undeclared killer when an unrelated test file fails to load: three tests fail by assertion in every whole-suite run, but the run's outcome is `error`. Known for `RATES-AND-PEAK-WINDOW/F1`, `/F2`. |
 | #265 | `js-jest-newsletter` | GATE-SEMANTICS does not order `nocover` against an invalid anchor; the tool says `nocover`, the key says `anchor-ambiguous`. Known failure for `SCHEDULE-VALIDATION/F1` until the spec settles it. |

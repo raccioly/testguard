@@ -348,7 +348,14 @@
               "ok": {
                 "type": "boolean"
               },
-              "detail": {}
+              "detail": {},
+              "critical": {
+                "description": "A failure no known-failures entry can excuse: today only subject-untouched (the tool modified the project it measured).",
+                "type": "boolean"
+              },
+              "summary": {
+                "type": "string"
+              }
             }
           }
         },

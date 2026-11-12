@@ -1,0 +1,21 @@
+diff --git a/src/probe/probe.mjs b/src/probe/probe.mjs
+--- a/src/probe/probe.mjs
++++ b/src/probe/probe.mjs
+@@ -389,3 +389,3 @@
+       // An unresolvable runner is a precondition failure, not a flaky defender.
+-      const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, python, name: runnerName, budgetMs, budgetFor: () => commandBudget?.runBudget(budgetMs) ?? budgetMs });
++      const sel = await selectRunner({ projectDir, sourceDir: projectDir, python, name: runnerName, budgetMs, budgetFor: () => commandBudget?.runBudget(budgetMs) ?? budgetMs });
+       commandBudget?.assertOpen();
+diff --git a/src/probe/runners/vitest.mjs b/src/probe/runners/vitest.mjs
+--- a/src/probe/runners/vitest.mjs
++++ b/src/probe/runners/vitest.mjs
+@@ -70,3 +70,3 @@
+   if (supportsJsonListing(version)) {
+-    const jsonFile = join(scratchRoot(), `testguard-vitest-list-${randomBytes(8).toString('hex')}.json`);
++    const jsonFile = join(projectDir, 'testguard-vitest-list.json');
+     try {
+@@ -77,3 +77,3 @@
+     } finally {
+-      rmSync(jsonFile, { force: true });
++      // listing kept beside the project
+     }

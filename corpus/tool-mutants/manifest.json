@@ -251,6 +251,19 @@
           ]
         }
       ]
+    },
+    {
+      "name": "discovery-writes-into-project",
+      "patch": "discovery-writes-into-project.patch",
+      "description": "Discovery runs in the user's project instead of the scratch tree, and vitest's JSON listing is written into the project and left there: the shape of a field report where a tracked test file was found overwritten with a vitest listing. Every verdict stays right; only the harness's subject-untouched check (a critical failure) catches it.",
+      "targets": [
+        {
+          "subject": "ts-vitest-stock",
+          "modes": [
+            "reference"
+          ]
+        }
+      ]
     }
   ]
 }
