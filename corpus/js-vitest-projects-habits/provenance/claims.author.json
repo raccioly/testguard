@@ -1,0 +1,138 @@
+[
+  {
+    "id": "INVALID-DATE-REJECTED",
+    "requirement": "R2",
+    "statement": "A date that is not a real YYYY-MM-DD calendar date (such as 2025-02-30, 2025-13-01 or 2025-1-5) is rejected with InvalidDateError, and nothing is stored.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The strict YYYY-MM-DD format check is removed, so '2025-1-5' is parsed as a valid date and accepted.",
+        "faultClass": "guard-removed",
+        "file": "src/dates.js",
+        "find": "if (typeof text !== 'string' || !FORMAT.test(text)) return NaN;",
+        "replace": "if (typeof text !== 'string') return NaN;"
+      },
+      {
+        "id": "F2",
+        "description": "Date validation is no longer called when a check-in or freeze is recorded, so impossible dates such as 2025-02-30 are stored.",
+        "faultClass": "call-removed",
+        "file": "src/tracker.js",
+        "find": "parseDate(date);",
+        "replace": ""
+      }
+    ]
+  },
+  {
+    "id": "CURRENT-STREAK-TODAY-OR-YESTERDAY",
+    "requirement": "R5",
+    "statement": "The current streak counts consecutive check-in days ending today, or ending yesterday when today has no check-in, and is 0 when neither day has a check-in.",
+    "severity": "critical",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The yesterday branch is disabled, so a streak that ended yesterday is reported as 0 instead of staying alive.",
+        "faultClass": "condition-forced",
+        "file": "src/tracker.js",
+        "find": "if (checkIns.has(yesterday)) return streakEndingAt(yesterday);",
+        "replace": "if (false) return streakEndingAt(yesterday);"
+      },
+      {
+        "id": "F2",
+        "description": "'Yesterday' is computed as two days ago, so a streak ending the day before today is dropped and one ending two days ago is wrongly kept alive.",
+        "faultClass": "literal-changed",
+        "file": "src/tracker.js",
+        "find": "const yesterday = addDays(today, -1);",
+        "replace": "const yesterday = addDays(today, -2);"
+      }
+    ]
+  },
+  {
+    "id": "FREEZE-BRIDGES-ONE-GAP",
+    "requirement": "R6",
+    "statement": "A single freeze day between two check-ins keeps the streak unbroken without adding to its length, while two or more consecutive days without check-ins (frozen or not) break it.",
+    "severity": "critical",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The requirement that a check-in precedes the freeze day is dropped, so consecutive freeze days can bridge a gap of two days.",
+        "faultClass": "guard-removed",
+        "file": "src/tracker.js",
+        "find": "freezes.has(cursor) && checkIns.has(addDays(cursor, -1))",
+        "replace": "freezes.has(cursor)"
+      },
+      {
+        "id": "F2",
+        "description": "The frozen-day test is forced true, so any single unfrozen empty day is bridged as if it were frozen.",
+        "faultClass": "condition-forced",
+        "file": "src/tracker.js",
+        "find": "freezes.has(cursor) &&",
+        "replace": "true &&"
+      },
+      {
+        "id": "F3",
+        "description": "The check for a check-in before the freeze day looks at the freeze day itself, which never has one, so freeze days no longer bridge any gap.",
+        "faultClass": "variable-swap",
+        "file": "src/tracker.js",
+        "find": "checkIns.has(addDays(cursor, -1))",
+        "replace": "checkIns.has(cursor)"
+      }
+    ]
+  },
+  {
+    "id": "WEEKLY-PERCENT-ROUNDED",
+    "requirement": "R8",
+    "statement": "Weekly completion is the number of check-in days in the Monday-to-Sunday week containing the given date, divided by 7 and multiplied by 100, rounded to the nearest whole percent with halves rounding up.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The percentage is truncated instead of rounded, so 3 check-ins give 42 instead of 43.",
+        "faultClass": "return-altered",
+        "file": "src/tracker.js",
+        "find": "return Math.floor((done * 200 + 7) / 14);",
+        "replace": "return Math.floor((done * 200) / 14);"
+      },
+      {
+        "id": "F2",
+        "description": "Only six days of the week are counted, so a check-in on Sunday is ignored.",
+        "faultClass": "literal-changed",
+        "file": "src/tracker.js",
+        "find": "for (let i = 0; i < 7; i++) {",
+        "replace": "for (let i = 0; i < 6; i++) {"
+      },
+      {
+        "id": "F3",
+        "description": "The week starts at the supplied date instead of its Monday, so a mid-week date reports on the wrong days.",
+        "faultClass": "variable-swap",
+        "file": "src/tracker.js",
+        "find": "const start = weekStart(date);",
+        "replace": "const start = date;"
+      }
+    ]
+  },
+  {
+    "id": "FREEZE-NOT-A-CHECKIN",
+    "requirement": "R4",
+    "statement": "Marking a date that already has a check-in as a freeze day is rejected with ConflictError, and a freeze day is not recorded as a check-in, so it does not count toward weekly completion.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The conflict check is deleted, so a date with a check-in can also be frozen without error.",
+        "faultClass": "statement-deleted",
+        "file": "src/tracker.js",
+        "find": "if (checkIns.has(date)) throw new ConflictError(date);",
+        "replace": ""
+      },
+      {
+        "id": "F2",
+        "description": "Freezing a date stores it as a check-in, so freeze days count as completed days in weekly percentages and streaks.",
+        "faultClass": "variable-swap",
+        "file": "src/tracker.js",
+        "find": "freezes.add(date);",
+        "replace": "checkIns.add(date);"
+      }
+    ]
+  }
+]

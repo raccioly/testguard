@@ -1,0 +1,22 @@
+{
+  "runner": "vitest",
+  "install": "npm",
+  "testFiles": "^test/.*\\.test\\.js$",
+  "budgetMs": 60000,
+  "probeArgs": [
+    "--runner",
+    "vitest"
+  ],
+  "noise": [
+    {
+      "add": "src/unused-banner.js",
+      "content": "// corpus metamorphic noise: an unrelated module nothing imports\nexport const BANNER = 'corpus';\n"
+    },
+    {
+      "rename": [
+        "SPEC.md",
+        "docs/SPEC.md"
+      ]
+    }
+  ]
+}

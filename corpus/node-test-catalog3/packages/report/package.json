@@ -1,0 +1,10 @@
+{
+  "name": "@shelf/report",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": "./src/index.js",
+  "dependencies": {
+    "@shelf/core": "1.0.0",
+    "@shelf/search": "1.0.0"
+  }
+}

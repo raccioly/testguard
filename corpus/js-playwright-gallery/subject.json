@@ -1,0 +1,30 @@
+{
+  "runner": "playwright",
+  "install": "npm",
+  "installExtra": [
+    [
+      "npx",
+      "playwright",
+      "install",
+      "chromium"
+    ]
+  ],
+  "testFiles": "^e2e/.*\\.spec\\.mjs$",
+  "budgetMs": 90000,
+  "probeArgs": [
+    "--runner",
+    "playwright"
+  ],
+  "noise": [
+    {
+      "add": "src/unused-banner.js",
+      "content": "// corpus metamorphic noise: an unrelated module nothing imports\nexport const BANNER = 'corpus';\n"
+    },
+    {
+      "rename": [
+        "SPEC.md",
+        "docs/SPEC.md"
+      ]
+    }
+  ]
+}

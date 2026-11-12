@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lantern Hall Community Photo Exhibit</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 1rem auto; max-width: 60rem; padding: 0 1rem; }
+    #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 1rem; }
+    .card { border: 1px solid #ccc; border-radius: 6px; padding: 0.75rem; }
+    .tag { display: inline-block; background: #eee; border-radius: 4px; margin: 0 4px 4px 0; padding: 2px 6px; }
+    button[aria-pressed="true"] { background: #222; color: #fff; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <h1>Lantern Hall Community Photo Exhibit</h1>
+  <input id="search" type="search" placeholder="Search title or photographer" aria-label="Search">
+  <select id="sort" aria-label="Sort">
+    <option value="title">title</option>
+    <option value="year">year</option>
+  </select>
+  <div id="tags" role="group" aria-label="Filter by tag"></div>
+  <p id="status"></p>
+  <p id="favorites"></p>
+  <p id="empty" hidden>No photos match your filters.</p>
+  <div id="grid"></div>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>

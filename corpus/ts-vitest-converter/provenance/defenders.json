@@ -1,0 +1,41 @@
+{
+  "rule": "Fixed before the claim and test authors ran: a claim tied to a requirement is defended by the test file the test author was told to write for that requirement.",
+  "byRequirement": {
+    "R1": [
+      "test/registry.test.ts"
+    ],
+    "R2": [
+      "test/registry.test.ts"
+    ],
+    "R3": [
+      "test/plugins.test.ts"
+    ],
+    "R4": [
+      "test/plugins.test.ts"
+    ],
+    "R5": [
+      "test/plugins.test.ts"
+    ],
+    "R6": [
+      "test/plugins.test.ts"
+    ],
+    "R7": [
+      "test/plugins.test.ts"
+    ],
+    "R8": [
+      "test/audit.test.ts"
+    ],
+    "R9": [
+      "test/audit.test.ts"
+    ],
+    "R10": [
+      "test/scaler.test.ts"
+    ],
+    "R11": [
+      "test/scaler.test.ts"
+    ],
+    "R12": [
+      "test/scaler.test.ts"
+    ]
+  }
+}

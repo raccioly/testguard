@@ -1,0 +1,36 @@
+{
+  "runner": "unittest",
+  "install": "none",
+  "python": "python3",
+  "testFiles": "^tests/test_.*\\.py$",
+  "budgetMs": 60000,
+  "probeArgs": [
+    "--runner",
+    "unittest"
+  ],
+  "ignoredCopies": [
+    {
+      "from": "shipping",
+      "to": "build/lib/shipping"
+    },
+    {
+      "from": "vendored/fieldkit",
+      "to": "build/lib/fieldkit"
+    }
+  ],
+  "untrackedSources": [
+    "vendored"
+  ],
+  "noise": [
+    {
+      "add": "shipping/unused_banner.py",
+      "content": "# corpus metamorphic noise: an unrelated module nothing imports\nBANNER = 'corpus'\n"
+    },
+    {
+      "rename": [
+        "SPEC.md",
+        "docs/SPEC.md"
+      ]
+    }
+  ]
+}

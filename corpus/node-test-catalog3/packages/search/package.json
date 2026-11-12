@@ -1,0 +1,9 @@
+{
+  "name": "@shelf/search",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": "./src/index.js",
+  "dependencies": {
+    "@shelf/core": "1.0.0"
+  }
+}

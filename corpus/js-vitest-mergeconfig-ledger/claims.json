@@ -1,0 +1,239 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "EQUAL-SPLIT-REMAINDER-ORDER",
+      "statement": "An equal split gives each participant floor(amount/count) cents and hands the leftover cents out one each in ascending byte-order name order, regardless of the order the participants were listed.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-vitest-mergeconfig-ledger#R2"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/split.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Participants are no longer sorted, so leftover cents go to the first-listed participants instead of the alphabetically first.",
+          "faultClass": "call-removed",
+          "file": "src/split.js",
+          "find": "[...participants].sort(byName).forEach((name, i) => {",
+          "replace": "[...participants].forEach((name, i) => {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Off-by-one in the leftover distribution gives one extra participant an additional cent, so portions no longer sum to the amount.",
+          "faultClass": "literal-changed",
+          "file": "src/split.js",
+          "find": "portions[name] = base + (i < extra ? 1 : 0);",
+          "replace": "portions[name] = base + (i <= extra ? 1 : 0);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SHARES-LEFTOVER-ALLOCATION",
+      "statement": "In a shares split, leftover cents go one each to the participants with the largest fractional remainders, with ties going to the alphabetically earlier name.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-vitest-mergeconfig-ledger#R3"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/split.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Remainder ties are broken in favor of the alphabetically later name.",
+          "faultClass": "argument-swapped",
+          "file": "src/split.js",
+          "find": "(a.rem === b.rem ? byName(a.name, b.name)",
+          "replace": "(a.rem === b.rem ? byName(b.name, a.name)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Leftover cents go to the smallest remainders instead of the largest.",
+          "faultClass": "return-altered",
+          "file": "src/split.js",
+          "find": "a.rem > b.rem ? -1 : 1));",
+          "replace": "a.rem > b.rem ? 1 : -1));",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "INVALID-SPLIT-VALIDATION",
+      "statement": "Recording an expense with duplicate participant names, an empty participant list, or a non-positive or non-integer share weight fails with InvalidSplit, and an unrecognized split type fails with UnknownSplitType.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-vitest-mergeconfig-ledger#R4"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/split.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The duplicate-participant check is disabled, so duplicate names are accepted.",
+          "faultClass": "condition-forced",
+          "file": "src/split.js",
+          "find": "if (new Set(participants).size !== participants.length) {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The positive-weight check is dropped, so zero or negative share weights are accepted.",
+          "faultClass": "guard-removed",
+          "file": "src/split.js",
+          "find": "if (!Number.isSafeInteger(w) || w <= 0) {",
+          "replace": "if (!Number.isSafeInteger(w)) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An unknown split type raises InvalidSplit instead of UnknownSplitType.",
+          "faultClass": "literal-changed",
+          "file": "src/split.js",
+          "find": "throw new UnknownSplitType(`unknown split type: ${String(split)}`);",
+          "replace": "throw new InvalidSplit(`unknown split type: ${String(split)}`);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "BALANCE-PAID-MINUS-PORTIONS",
+      "statement": "A roommate's net balance is the total they paid minus the total of their portions across all expenses, accumulated over every expense, so balances sum to exactly 0.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-vitest-mergeconfig-ledger#R5"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/balances.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Portions are added to the balance instead of subtracted.",
+          "faultClass": "literal-changed",
+          "file": "src/ledger.js",
+          "find": "add(name, -cents);",
+          "replace": "add(name, cents);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The payer is never credited with the amount they paid.",
+          "faultClass": "statement-deleted",
+          "file": "src/ledger.js",
+          "find": "add(e.payer, e.amount);",
+          "replace": "/* payer credit omitted */",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Each expense overwrites a roommate's running total instead of accumulating across expenses.",
+          "faultClass": "return-altered",
+          "file": "src/ledger.js",
+          "find": "totals.set(name, (totals.get(name) ?? 0) + delta);",
+          "replace": "totals.set(name, delta);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SETTLE-DETERMINISTIC-GREEDY",
+      "statement": "Settle-up repeatedly matches the largest debtor with the largest creditor (ties by alphabetical name), with the debtor as payer, and pays the smaller of the two absolute amounts.",
+      "source": {
+        "kind": "spec",
+        "ref": "req:js-vitest-mergeconfig-ledger#R8"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+      },
+      "defendedBy": [
+        "test/settle.test.js"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Equal-amount ties are broken in favor of the alphabetically later name.",
+          "faultClass": "argument-swapped",
+          "file": "src/ledger.js",
+          "find": "byName(it.name, best.name) < 0",
+          "replace": "byName(best.name, it.name) < 0",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Payer and recipient are swapped in each produced payment.",
+          "faultClass": "variable-swap",
+          "file": "src/ledger.js",
+          "find": "payments.push({ payer: debtor.name, recipient: creditor.name, amount });",
+          "replace": "payments.push({ payer: creditor.name, recipient: debtor.name, amount });",
+          "producedBy": {
+            "producer": "agent",
+            "by": "corpus claim author (claude-sonnet-5-5, blind to the tests)"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "corpus-js-playwright-gallery",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Corpus subject: a static page tested in a real browser with Playwright. See SPEC.md and PROVENANCE.md.",
+  "type": "module",
+  "scripts": { "test": "playwright test" },
+  "devDependencies": { "@playwright/test": "1.63.0" }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "corpus-js-vitest-mergeconfig-ledger",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Corpus subject: a vitest config that imports vite and uses mergeConfig (#278); in the corpus its node_modules entries are symlinks into another checkout's install (#279). See SPEC.md and PROVENANCE.md.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vite": "8.3.8",
+    "vitest": "5.0.5"
+  }
+}
