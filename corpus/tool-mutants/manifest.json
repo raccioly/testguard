@@ -190,7 +190,7 @@
     {
       "name": "mixed-kill-kind-read-as-assertion",
       "patch": "mixed-kill-kind-read-as-assertion.patch",
-      "description": "A kill whose runs fail by assertion in some runs and only by exception in others is recorded as an assertion kill instead of mixed (rule 3). The evidence stays valid; the key for ts-vitest-converter's rotating plugin checks catches it.",
+      "description": "vitest's kinds reporter reads every error object as an assertion, so a kill that fails only by exception in some runs (mixed) or in every run (exception-only) is recorded as an assertion kill (rule 3). The evidence stays valid; the key for ts-vitest-converter's rotating plugin checks catches it.",
       "targets": [
         {
           "subject": "ts-vitest-converter",
@@ -203,7 +203,7 @@
     {
       "name": "defenders-load-error-read-as-flaky",
       "patch": "defenders-load-error-read-as-flaky.patch",
-      "description": "A declared defender that fails to load on unmodified source is reported as flaky-defender/defenders-not-green instead of unverifiable/defenders-failed-to-load: a broken test file reads as an unstable one.",
+      "description": "A test file that fails to load is read as an ordinary failing run, so a declared defender that cannot load reads as flaky-defender/defenders-not-green instead of unverifiable/defenders-failed-to-load: a broken test file reads as an unstable one. The evidence stays valid; the key catches it.",
       "targets": [
         {
           "subject": "js-vitest-booking",
