@@ -1,0 +1,10 @@
+[
+  {
+    "file": "<root>/tests/node/b.test.mjs",
+    "projectName": "node"
+  },
+  {
+    "file": "<root>/tests/ui/a.test.mjs",
+    "projectName": "0"
+  }
+]

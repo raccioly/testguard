@@ -1,0 +1,3 @@
+tests/node/b.test.mjs
+tests/shared/both.test.mjs
+tests/ui/a.test.mjs

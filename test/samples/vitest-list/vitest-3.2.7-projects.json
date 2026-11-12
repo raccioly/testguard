@@ -1,0 +1,18 @@
+[
+  {
+    "file": "<root>/tests/shared/both.test.mjs",
+    "projectName": "ui"
+  },
+  {
+    "file": "<root>/tests/ui/a.test.mjs",
+    "projectName": "ui"
+  },
+  {
+    "file": "<root>/tests/node/b.test.mjs",
+    "projectName": "node"
+  },
+  {
+    "file": "<root>/tests/shared/both.test.mjs",
+    "projectName": "node"
+  }
+]

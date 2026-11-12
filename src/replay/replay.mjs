@@ -202,6 +202,8 @@ export function buildReplayRunnerUniverse(primary, manifests) {
   return Object.freeze({
     files: Object.freeze([...ownerByFile.keys()].sort()),
     ownerOf(file) { return ownerByFile.get(file); },
+    // Vitest project membership (#277): which projects each file runs under.
+    projectsOf(owner) { return manifests.get(owner)?.projects; },
   });
 }
 
@@ -339,7 +341,7 @@ async function replayOne({ fix, iso, root, projectDir, python, confirmRuns, budg
       const parts = [];
       for (const [configuredRunner, files] of partitionReplayDefenders(related, runner, universe)) {
         commandBudget?.assertOpen();
-        parts.push(await configuredRunner.run({ projectDir: iso.projectDir, sourceDir: projectDir, python, files, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, workers, serial }));
+        parts.push(await configuredRunner.run({ projectDir: iso.projectDir, sourceDir: projectDir, python, files, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, workers, serial, projects: universe.projectsOf?.(configuredRunner) }));
         commandBudget?.assertOpen();
       }
       res = mergeRuns(parts);
