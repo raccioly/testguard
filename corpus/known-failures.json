@@ -36,18 +36,6 @@
         "verdict": "survived"
       },
       "issue": 282
-    },
-    {
-      "subject": "js-jest-newsletter",
-      "check": "nothing-left-stale",
-      "observed": {
-        "stale": [
-          "SCHEDULE-VALIDATION/F1",
-          "SCHEDULE-VALIDATION/F2"
-        ]
-      },
-      "issue": 297,
-      "why": "--changed after the footer-source edit does not select SCHEDULE-VALIDATION, whose discovered-defender inputs include src/footer.js; convergence keeps its two records stale (never carried as fresh), and the merged verdict map still equals a from-scratch probe."
     }
   ]
 }

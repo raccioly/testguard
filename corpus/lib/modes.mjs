@@ -251,11 +251,15 @@ export const RUN = {
     checks.push(exitCheck(seed));
     for (const step of spec.steps) {
       commitEdits(repo, step.edits, `corpus: ${step.name}`);
+      const before = existsSync(canonical) ? JSON.parse(readFileSync(canonical, 'utf8')).run.id : null;
       const r = await p(['--changed', 'HEAD~1']);
       runs.push(runSummary(`converge-${step.name}`, r));
       checks.push(exitCheck(r));
       const converged = r.json?.run?.converged;
-      checks.push(check(`converged:${step.name}`, converged?.into === canonical, converged ?? 'run.converged missing'));
+      // A change that selects no claim probes nothing: there is nothing to
+      // converge, and the canonical evidence must be left as it was.
+      const nothingSelected = r.json?.run?.scope?.selectedCount === 0 && !r.json?.run?.id;
+      checks.push(check(`converged:${step.name}`, nothingSelected ? r.evidence?.run?.id === before : converged?.into === canonical, nothingSelected ? 'nothing selected; canonical evidence unchanged' : converged ?? 'run.converged missing'));
     }
     const merged = existsSync(canonical) ? JSON.parse(readFileSync(canonical, 'utf8')) : null;
     const stale = (merged?.records ?? []).filter((x) => x.carried === 'inputs-changed').map((x) => `${x.claim.id}/${x.subject.id}`);
