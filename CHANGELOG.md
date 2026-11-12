@@ -113,6 +113,93 @@ Automated weekly release — everything merged since `v0.23.0`.
 
 ### Fixed
 
+- **A probe no longer writes into the user's `node_modules` (#279).** From a git
+  worktree whose `node_modules` (root and per package) were symlinks to the
+  main checkout's pnpm install, a `--runner-cmd` that ran pnpm in the scratch
+  tree relinked through the levels the scratch tree borrowed (`.bin`, `.pnpm`,
+  scopes, install metadata) and through a `node_modules` symlink an
+  `--include-dirty` snapshot had captured, rewriting the main checkout's links
+  to point into a scratch directory that was then deleted. Reproduced with a
+  generated pnpm workspace (32 entries changed). Now no level a package
+  manager may write is a link into the install: those directories are real in
+  the scratch tree, their files are copies (pnpm's workspace state rewritten to
+  name the scratch tree), links are recreated to their resolved targets, and a
+  checked-out `node_modules` symlink is replaced. Each borrowed install is
+  fingerprinted before and after the run; a difference refuses the run with
+  the new precondition `install-changed`, naming the paths, and writes no
+  evidence. `run.writeBoundary.installUnchanged` records the check. If an
+  install was damaged by an earlier version, reinstall it (`pnpm install`,
+  `npm ci`).
+- **`probe --changed` no longer misses a claim that reaches a changed
+  workspace package through its `node_modules` link (#268).** It was
+  unsound: a change to `packages/geometry` selected only geometry's own claims,
+  and the planner claims whose defenders import `@scope/geometry` kept their
+  old verdicts for code that had changed. A bare specifier that names a
+  workspace package (declared by `workspaces` or `pnpm-workspace.yaml`, or a
+  `node_modules` symlink into repository source) is now followed into the
+  package like a relative import, so the same change also refuses **verdict
+  reuse**: before, a workspace change that kept the live baseline green but
+  changed a kill was carried forward. A workspace package outside the project
+  directory, or one whose entry cannot be resolved, makes the closure
+  indeterminate (`unreadable-module`), and an indeterminate closure is selected
+  whenever anything in the repository changed, not only in the project. A link
+  out of the repository and an installed package stay outside the closure.
+- **A fault in a workspace package defended by a sibling package is measured
+  (#263).** The scratch worktree borrowed the main tree's `node_modules`, whose
+  workspace links resolve to the ORIGINAL checkout's package, so the defender
+  ran unmodified code and every such fault was `unverifiable` /
+  `subject-not-executed`. Each scratch tree (the fan-out's and the serial
+  re-measure's included) now points every link into repository source at its
+  own copy of the package, in the root install and in each package's own
+  `node_modules`, for npm, yarn and pnpm layouts, without writing into the
+  shared install (a read-only one works). A package's ignored build output
+  (`dist/`) is linked from the source package. A link to repository source the
+  scratch tree does not contain refuses the run with the new precondition
+  `workspace-link-outside-tree`, naming the link.
+- **An ignored build directory no longer makes `probe --changed` select
+  every claim (#272).** Closures were computed on the working tree, whose
+  git-ignored deployment bundle held copies of third-party Python packages;
+  indexed as project modules they led into computed imports and made every
+  closure indeterminate, so a docs-only change selected 20 of 21 claims while
+  the scratch tree saw complete closures. Closure discovery (the Python module
+  index, the JavaScript resolver and the hashed manifests) now counts only files
+  git tracks, plus untracked non-ignored files under `--include-dirty`, so
+  `probe`, `--changed`, `status`, `gate` and the origin-policy freshness check
+  agree on a claim's closure for the same commit. `run.scope.changed` gains
+  `matchReasons`: why each claim was selected (`file`, `glob`, or
+  `indeterminate` with the first issue).
+- **The verdict order between `nocover` and an invalid anchor is specified
+  (#265).** `GATE-SEMANTICS.md` now states the fixed order of the checks and
+  that `nocover` precedes an invalid anchor (the worse finding, whose repair is
+  needed either way). The tool already behaved this way; the validator now
+  rejects a record that reports `anchor-missing` or `anchor-ambiguous` for a
+  fault with no resolved defender.
+- **A vitest alias written `fileURLToPath(new URL('./src', import.meta.url))`
+  no longer refuses the whole probe (#264).** Discovery read the string
+  `'./src'` as a module, hashed `src/index.ts` as a config dependency and
+  refused (exit 2) on its first aliased import. A string naming a directory is
+  now never read as a module, and an aliased import in a setup file is followed
+  through the project's alias. The alias reader evaluates the common path
+  expressions (`new URL`, `fileURLToPath`, `path.resolve`/`join`/`dirname`,
+  `__dirname`, `import.meta.dirname`, `process.cwd()`, a top-level `const
+  root = …`) from the config's tokens; an alias it cannot evaluate makes the
+  closure of the files that use it indeterminate instead of being dropped
+  (dropped, its specifiers read as packages, outside the closure), and an alias
+  map it cannot read at all does the same for every bare specifier.
+- **Ordinary TypeScript and CommonJS export forms no longer turn reuse and
+  `probe --changed` off (#266, #267).** `export interface` and
+  `module.exports = { Name: define() }` marked the module `unsupported-syntax`,
+  so every importer's closure was indeterminate: nothing was reused and
+  `--changed` selected every claim. The export reader now reads type-only and
+  ambient forms (`export interface`, `export type`, `export declare`,
+  `export as namespace`, `export type { … } from`), `export enum`,
+  `export const enum`, `export namespace`, `export abstract class`,
+  decorators, generator functions, several declarators, destructuring
+  declarations, and CommonJS object-literal exports whose values are calls,
+  literals, functions, methods, `require()` or an imported namespace's member.
+  A spread, computed key, accessor or a `require` hidden inside an expression
+  stays uncertain. `import type from 'x'` (a default import named `type`) was
+  read as type-only and left `x` out of the closure; it is now followed.
 - **A vitest config that imports `vite` is probed again (#278).** Hashing the
   configuration that decides the test universe followed a bare package import
   into `node_modules`, read the package's module files and refused the run at

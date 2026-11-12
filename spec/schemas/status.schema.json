@@ -659,6 +659,36 @@
           "uniqueItems": true,
           "items": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" }
         },
+        "matchReasons": {
+          "description": "Why each matched claim was selected, one entry per matchedClaims id in the same order: `file` (a changed file is a fault target, a resolved defender or in the import closure; `file` names the first), `glob` (a changed path only a defendedBy glob matches, such as a deleted defender), or `indeterminate` (the closure cannot be followed and something in the repository changed; `issue` is its first recorded reason). Absent in documents written before it existed.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["claimId", "kind"],
+            "properties": {
+              "claimId": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" },
+              "kind": { "enum": ["file", "glob", "indeterminate"] },
+              "file": { "type": "string", "minLength": 1 },
+              "glob": { "type": "string", "minLength": 1 },
+              "issue": {
+                "type": "object",
+                "required": ["code", "file"],
+                "properties": {
+                  "code": { "enum": ["computed-specifier", "unreadable-module", "unsupported-syntax", "graph-limit"] },
+                  "file": { "type": "string", "minLength": 1 },
+                  "specifier": { "type": "string", "minLength": 1 }
+                },
+                "additionalProperties": false
+              }
+            },
+            "allOf": [
+              { "if": { "properties": { "kind": { "const": "file" } } }, "then": { "required": ["file"], "properties": { "file": true, "glob": false, "issue": false } } },
+              { "if": { "properties": { "kind": { "const": "glob" } } }, "then": { "required": ["file", "glob"], "properties": { "file": true, "glob": true, "issue": false } } },
+              { "if": { "properties": { "kind": { "const": "indeterminate" } } }, "then": { "properties": { "file": false, "glob": false } } }
+            ],
+            "additionalProperties": false
+          }
+        },
         "unmatchedFiles": {
           "description": "Changed source files no claim's target, defender or closure touches.",
           "type": "array",
@@ -680,8 +710,8 @@
         }
       },
       "if": { "properties": { "outcome": { "const": "determined" } } },
-      "then": { "properties": { "base": true, "head": true, "includeDirty": true, "files": true, "matchedClaims": true, "unmatchedFiles": true, "note": true, "reason": false }, "required": ["base", "head", "includeDirty", "files", "matchedClaims", "unmatchedFiles", "note"] },
-      "else": { "properties": { "reason": true, "files": false, "matchedClaims": false, "unmatchedFiles": false }, "required": ["reason"] },
+      "then": { "properties": { "base": true, "head": true, "includeDirty": true, "files": true, "matchedClaims": true, "matchReasons": true, "unmatchedFiles": true, "note": true, "reason": false }, "required": ["base", "head", "includeDirty", "files", "matchedClaims", "unmatchedFiles", "note"] },
+      "else": { "properties": { "reason": true, "files": false, "matchedClaims": false, "matchReasons": false, "unmatchedFiles": false }, "required": ["reason"] },
       "additionalProperties": false
     },
     "thinClaim": {

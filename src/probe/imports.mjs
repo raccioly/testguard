@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { linkedSourceDirs, packageSpecifier, repositoryRoot, within, workspacePackages } from './workspaces.mjs';
 
 export const IMPORT_LIMITS = Object.freeze({
   maxFileBytes: 1_048_576,
@@ -224,7 +225,13 @@ function namedEntries(tokens, open, close) {
   while (i < close) {
     if (punct(tokens[i], ',')) { i++; continue; }
     let typeOnly = false;
-    if (identifier(tokens[i], 'type')) { typeOnly = true; i++; }
+    // `type X` is a type-only specifier; `type` alone, `type as x` and
+    // `type,` name a binding called `type`. `type as as x` and `type as,` are
+    // the type-only specifier of a binding called `as`.
+    if (identifier(tokens[i], 'type') && identifier(tokens[i + 1])) {
+      const asName = identifier(tokens[i + 1], 'as');
+      if (!asName || identifier(tokens[i + 2], 'as') || !identifier(tokens[i + 2])) { typeOnly = true; i++; }
+    }
     if (!identifier(tokens[i])) return null;
     const imported = tokens[i++].value;
     let exported = imported;
@@ -253,7 +260,11 @@ function parseStaticImport(tokens, start, module) {
     module.runtime.push(tokens[start + 1].value);
     return end;
   }
-  if (identifier(tokens[start + 1], 'type')) return end;
+  // `import type { X } from`, `import type X from`, `import type * as X from`
+  // are erased. `import type from 'x'` and `import type, { a } from 'x'` are a
+  // DEFAULT import named `type`, which loads at runtime (#267).
+  const typeIsBinding = identifier(tokens[start + 2], 'from') || punct(tokens[start + 2], ',');
+  if (identifier(tokens[start + 1], 'type') && !typeIsBinding) return end;
   const from = tokens.findIndex((t, i) => i > start && i < end && identifier(t, 'from'));
   if (from === -1 || tokens[from + 1]?.type !== 'string') {
     module.uncertain.push('unsupported-syntax');
@@ -262,7 +273,7 @@ function parseStaticImport(tokens, start, module) {
   const specifier = tokens[from + 1].value;
   module.runtime.push(specifier);
   let i = start + 1;
-  if (identifier(tokens[i]) && !identifier(tokens[i], 'type')) {
+  if (identifier(tokens[i]) && (!identifier(tokens[i], 'type') || typeIsBinding)) {
     module.localImports.set(tokens[i].value, { specifier, imported: 'default' });
     module.requests.push({ specifier, symbol: 'default', local: tokens[i].value, mode: 'symbol' });
     module.bindingTokenIndexes.add(i);
@@ -287,10 +298,136 @@ function parseStaticImport(tokens, start, module) {
   return end;
 }
 
+/** Index just past the balanced bracket that opens at `open`, or -1. */
+function skipBalanced(tokens, open) {
+  const pairs = { '(': ')', '[': ']', '{': '}' };
+  const stack = [];
+  for (let i = open; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (t.type !== 'punc') continue;
+    if (pairs[t.value]) stack.push(pairs[t.value]);
+    else if (t.value === ')' || t.value === ']' || t.value === '}') {
+      if (stack.pop() !== t.value) return -1;
+      if (stack.length === 0) return i + 1;
+    }
+  }
+  return -1;
+}
+
+/** Past any decorators (`@a`, `@a.b`, `@a(...)`) starting at `i`. */
+function skipDecorators(tokens, i) {
+  while (punct(tokens[i], '@') && identifier(tokens[i + 1])) {
+    i += 2;
+    while (punct(tokens[i], '.') && identifier(tokens[i + 1])) i += 2;
+    if (punct(tokens[i], '(')) {
+      const next = skipBalanced(tokens, i);
+      if (next === -1) return i;
+      i = next;
+    }
+  }
+  return i;
+}
+
+/**
+ * The names a binding pattern declares (`a`, `{ a, b: c, ...d }`,
+ * `[e, , f = 1]`), or null for a form this reader does not model.
+ */
+function patternNames(tokens, start, end) {
+  if (identifier(tokens[start]) && start + 1 === end) return [tokens[start].value];
+  const open = tokens[start];
+  if (!punct(open, '{') && !punct(open, '[')) return null;
+  const close = skipBalanced(tokens, start);
+  if (close !== end) return null;
+  const names = [];
+  let i = start + 1;
+  const last = end - 1;
+  while (i < last) {
+    if (punct(tokens[i], ',')) { i++; continue; }
+    const elementEnd = nextTopLevel(tokens, i, last);
+    let at = i;
+    if (punct(tokens[at], '.') && punct(tokens[at + 1], '.') && punct(tokens[at + 2], '.')) at += 3;
+    else if (punct(open, '{')) {
+      if (!identifier(tokens[at]) && tokens[at]?.type !== 'string' && tokens[at]?.type !== 'num') return null;
+      if (punct(tokens[at + 1], ':')) at += 2;
+      else if (!identifier(tokens[at])) return null;
+    }
+    // The binding itself ends at a default (`= value`) or at the element's end.
+    let bindingEnd = at;
+    if (identifier(tokens[at])) bindingEnd = at + 1;
+    else if (punct(tokens[at], '{') || punct(tokens[at], '[')) bindingEnd = skipBalanced(tokens, at);
+    if (bindingEnd === -1 || bindingEnd > elementEnd) return null;
+    if (bindingEnd < elementEnd && !punct(tokens[bindingEnd], '=')) return null;
+    const inner = patternNames(tokens, at, bindingEnd);
+    if (!inner) return null;
+    names.push(...inner);
+    i = elementEnd;
+  }
+  return names;
+}
+
+/** Index of the next `,` at bracket depth 0 from `i`, or `end`. */
+function nextTopLevel(tokens, i, end) {
+  for (let n = i; n < end; n++) {
+    const t = tokens[n];
+    if (punct(t, '(') || punct(t, '[') || punct(t, '{')) {
+      const next = skipBalanced(tokens, n);
+      if (next === -1 || next > end) return end;
+      n = next - 1;
+    } else if (punct(t, ',')) return n;
+  }
+  return end;
+}
+
+/**
+ * The names `const a = 1, { b } = o, c: Map<K, V> = m;` declares, or null.
+ * A type annotation's generic arguments may hold commas, so `<`/`>` nest
+ * while an annotation is open (an `=>` inside it is an arrow, not the
+ * initializer).
+ */
+function declaredNames(tokens, start, end) {
+  const names = [];
+  let i = start;
+  while (i < end) {
+    let bindingEnd;
+    if (identifier(tokens[i])) bindingEnd = i + 1;
+    else if (punct(tokens[i], '{') || punct(tokens[i], '[')) bindingEnd = skipBalanced(tokens, i);
+    else return null;
+    if (bindingEnd === -1) return null;
+    const bound = patternNames(tokens, i, bindingEnd);
+    if (!bound) return null;
+    names.push(...bound);
+    i = bindingEnd;
+    if (punct(tokens[i], '!')) i++;
+    if (punct(tokens[i], ':')) {
+      let angles = 0;
+      for (i++; i < end; i++) {
+        const t = tokens[i];
+        if (punct(t, '<')) angles++;
+        else if (punct(t, '>')) angles = Math.max(0, angles - 1);
+        else if (punct(t, '=') && punct(tokens[i + 1], '>')) i++;
+        else if (punct(t, '(') || punct(t, '[') || punct(t, '{')) { const next = skipBalanced(tokens, i); if (next === -1) return null; i = next - 1; }
+        else if (angles === 0 && (punct(t, '=') || punct(t, ',') || punct(t, ';'))) break;
+      }
+    }
+    if (punct(tokens[i], '=')) i = nextTopLevel(tokens, i + 1, end);
+    if (punct(tokens[i], ';') || i >= end) break;
+    if (!punct(tokens[i], ',')) return null;
+    i++;
+  }
+  return names.length ? names : null;
+}
+
 function parseExport(tokens, start, module) {
   const end = statementEnd(tokens, start);
-  let i = start + 1;
-  if (identifier(tokens[i], 'type')) return end;
+  let i = skipDecorators(tokens, start + 1);
+  // Types and ambient declarations export no runtime binding (#267):
+  // `export type A = …`, `export type { A } from`, `export interface`,
+  // `export declare …`, `export as namespace X`. Nothing to resolve, nothing
+  // uncertain.
+  if (identifier(tokens[i], 'type') && (identifier(tokens[i + 1]) || punct(tokens[i + 1], '{') || punct(tokens[i + 1], '*'))) return end;
+  if (identifier(tokens[i], 'interface') && identifier(tokens[i + 1])) return end;
+  if (identifier(tokens[i], 'declare') && identifier(tokens[i + 1])) return end;
+  if (identifier(tokens[i], 'as') && identifier(tokens[i + 1], 'namespace')) return end;
   if (punct(tokens[i], '*')) {
     i++;
     let exported = null;
@@ -318,13 +455,16 @@ function parseExport(tokens, start, module) {
     addExplicit(module, 'default', { kind: 'terminal', symbol: 'default' });
     return end;
   }
-  if (identifier(tokens[i], 'async') && identifier(tokens[i + 1], 'function') && identifier(tokens[i + 2])) {
-    addExplicit(module, tokens[i + 2].value, { kind: 'terminal', symbol: tokens[i + 2].value });
-    return end;
-  }
-  if (['const', 'let', 'var', 'function', 'class'].some((word) => identifier(tokens[i], word)) && identifier(tokens[i + 1])) {
-    addExplicit(module, tokens[i + 1].value, { kind: 'terminal', symbol: tokens[i + 1].value });
-    return end;
+  if (identifier(tokens[i], 'async') && identifier(tokens[i + 1], 'function')) i++;
+  if (identifier(tokens[i], 'abstract') && identifier(tokens[i + 1], 'class')) i++;
+  if (identifier(tokens[i], 'const') && identifier(tokens[i + 1], 'enum')) i++;
+  const terminal = (name) => { addExplicit(module, name, { kind: 'terminal', symbol: name }); return end; };
+  if (identifier(tokens[i], 'function') && punct(tokens[i + 1], '*') && identifier(tokens[i + 2])) return terminal(tokens[i + 2].value);
+  // enum and namespace are runtime objects; `module Foo {}` is the old spelling of namespace.
+  if (['function', 'class', 'enum', 'namespace', 'module'].some((word) => identifier(tokens[i], word)) && identifier(tokens[i + 1])) return terminal(tokens[i + 1].value);
+  if (['const', 'let', 'var'].some((word) => identifier(tokens[i], word))) {
+    const names = declaredNames(tokens, i + 1, end);
+    if (names) { for (const name of names) terminal(name); return end; }
   }
   module.uncertain.push('unsupported-syntax');
   return end;
@@ -340,25 +480,58 @@ function dynamicImportCall(tokens, i) {
   return { specifier: tokens[i + 2].value, end: i + 4 };
 }
 
+/**
+ * What one property value of an exported object literal is (#266):
+ * - `name` → the local binding (an import, resolved in the post-pass, or a terminal);
+ * - `require('x')` → the whole module x; `require('x').y` → x's export y;
+ * - `name.member` → resolved in the post-pass (an imported namespace's export,
+ *   uncertain for a member of a named import, else a value defined here);
+ * - any other expression → a value computed here, a terminal, as `exports.X = call()` is.
+ * null when the value hides a module load (`wrap(require('x'))`): its export
+ * is that module's, in a way this reader does not model.
+ */
+function commonJsValue(tokens, s, e, key) {
+  if (e - s === 1 && identifier(tokens[s])) return { kind: 'local', local: tokens[s].value };
+  const call = requireCall(tokens, s);
+  if (call && call.end === e) return { kind: 'namespace', specifier: call.specifier };
+  if (call && call.end + 2 === e && punct(tokens[call.end], '.') && identifier(tokens[call.end + 1])) return { kind: 'remote', specifier: call.specifier, imported: tokens[call.end + 1].value };
+  if (e - s === 3 && identifier(tokens[s]) && punct(tokens[s + 1], '.') && identifier(tokens[s + 2])) return { kind: 'member', local: tokens[s].value, member: tokens[s + 2].value };
+  for (let n = s; n < e; n++) {
+    if ((identifier(tokens[n], 'require') || identifier(tokens[n], 'import')) && punct(tokens[n + 1], '(') && !punct(tokens[n - 1], '.')) return null;
+  }
+  return { kind: 'terminal', symbol: key };
+}
+
+/** `{ a, b: c, d: call(), e() {} }` → [{ exported, origin }], or null for a spread, a computed key or an accessor. */
 function commonJsObjectEntries(tokens, open) {
+  const after = skipBalanced(tokens, open);
+  if (after === -1) return null;
+  const close = after - 1;
   const entries = [];
   let i = open + 1;
-  while (i < tokens.length && !punct(tokens[i], '}')) {
+  while (i < close) {
     if (punct(tokens[i], ',')) { i++; continue; }
-    const key = identifier(tokens[i]) || tokens[i]?.type === 'string' ? tokens[i].value : null;
-    if (!key) return null;
+    if (punct(tokens[i], '.') || punct(tokens[i], '[')) return null; // a spread or a computed key
+    const isKey = (t) => identifier(t) || t?.type === 'string' || t?.type === 'num';
+    const modifierBeforeKey = (word) => identifier(tokens[i], word) && (isKey(tokens[i + 1]) || punct(tokens[i + 1], '*') || punct(tokens[i + 1], '['));
+    if (modifierBeforeKey('get') || modifierBeforeKey('set')) return null; // an accessor
+    let method = false;
+    if (modifierBeforeKey('async')) { i++; method = true; }
+    if (punct(tokens[i], '*')) { i++; method = true; }
+    if (!isKey(tokens[i])) return null;
+    const key = tokens[i].value;
     i++;
-    let local = key;
-    if (punct(tokens[i], ':')) {
-      i++;
-      if (!identifier(tokens[i])) return null;
-      local = tokens[i].value;
-      i++;
-    }
-    entries.push({ exported: key, local });
-    if (!punct(tokens[i], ',') && !punct(tokens[i], '}')) return null;
+    const valueEnd = nextTopLevel(tokens, i, close);
+    let origin;
+    if (punct(tokens[i], '(')) origin = { kind: 'terminal', symbol: key }; // a method
+    else if (method) return null;
+    else if (punct(tokens[i], ':')) origin = commonJsValue(tokens, i + 1, valueEnd, key);
+    else if (i === valueEnd && identifier(tokens[i - 1])) origin = { kind: 'local', local: key }; // shorthand
+    if (!origin) return null;
+    entries.push({ exported: key, origin });
+    i = valueEnd;
   }
-  return punct(tokens[i], '}') ? entries : null;
+  return entries;
 }
 
 function isCommonJsExportsReference(tokens, i) {
@@ -435,7 +608,7 @@ function parseCommonJsExports(tokens, module) {
     } else if (exported === '*' && punct(tokens[eq + 1], '{')) {
       const entries = commonJsObjectEntries(tokens, eq + 1);
       if (!entries) module.uncertain.push('unsupported-syntax');
-      else for (const entry of entries) addExplicit(module, entry.exported, { kind: 'local', local: entry.local });
+      else for (const entry of entries) addExplicit(module, entry.exported, entry.origin);
     } else if (exported !== '*' && identifier(tokens[eq + 1])) {
       addExplicit(module, exported, { kind: 'local', local: tokens[eq + 1].value });
     } else if (exported !== '*') {
@@ -560,6 +733,15 @@ export function parseModuleSource(source) {
   namespaceRequests(tokens, module);
   for (const [name, origins] of module.explicit) {
     module.explicit.set(name, origins.map((origin) => {
+      if (origin.kind === 'member') {
+        // `X: ns.y`: an imported namespace's export y; a member of a named
+        // import is a property of some other module's value, which this reader
+        // does not follow (uncertain, never a terminal it is not).
+        const ns = module.namespaceImports.find((entry) => entry.local === origin.local);
+        if (ns) return { kind: 'remote', specifier: ns.specifier, imported: origin.member };
+        if (module.localImports.has(origin.local)) module.uncertain.push('unsupported-syntax');
+        return { kind: 'terminal', symbol: name };
+      }
       if (origin.kind !== 'local') return origin;
       const imported = module.localImports.get(origin.local);
       return imported ? { kind: 'remote', ...imported } : { kind: 'terminal', symbol: origin.local };
@@ -597,6 +779,62 @@ function expandBase(base) {
   return [...SOURCE_EXTENSIONS.map((ext) => candidateFile(base + ext)), ...SOURCE_EXTENSIONS.map((ext) => candidateFile(join(base, `index${ext}`)))].filter(Boolean);
 }
 
+/** Every string target of a package.json `exports` condition value (`types` excluded: never loaded). */
+function conditionTargets(value) {
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) return value.flatMap(conditionTargets);
+  if (value && typeof value === 'object') {
+    return Object.entries(value).filter(([key]) => key !== 'types' && key !== 'typings').flatMap(([, child]) => conditionTargets(child));
+  }
+  return [];
+}
+
+/**
+ * The files a package directory's entry point can be, for `subpath` ('.' or
+ * './x'): `exports` (a string, an array, a conditions object or a subpath map
+ * with `*` patterns; every condition, since which one loads depends on the
+ * caller), else `main`/`module`, else `index`. A condition whose file does not
+ * exist cannot be what loads, so it is skipped while another resolves. null
+ * when nothing resolves or the manifest cannot be read: a package the closure
+ * cannot follow, which the caller must report, never drop.
+ */
+export function packageEntryFiles(dir, subpath) {
+  let pkg;
+  try { pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')); } catch { return null; }
+  if (!pkg || typeof pkg !== 'object') return null;
+  let targets;
+  if (pkg.exports !== undefined && pkg.exports !== null) {
+    const exp = pkg.exports;
+    const keys = exp && typeof exp === 'object' && !Array.isArray(exp) ? Object.keys(exp) : [];
+    const dotted = keys.filter((key) => key.startsWith('.'));
+    if (dotted.length && dotted.length !== keys.length) return null; // mixed subpaths and conditions: invalid
+    const map = dotted.length ? exp : { '.': exp };
+    let value = map[subpath];
+    let star = null;
+    if (value === undefined) {
+      const patterns = Object.keys(map).filter((key) => key.includes('*')).map((key) => {
+        const [prefix, suffix] = key.split('*');
+        return { key, prefix, suffix };
+      }).filter(({ prefix, suffix }) => subpath.startsWith(prefix) && subpath.endsWith(suffix) && subpath.length >= prefix.length + suffix.length)
+        .sort((a, b) => b.prefix.length - a.prefix.length);
+      if (patterns.length) {
+        value = map[patterns[0].key];
+        star = subpath.slice(patterns[0].prefix.length, subpath.length - patterns[0].suffix.length);
+      }
+    }
+    if (value === undefined) return null;
+    targets = conditionTargets(value).map((target) => (star === null ? target : target.split('*').join(star)));
+  } else if (subpath === '.') {
+    targets = [pkg.main, pkg.module].filter((target) => typeof target === 'string' && target);
+    if (!targets.length) targets = ['./index'];
+  } else targets = [subpath];
+  const files = [...new Set(targets.flatMap((target) => {
+    const base = resolve(dir, target);
+    return within(dir, base) ? expandBase(base) : [];
+  }))];
+  return files.length ? files : null;
+}
+
 function aliasMatches(specifier, aliases) {
   const matched = aliases.filter((rule) => rule.wildcard
     ? specifier.startsWith(rule.prefix) && specifier.endsWith(rule.suffix ?? '') && specifier.length >= rule.prefix.length + (rule.suffix?.length ?? 0)
@@ -611,13 +849,49 @@ function issue(code, file, specifier) {
   return { code, file, ...(specifier ? { specifier } : {}) };
 }
 
-export function createImportResolver(projectDir, { aliases = [], configFiles = [], limits = {} } = {}) {
+export function createImportResolver(projectDir, { aliases = [], configFiles = [], limits = {}, visible = null } = {}) {
   const root = realpathSync(resolve(projectDir));
   const cap = { ...IMPORT_LIMITS, ...limits };
   const parseCache = new Map();
 
   const rel = (file) => relative(root, file).split(sep).join('/');
   const display = (file) => inside(root, file) ? rel(file) : file;
+  const repo = repositoryRoot(root);
+  let workspaceIndex;
+  // #272: with `visible` (the files git tracks, see visible-files.mjs), a
+  // project file git does not track or ignores does not exist for the
+  // resolver: the scratch tree the probe runs in will not contain it either.
+  const isVisible = (file) => !visible || !inside(root, file) || visible.has(rel(file));
+
+  /**
+   * A bare specifier that names a workspace package (#268): the package's
+   * entry files, the manifests that decide them, and whether any of it could
+   * not be followed. null when the specifier is an ordinary package: outside
+   * the project, and outside the closure.
+   */
+  function resolveWorkspace(fromFile, specifier) {
+    const parsed = packageSpecifier(specifier);
+    if (!parsed) return null;
+    workspaceIndex ??= workspacePackages(root, repo);
+    const dirs = new Set();
+    if (workspaceIndex.has(parsed.name)) dirs.add(workspaceIndex.get(parsed.name));
+    // Node's own lookup: the nearest node_modules/<name> from the importer up.
+    for (let at = dirname(fromFile); within(repo, at); at = dirname(at)) {
+      const found = linkedSourceDirs(join(at, 'node_modules', parsed.name), repo);
+      if (found) { for (const dir of found) dirs.add(dir); break; }
+      if (at === repo || dirname(at) === at) break;
+    }
+    if (!dirs.size) return null;
+    const files = new Set();
+    let unreadable = false;
+    for (const dir of dirs) {
+      const entry = packageEntryFiles(dir, parsed.subpath);
+      const shown = entry?.filter(isVisible);
+      if (shown?.length) for (const file of shown) files.add(file);
+      else unreadable = true;
+    }
+    return { files: [...files], manifests: [...dirs].map((dir) => join(dir, 'package.json')), unreadable };
+  }
 
   function resolveSpecifier(fromFile, specifier) {
     const aliasRules = aliasMatches(specifier, aliases);
@@ -631,7 +905,7 @@ export function createImportResolver(projectDir, { aliases = [], configFiles = [
         const suffix = rule.suffix ?? '';
         const star = rule.wildcard ? specifier.slice(rule.prefix.length, specifier.length - suffix.length) : '';
         for (const target of rule.targets ?? []) {
-          const expanded = expandBase(target.replace('*', star));
+          const expanded = expandBase(target.replace('*', star)).filter(isVisible);
           if (expanded.length) { bases.push(...expanded); break; } // ordered TS-path fallback
         }
       }
@@ -640,7 +914,7 @@ export function createImportResolver(projectDir, { aliases = [], configFiles = [
       if (unique.length === 1) return { status: 'resolved', file: unique[0], usedAlias };
       return { status: 'missing', candidates: [], usedAlias };
     } else return { status: 'external', candidates: [], usedAlias: false };
-    const candidates = [...new Set(bases.flatMap(expandBase))];
+    const candidates = [...new Set(bases.flatMap(expandBase))].filter(isVisible);
     if (candidates.length > 1) return { status: 'ambiguous', candidates, usedAlias };
     if (candidates.length === 1) return { status: 'resolved', file: candidates[0], usedAlias };
     return { status: 'missing', candidates: [], usedAlias };
@@ -906,7 +1180,20 @@ export function createImportResolver(projectDir, { aliases = [], configFiles = [
             if (!optional.has(specifier)) addIssue(ctx, 'unreadable-module', file, specifier);
             continue;
           }
-          const targets = found.status === 'resolved' ? [found.file] : found.status === 'ambiguous' ? found.candidates : [];
+          let targets = found.status === 'resolved' ? [found.file] : found.status === 'ambiguous' ? found.candidates : [];
+          if (found.status === 'external') {
+            // A workspace package is source the defenders run, reached by a
+            // name instead of a path. Followed like a relative import when it
+            // is inside the project; inside the repository but outside the
+            // project it cannot be hashed project-relative, so the closure is
+            // indeterminate — never silently smaller (#268).
+            const pkg = resolveWorkspace(file, specifier);
+            if (pkg) {
+              for (const manifest of pkg.manifests) ctx.dependencies.add(manifest);
+              if (pkg.unreadable || [...pkg.files, ...pkg.manifests].some((path) => !inside(root, path))) addIssue(ctx, 'unreadable-module', file, specifier);
+              targets = pkg.files;
+            }
+          }
           for (const target of targets) {
             if (!inside(root, target) || files.has(target)) continue;
             files.add(target);

@@ -11,7 +11,7 @@ import { classifyDefenders } from './mocks.mjs';
 import { detectContention, contentionWarning, fanOutWarning } from './contention.mjs';
 import { availableParallelism } from 'node:os';
 import { withScratchBase } from '../scratch-dir.mjs';
-import { createScratch, inPlace, PreconditionError, writeBoundary } from './worktree.mjs';
+import { createScratch, inPlace, installsChangedSince, installsFingerprint, PreconditionError, writeBoundary } from './worktree.mjs';
 import { UsageError } from './precondition-error.mjs';
 import { BudgetExhaustedError } from '../command-budget.mjs';
 import { completeRecords, budgetSummary, notReachedRecord, isNotReached } from './partial-budget.mjs';
@@ -294,6 +294,10 @@ async function measureProbe({
   projectDir = realpathSync(resolve(projectDir));
   const root = gitRoot(projectDir);
   const boundary = writeBoundary({ repoRoot: root, nodeModules }); // as the run starts, before anything is linked or written
+  // #279: the installs a scratch tree borrows are fingerprinted now and again
+  // after every tree is gone. A difference means something wrote into the
+  // user's node_modules; the run is refused and names the paths.
+  const installsBefore = mode === 'worktree' && boundary.nodeModulesWritable !== undefined ? installsFingerprint({ repoRoot: root, projectDir, nodeModules }) : null;
   const head = headSha(root, ref);
   ctx.head = head;
   if (!head) {
@@ -955,6 +959,17 @@ async function measureProbe({
     for (const scratch of extraTrees.reverse()) scratch.cleanup();
     typechecker?.cleanup();
     iso.cleanup();
+  }
+  if (installsBefore) {
+    const changed = installsChangedSince(installsBefore, { repoRoot: root, projectDir, nodeModules });
+    if (changed.length) {
+      throw new PreconditionError(
+        `the run changed the user's node_modules (${changed.length} entr${changed.length === 1 ? 'y' : 'ies'}: ${changed.slice(0, 5).join(', ')}${changed.length > 5 ? ', …' : ''}). ` +
+        'Its verdicts are not reported. Reinstall (for example `pnpm install --frozen-lockfile` or `npm ci`) and report this as a TestGuard defect; if something else changed the install during the run, run the probe again.',
+        'install-changed',
+      );
+    }
+    boundary.installUnchanged = true;
   }
 
   commandBudget?.assertOpen();
