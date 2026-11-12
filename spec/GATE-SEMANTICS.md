@@ -315,6 +315,23 @@ Rules that follow from the table:
    either makes the closure indeterminate (`unreadable-module`, naming the
    specifier). A link whose target leaves the repository, and a package
    installed as a real directory, stay outside the closure.
+   **Ordinary export forms are read, not refused.** A module whose exports the
+   reader cannot read is `unsupported-syntax`, which makes every importer's
+   closure indeterminate, so the reader covers what projects ordinarily write.
+   TypeScript type-only and ambient forms (`export interface`, `export type`,
+   `export type { … } from`, `import type`, `export declare …`,
+   `export as namespace`) declare no runtime binding and load nothing; `export
+   enum`, `export const enum`, `export namespace`/`module`, `export abstract
+   class`, generator functions, decorated classes, `satisfies`, several
+   declarators and destructuring declarations export the names they declare.
+   `import type from 'x'` is a default import named `type` and loads `x`. A
+   CommonJS `module.exports = { … }` exports each key: a shorthand or a name is
+   that binding; `require('x')` is module `x`, `require('x').y` its export `y`,
+   `ns.y` the export `y` of an imported namespace; any other value is computed
+   in the module, as `exports.X = call()` is. A spread, a computed key, an
+   accessor, a member of a named import, and a module load inside an
+   expression (`wrap(require('x'))`) stay `unsupported-syntax`: when in doubt
+   the closure is indeterminate, never smaller.
    When any import cannot be followed — a dynamic import, `require`,
    `import_module` or `__import__` whose argument is not one string literal; a
    project-relative or aliased specifier that resolves to no file; a module

@@ -35,6 +35,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`dist/`) is linked from the source package. A link to repository source the
   scratch tree does not contain refuses the run with the new precondition
   `workspace-link-outside-tree`, naming the link.
+- **Ordinary TypeScript and CommonJS export forms no longer turn reuse and
+  `probe --changed` off (#266, #267).** `export interface` and
+  `module.exports = { Name: define() }` marked the module `unsupported-syntax`,
+  so every importer's closure was indeterminate: nothing was reused and
+  `--changed` selected every claim. The export reader now reads type-only and
+  ambient forms (`export interface`, `export type`, `export declare`,
+  `export as namespace`, `export type { … } from`), `export enum`,
+  `export const enum`, `export namespace`, `export abstract class`,
+  decorators, generator functions, several declarators, destructuring
+  declarations, and CommonJS object-literal exports whose values are calls,
+  literals, functions, methods, `require()` or an imported namespace's member.
+  A spread, computed key, accessor or a `require` hidden inside an expression
+  stays uncertain. `import type from 'x'` (a default import named `type`) was
+  read as type-only and left `x` out of the closure; it is now followed.
 - **The self-probe cost gate no longer credits a runner that slowed down
   mid-run.** When the reference medians before and after the probe differ by
   more than `reference.maxDrift`, the speed factor is the faster reading, not the
