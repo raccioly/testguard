@@ -135,6 +135,9 @@ describe('a node_modules that is never written through', () => {
     mkdirSync(join(nm, '.vite', 'vitest'), { recursive: true });
     mkdirSync(join(nm, '.cache'));
     writeFileSync(join(nm, 'dep', 'index.js'), 'module.exports = 1\n');
+    writeFileSync(join(nm, 'dep', 'package.json'), '{"name":"dep"}');
+    writeFileSync(join(nm, '@scope', 'pkg', 'package.json'), '{"name":"@scope/pkg"}');
+    writeFileSync(join(nm, '.bin', 'dep'), '#!/bin/sh\n');
     writeFileSync(join(nm, '.package-lock.json'), '{}');
     return nm;
   };
@@ -146,6 +149,10 @@ describe('a node_modules that is never written through', () => {
     expect(readdirSync(at).sort()).toEqual(['.bin', '.package-lock.json', '@scope', 'dep']);
     expect(lstatSync(join(at, 'dep')).isSymbolicLink()).toBe(true);
     expect(readFileSync(join(at, 'dep', 'index.js'), 'utf8')).toBe('module.exports = 1\n');
+    // #279: every level a package manager writes is the scratch tree's own.
+    for (const level of ['.bin', '@scope']) expect(lstatSync(join(at, level)).isSymbolicLink(), level).toBe(false);
+    for (const file of ['.bin/dep', '.package-lock.json']) expect(lstatSync(join(at, file)).isSymbolicLink(), file).toBe(false);
+    expect(lstatSync(join(at, '@scope', 'pkg')).isSymbolicLink()).toBe(true);
   });
 
   it('a write to .vite-temp or .vite through it lands in the scratch tree, never in the install', () => {

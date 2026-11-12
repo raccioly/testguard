@@ -109,7 +109,27 @@
         "unmatchedFiles": [
           "src/session.mjs"
         ],
-        "note": "not covered by any claim; absence from the results is not a pass"
+        "note": "not covered by any claim; absence from the results is not a pass",
+        "matchReasons": [
+          {
+            "claimId": "REDACT-001",
+            "kind": "file",
+            "file": "src/redact.mjs"
+          },
+          {
+            "claimId": "REDACT-002",
+            "kind": "file",
+            "file": "test/redact.test.mjs"
+          },
+          {
+            "claimId": "REDACT-003",
+            "kind": "indeterminate",
+            "issue": {
+              "code": "computed-specifier",
+              "file": "src/redact.mjs"
+            }
+          }
+        ]
       },
       "state": "unproven",
       "next": {

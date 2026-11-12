@@ -42,7 +42,8 @@
     },
     "writeBoundary": {
       "scratchDir": "configured",
-      "nodeModulesWritable": false
+      "nodeModulesWritable": false,
+      "installUnchanged": true
     }
   },
   "records": [

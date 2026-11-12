@@ -5,9 +5,10 @@ import { isKillRun, killKindOf } from './kill-kind.mjs';
  * branch is unit-testable without a runner.
  *
  * Order matters. Each check short-circuits the ones below it, and the order
- * encodes GATE-SEMANTICS.md: nothing to run → nocover; nothing to apply →
- * unverifiable; defenders not green → flaky-defender; then, and only then,
- * does the fault's own result count.
+ * IS GATE-SEMANTICS.md's "The checks run in a fixed order": nothing to run →
+ * nocover (before an invalid anchor: the worse finding, #265); nothing to
+ * apply → unverifiable; the type check; defenders not green → flaky-defender;
+ * then, and only then, does the fault's own result count.
  *
  * `subjectReached` is the negative control's answer and is consulted at one
  * point only: a would-be `survived`. It is never asked about a kill — a kill
