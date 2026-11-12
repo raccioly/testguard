@@ -84,10 +84,26 @@ export function mergeScorecards(docs) {
   if (docs.length === 0) throw new Error('mergeScorecards: nothing to merge');
   const heads = new Set(docs.map((d) => d.tool.head));
   if (heads.size > 1) throw new Error(`mergeScorecards: shards measured different builds (${[...heads].join(', ')})`);
-  const rows = docs.flatMap((d) => d.rows);
+  // A subject split across shards by mode runs its reference in every shard
+  // (the other modes compare with it). Each extra reference row is kept only
+  // if it disagrees with the first one, so totals count a mode once and a
+  // reference that answered differently on another runner is not hidden.
+  const seen = new Map();
+  const rows = [];
+  for (const r of docs.flatMap((d) => d.rows)) {
+    const k = `${r.subject}\u0000${r.mode}`;
+    const first = seen.get(k);
+    if (first && r.mode === 'reference' && first.ok === r.ok && JSON.stringify(first.mismatches) === JSON.stringify(r.mismatches)) continue;
+    if (!first) seen.set(k, r);
+    rows.push(r);
+  }
   const mutantResults = docs.flatMap((d) => d.mutants?.results ?? []);
-  const totals = { right: 0, wrong: 0, critical: 0, known: 0, differentialMismatches: 0, noEvidence: 0 };
-  for (const d of docs) for (const k of Object.keys(totals)) totals[k] += d.totals[k] ?? 0;
+  const totals = rows.reduce((t, r) => {
+    if (r.faults) { t.right += r.faults.right; t.wrong += r.faults.wrong; t.critical += r.faults.critical; t.known += r.faults.known; }
+    if (r.differential && !r.differential.equal) t.differentialMismatches++;
+    t.noEvidence += (r.noEvidence ?? []).length;
+    return t;
+  }, { right: 0, wrong: 0, critical: 0, known: 0, differentialMismatches: 0, noEvidence: 0 });
   const factors = docs.map((d) => d.machine.speedFactor).filter((f) => f);
   const mid = (a) => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
   return {
