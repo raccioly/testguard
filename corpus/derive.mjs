@@ -38,15 +38,24 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { copySubjectFiles, linkDependencies, placeIgnoredCopies } from './lib/layout.mjs';
 
 const RUNS = 3;
 
-export function loadSubject(dir) {
+export function loadSubject(dir, { variant } = {}) {
   const config = JSON.parse(readFileSync(join(dir, 'subject.json'), 'utf8'));
   const claims = JSON.parse(readFileSync(join(dir, 'claims.json'), 'utf8')).claims;
-  return { dir: resolve(dir), name: basename(resolve(dir)), config, claims };
+  let name = basename(resolve(dir));
+  if (config.variants) {
+    const v = variant ?? Object.keys(config.variants)[0];
+    if (!config.variants[v]) throw new Error(`${name}: no variant ${v}`);
+    Object.assign(config, config.variants[v]);
+    name = `${name}@${v}`;
+  }
+  return { dir: resolve(dir), name, config, claims };
 }
 
 /** Every file under dir (relative paths), skipping installed dependencies and counters. */
@@ -65,29 +74,15 @@ export function listFiles(dir, skip = (rel) => /(^|\/)(node_modules|\.venv|\.out
 }
 
 /**
- * A fresh copy of the subject with its dependencies reachable. A workspace's
- * node_modules holds relative links to its own packages, so it is copied with
- * the links verbatim (they then resolve inside the copy); any other
- * node_modules is linked as a whole.
+ * A fresh copy of the subject with its dependencies reachable, laid out by
+ * corpus/lib/layout.mjs exactly as the harness lays out its repositories
+ * (workspace links inside the copy, ignored build copies, linked entries).
  */
 export function scratchCopy(subject, edits = []) {
-  const dir = mkdtempSync(join(tmpdir(), `corpus-derive-${subject.name}-`));
-  const counters = new Set(subject.config.counters ?? []);
-  cpSync(subject.dir, dir, {
-    recursive: true,
-    verbatimSymlinks: true,
-    filter: (src) => {
-      const rel = relative(subject.dir, src);
-      if (rel === '') return true;
-      if (counters.has(rel)) return false;
-      if (/(^|\/)(\.venv|\.out|__pycache__)(\/|$)/.test(rel)) return false;
-      if (subject.config.install === 'npm-workspace') return true;
-      return !/(^|\/)node_modules(\/|$)/.test(rel);
-    },
-  });
-  if (subject.config.install !== 'npm-workspace' && existsSync(join(subject.dir, 'node_modules'))) {
-    symlinkSync(join(subject.dir, 'node_modules'), join(dir, 'node_modules'), 'dir');
-  }
+  const dir = mkdtempSync(join(tmpdir(), `corpus-derive-${subject.name.replace('@', '-')}-`));
+  copySubjectFiles(subject, dir);
+  placeIgnoredCopies(subject, dir);
+  linkDependencies(subject, dir);
   for (const e of edits) {
     const p = join(dir, e.file);
     const text = readFileSync(p, 'utf8');
@@ -119,6 +114,25 @@ function run(cmd, args, { cwd, budgetMs, env }) {
 const firstLine = (s) => String(s ?? '').split('\n').find((l) => l.trim() !== '') ?? '';
 
 /** jest and vitest both write the jest-compatible JSON report. */
+/**
+ * vitest's JSON keeps only stack text, so its header cannot tell a failed
+ * `expect(...).rejects` (an AssertionError printed as "Error: ...") from a
+ * thrown error. The corpus reporter records each error's raw name/code/
+ * operator; a test is an assertion when any error has assertion identity
+ * (rule 3), else an exception. A test the sidecar does not name keeps the
+ * header reading.
+ */
+function withVitestErrorShapes(parsed, sidecar, cwd) {
+  if (!existsSync(sidecar)) return parsed;
+  for (const t of JSON.parse(readFileSync(sidecar, 'utf8'))) {
+    const name = `${t.file.split('/').slice(-2).join('/')} > ${t.title.join(' ')}`;
+    if (!(name in parsed.tests) || parsed.tests[name] === 'fail:timeout') continue;
+    const assertion = t.errors.some((e) => e.name === 'AssertionError' || e.code === 'ERR_ASSERTION' || typeof e.operator === 'string');
+    parsed.tests[name] = assertion ? 'fail:assertion' : 'fail:exception';
+  }
+  return parsed;
+}
+
 function parseJestShape(report, { assertionByMatcher }) {
   const tests = {};
   let loadError = null;
@@ -188,6 +202,28 @@ const pytestKind = ({ tag, message, text }) => {
   return 'fail:exception';
 };
 
+/** Playwright's JSON reporter: nested suites of specs, each test's last result. */
+function parsePlaywright(report) {
+  const tests = {};
+  const walk = (suite, trail) => {
+    const here = suite.title ? [...trail, suite.title] : trail;
+    for (const spec of suite.specs ?? []) {
+      for (const t of spec.tests ?? []) {
+        const last = (t.results ?? []).at(-1);
+        const name = `${[...here, spec.title].join(' > ')}${t.projectName ? ` [${t.projectName}]` : ''}`;
+        if (!last || last.status === 'skipped') tests[name] = 'skip';
+        else if (last.status === 'passed') tests[name] = 'pass';
+        else if (last.status === 'timedOut') tests[name] = 'fail:timeout';
+        else tests[name] = /expect\(/.test(String(last.error?.message ?? '')) ? 'fail:assertion' : 'fail:exception';
+      }
+    }
+    for (const s of suite.suites ?? []) walk(s, here);
+  };
+  for (const s of report.suites ?? []) walk(s, []);
+  const loadError = (report.errors ?? []).length ? firstLine(report.errors[0].message) : null;
+  return { tests, loadError };
+}
+
 /** Runs the given test files once and returns the normalized outcome plus the exact command. */
 export async function runOnce(subject, cwd, files, { budgetMs, python }) {
   const out = join(mkdtempSync(join(tmpdir(), 'corpus-report-')), 'report');
@@ -197,8 +233,8 @@ export async function runOnce(subject, cwd, files, { budgetMs, python }) {
   let parse;
   if (runner === 'vitest') {
     cmd = join(cwd, 'node_modules', '.bin', 'vitest');
-    args = ['run', ...files, '--reporter=json', `--outputFile=${out}`, '--no-file-parallelism'];
-    parse = (text) => parseJestShape(JSON.parse(text), { assertionByMatcher: false });
+    args = ['run', ...files, '--reporter=json', `--outputFile=${out}`, '--reporter', join(dirname(fileURLToPath(import.meta.url)), 'lib', 'vitest-errors-reporter.mjs'), '--no-file-parallelism'];
+    parse = (text) => withVitestErrorShapes(parseJestShape(JSON.parse(text), { assertionByMatcher: false }), `${out}.errors.json`, cwd);
   } else if (runner === 'jest') {
     cmd = join(cwd, 'node_modules', '.bin', 'jest');
     args = [...files, '--json', `--outputFile=${out}`, '--runInBand', '--ci', '--runTestsByPath'];
@@ -211,8 +247,16 @@ export async function runOnce(subject, cwd, files, { budgetMs, python }) {
     cmd = python;
     args = ['-m', 'pytest', ...files, '-p', 'no:cacheprovider', '-q', `--junitxml=${out}`];
     parse = (text) => parseJunit(text, { kindOf: pytestKind });
+  } else if (runner === 'unittest') {
+    cmd = python;
+    args = [join(dirname(fileURLToPath(import.meta.url)), 'lib', 'unittest_runner.py'), out, ...files];
+    parse = (text) => JSON.parse(text);
+  } else if (runner === 'playwright') {
+    cmd = join(cwd, 'node_modules', '.bin', 'playwright');
+    args = ['test', ...files, '--reporter=json', '--workers=1', '--retries=0'];
+    parse = (text) => parsePlaywright(JSON.parse(text));
   } else throw new Error(`unknown runner ${runner}`);
-  const env = runner === 'pytest' ? { PYTHONDONTWRITEBYTECODE: '1' } : {};
+  const env = runner === 'pytest' || runner === 'unittest' ? { PYTHONDONTWRITEBYTECODE: '1' } : runner === 'playwright' ? { PLAYWRIGHT_JSON_OUTPUT_NAME: out } : runner === 'vitest' ? { CORPUS_VITEST_ERRORS: `${out}.errors.json` } : {};
   const r = await run(cmd, args, { cwd, budgetMs, env });
   let parsed = { tests: {}, loadError: null };
   if (!r.timedOut) {
@@ -222,7 +266,7 @@ export async function runOnce(subject, cwd, files, { budgetMs, python }) {
     }
   }
   rmSync(join(out, '..'), { recursive: true, force: true });
-  const command = [runner === 'pytest' ? 'python' : runner === 'node-test' ? 'node' : relative(cwd, cmd), ...args.map((a) => a.replace(out, '<report>'))].join(' ');
+  const command = [runner === 'pytest' || runner === 'unittest' ? 'python' : runner === 'node-test' ? 'node' : relative(cwd, cmd), ...args.map((a) => a.replace(out, '<report>').replace(dirname(fileURLToPath(import.meta.url)), 'corpus'))].join(' ');
   return { command, run: { exit: r.exit, timedOut: r.timedOut, loadError: parsed.loadError, tests: sortKeys(parsed.tests) } };
 }
 
@@ -307,10 +351,10 @@ export function outputHash(record) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const { values, positionals } = parseArgs({ allowPositionals: true, options: { only: { type: 'string' }, out: { type: 'string' }, python: { type: 'string' }, budget: { type: 'string' }, edits: { type: 'string' } } });
-  const subject = loadSubject(positionals[0]);
+  const { values, positionals } = parseArgs({ allowPositionals: true, options: { only: { type: 'string' }, out: { type: 'string' }, python: { type: 'string' }, budget: { type: 'string' }, edits: { type: 'string' }, variant: { type: 'string' } } });
+  const subject = loadSubject(positionals[0], { variant: values.variant });
   const only = values.only ? new Set(values.only.split(',')) : null;
-  const python = values.python ?? process.env.TESTGUARD_PYTHON ?? join(subject.dir, '.venv', 'bin', 'python');
+  const python = values.python ?? process.env.TESTGUARD_PYTHON ?? subject.config.python ?? join(subject.dir, '.venv', 'bin', 'python');
   const edits = values.edits ? JSON.parse(readFileSync(values.edits, 'utf8')) : [];
   const opts = { budgetMs: Number(values.budget ?? subject.config.budgetMs ?? 30000), python, edits };
   const records = [];
@@ -328,7 +372,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       console.error(`${id}: anchor ${record.anchor.hits}/${record.anchor.expectHits} baseline ${b} probe ${p}${record.negativeControl ? ` control ${green(record.negativeControl) ? 'green' : 'red'}` : ''}${record.wholeSuiteFailingEveryRun ? ` suite-common ${record.wholeSuiteFailingEveryRun.length}` : ''} (${((Date.now() - started) / 1000).toFixed(1)}s)`);
     }
   }
-  const text = `${JSON.stringify({ subject: subject.name, runs: RUNS, ...(edits.length ? { edits } : {}), records }, null, 2)}\n`;
+  const text = `${JSON.stringify({ subject: subject.name, ...(subject.config.layout ? { layout: subject.config.layout } : {}), runs: RUNS, ...(edits.length ? { edits } : {}), records }, null, 2)}\n`;
   if (values.out) writeFileSync(values.out, text);
   else process.stdout.write(text);
 }

@@ -1,0 +1,162 @@
+{
+  "confirmRuns": 3,
+  "derivedWith": "node corpus/derive.mjs (applies each fault by hand to a scratch copy and runs the subject's own runner; never TestGuard). Verdicts written by hand in provenance/judgments.json.",
+  "expected": {
+    "EQUAL-SPLIT-REMAINDER-ORDER/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Remainder cents go in input order instead of name order; test/split.test.js fails by assertion in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/split.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "3a25f762e3e0053eaae54792fee55877a8ecb9b5d26351266ec770ca39f2d044",
+        "derivedAt": "2026-11-12T05:34:08.229Z"
+      }
+    },
+    "EQUAL-SPLIT-REMAINDER-ORDER/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "One participant too many gets an extra cent; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/split.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "010e170b3247e00dd3571c2dff3dfc0647f8a480907412e50e7b1fe7a936ca5d",
+        "derivedAt": "2026-11-12T05:34:12.041Z"
+      }
+    },
+    "SHARES-LEFTOVER-ALLOCATION/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Ties on remainder break by reverse name; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/split.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "2454d25bc4eb1a1322aba46b184a0f34f23274a454a4ab95e6f2326331b70cdc",
+        "derivedAt": "2026-11-12T05:34:15.643Z"
+      }
+    },
+    "SHARES-LEFTOVER-ALLOCATION/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Leftover cents go to the smallest remainders; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/split.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "6bf474e1e7fa04e8f6cdeac50100a42a52cf9b76f7f676ce7255cebfbeb3d550",
+        "derivedAt": "2026-11-12T05:34:19.746Z"
+      }
+    },
+    "INVALID-SPLIT-VALIDATION/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Duplicate participants are accepted; toThrow(InvalidSplit) fails in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/split.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "2d7a62e9e2c1d55491de237ced45a908bc2ac5cba0069d0cb99f6293bdc95149",
+        "derivedAt": "2026-11-12T05:34:23.971Z"
+      }
+    },
+    "INVALID-SPLIT-VALIDATION/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Zero and negative weights are accepted; toThrow fails in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/split.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "71437edad86857305ce73ecf5040932975804fb3c0946835702a95d3462632a6",
+        "derivedAt": "2026-11-12T05:34:27.653Z"
+      }
+    },
+    "INVALID-SPLIT-VALIDATION/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "An unknown split type throws the wrong class; toThrow(UnknownSplitType) fails in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/split.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "3d279985da1a4429fbc6cc4156059750eb48ef7188233a34d94d1909c4854345",
+        "derivedAt": "2026-11-12T05:34:30.975Z"
+      }
+    },
+    "BALANCE-PAID-MINUS-PORTIONS/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Portions are credited instead of debited; test/balances.test.js fails by assertion in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/balances.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "2c44eb4aef3fb5898de252c03f522c02cf3d033d0ca6c39d672cbba39d0cad52",
+        "derivedAt": "2026-11-12T05:34:34.123Z"
+      }
+    },
+    "BALANCE-PAID-MINUS-PORTIONS/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The payer is never credited; ten balance tests fail by assertion and one by exception in each of the three runs, so every run has an assertion failure.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/balances.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "eb978b935e8e4c89bc33bab3e803e69c7e57784ab56be3803db356dbaf32d18e",
+        "derivedAt": "2026-11-12T05:34:37.500Z"
+      }
+    },
+    "BALANCE-PAID-MINUS-PORTIONS/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Each entry overwrites the running total; assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/balances.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "0f0052b6e7820f857ef1526762745b8149cb092ce56d2e068ff92ec44a94faad",
+        "derivedAt": "2026-11-12T05:34:40.696Z"
+      }
+    },
+    "SETTLE-DETERMINISTIC-GREEDY/F1": {
+      "verdict": "survived",
+      "why": "test/settle.test.js never builds a tie between creditors (partial): green 3/3. Control (ledger.js unparseable) fails to load, so it executes the module. Whole suite 3/3: no test fails in every run.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/settle.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism",
+          "wholeSuite": "node_modules/.bin/vitest run test/balances.test.js test/settle.test.js test/split.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe GGG; negative control red; whole suite: 0 test(s) fail every run",
+        "outputHash": "964dba821fbfb42924db967cf8293336c353d154181ed28b5095eff21be8804f",
+        "derivedAt": "2026-11-12T05:34:46.946Z"
+      }
+    },
+    "SETTLE-DETERMINISTIC-GREEDY/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Payments run backwards; settle assertions fail in all three runs.",
+      "derivation": {
+        "commands": {
+          "defenders": "node_modules/.bin/vitest run test/settle.test.js --reporter=json --outputFile=<report> --reporter corpus/lib/vitest-errors-reporter.mjs --no-file-parallelism"
+        },
+        "observed": "baseline GGG; probe RRR",
+        "outputHash": "a032258885da2d88c0630b7d8ee11e79036e2786e28c93e2d6f0b29ec2b2a989",
+        "derivedAt": "2026-11-12T05:34:50.422Z"
+      }
+    }
+  }
+}

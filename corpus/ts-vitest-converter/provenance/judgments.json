@@ -1,0 +1,122 @@
+{
+  "expected": {
+    "REGISTRY-LAZY-PLUGIN-LOADING/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Temperature is no longer a category; each run has both assertion failures and UnknownCategory exceptions, so every run has at least one assertion failure."
+    },
+    "REGISTRY-LAZY-PLUGIN-LOADING/F2": {
+      "verdict": "survived",
+      "why": "Eager loading of the other plugins changes no result test/registry.test.ts asserts: green 3/3. Control (registry.ts unparseable) red. Whole suite 3/3: no test fails in every run."
+    },
+    "VOLUME-CONVERSION-RATIOS-AND-ROUNDING/F1": {
+      "verdict": "killed",
+      "killKind": "mixed",
+      "why": "test/support/verify.ts alternates between expect() and throw from one process run to the next (counter file). The defender fails in every run, by exception in runs 1 and 3 and by assertion in run 2: a kill in every run, but neither every run nor no run has an assertion failure, so the kind is mixed. Any three consecutive runs alternate, whatever the counter's starting value."
+    },
+    "VOLUME-CONVERSION-RATIOS-AND-ROUNDING/F2": {
+      "verdict": "killed",
+      "killKind": "mixed",
+      "why": "Without --typecheck the string result fails the rotating checks every run (exception, assertion, exception): mixed, as F1. Under --typecheck see modes.typecheck."
+    },
+    "MASS-CONVERSION-RATIOS-AND-ROUNDING/F1": {
+      "verdict": "killed",
+      "killKind": "mixed",
+      "why": "Rotating verify: exception, assertion, exception; every run red."
+    },
+    "MASS-CONVERSION-RATIOS-AND-ROUNDING/F2": {
+      "verdict": "killed",
+      "killKind": "mixed",
+      "why": "Rotating verify: exception, assertion, exception; every run red."
+    },
+    "TEMPERATURE-ABSOLUTE-VS-DELTA/F1": {
+      "verdict": "killed",
+      "killKind": "mixed",
+      "why": "Rotating verify: exception, assertion, exception; every run red."
+    },
+    "TEMPERATURE-ABSOLUTE-VS-DELTA/F2": {
+      "verdict": "killed",
+      "killKind": "mixed",
+      "why": "Rotating verify: exception, assertion, exception; every run red."
+    },
+    "TEMPERATURE-ABSOLUTE-VS-DELTA/F3": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "Negative deltas now throw BelowAbsoluteZero inside convert(), before any check runs: an exception in all three runs whatever the rotation, never an assertion."
+    },
+    "AUDIT-ENTRY-CONTENT-AND-COUNT/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Entries lose fields; the vi.mock'd sink's recorded calls fail toHaveBeenCalledWith in all three runs. The mock replaces the sink (a collaborator), not audit.ts, so the defender still executes the faulted module."
+    },
+    "AUDIT-ENTRY-CONTENT-AND-COUNT/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The timestamp comes from Date.now() instead of the sink clock; assertions fail in all three runs."
+    },
+    "AUDIT-ENTRY-CONTENT-AND-COUNT/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Failed conversions also write an entry; the 'sends nothing' assertions fail in all three runs."
+    },
+    "SCALER-MULTIPLY-THEN-CONVERT/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Quantities are squared; scaler assertions fail in all three runs."
+    },
+    "SCALER-MULTIPLY-THEN-CONVERT/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "A zero factor is accepted, so `expect(scaleRecipe(..., 0, ...)).rejects.toMatchObject(InvalidScale)` fails with vitest's AssertionError ('promise resolved instead of rejecting') in all three runs. vitest's JSON report prints that error as 'Error: ...'; the class is read from the error object (corpus/lib/vitest-errors-reporter.mjs), not the text."
+    },
+    "SCALER-ONE-AUDIT-ENTRY-PER-CONVERSION/F1": {
+      "verdict": "survived",
+      "why": "test/scaler.test.ts never checks audit entries (partial): green 3/3. Control (scaler.ts unparseable) fails to load, so it executes the module. Whole suite 3/3: no test fails in every run."
+    },
+    "SCALER-ONE-AUDIT-ENTRY-PER-CONVERSION/F2": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "The fault's file is src/registry.ts; the declared test/scaler.test.ts is green 3/3 with no audit entry recorded. test/audit.test.ts fails in all three runs and is not declared for this claim."
+    }
+  },
+  "modes": {
+    "typecheck": {
+      "expected": {
+        "VOLUME-CONVERSION-RATIOS-AND-ROUNDING/F2": {
+          "verdict": "fault-invalid",
+          "reason": "replacement-does-not-typecheck",
+          "why": "tsc --noEmit exits 2 with the fault applied: TS2322 Type 'string' is not assignable to type 'number' (src/plugins/volume.ts). The unmodified tree type-checks clean; every other fault type-checks (tsc exit 0)."
+        }
+      }
+    },
+    "reuse-edit": {
+      "why": "Every defender reaches src/registry.ts (plugins, audit and registry tests directly, the scaler test through src/scaler.ts), and registry.ts loads its plugins with a computed import(`./plugins/${key}.ts`). Rule 8: an import that cannot be followed makes the closure indeterminate, and such a record is never reused. The edit is a behavior-neutral comment in src/plugins/volume.ts, a file every defender runs but only through that computed import: a reuse that hashes the static closure only would carry every answer forward. Every fault must be measured again; no answer changes.",
+      "edits": [
+        {
+          "file": "src/plugins/volume.ts",
+          "find": "import { ratioConvert } from \"../util.ts\";",
+          "replace": "// corpus reuse edit: behavior-neutral\nimport { ratioConvert } from \"../util.ts\";"
+        }
+      ],
+      "expected": {},
+      "mustRemeasure": [
+        "REGISTRY-LAZY-PLUGIN-LOADING/F1",
+        "REGISTRY-LAZY-PLUGIN-LOADING/F2",
+        "VOLUME-CONVERSION-RATIOS-AND-ROUNDING/F1",
+        "VOLUME-CONVERSION-RATIOS-AND-ROUNDING/F2",
+        "MASS-CONVERSION-RATIOS-AND-ROUNDING/F1",
+        "MASS-CONVERSION-RATIOS-AND-ROUNDING/F2",
+        "TEMPERATURE-ABSOLUTE-VS-DELTA/F1",
+        "TEMPERATURE-ABSOLUTE-VS-DELTA/F2",
+        "TEMPERATURE-ABSOLUTE-VS-DELTA/F3",
+        "AUDIT-ENTRY-CONTENT-AND-COUNT/F1",
+        "AUDIT-ENTRY-CONTENT-AND-COUNT/F2",
+        "AUDIT-ENTRY-CONTENT-AND-COUNT/F3",
+        "SCALER-MULTIPLY-THEN-CONVERT/F1",
+        "SCALER-MULTIPLY-THEN-CONVERT/F2",
+        "SCALER-ONE-AUDIT-ENTRY-PER-CONVERSION/F1",
+        "SCALER-ONE-AUDIT-ENTRY-PER-CONVERSION/F2"
+      ]
+    }
+  }
+}
