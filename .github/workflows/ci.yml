@@ -312,25 +312,18 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm ci --prefix fixtures/known-answer-typescript
-      - name: Restore previous self-probe evidence (verdict reuse)
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .testguard/ci-self-evidence.json
-          key: self-evidence-shard${{ matrix.shard }}-${{ hashFiles('testguard.claims.json') }}-${{ github.sha }}
-          restore-keys: |
-            self-evidence-shard${{ matrix.shard }}-${{ hashFiles('testguard.claims.json') }}-
-            self-evidence-shard${{ matrix.shard }}-
       # Each shard times the reference workload before and after its own probe,
       # on its own runner (#255): the cost gate normalizes each shard by ITS speed.
       - name: Time the reference workload before the probe
         run: node .github/scripts/measure-reference.mjs --out .testguard/reference-before.json
+      # Always from scratch. A verdict reused from an earlier run carries the
+      # duration it had on THAT runner, which the gate then normalizes by THIS
+      # runner's speed (the gate flags it low-confidence), so reuse made the
+      # per-claim ceiling depend on which runner the last run happened to get.
       - name: probe this shard's claims
         env:
           SHARD_CLAIMS: ${{ fromJSON(needs.scope.outputs.shards)[matrix.shard] }}
-          # The nightly run and a release branch measure from scratch: a verdict
-          # reused from the cache would make "probed in full" mean "not probed".
-          NO_REUSE: ${{ (github.event_name == 'schedule' || startsWith(github.head_ref || github.ref_name, 'release/')) && '--no-reuse' || '' }}
-        run: node cli/testguard.mjs probe . --claim "$SHARD_CLAIMS" --budget 180000 --no-escalate --cost $NO_REUSE --out .testguard/ci-self-evidence.json
+        run: node cli/testguard.mjs probe . --claim "$SHARD_CLAIMS" --budget 180000 --no-escalate --cost --no-reuse --out .testguard/ci-self-evidence.json
       - name: Time the reference workload after the probe
         if: always()
         run: node .github/scripts/measure-reference.mjs --out .testguard/reference-after.json

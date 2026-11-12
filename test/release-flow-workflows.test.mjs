@@ -49,8 +49,8 @@ describe('ci.yml: pull requests probe what changed, everything else probes in fu
     expect(probe.env.SHARD_CLAIMS).toBe('${{ fromJSON(needs.scope.outputs.shards)[matrix.shard] }}');
     expect(probe.run).toContain('--claim "$SHARD_CLAIMS"');
     expect(probe.run).not.toContain('--changed');
-    expect(probe.env.NO_REUSE).toContain("startsWith(github.head_ref || github.ref_name, 'release/')");
-    expect(probe.env.NO_REUSE).toContain("github.event_name == 'schedule'");
+    expect(probe.run).toContain('--no-reuse');
+    expect(steps(ci, 'selfprobe').some((s) => /actions\/cache/.test(s.uses ?? ''))).toBe(false);
   });
 
   it('merges the shards, requiring every fault exactly once, and gates the SUM of their cost', () => {
