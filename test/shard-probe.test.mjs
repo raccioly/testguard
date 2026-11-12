@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { compareVerdicts, mergeShards, planShards, recordedCosts } from '../.github/scripts/shard-probe.mjs';
+import { recordedOriginSummary } from '../spec/lib/origins.mjs';
 import { decideShardCost } from '../.github/scripts/check-shard-cost.mjs';
 import { changedClaimIds, decideScope } from '../.github/scripts/self-probe-scope.mjs';
 import { ROOT } from './helpers/release-project.mjs';
@@ -65,6 +66,7 @@ describe('shard-probe: the merge fails unless every fault appears exactly once',
     expect(doc.run.measurements).toEqual({ elapsedMs: 300, runnerInvocations: 12 });
     expect(doc.run.reuse).toEqual({ reused: 0, measured: 5 });
     expect(doc.run.startedAt).toBe('2026-11-12T10:00:00.000Z');
+    expect(doc.origins).toEqual(recordedOriginSummary(doc.records));
   });
 
   it('fails on a fault in no shard (a lost shard must not read as a smaller passing probe)', () => {

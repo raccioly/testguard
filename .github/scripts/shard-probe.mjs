@@ -20,6 +20,7 @@
 import { existsSync, readdirSync, readFileSync, statSync, appendFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { recordedOriginSummary } from '../../spec/lib/origins.mjs';
 import { parseArgs } from 'node:util';
 
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
@@ -101,7 +102,8 @@ export function mergeShards(claimsDoc, shardDocs) {
   const starts = shardDocs.map((d) => d.run?.startedAt).filter(Boolean).sort();
   const ends = shardDocs.map((d) => d.run?.finishedAt).filter(Boolean).sort();
   const run = { ...first.run, startedAt: starts[0], ...(ends.length ? { finishedAt: ends[ends.length - 1] } : {}), measurements, ...(first.run?.reuse ? { reuse } : {}) };
-  return { problems, doc: { ...first, run, records } };
+  // `origins` summarizes the records and the validator recomputes it from them.
+  return { problems, doc: { ...first, run, records, origins: recordedOriginSummary(records) } };
 }
 
 /** Verdicts the two documents disagree on, over the faults both carry. */
