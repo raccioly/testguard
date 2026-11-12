@@ -2,10 +2,11 @@
 // committed change that touches no fault anchor, `probe --changed HEAD~1`,
 // then `status`. Before convergence the project stayed `evidence-stale` and
 // `next` asked for the full probe again.
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.setConfig({ testTimeout: 120_000 });
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main } from '../src/cli.mjs';
 import { probeCommand } from '../src/commands/probe.mjs';
@@ -27,11 +28,26 @@ const canonical = (dir) => join(dir, '.testguard', 'evidence.json');
 const read = (path) => JSON.parse(readFileSync(path, 'utf8'));
 const touch = (dir, file) => writeFileSync(join(dir, file), `// edited\n${readFileSync(join(dir, file), 'utf8')}`);
 
+// One full probe for the whole file: every case starts from a copy of this
+// probed repository, so the file pays for one full probe instead of nine.
+let seed;
+beforeAll(async () => {
+  seed = project();
+  expect((await run(['probe', seed.dir, ...node, '--quiet'])).code).toBe(0);
+});
+afterAll(() => rmSync(seed.root, { recursive: true, force: true }));
+
+/** A copy of the probed seed. */
+function probed() {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'tg-converge-')));
+  cpSync(seed.root, root, { recursive: true });
+  roots.push(root);
+  return { root, dir: root, base: seed.base };
+}
+
 /** A probed project with one committed edit to src/tax.mjs that moves no anchor. */
 async function probedThenEdited() {
-  const p = project();
-  roots.push(p.root);
-  expect((await run(['probe', p.dir, ...node, '--quiet'])).code).toBe(0);
+  const p = probed();
   touch(p.dir, 'src/tax.mjs');
   commit(p.root, 'edit tax');
   return p;
@@ -49,9 +65,7 @@ describe('a change-scoped probe converges the canonical evidence', () => {
   });
 
   it('status and baseline agree when a record is kept for an input status does not hash (a new test file)', async () => {
-    const p = project();
-    roots.push(p.root);
-    expect((await run(['probe', p.dir, ...node, '--quiet'])).code).toBe(0);
+    const p = probed();
     // One commit: the change TAX-DOUBLES is selected for, and a new test file
     // that touches no claim but changes the runner's test universe.
     touch(p.dir, 'src/tax.mjs');
