@@ -1486,6 +1486,16 @@ A suite that needs a port, a database or a directory of its own derives it
 from the index (`8787 + TESTGUARD_WORKER`) and stays parallel instead of being
 measured alone. The index is never part of a verdict or of reuse.
 
+Two probe commands on one machine (two agent sessions) must not hand out the
+same index (#293). Each command adds a base: `TESTGUARD_WORKER_BASE` when set
+(a non-negative integer, else a usage error), otherwise its slot times 100.
+The slot is the lowest one no live command holds, recorded as a pid-owned lock
+file under the scratch root's `testguard-locks/worker-slots/`, beside the
+worktree lock, and removed when the command ends. A slot whose owner is
+provably gone (same host, pid not running) is taken over. A lone command holds
+slot 0 and hands out 0, 1, 2… as before. Commands that use different scratch
+roots do not coordinate; with every slot held, a command starts at 0.
+
 ## Speed advice
 
 `status`, `brief` and the end of a text-mode `probe` carry `advice` (#270):
@@ -1771,6 +1781,11 @@ defaults to one and records no source unless its caller passes one.
    green N/N) is finished there. A fault measured in another tree reads the
    baselines, it never runs them.
 3. **Fan-out.** The remaining faults are handed, in order, to at most n trees.
+   The baseline phase's trees serve as fault trees (#293): a baseline never
+   applies a fault, so its tree is kept, and reused only while `git status`
+   (tracked and untracked files) reads exactly as it did right after the tree
+   was created. A tree that reads otherwise is removed and replaced by a fresh
+   one, and kept trees the fault phase does not need are removed then.
    A fault's probe runs, its negative control and its escalation all run in
    the tree that holds it. A negative control shared by two faults (same
    target, same defenders) is paid once, by whichever asks first.

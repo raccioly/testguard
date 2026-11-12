@@ -15500,8 +15500,8 @@
           "description": "The worker index is never set.",
           "faultClass": "return-altered",
           "file": "src/probe/worker-env.mjs",
-          "find": "export const workerEnv = () => ({ TESTGUARD_WORKER: String(context.getStore() ?? 0) });",
-          "replace": "export const workerEnv = () => ({});",
+          "find": "  return { TESTGUARD_WORKER: String((store?.base ?? 0) + (store?.index ?? 0)) };",
+          "replace": "  return {};",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -16023,6 +16023,90 @@
           "file": "src/commands/probe.mjs",
           "find": "  if (noFullFallback) return",
           "replace": "  if (false) return",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-WORKER-INDEX-IS-UNIQUE-ACROSS-COMMANDS",
+      "statement": "Two probe commands on one machine hand out different TESTGUARD_WORKER values: each adds TESTGUARD_WORKER_BASE or 100 times the lowest slot no live command holds, takes over a slot whose owner is gone, and releases it when done.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (worker index across commands; baseline trees serve the faults)"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/worker-env.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every command starts at 0.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/worker-env.mjs",
+          "find": "    return await context.run({ base: claim.slot * WORKER_SLOT_STRIDE, index: 0 }, fn);",
+          "replace": "    return await context.run({ base: 0, index: 0 }, fn);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A slot whose owner is gone is never taken over.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/worker-env.mjs",
+          "find": "      if (!lockIsStale(owner, { alive, host })) break;",
+          "replace": "      break;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-BASELINE-TREES-SERVE-THE-FAULTS",
+      "statement": "A fan-out reuses a baseline-phase scratch tree for a fault only while git sees it exactly as it was created, replaces any other, and removes kept trees the fault phase does not need.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (worker index across commands; baseline trees serve the faults)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/tree-reuse.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A tree is reused whatever git says about it.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/tree-reuse.mjs",
+          "find": "      try { clean = stateOf(tree) === tree.stateAtCreation; } catch { clean = false; }",
+          "replace": "      clean = true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Unneeded kept trees are never removed.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/tree-reuse.mjs",
+          "find": "  for (const tree of byWorker.values()) release(tree);\n",
+          "replace": "",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

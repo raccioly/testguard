@@ -30,7 +30,8 @@ import { persistenceSignalsFor } from '../supply/persistence.mjs';
 import { collectOwnedManifests, hashNativeTestUniverse, hashCustomCommandUniverse } from './universe.mjs';
 import { createDependencyHasher, instrumentOf } from './dependencies.mjs';
 import { createTypechecker, sameTypecheck } from './typecheck.mjs';
-import { withWorker } from './worker-env.mjs';
+import { withCommandWorkers, withWorker } from './worker-env.mjs';
+import { fillSlots, treeState } from './tree-reuse.mjs';
 import { aloneDisagrees, contentionRoundDown, createBusyClock, createOverlapTracker, deferLastRun, mustConfirmAlone, needsSerialRemeasure, orderedEmitter, parseFaultWorkers, runPool, singleFlight } from './fan-out.mjs';
 
 
@@ -186,7 +187,7 @@ export const serialRequested = (faultWorkers, source) => faultWorkers === 1 && [
  * Probe every fault of every claim. Returns a spec-conformant evidence
  * document; writing it is the caller's job.
  */
-export const probe = (options) => withScratchBase(options.scratchBase, () => probeBudgeted(options));
+export const probe = (options) => withScratchBase(options.scratchBase, () => withCommandWorkers(() => probeBudgeted(options)));
 
 async function probeBudgeted(options) {
   const { partialOnBudget = false, commandBudget } = options;
@@ -773,7 +774,9 @@ async function measureProbe({
     const freshTree = (worker = 0) => {
       const scratch = createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules });
       extraTrees.push(scratch);
-      return treeContext(scratch, worker);
+      // What git sees right after the checkout: a tree is kept for later work
+      // only while it still looks exactly like this (#293).
+      return { ...treeContext(scratch, worker), stateAtCreation: treeState(scratch.root) };
     };
     const releaseTrees = () => { while (extraTrees.length) extraTrees.pop().cleanup(); };
     const releaseTree = (tree) => { extraTrees.splice(extraTrees.indexOf(tree.iso), 1); tree.iso.cleanup(); };
@@ -881,7 +884,8 @@ async function measureProbe({
           baselineCache.get(set.defenders.join('\n')).error = err;
         }
       }, { beforeEach: () => commandBudget?.assertOpen() });
-      releaseTrees();
+      // Kept for the fault phase (#293): a baseline never applies a fault.
+      const keptTrees = baselineSlots.slice(1);
       if (baselineContended) {
         for (const set of sets) {
           const key = set.defenders.join('\n');
@@ -896,7 +900,7 @@ async function measureProbe({
             if (fatalToTheRun(err)) throw err;
             baselineCache.get(key).error = err;
           } finally {
-            releaseTrees();
+            releaseTree(fresh);
           }
           baselineCache.get(key).remeasuredSerially = true;
           // Red beside other sets, green alone: the red was theirs, so this
@@ -920,11 +924,15 @@ async function measureProbe({
       // 4. Faults: one tree per fault in flight, never more trees than faults.
       //    Every run records whether it was alone; a fault whose runs were all
       //    kills beside other faults stops before its last run (#270).
-      const slots = [primary];
-      for (let i = 1; i < Math.min(faultWorkers, pending.length); i++) {
-        commandBudget?.assertOpen();
-        slots.push(freshTree(i));
-      }
+      // The baseline phase's trees serve the faults when git sees them as
+      // they were created; any other is replaced, and the rest go now (#293).
+      const { slots: faultSlots } = fillSlots({
+        kept: keptTrees,
+        count: Math.min(faultWorkers, pending.length),
+        fresh: (i) => { commandBudget?.assertOpen(); return freshTree(i); },
+        release: releaseTree,
+      });
+      const slots = [primary, ...faultSlots];
       const overlap = createOverlapTracker();
       const outcomes = [];
       await runPool(pending, slots, async ({ index, state }, tree) => {
