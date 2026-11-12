@@ -177,6 +177,22 @@ export const RUN = {
     for (const step of spec.steps) {
       commitEdits(repo, step.edits, `corpus: ${step.name}`);
       const r = await probe({ toolRoot: ctx.toolRoot, subject: ctx.subject, repo, outPath: out(repo, `changed-${step.name}`), args: ['--no-reuse', '--changed', 'HEAD~1'], python: ctx.python });
+      if (step.expectedClaims.length === 0) {
+        // A determined change that reaches no claim: exit 0, selectedCount 0,
+        // no evidence written. Anything probed is a wrong selection.
+        const scope = r.json?.run?.scope;
+        const selected = [...new Set((r.evidence?.records ?? []).map((x) => x.claim.id))].sort();
+        runs.push({ ...runSummary(step.name, r), expectNoEvidence: true });
+        const ok = r.exit === 0 && !r.evidence && scope?.selectedCount === 0 && scope?.changed?.outcome === 'determined';
+        const c = check(`selection:${step.name}`, ok, { expected: [], selected, exit: r.exit, scope: scope ?? null, wroteEvidence: Boolean(r.evidence) });
+        if (!ok) {
+          const k = ctx.known.find((x) => x.subject === ctx.subject.name && x.check === c.check && JSON.stringify([...x.observed.selected].sort()) === JSON.stringify(selected));
+          if (k) { c.ok = true; c.detail.knownIssue = k.issue; c.detail.unsound = false; }
+        }
+        checks.push(c);
+        c.allowEmpty = true;
+        continue;
+      }
       runs.push(runSummary(step.name, r));
       const selected = [...new Set((r.evidence?.records ?? []).map((x) => x.claim.id))].sort();
       const want = [...step.expectedClaims].sort();

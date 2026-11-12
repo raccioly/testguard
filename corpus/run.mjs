@@ -26,11 +26,12 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { loadKnownFailures } from './lib/checks.mjs';
+import { excuseKnownNoEvidence, loadKnownFailures } from './lib/checks.mjs';
 import { MODES, RUN, applies } from './lib/modes.mjs';
 import { checkMutants, loadManifest, runMutants } from './lib/mutants.mjs';
 import { buildScorecard, measureMachine, mergeScorecards, renderMarkdown, validateScorecard } from './lib/scorecard.mjs';
-import { CORPUS, SubjectError, install, listSubjects, loadSubject, preflight } from './lib/subject.mjs';
+import { join as pjoin } from 'node:path';
+import { CORPUS, SubjectError, install, installCheckScope, installDigest, listSubjects, loadSubject, preflight, subjectRef } from './lib/subject.mjs';
 
 const TOOL_ROOT = resolve(CORPUS, '..');
 
@@ -39,6 +40,13 @@ export async function runSubject(subject, { modes, toolRoot = TOOL_ROOT, python,
   const work = mkdtempSync(join(tmpdir(), `corpus-run-${subject.name}-`));
   const ctx = { subject, toolRoot, python, known, work };
   const results = [];
+  // Every mode runs against links into the subject's own install (a developer
+  // whose node_modules are another checkout's, #279). Nothing the tool does may
+  // write through them: the install is hashed, bytes and link targets, before
+  // and after every mode.
+  const installDir = pjoin(subject.dir, 'node_modules');
+  const scope = installCheckScope(subject);
+  const before = existsSync(installDir) ? installDigest(installDir, scope) : null;
   try {
     const wanted = ['reference', ...modes.filter((m) => m !== 'reference')];
     for (const mode of wanted) {
@@ -49,6 +57,13 @@ export async function runSubject(subject, { modes, toolRoot = TOOL_ROOT, python,
         r = await RUN[mode](ctx);
       } catch (error) {
         r = { subject: subject.name, mode, ok: false, error: error.stack ?? String(error), runs: [], key: null, differential: null, checks: [] };
+      }
+      excuseKnownNoEvidence(r, known);
+      if (before) {
+        const after = installDigest(installDir, scope);
+        const c = { check: 'install-unchanged', ok: after === before, detail: after === before ? `sha256 ${before.slice(0, 12)}${scope.exclude.length ? ` (runner caches ${scope.exclude.join(', ')} left out)` : ' (byte for byte)'}` : { before, after, install: installDir, excluded: scope.exclude } };
+        r.checks.push(c);
+        if (!c.ok) r.ok = false;
       }
       results.push(r);
       log(`  ${subject.name} ${mode}: ${r.ok ? 'ok' : 'RED'}${r.key ? ` (key ${r.key.right}/${r.key.total}${r.key.critical ? `, ${r.key.critical} CRITICAL` : ''}${r.key.known ? `, ${r.key.known} known` : ''})` : ''}${r.differential && !r.differential.equal ? ' (differential mismatch)' : ''}${r.runs.length ? ` ${(r.runs.reduce((s, x) => s + x.elapsedMs, 0) / 1000).toFixed(1)}s` : ''}`);
@@ -119,7 +134,7 @@ async function main() {
         ? [...new Set(loadManifest().filter((m) => !values.mutant || values.mutant.includes(m.name)).flatMap((m) => m.targets.map((t) => t.subject)))]
         : null;
       const names = values.subject ?? targeted ?? listSubjects();
-      for (const n of names) subjects.push(loadSubject(join(CORPUS, n)));
+      for (const n of names) { const { dir, variant } = subjectRef(n); subjects.push(loadSubject(dir, { variant })); }
     }
     if (subjects.length === 0) throw new SubjectError('no subject selected');
     if (values.mutant) for (const m of values.mutant) if (!loadManifest().some((x) => x.name === m)) throw new SubjectError(`unknown mutant ${m}`);

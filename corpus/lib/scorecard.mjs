@@ -143,16 +143,16 @@ export function renderMarkdown(doc, { base = null } = {}) {
     lines.push('');
     lines.push('**The tool wrote no evidence** (a refusal or a crash, not a verdict):');
     lines.push('');
-    lines.push('| subject | mode | run | exit | kind | reason |');
-    lines.push('|---|---|---|---|---|---|');
-    for (const n of refused) lines.push(`| ${n.subject} | ${n.mode} | ${n.run} | ${n.exit} | ${n.kind ?? '–'} | ${String(n.reason).replace(/\|/g, '\\|').slice(0, 200)} |`);
+    lines.push('| subject | mode | run | exit | kind | reason | |');
+    lines.push('|---|---|---|---|---|---|---|');
+    for (const n of refused) lines.push(`| ${n.subject} | ${n.mode} | ${n.run} | ${n.exit} | ${n.kind ?? '–'} | ${String(n.reason).replace(/\|/g, '\\|').slice(0, 200)} | ${n.knownIssue ? `known: #${n.knownIssue}` : '**unexplained**'} |`);
   }
   const knownChecks = doc.rows.flatMap((r) => r.checks.filter((c) => c.detail && c.detail.knownIssue).map((c) => ({ ...c, subject: r.subject, mode: r.mode })));
   if (knownChecks.length) {
     lines.push('');
     lines.push('| subject | mode | check | known | |');
     lines.push('|---|---|---|---|---|');
-    for (const c of knownChecks) lines.push(`| ${c.subject} | ${c.mode} | ${c.check} | #${c.detail.knownIssue} | ${c.detail.unsound ? '**UNSOUND: misses claims the change can affect**' : 'superset (imprecise, safe)'} |`);
+    for (const c of knownChecks) lines.push(`| ${c.subject} | ${c.mode} | ${c.check} | #${c.detail.knownIssue} | ${c.detail.noEvidence ? 'no evidence written (see above)' : c.detail.unsound ? '**UNSOUND: misses claims the change can affect**' : 'superset (imprecise, safe)'} |`);
   }
   if (doc.mutants) {
     lines.push('');

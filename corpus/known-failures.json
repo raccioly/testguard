@@ -108,6 +108,176 @@
       },
       "unsound": true,
       "issue": 268
+    },
+    {
+      "subject": "js-vitest-projects-habits",
+      "check": "tool-wrote-evidence",
+      "expected": {
+        "evidence": "every fault probed and killed as keyed"
+      },
+      "observed": {
+        "exit": 2,
+        "kind": "runner-unresolvable",
+        "reasonIncludes": "native test discovery path does not exist: [streaks] test/shared.test.js"
+      },
+      "issue": 277
+    },
+    {
+      "subject": "js-vitest-mergeconfig-ledger",
+      "check": "tool-wrote-evidence",
+      "expected": {
+        "evidence": "every fault probed as keyed"
+      },
+      "observed": {
+        "exit": 2,
+        "kind": "runner-unresolvable",
+        "reasonIncludes": "module config dependency vite exceeded 1048576 bytes"
+      },
+      "issue": 278
+    },
+    {
+      "subject": "js-vitest-booking",
+      "fault": "RATES-AND-PEAK-WINDOW/F1",
+      "expected": {
+        "verdict": "survived",
+        "reason": "killed-by-undeclared-tests"
+      },
+      "observed": {
+        "verdict": "survived"
+      },
+      "issue": 282
+    },
+    {
+      "subject": "js-vitest-booking",
+      "fault": "RATES-AND-PEAK-WINDOW/F2",
+      "expected": {
+        "verdict": "survived",
+        "reason": "killed-by-undeclared-tests"
+      },
+      "observed": {
+        "verdict": "survived"
+      },
+      "issue": 282
+    },
+    {
+      "subject": "node-test-catalog3@npm",
+      "fault": "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES/F1",
+      "expected": {
+        "verdict": "killed"
+      },
+      "observed": {
+        "verdict": "survived",
+        "reason": "killed-by-undeclared-tests"
+      },
+      "issue": 263
+    },
+    {
+      "subject": "node-test-catalog3@npm",
+      "fault": "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES/F2",
+      "expected": {
+        "verdict": "killed"
+      },
+      "observed": {
+        "verdict": "survived",
+        "reason": "killed-by-undeclared-tests"
+      },
+      "issue": 263
+    },
+    {
+      "subject": "node-test-catalog3@npm",
+      "fault": "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY/F1",
+      "expected": {
+        "verdict": "killed"
+      },
+      "observed": {
+        "verdict": "unverifiable",
+        "reason": "subject-not-executed"
+      },
+      "issue": 263
+    },
+    {
+      "subject": "node-test-catalog3@npm",
+      "fault": "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY/F2",
+      "expected": {
+        "verdict": "killed"
+      },
+      "observed": {
+        "verdict": "unverifiable",
+        "reason": "subject-not-executed"
+      },
+      "issue": 263
+    },
+    {
+      "subject": "node-test-catalog3@npm",
+      "fault": "REPORT-CITATION-LINE/F1",
+      "expected": {
+        "verdict": "killed"
+      },
+      "observed": {
+        "verdict": "unverifiable",
+        "reason": "subject-not-executed"
+      },
+      "issue": 263
+    },
+    {
+      "subject": "node-test-catalog3@pnpm",
+      "fault": "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES/F1",
+      "expected": {
+        "verdict": "killed"
+      },
+      "observed": {
+        "verdict": "survived",
+        "reason": "killed-by-undeclared-tests"
+      },
+      "issue": 263
+    },
+    {
+      "subject": "node-test-catalog3@pnpm",
+      "fault": "SEARCH-ISBN-LOOKUP-NORMALIZES-AND-VALIDATES/F2",
+      "expected": {
+        "verdict": "killed"
+      },
+      "observed": {
+        "verdict": "survived",
+        "reason": "killed-by-undeclared-tests"
+      },
+      "issue": 263
+    },
+    {
+      "subject": "node-test-catalog3@pnpm",
+      "fault": "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY/F1",
+      "expected": {
+        "verdict": "killed"
+      },
+      "observed": {
+        "verdict": "unverifiable",
+        "reason": "subject-not-executed"
+      },
+      "issue": 263
+    },
+    {
+      "subject": "node-test-catalog3@pnpm",
+      "fault": "SEARCH-TITLE-PREFIX-NORMALIZED-QUERY/F2",
+      "expected": {
+        "verdict": "killed"
+      },
+      "observed": {
+        "verdict": "unverifiable",
+        "reason": "subject-not-executed"
+      },
+      "issue": 263
+    },
+    {
+      "subject": "node-test-catalog3@pnpm",
+      "fault": "REPORT-CITATION-LINE/F1",
+      "expected": {
+        "verdict": "killed"
+      },
+      "observed": {
+        "verdict": "unverifiable",
+        "reason": "subject-not-executed"
+      },
+      "issue": 263
     }
   ]
 }

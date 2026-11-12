@@ -39,6 +39,21 @@ jobs:
             args: --subject py-pytest-circulation
           - name: node-test-floorplan
             args: --subject node-test-floorplan
+          - name: js-playwright-gallery
+            args: --subject js-playwright-gallery
+            browser: true
+          - name: py-unittest-shipping
+            args: --subject py-unittest-shipping
+          - name: js-vitest-booking
+            args: --subject js-vitest-booking
+          - name: ts-vitest-converter
+            args: --subject ts-vitest-converter
+          - name: node-test-catalog3
+            args: --subject node-test-catalog3@npm --subject node-test-catalog3@pnpm
+          - name: js-vitest-projects-habits
+            args: --subject js-vitest-projects-habits
+          - name: js-vitest-mergeconfig-ledger
+            args: --subject js-vitest-mergeconfig-ledger
           - name: mutants-classify
             args: --tool-mutants --mutant timeout-counted-as-kill --mutant mixed-result-counted-as-kill --mutant baseline-not-required-green --mutant negative-control-skipped
           - name: mutants-reuse
@@ -59,6 +74,11 @@ jobs:
       # requirements.txt. The harness refuses to run (exit 2) without them.
       - name: Install the subjects this shard runs
         run: node corpus/run.mjs --install ${{ matrix.args }}
+      # Chromium's system libraries; the browser itself is installed by the
+      # subject's installExtra (npx playwright install chromium).
+      - name: Browser system libraries
+        if: matrix.browser
+        run: npx --prefix corpus/js-playwright-gallery playwright install-deps chromium
       - name: Every mutant patch still applies
         run: node corpus/run.mjs --check-mutants
       - name: Run the corpus

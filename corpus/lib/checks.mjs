@@ -30,7 +30,9 @@ export function loadKnownFailures(path = join(CORPUS, 'known-failures.json')) {
   const doc = JSON.parse(readFileSync(path, 'utf8'));
   for (const k of doc.entries ?? []) {
     if (!Number.isInteger(k.issue) || k.issue < 1) throw new Error(`known-failures.json: ${k.subject} ${k.fault} names no issue number`);
-    if (k.check && !(k.check.startsWith('selection:') && Array.isArray(k.observed?.selected))) throw new Error(`known-failures.json: ${k.subject} ${k.check}: only a --changed selection can be a known check failure`);
+    const selection = k.check?.startsWith('selection:') && Array.isArray(k.observed?.selected);
+    const noEvidence = k.check === 'tool-wrote-evidence' && Number.isInteger(k.observed?.exit) && typeof k.observed?.kind === 'string' && typeof k.observed?.reasonIncludes === 'string';
+    if (k.check && !selection && !noEvidence) throw new Error(`known-failures.json: ${k.subject} ${k.check}: only a --changed selection, or a run where the tool wrote no evidence (observed exit, kind and reasonIncludes), can be a known check failure`);
     if (k.observed?.verdict === 'killed' && k.expected?.verdict !== 'killed') throw new Error(`known-failures.json: ${k.subject} ${k.fault} would excuse a false kill; a critical failure is never known`);
   }
   return doc.entries ?? [];
@@ -90,4 +92,33 @@ export function differential({ reference, observed, ids, deltas = [] }) {
 
 export function check(name, ok, detail) {
   return { check: name, ok: Boolean(ok), detail };
+}
+
+/**
+ * A run where the tool wrote no evidence is excused only by an entry naming
+ * this subject, the exact exit code and error kind, and a phrase of the
+ * reason. The mode then measured nothing because of that refusal, so the
+ * checks that only restate it (nothing measured, the exit code, no fault
+ * reported) are excused with the same issue; every other check still counts.
+ */
+const NO_EVIDENCE_CONSEQUENCES = new Set(['measured-something', 'exit-code', 'every-fault-reported']);
+
+export function excuseKnownNoEvidence(result, known) {
+  for (const run of result.runs) {
+    if (!run.noEvidence || run.expectNoEvidence) continue;
+    const k = known.find((x) => x.check === 'tool-wrote-evidence' && x.subject === result.subject
+      && x.observed.exit === run.noEvidence.exit && x.observed.kind === run.noEvidence.kind && String(run.noEvidence.reason).includes(x.observed.reasonIncludes));
+    if (!k) continue;
+    run.noEvidence.knownIssue = k.issue;
+    for (const c of result.checks) {
+      if (c.ok) continue;
+      const restates = c.check === 'exit-code' ? String(c.detail).startsWith(`exit ${run.noEvidence.exit}`) : NO_EVIDENCE_CONSEQUENCES.has(c.check);
+      if ((c.check === 'tool-wrote-evidence' && c.detail?.run === run.label) || restates) {
+        c.ok = true;
+        c.detail = { ...(typeof c.detail === 'object' ? c.detail : { note: c.detail }), knownIssue: k.issue, noEvidence: true };
+      }
+    }
+  }
+  result.ok = !result.error && (!result.key || (result.key.wrong === 0 && result.key.critical === 0)) && (!result.differential || result.differential.equal) && result.checks.every((c) => c.ok);
+  return result;
 }

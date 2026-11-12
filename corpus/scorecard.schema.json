@@ -462,6 +462,11 @@
               },
               "reason": {
                 "type": "string"
+              },
+              "knownIssue": {
+                "description": "The filed issue a reviewed known-failures.json entry names for this exact refusal (subject, exit, kind, reason phrase).",
+                "type": "integer",
+                "minimum": 1
               }
             }
           }
