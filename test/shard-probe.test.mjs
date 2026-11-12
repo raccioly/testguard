@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { compareVerdicts, mergeShards, planShards, recordedCosts } from '../.github/scripts/shard-probe.mjs';
+import { compareVerdicts, defenderSets, mergeShards, planShards, recordedCosts } from '../.github/scripts/shard-probe.mjs';
 import { recordedOriginSummary } from '../spec/lib/origins.mjs';
 import { decideShardCost } from '../.github/scripts/check-shard-cost.mjs';
 import { changedClaimIds, decideScope } from '../.github/scripts/self-probe-scope.mjs';
@@ -53,6 +53,59 @@ describe('shard-probe: every claim lands in exactly one shard, deterministically
     const costs = recordedCosts({ records: [rec('A', 'F1', 'killed', 100), rec('A', 'F2', 'killed', 50), { claim: { id: 'B' }, subject: { id: 'F1' }, detail: { baselineRuns: [{ durationMs: 7 }], probeRuns: [{ durationMs: 1 }], escalationRuns: [{ durationMs: 2 }] } }] });
     expect(costs.get('A')).toBe(150);
     expect(costs.get('B')).toBe(10);
+  });
+});
+
+describe('shard-probe: claims that share a defender set land in one shard', () => {
+  const withSets = { claims: [{ ...claim('A', 2), defendedBy: ['t/x.test.mjs'] }, { ...claim('B', 2), defendedBy: ['t/y.test.mjs', 't/x.test.mjs'] }, { ...claim('C', 2), defendedBy: ['t/x.test.mjs', 't/y.test.mjs'] }, { ...claim('D', 2), defendedBy: ['t/z.test.mjs'] }, { ...claim('E', 2), defendedBy: ['t/w.test.mjs'] }, { ...claim('F', 2) }] };
+
+  it('keys a claim by its recorded resolved set, else by its own defendedBy, order-independent, and gives a claim with neither no key', () => {
+    const evidence = { records: [{ claim: { id: 'A' }, defenders: { resolved: ['b.mjs', 'a.mjs'] } }, { claim: { id: 'D' }, defenders: { resolved: ['a.mjs', 'b.mjs'] } }] };
+    const sets = defenderSets(withSets, evidence);
+    expect(sets.get('A')).toEqual(new Set(['a.mjs\nb.mjs']));
+    expect(sets.get('D')).toEqual(sets.get('A'));
+    expect(sets.get('B')).toEqual(sets.get('C'));
+    expect(sets.has('F')).toBe(false);
+  });
+
+  it('puts claims with an identical set together whatever the balance would prefer, and every claim once', () => {
+    const sets = defenderSets(withSets);
+    for (const n of [2, 3, 5]) {
+      const slices = planShards(withSets, n, new Map(), sets);
+      const where = (id) => slices.findIndex((s) => s.ids.includes(id));
+      expect(where('B')).toBe(where('C'));
+      expect(slices.flatMap((s) => s.ids).sort()).toEqual(['A', 'B', 'C', 'D', 'E', 'F']);
+    }
+  });
+
+  it('joins claims that are connected through a claim using both sets, and still balances the units', () => {
+    const chain = { claims: [{ ...claim('A', 1), defendedBy: ['x'] }, { ...claim('B', 1), defendedBy: ['x', 'y'] }, { ...claim('C', 1), defendedBy: ['y'] }, { ...claim('D', 1), defendedBy: ['q'] }] };
+    const evidence = { records: [{ claim: { id: 'A' }, defenders: { resolved: ['x'] } }, { claim: { id: 'B' }, defenders: { resolved: ['x'] } }, { claim: { id: 'B' }, defenders: { resolved: ['y'] } }, { claim: { id: 'C' }, defenders: { resolved: ['y'] } }] };
+    const slices = planShards(chain, 2, new Map(), defenderSets(chain, evidence));
+    expect(slices.find((s) => s.ids.includes('A')).ids).toEqual(['A', 'B', 'C']);
+    expect(slices.find((s) => s.ids.includes('D')).ids).toEqual(['D']);
+  });
+});
+
+describe('shard-probe: wrong builds of the slicing are caught by the merge', () => {
+  const ids = (slices) => slices.map((s) => s.ids);
+  const run = (partition) => mergeShards(claimsDoc, partition.map((cs) => shardDoc(cs)));
+
+  it('a partition that drops a claim fails the merge, naming the first lost fault', () => {
+    const good = ids(planShards(claimsDoc, 3));
+    expect(run(good).problems).toEqual([]);
+    const dropped = good.map((cs, i) => (i === 0 ? cs.slice(1) : cs));
+    const r = run(dropped);
+    expect(r.doc).toBeUndefined();
+    expect(r.problems.join()).toMatch(/declared fault\(s\) in no shard/);
+  });
+
+  it('a partition that gives one claim to two shards fails the merge, naming both', () => {
+    const good = ids(planShards(claimsDoc, 3));
+    const dup = good.map((cs, i) => (i === 1 ? [...cs, good[0][0]] : cs));
+    const r = run(dup);
+    expect(r.doc).toBeUndefined();
+    expect(r.problems.join()).toMatch(/appears in shard 0 and shard 1/);
   });
 });
 
@@ -157,52 +210,75 @@ describe('shard-probe as a command', () => {
   });
 });
 
-describe('check-shard-cost: the ceiling is on the sum of the shards\' normalized compute', () => {
-  const budget = JSON.parse(readFileSync(join(ROOT, 'testguard.cost-budget.json'), 'utf8'));
+describe('check-shard-cost: the ceilings are on the sum and on the slowest shard, for this many shards', () => {
+  const cfg = JSON.parse(readFileSync(join(ROOT, 'testguard.cost-budget.json'), 'utf8'));
+  const budget = { ...cfg, sharded: { shards: 2, seconds: 1000, slowestShardSeconds: 600 } };
   const ref = (ms = budget.reference.baselineMs) => ({ workload: budget.reference.workload, medianMs: ms, cpus: budget.reference.cpus, platform: budget.reference.platform });
   const shard = (name, elapsedSeconds, over = {}) => ({ name, evidence: { records: [rec('A', 'F1', 'killed', 1000)], run: { faultWorkers: budget.faultWorkers ?? 1, measurements: { elapsedMs: elapsedSeconds * 1000 } } }, before: ref(), after: ref(), ...over });
 
-  it('sums the shards and reports the slowest beside it, so the ceiling does not depend on the shard count', () => {
-    const d = decideShardCost([shard('s0', 600), shard('s1', 500), shard('s2', 400), shard('s3', 300)], budget);
+  it('sums the shards and reports the slowest beside it', () => {
+    const d = decideShardCost([shard('s0', 600), shard('s1', 400)], budget);
     expect(d.ok).toBe(true);
-    expect(d.sumMs).toBe(1800000);
+    expect(d.sumMs).toBe(1000000);
     expect(d.slowestMs).toBe(600000);
-    const same = decideShardCost([shard('s0', 1800)], budget);
-    expect(same.sumMs).toBe(d.sumMs);
   });
 
-  it('fails when the SUM is over the ceiling even though every shard alone is under it', () => {
-    const each = budget.seconds / 3 + 1;
-    const d = decideShardCost([shard('s0', each), shard('s1', each), shard('s2', each)], budget);
+  it('fails when the SUM is over its ceiling even though every shard alone is under it', () => {
+    const d = decideShardCost([shard('s0', 520), shard('s1', 520)], budget);
     expect(d.ok).toBe(false);
     expect(d.failures.join()).toMatch(/over-budget: the shards' normalized compute/);
+    expect(d.failures.join()).not.toMatch(/over-wall-budget/);
+  });
+
+  it('fails when the SLOWEST shard is over its own ceiling even though the sum is under', () => {
+    const d = decideShardCost([shard('s0', 601), shard('s1', 100)], budget);
+    expect(d.ok).toBe(false);
+    expect(d.failures.join()).toMatch(/over-wall-budget: the slowest shard's normalized 601s is over its 600s ceiling/);
+    expect(d.failures.join()).not.toMatch(/over-budget:/);
+  });
+
+  it('fails closed on another number of shards than the ceilings were derived for, in either direction', () => {
+    expect(decideShardCost([shard('s0', 100)], budget).failures.join()).toMatch(/shards-mismatch: 1 shards ran, the ceilings are for 2/);
+    expect(decideShardCost([shard('s0', 1), shard('s1', 1), shard('s2', 1)], budget).failures.join()).toMatch(/shards-mismatch: 3 shards ran/);
+  });
+
+  it('fails closed when the budget has no sharded configuration', () => {
+    const { sharded, ...bare } = budget;
+    expect(decideShardCost([shard('s0', 1)], bare).failures.join()).toMatch(/no `sharded` configuration/);
   });
 
   it('normalizes each shard by its own speed: a slow runner\'s shard counts for less compute', () => {
-    const slow = shard('s0', 1000, { before: ref(budget.reference.baselineMs * 1.5), after: ref(budget.reference.baselineMs * 1.5) });
-    const d = decideShardCost([slow], budget);
-    expect(d.rows[0].normalizedMs).toBeCloseTo(1000000 / 1.5, -2);
+    const slow = shard('s0', 600, { before: ref(budget.reference.baselineMs * 1.5), after: ref(budget.reference.baselineMs * 1.5) });
+    const d = decideShardCost([slow, shard('s1', 100)], budget);
+    expect(d.rows[0].normalizedMs).toBeCloseTo(400000, -2);
   });
 
   it('fails closed on a shard whose reference is missing, and on one run at another fault-worker width', () => {
-    const noRef = decideShardCost([shard('s0', 10, { before: undefined })], budget);
+    const noRef = decideShardCost([shard('s0', 10, { before: undefined }), shard('s1', 10)], budget);
     expect(noRef.ok).toBe(false);
     expect(noRef.failures.join()).toMatch(/s0: reference-missing/);
     const wide = shard('s1', 10);
     wide.evidence.run.faultWorkers = (budget.faultWorkers ?? 1) + 2;
-    expect(decideShardCost([wide], budget).failures.join()).toMatch(/s1: fault-workers-mismatch/);
+    expect(decideShardCost([shard('s0', 10), wide], budget).failures.join()).toMatch(/s1: fault-workers-mismatch/);
     expect(decideShardCost([], budget).failures).toContain('no shard evidence');
   });
 
-  it('as a command: exits 1 with an ::error:: when a shard is missing its reference', () => {
+  it('as a command: exits 1 with an ::error::, and prints the slowest shard\'s ceiling', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tg-shard-cost-'));
     mkdirSync(join(dir, 'selfprobe-shard-0'), { recursive: true });
     writeFileSync(join(dir, 'selfprobe-shard-0', 'evidence.json'), JSON.stringify(shard('x', 10).evidence));
     const r = spawnSync(process.execPath, [join(ROOT, '.github', 'scripts', 'check-shard-cost.mjs'), dir], { encoding: 'utf8', env: { ...process.env, GITHUB_STEP_SUMMARY: '' } });
     expect(r.status).toBe(1);
-    expect(r.stdout).toMatch(/COST BUDGET EXCEEDED \(sharded\)/);
+    expect(r.stdout).toMatch(/COST BUDGET EXCEEDED \(sharded\).*slowest shard \d+s of \d+s/);
     expect(r.stdout).toMatch(/::error::/);
     expect(spawnSync(process.execPath, [join(ROOT, '.github', 'scripts', 'check-shard-cost.mjs')], { encoding: 'utf8' }).status).toBe(2);
+  });
+
+  it('the real budget names the sharded configuration and its two ceilings', () => {
+    expect(cfg.shards).toBe(1);
+    expect(Number.isInteger(cfg.sharded.shards) && cfg.sharded.shards > 1).toBe(true);
+    expect(cfg.sharded.seconds).toBeGreaterThan(cfg.sharded.slowestShardSeconds);
+    expect(cfg.sharded.slowestShardSeconds).toBeGreaterThan(0);
   });
 });
 

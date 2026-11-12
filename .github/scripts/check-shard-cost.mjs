@@ -11,6 +11,12 @@
  * unsharded gate still fails (missing or absurd reference, another fault-worker
  * width, a claim over the per-claim ceiling); only the total is judged on the sum.
  *
+ * A sharded run is a different CONFIGURATION from an unsharded one, exactly as
+ * another fault-worker count is: its ceilings live in `budget.sharded`
+ * ({ shards, seconds, slowestShardSeconds }) and the gate fails closed when the
+ * run had another number of shards. Two numbers are bounded: the sum (total
+ * compute) and the slowest shard's normalized time, which is what a person waits for.
+ *
  *   usage: check-shard-cost.mjs <dir>     (<dir>/<shard>/{evidence,reference-before,reference-after}.json)
  */
 import { appendFileSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -23,6 +29,10 @@ const tryRead = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } cat
 
 /** Pure: shard measurements in, a decision out. */
 export function decideShardCost(shards, budget) {
+  const cfg = budget.sharded;
+  if (!cfg || !Number.isInteger(cfg.shards) || typeof cfg.seconds !== 'number' || typeof cfg.slowestShardSeconds !== 'number') {
+    return { ok: false, failures: ['the cost budget has no `sharded` configuration (shards, seconds, slowestShardSeconds)'], rows: [], sumMs: 0, slowestMs: 0, budgetMs: 0, slowestBudgetMs: 0 };
+  }
   const rows = shards.map((s) => {
     const report = costReport(s.evidence.records);
     const d = checkCostBudget(report, {
@@ -40,14 +50,18 @@ export function decideShardCost(shards, budget) {
   const slowestMs = rows.reduce((a, r) => Math.max(a, r.normalizedMs), 0);
   const failures = rows.flatMap((r) => r.failures.map((f) => `${r.name}: ${f}`));
   if (rows.length === 0) failures.push('no shard evidence');
-  if (sumMs > budget.seconds * 1000) failures.push(`over-budget: the shards' normalized compute ${(sumMs / 1000).toFixed(0)}s is over the ${budget.seconds}s ceiling`);
-  return { ok: failures.length === 0, failures, rows, sumMs, slowestMs, budgetMs: budget.seconds * 1000 };
+  if (rows.length !== cfg.shards) failures.push(`shards-mismatch: ${rows.length} shards ran, the ceilings are for ${cfg.shards}`);
+  else {
+    if (sumMs > cfg.seconds * 1000) failures.push(`over-budget: the shards' normalized compute ${(sumMs / 1000).toFixed(0)}s is over the ${cfg.seconds}s ceiling`);
+    if (slowestMs > cfg.slowestShardSeconds * 1000) failures.push(`over-wall-budget: the slowest shard's normalized ${(slowestMs / 1000).toFixed(0)}s is over its ${cfg.slowestShardSeconds}s ceiling`);
+  }
+  return { ok: failures.length === 0, failures, rows, sumMs, slowestMs, budgetMs: cfg.seconds * 1000, slowestBudgetMs: cfg.slowestShardSeconds * 1000 };
 }
 
 export function render(d) {
   const s = (ms) => `${(ms / 1000).toFixed(0)}s`;
   return [
-    `${d.ok ? 'COST WITHIN BUDGET' : 'COST BUDGET EXCEEDED'} (sharded): total normalized compute ${s(d.sumMs)} of ${s(d.budgetMs)} across ${d.rows.length} shards; slowest shard ${s(d.slowestMs)} (the wall time, before the merge).`,
+    `${d.ok ? 'COST WITHIN BUDGET' : 'COST BUDGET EXCEEDED'} (sharded): total normalized compute ${s(d.sumMs)} of ${s(d.budgetMs)} across ${d.rows.length} shards; slowest shard ${s(d.slowestMs)} of ${s(d.slowestBudgetMs)} (the wall time, before the merge).`,
     ...d.rows.map((r) => `  ${r.name}: ${r.faults} faults, raw ${s(r.rawMs)}, normalized ${s(r.normalizedMs)} (${r.basis})${r.failures.length ? ` — ${r.failures.join(', ')}` : ''}`),
     ...d.failures.map((f) => `  FAIL ${f}`),
   ].join('\n');
@@ -62,7 +76,7 @@ export function main(argv) {
   const d = decideShardCost(shards, budget);
   const text = render(d);
   console.log(text);
-  console.log(`cost-measurement ${JSON.stringify({ sharded: true, shards: d.rows.length, sumNormalizedSeconds: Math.round(d.sumMs / 100) / 10, slowestShardNormalizedSeconds: Math.round(d.slowestMs / 100) / 10, ok: d.ok, failures: d.failures })}`);
+  console.log(`cost-measurement ${JSON.stringify({ sharded: true, shards: d.rows.length, sumNormalizedSeconds: Math.round(d.sumMs / 100) / 10, slowestShardNormalizedSeconds: Math.round(d.slowestMs / 100) / 10, shardWalls: d.rows.map((r) => Math.round(r.normalizedMs / 100) / 10), ok: d.ok, failures: d.failures })}`);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Sharded self-probe cost — ${d.ok ? 'within budget' : 'FAILED'}\n\n\`\`\`\n${text}\n\`\`\`\n`);
   if (!d.ok) { console.log(`::error::${text.split('\n')[0]}`); return 1; }
   return 0;

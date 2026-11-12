@@ -15166,8 +15166,8 @@
           "description": "Equal-weight claims are ordered by input order, so the partition depends on how the file happens to be sorted.",
           "faultClass": "return-altered",
           "file": ".github/scripts/shard-probe.mjs",
-          "find": "weight(b) - weight(a) || (a.id < b.id ? -1 : 1)",
-          "replace": "weight(b) - weight(a)",
+          "find": "b.weight - a.weight || (a.ids.slice().sort()[0] < b.ids.slice().sort()[0] ? -1 : 1)",
+          "replace": "b.weight - a.weight",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -15194,6 +15194,19 @@
           "file": ".github/scripts/shard-probe.mjs",
           "find": "shared.filter((k) => ma.get(k) !== mb.get(k))",
           "replace": "shared.filter((k) => ma.get(k) === mb.get(k))",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F9",
+          "description": "Claims sharing a defender set are split across shards again, so each shard pays that set's baseline.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/shard-probe.mjs",
+          "find": "if (firstOfKey.has(key)) {",
+          "replace": "if (false) {",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -15237,7 +15250,7 @@
           "description": "The sum is never compared with the ceiling.",
           "faultClass": "condition-forced",
           "file": ".github/scripts/check-shard-cost.mjs",
-          "find": "if (sumMs > budget.seconds * 1000) failures.push(",
+          "find": "if (sumMs > cfg.seconds * 1000) failures.push(",
           "replace": "if (false) failures.push(",
           "producedBy": {
             "producer": "human",
@@ -15252,6 +15265,32 @@
           "file": ".github/scripts/check-shard-cost.mjs",
           "find": "r.failures.map((f) => `${r.name}: ${f}`)",
           "replace": "[]",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A run with another number of shards than the ceilings were derived for is judged anyway.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/check-shard-cost.mjs",
+          "find": "if (rows.length !== cfg.shards) failures.push(",
+          "replace": "if (false) failures.push(",
+          "producedBy": {
+            "producer": "human",
+            "by": "maintainer",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The slowest shard has no ceiling of its own.",
+          "faultClass": "condition-forced",
+          "file": ".github/scripts/check-shard-cost.mjs",
+          "find": "if (slowestMs > cfg.slowestShardSeconds * 1000) failures.push(",
+          "replace": "if (false) failures.push(",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",

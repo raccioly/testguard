@@ -221,5 +221,12 @@
     ]
   },
   "unit": "normalized-elapsed-seconds",
-  "faultWorkers": 2
+  "faultWorkers": 2,
+  "shards": 1,
+  "sharded": {
+    "shards": 4,
+    "seconds": 2270,
+    "slowestShardSeconds": 900,
+    "provisional": "Placeholder until derived from from-scratch sharded CI runs on the final code (#294)."
+  }
 }

@@ -37,25 +37,66 @@ export function recordedCosts(evidence) {
 }
 
 /**
- * Longest-processing-time-first: heaviest claim to the lightest shard. A claim
- * with no recorded cost is weighted by its fault count at the average cost per
- * fault of those that have one (or by fault count alone with no recording).
- * Ties break by claim id, so the partition is a pure function of its inputs.
+ * The defender sets each claim is measured with: key -> claim ids. A baseline
+ * is measured once per defender SET, so two shards that each hold a fault of
+ * one set each pay for it. The sets come from the last full evidence (what the
+ * probe actually resolved, discovery included) and, for a claim it has no record
+ * of, from the claim's own `defendedBy`. A claim with neither is its own unit.
  */
-export function planShards(claimsDoc, shards, costs = new Map()) {
+export function defenderSets(claimsDoc, evidence) {
+  const keysByClaim = new Map();
+  const add = (id, files) => {
+    if (!files?.length) return;
+    const set = keysByClaim.get(id) ?? new Set();
+    set.add([...files].sort().join('\n'));
+    keysByClaim.set(id, set);
+  };
+  for (const r of evidence?.records ?? []) add(r.claim?.id, r.defenders?.resolved);
+  for (const c of claimsDoc.claims ?? []) if (!keysByClaim.has(c.id)) add(c.id, c.defendedBy);
+  return keysByClaim;
+}
+
+/**
+ * Longest-processing-time-first over UNITS: claims that share a defender set
+ * (directly, or through a claim that uses both) are one unit and land in one
+ * shard, so each set's baseline is paid once. A unit weighs the sum of its
+ * claims: their recorded cost when there is one, else their fault count at the
+ * average cost per fault of those that have one (or the fault count alone with
+ * no recording). Ties break by claim id, so the partition is a pure function of
+ * its inputs.
+ */
+export function planShards(claimsDoc, shards, costs = new Map(), sets = new Map()) {
   if (!Number.isInteger(shards) || shards < 1) throw new RangeError('shards must be a positive integer');
   const claims = claimsDoc.claims ?? [];
   const known = claims.filter((c) => costs.has(c.id));
   const faultsKnown = known.reduce((a, c) => a + c.faults.length, 0);
   const perFault = faultsKnown > 0 ? known.reduce((a, c) => a + costs.get(c.id), 0) / faultsKnown : 1;
   const weight = (c) => (costs.has(c.id) ? costs.get(c.id) : c.faults.length * perFault);
-  const order = [...claims].sort((a, b) => weight(b) - weight(a) || (a.id < b.id ? -1 : 1));
+  // Union-find over claims that share a defender set.
+  const parent = new Map(claims.map((c) => [c.id, c.id]));
+  const find = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
+  const firstOfKey = new Map();
+  for (const c of claims) {
+    for (const key of sets.get(c.id) ?? []) {
+      if (firstOfKey.has(key)) { const a = find(c.id); const b = find(firstOfKey.get(key)); if (a !== b) parent.set(a < b ? b : a, a < b ? a : b); } else firstOfKey.set(key, c.id);
+    }
+  }
+  const units = new Map();
+  for (const c of claims) {
+    const root = find(c.id);
+    const u = units.get(root) ?? { ids: [], weight: 0, faults: 0 };
+    u.ids.push(c.id);
+    u.weight += weight(c);
+    u.faults += c.faults.length;
+    units.set(root, u);
+  }
+  const order = [...units.values()].sort((a, b) => b.weight - a.weight || (a.ids.slice().sort()[0] < b.ids.slice().sort()[0] ? -1 : 1));
   const slices = Array.from({ length: shards }, () => ({ ids: [], weight: 0, faults: 0 }));
-  for (const c of order) {
+  for (const u of order) {
     const lightest = slices.reduce((m, s, i) => (s.weight < slices[m].weight ? i : m), 0);
-    slices[lightest].ids.push(c.id);
-    slices[lightest].weight += weight(c);
-    slices[lightest].faults += c.faults.length;
+    slices[lightest].ids.push(...u.ids);
+    slices[lightest].weight += u.weight;
+    slices[lightest].faults += u.faults;
   }
   return slices.map((s) => ({ ...s, ids: s.ids.sort() }));
 }
@@ -127,12 +168,13 @@ export async function main(argv, env = process.env) {
     const n = Number(values.shards);
     if (!Number.isInteger(n) || n < 1) { console.error('usage: shard-probe.mjs plan --shards <n> [--claims <file>] [--weights-from <evidence>]'); return 2; }
     let costs = new Map();
+    let evidence;
     let basis = 'fault count';
     if (values['weights-from'] && existsSync(values['weights-from'])) {
-      try { costs = recordedCosts(readJson(values['weights-from'])); basis = `recorded cost of ${costs.size} claims`; } catch { costs = new Map(); }
+      try { evidence = readJson(values['weights-from']); costs = recordedCosts(evidence); basis = `recorded cost of ${costs.size} claims`; } catch { costs = new Map(); }
     }
     const claimsDoc = readJson(resolve(values.claims));
-    const slices = planShards(claimsDoc, n, costs);
+    const slices = planShards(claimsDoc, n, costs, defenderSets(claimsDoc, evidence));
     console.log(`shard plan (${basis}): ${slices.map((s, i) => `#${i} ${s.ids.length} claims/${s.faults} faults/${Math.round(s.weight / 1000)}s`).join('; ')}`);
     if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `shards=${JSON.stringify(slices.map((s) => s.ids.join(',')))}\n`);
     return 0;
