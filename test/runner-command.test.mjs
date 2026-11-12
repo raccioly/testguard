@@ -30,8 +30,10 @@ describe('a report of the wrong shape says so', () => {
     expect(loadMessage).toMatch(/no `testResults` array/);
   });
 
-  it('a genuinely empty jest report is still just empty', () => {
-    expect(parseReport({ testResults: [], numTotalTests: 0 }, 1).loadMessage).toBeUndefined();
+  it('a genuinely empty jest report is an error that says nothing was collected, not a wordless one (#291)', () => {
+    const { run, loadMessage } = parseReport({ testResults: [], numTotalTests: 0 }, 1);
+    expect(run.outcome).toBe('error');
+    expect(loadMessage).toMatch(/collected no tests/);
   });
 });
 
