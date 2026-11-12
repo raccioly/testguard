@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { workerEnv } from '../worker-env.mjs';
 import { registerChild, assertNotCancelled } from './lifecycle.mjs';
 import { readBoundedJsonFile } from './discovery.mjs';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
@@ -308,7 +309,7 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
   const scope = childScope();
 
   return new Promise((resolve) => {
-    const child = spawn(cmd, args, { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32', env: { ...process.env, CI: '1', FORCE_COLOR: '0', ...scope.env, ...extraEnv } });
+    const child = spawn(cmd, args, { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32', env: { ...process.env, CI: '1', FORCE_COLOR: '0', ...scope.env, ...workerEnv(), ...extraEnv } });
     child.once('close', scope.dispose);
     registerChild(child, () => terminateProcessTree(child));
     child.stdout.resume(); // Reports are read from the file; drain logs to prevent pipe backpressure.

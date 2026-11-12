@@ -164,7 +164,11 @@ probes or test runners.
   itself. A kill is never reported from those runs: every kill rests on a
   run with nothing else in flight, and a run alone that passes marks the set
   `detail.notParallelSafe` and names its files in a warning. Its faults are
-  then measured one at a time. Make those tests hermetic, or pass `--serial`.
+  then measured one at a time. Make those tests hermetic — a port or a
+  directory derived from `TESTGUARD_WORKER`, which every runner process gets —
+  or declare the claim `"serial": true`. A load error, a `fault-invalid` or an
+  `unverifiable` measured beside another fault is never the reported answer:
+  it is measured again alone first (#287).
 
 ### Everything is `FLAKY-DEFENDER`
 

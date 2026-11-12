@@ -1253,6 +1253,16 @@ cannot check `claim-changed` (claim metadata against the file) and cannot tell
 whether the file it was measured against is the one a caller holds, except by
 comparing `sha256`.
 
+### The worker index
+
+Every test runner process a probe starts gets `TESTGUARD_WORKER` in its
+environment: the 0-based index of the scratch tree it runs in. Trees that run
+side by side have different indices; a run with nothing else in flight (one
+fault at a time, a confirmation, a re-measure, the serial lane) is worker 0.
+A suite that needs a port, a database or a directory of its own derives it
+from the index (`8787 + TESTGUARD_WORKER`) and stays parallel instead of being
+measured alone. The index is never part of a verdict or of reuse.
+
 ## Speed advice
 
 `status`, `brief` and the end of a text-mode `probe` carry `advice` (#270):
@@ -1538,10 +1548,13 @@ defaults to one and records no source unless its caller passes one.
 5. **Contention is not a verdict.** Per-run budgets (`--budget`) do not scale
    with the fan-out. A record measured while another fault was in flight whose
    verdict is `timeout`, `flaky-defender` with reason `inconsistent-probe`,
-   `fault-invalid` with reason `suite-failed-to-load`, or `survived` with
-   reason `killed-by-undeclared-tests` (the wider suite's run is the one most
-   exposed to neighbours, and its attribution names killers), is not reported
-   from that measurement: after the fan-out it is measured
+   `fault-invalid` (any reason but `replacement-does-not-typecheck`, which is
+   decided while planning), `unverifiable`, or `survived` with reason
+   `killed-by-undeclared-tests` (the wider suite's run is the one most exposed
+   to neighbours, and its attribution names killers), or with any probe run
+   whose outcome is `error` (a suite that would not load: a neighbour can hold
+   the port its dev server needs, #287), is not reported from that
+   measurement: after the fan-out it is measured
    again with nothing else in flight, in a fresh scratch tree (the contended
    run may have left state in its own), reusing its frozen baseline, and the
    serial measurement is what the record reports, whatever its verdict, with
@@ -1627,6 +1640,10 @@ defaults to one and records no source unless its caller passes one.
    - A negative control or survivor measured beside other faults can only
      lean towards red, which keeps a survivor a survivor: the pessimistic
      side, so neither is re-measured.
+   - A claim that declares `serial: true` (claims schema) is probed like a set
+     already not parallel-safe: after the fan-out, alone, every run `alone`,
+     and its records say `detail.serialDeclared: true`. A declaration, not a
+     detection: both may apply to one record.
    **What a fan-out kill rests on.** N red runs, at least one alone. In a set
    that never showed interference the other runs count as a serial run's
    would. If the set does interfere, the run alone disagrees and the set is

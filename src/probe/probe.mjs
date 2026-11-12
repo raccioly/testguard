@@ -30,6 +30,7 @@ import { persistenceSignalsFor } from '../supply/persistence.mjs';
 import { collectOwnedManifests, hashNativeTestUniverse, hashCustomCommandUniverse } from './universe.mjs';
 import { createDependencyHasher, instrumentOf } from './dependencies.mjs';
 import { createTypechecker, sameTypecheck } from './typecheck.mjs';
+import { withWorker } from './worker-env.mjs';
 import { aloneDisagrees, contentionRoundDown, createBusyClock, createOverlapTracker, deferLastRun, mustConfirmAlone, needsSerialRemeasure, orderedEmitter, parseFaultWorkers, runPool, singleFlight } from './fan-out.mjs';
 
 
@@ -561,12 +562,14 @@ async function measureProbe({
      * path maps back to the repository. One per tree; a fault only ever uses
      * the tree it was handed.
      */
-    const treeContext = (scratch) => {
+    const treeContext = (scratch, worker = 0) => {
       const real = scratch === iso ? isoReal : realpathSync(scratch.projectDir);
       return {
         iso: scratch,
         isoReal: real,
-        runDefenders: (files, targets = []) => runDefenders(files, targets, scratch.projectDir),
+        worker,
+        // Every runner process this tree starts sees its index (#287).
+        runDefenders: (files, targets = []) => withWorker(worker, () => runDefenders(files, targets, scratch.projectDir)),
         // The runner that will LOAD the subject, which is not always the project
         // runner — a `.py` source file is Python's whatever the project runs.
         fatalEditFor: (file) => runnerFor(scratch.projectDir, file, runner).fatalEdit?.(),
@@ -736,10 +739,10 @@ async function measureProbe({
     // A precondition failure is about the whole run; anything else a baseline
     // throws belongs to the faults that ask for that baseline.
     const fatalToTheRun = (err) => err instanceof PreconditionError;
-    const freshTree = () => {
+    const freshTree = (worker = 0) => {
       const scratch = createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules });
       extraTrees.push(scratch);
-      return treeContext(scratch);
+      return treeContext(scratch, worker);
     };
     const releaseTrees = () => { while (extraTrees.length) extraTrees.pop().cleanup(); };
     const releaseTree = (tree) => { extraTrees.splice(extraTrees.indexOf(tree.iso), 1); tree.iso.cleanup(); };
@@ -772,7 +775,10 @@ async function measureProbe({
         onWarn(`defender set ${key.split('\n').join(', ')} is not parallel-safe: ${why}, so its tests share something across scratch trees (a fixed port, a database, a temp path). Its faults are measured with nothing else in flight. Make those tests hermetic (an ephemeral port, a per-run directory) to get the fan-out back for them.`);
       };
       const tagUnsafe = (state, record) => {
-        if (unsafe.has(setKey(state)) && !record.reusedFrom && record.detail) record.detail.notParallelSafe = true;
+        if (record.reusedFrom || !record.detail) return record;
+        if (unsafe.has(setKey(state))) record.detail.notParallelSafe = true;
+        // Declared, not detected (#287): the claim says its tests cannot share the machine.
+        if (state.claim.serial === true) record.detail.serialDeclared = true;
         return record;
       };
       Object.assign(measurements, { aloneConfirmRuns: 0, aloneConfirmMs: 0, remeasuredFaults: 0, remeasureMs: 0 });
@@ -803,7 +809,7 @@ async function measureProbe({
       const baselineSlots = [primary];
       for (let i = 1; i < Math.min(faultWorkers, sets.length); i++) {
         commandBudget?.assertOpen();
-        baselineSlots.push(freshTree());
+        baselineSlots.push(freshTree(i));
       }
       const baselineContended = baselineSlots.length > 1;
       await runPool(sets, baselineSlots, async (set, tree) => {
@@ -847,7 +853,7 @@ async function measureProbe({
         const planned = await finishPlanOne(p);
         if (planned.record) settle(index, planned.record);
         else if (!planned.state.mutate) settle(index, await measureOne(planned.state, primary));
-        else if (unsafe.has(setKey(planned.state))) serialLane.push({ index, state: planned.state });
+        else if (unsafe.has(setKey(planned.state)) || planned.state.claim.serial === true) serialLane.push({ index, state: planned.state });
         else pending.push({ index, state: planned.state });
       }
       // 4. Faults: one tree per fault in flight, never more trees than faults.
@@ -856,7 +862,7 @@ async function measureProbe({
       const slots = [primary];
       for (let i = 1; i < Math.min(faultWorkers, pending.length); i++) {
         commandBudget?.assertOpen();
-        slots.push(freshTree());
+        slots.push(freshTree(i));
       }
       const overlap = createOverlapTracker();
       const outcomes = [];

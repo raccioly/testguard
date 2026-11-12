@@ -632,6 +632,10 @@
               "description": "This record was first measured under a fault fan-out (`run.faultWorkers` above one) and that measurement could not be believed: a `timeout`, a `flaky-defender`/`inconsistent-probe`, a `fault-invalid`/`suite-failed-to-load` or a `killed-by-undeclared-tests` attribution measured beside other faults (outcomes a loaded or shared machine can manufacture); contended runs that a run alone contradicted; or a kill in a defender set that is not parallel-safe. It was measured again, in full, with no other fault in flight, and that measurement is what this record reports, whatever its verdict. Every probe run is `alone`.",
               "const": true
             },
+            "serialDeclared": {
+              "description": "Under a fault fan-out: this record's claim declares `serial: true`, so its fault was probed with no other fault in flight, after the fan-out. Every probe run is `alone`.",
+              "const": true
+            },
             "notParallelSafe": {
               "description": "Under a fault fan-out: this record's defender set showed during the run that it shares something across scratch trees — a baseline red beside other sets and green alone, or probe runs red beside other faults and green alone. Every kill in such a set is measured with every probe run alone.",
               "const": true

@@ -16,7 +16,7 @@ import { FIXTURE_GIT } from './helpers/git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-it('reproduces the oracle at n = 4, in order, re-measuring exactly its timeout and inconsistent probe', async () => {
+it('reproduces the oracle at n = 4, in order, re-measuring exactly what contention could have caused', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'tg-fanout-ka-'));
   try {
     cpSync(join(ROOT, 'fixtures/known-answer-node'), dir, { recursive: true, filter: (src) => !/node_modules|counter/.test(src) });
@@ -33,7 +33,10 @@ it('reproduces the oracle at n = 4, in order, re-measuring exactly its timeout a
     expect(published).toEqual(ids);
     expect(Object.fromEntries(evidence.records.map((r) => [`${r.claim.id}/${r.subject.id}`, { verdict: r.verdict, reason: r.detail.reason }])))
       .toEqual(Object.fromEntries(Object.entries(expected).map(([k, v]) => [k, { verdict: v.verdict, reason: v.reason ?? evidence.records.find((r) => `${r.claim.id}/${r.subject.id}` === k)?.detail.reason }])));
-    expect(evidence.records.filter((r) => r.detail.remeasuredSerially).map((r) => r.claim.id).sort()).toEqual(['NODE-MIXED', 'NODE-READY']);
+    // Its timeout and inconsistent probe, and (#287) its suite that does not
+    // load and its unreached subject: outcomes a neighbour could have caused,
+    // so they are measured again alone before they are reported.
+    expect(evidence.records.filter((r) => r.detail.remeasuredSerially).map((r) => r.claim.id).sort()).toEqual(['NODE-MIXED', 'NODE-REACH', 'NODE-READY', 'NODE-SYNTAX']);
     expect(evidence.run.faultWorkers).toBe(4);
     expect(validate('evidence', evidence).errors).toEqual([]);
   } finally {

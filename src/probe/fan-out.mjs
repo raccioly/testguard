@@ -155,7 +155,14 @@ export function needsSerialRemeasure(record) {
   // The wider suite's run is the one most exposed to neighbours, and its N/N
   // failures name other files as killers; a load that failed can be a port or
   // a lock taken by a neighbour, not the replacement (#270).
-  if (reason === 'killed-by-undeclared-tests' || (record.verdict === 'fault-invalid' && reason === 'suite-failed-to-load')) return true;
+  if (reason === 'killed-by-undeclared-tests') return true;
+  // A suite that would not load, or a measurement that could not finish, is
+  // never final beside other faults: a neighbour can hold the port or the
+  // file it needed (#287). Only the type check's refusal is about the text
+  // alone, and it ran while planning, before any fan-out.
+  if (record.verdict === 'fault-invalid' && reason !== 'replacement-does-not-typecheck') return true;
+  if (record.verdict === 'unverifiable') return true;
+  if ((record.detail?.probeRuns ?? []).some((run) => run.outcome === 'error')) return true;
   return record.verdict === 'flaky-defender' && reason === 'inconsistent-probe';
 }
 

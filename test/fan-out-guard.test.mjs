@@ -157,11 +157,16 @@ describe('aloneDisagrees', () => {
 });
 
 describe('needsSerialRemeasure, for the outcomes contention can manufacture', () => {
-  it('re-measures a kill attributed to undeclared tests and a suite that failed to load', () => {
+  it('re-measures a kill attributed to undeclared tests, and every load failure or unverifiable result (#287)', () => {
     expect(needsSerialRemeasure({ verdict: 'survived', detail: { reason: 'killed-by-undeclared-tests' } })).toBe(true);
     expect(needsSerialRemeasure({ verdict: 'fault-invalid', detail: { reason: 'suite-failed-to-load' } })).toBe(true);
-    // A replacement that does not compile is a property of the text, not of the load.
-    expect(needsSerialRemeasure({ verdict: 'fault-invalid', detail: { reason: 'replacement-does-not-compile' } })).toBe(false);
+    // A neighbour holding a port can make a load error look like a parse error too.
+    expect(needsSerialRemeasure({ verdict: 'fault-invalid', detail: { reason: 'replacement-does-not-compile' } })).toBe(true);
+    expect(needsSerialRemeasure({ verdict: 'unverifiable', detail: { reason: 'probe-error' } })).toBe(true);
+    expect(needsSerialRemeasure({ verdict: 'unverifiable', detail: { reason: 'subject-not-executed' } })).toBe(true);
+    expect(needsSerialRemeasure({ verdict: 'killed', detail: { probeRuns: [{ outcome: 'error' }] } })).toBe(true);
+    // The type check's refusal ran while planning, before any fan-out: it is about the text alone.
+    expect(needsSerialRemeasure({ verdict: 'fault-invalid', detail: { reason: 'replacement-does-not-typecheck' } })).toBe(false);
     expect(needsSerialRemeasure({ verdict: 'survived', detail: {} })).toBe(false);
   });
 });

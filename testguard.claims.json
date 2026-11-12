@@ -13256,10 +13256,10 @@
         },
         {
           "id": "F6",
-          "description": "Contended suite-load failures and undeclared-killer attributions are reported as measured.",
+          "description": "A contended undeclared-killer attribution is reported as measured.",
           "faultClass": "statement-deleted",
           "file": "src/probe/fan-out.mjs",
-          "find": "  if (reason === 'killed-by-undeclared-tests' || (record.verdict === 'fault-invalid' && reason === 'suite-failed-to-load')) return true;\n",
+          "find": "  if (reason === 'killed-by-undeclared-tests') return true;\n",
           "replace": "",
           "producedBy": {
             "producer": "agent",
@@ -13722,6 +13722,194 @@
           "defendedBy": [
             "test/advice.test.mjs"
           ]
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-NEVER-FINALIZES-A-CONTENDED-LOAD-FAILURE",
+      "statement": "A record measured beside another fault is never reported fault-invalid (except a type-check refusal), unverifiable, or from a probe run whose outcome is error: it is measured again alone; and every runner process learns the index of the tree it runs in as TESTGUARD_WORKER.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #287 (a suite sharing a fixed port under the fan-out)"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out-guard.test.mjs",
+        "test/worker-env.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A contended fault-invalid is reported as measured.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  if (record.verdict === 'fault-invalid' && reason !== 'replacement-does-not-typecheck') return true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/fan-out-guard.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "A contended unverifiable is reported as measured.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  if (record.verdict === 'unverifiable') return true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/fan-out-guard.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "A contended record with an error run is reported as measured.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  if ((record.detail?.probeRuns ?? []).some((run) => run.outcome === 'error')) return true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/fan-out-guard.test.mjs"
+          ]
+        },
+        {
+          "id": "F4",
+          "description": "The worker index is never set.",
+          "faultClass": "return-altered",
+          "file": "src/probe/worker-env.mjs",
+          "find": "export const workerEnv = () => ({ TESTGUARD_WORKER: String(context.getStore() ?? 0) });",
+          "replace": "export const workerEnv = () => ({});",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/worker-env.test.mjs"
+          ]
+        },
+        {
+          "id": "F5",
+          "description": "Runner processes do not receive the worker index.",
+          "faultClass": "element-removed",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "...workerEnv(), ...extraEnv",
+          "replace": "...extraEnv",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/worker-env.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-SERIAL-CLAIMS-ARE-PROBED-ALONE",
+      "statement": "A claim declared serial: true is probed after the fan-out with every probe run alone, its records say serialDeclared, and a validator rejects a declared-serial record with a run that was not alone.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #287 (a suite sharing a fixed port under the fan-out)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-serial-claim.test.mjs",
+        "spec/conformance/fault-workers.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The declaration is ignored: the claim stays in the fan-out.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "|| planned.state.claim.serial === true) serialLane",
+          "replace": ") serialLane",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/probe-serial-claim.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "The record does not say it was declared serial.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "        if (state.claim.serial === true) record.detail.serialDeclared = true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/probe-serial-claim.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "A declared-serial record with a contended run passes validation.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (measuredHere && r.detail.serialDeclared && !runsHere0(r).every((run) => run.alone)) {",
+          "replace": "      if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "spec/conformance/fault-workers.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-A-CONTENDED-BASELINE-MARKS-THE-SET",
+      "statement": "A defender set whose baseline was red beside other sets and green alone is not parallel-safe: its faults are probed alone after the fan-out and its records say notParallelSafe.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #287 (a suite sharing a fixed port under the fan-out)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers-baselines.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A baseline that needed a solo re-measure leaves the set in the fan-out.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "          if (baselineCache.get(key).runs.every((run) => run.outcome === 'pass')) markUnsafe(key, 'its baseline failed beside other defender sets and passed alone');\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
         }
       ]
     }

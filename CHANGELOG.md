@@ -25,7 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set **not parallel-safe** (`detail.notParallelSafe`, and a warning naming
   its files): the fault, and every kill in that set, is measured again alone.
   So is a set whose baseline was red beside other sets and green alone. A
-  suite that binds a fixed port no longer turns into false kills. The guard's
+  suite that binds a fixed port no longer turns into false kills. A record
+  measured beside another fault is never reported `fault-invalid` (apart from a
+  type-check refusal), `unverifiable`, or from a run whose outcome is `error`:
+  it is measured again alone (#287: a dev server on one fixed port turned two
+  kills into `fault-invalid` at `--fault-workers 6`). The guard's
   cost is in `run.measurements` (`aloneConfirmRuns`, `aloneConfirmMs`,
   `remeasuredFaults`, `remeasureMs`). Contended `killed-by-undeclared-tests`
   attributions and `suite-failed-to-load` are re-measured alone too.
@@ -80,6 +84,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   commands — and the status document's `advice`.
 - **The GitHub Action has a `changed` input** for `probe` (`auto` or a ref),
   and its `evidence` output also names `evidence-partial.json`.
+- **`TESTGUARD_WORKER`** (#287): every test runner process a probe starts gets
+  the 0-based index of the scratch tree it runs in, so a suite that needs a
+  port of its own can derive one (`8787 + TESTGUARD_WORKER`) and stay parallel.
+- **`"serial": true` on a claim** (#287, claims schema): its faults are probed
+  alone after the fan-out, and the records say `detail.serialDeclared`.
 - **`probe --changed auto`** finds the base offline: the CI base branch, the
   remote default branch, a differently named upstream, then the branch's own
   upstream (the commits not pushed yet). With none, it probes every claim.

@@ -22,7 +22,7 @@ describe('needsSerialRemeasure', () => {
     expect(needsSerialRemeasure({ verdict: 'flaky-defender', detail: { reason: 'inconsistent-probe' } })).toBe(true);
     // A red baseline was measured before the fan-out, alone: never contended.
     expect(needsSerialRemeasure({ verdict: 'flaky-defender', detail: { reason: 'defenders-not-green' } })).toBe(false);
-    for (const verdict of ['killed', 'survived', 'nocover', 'unverifiable', 'fault-invalid']) {
+    for (const verdict of ['killed', 'survived', 'nocover']) {
       expect(needsSerialRemeasure({ verdict, detail: {} })).toBe(false);
     }
     // A reused verdict was not measured by this run at all.

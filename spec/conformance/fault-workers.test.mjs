@@ -109,3 +109,21 @@ describe('the fan-out guard (#270)', () => {
     expect(paths(doc).filter((p) => p.startsWith('/records'))).toEqual([]);
   });
 });
+
+describe('a claim declared serial (#287)', () => {
+  it('a claims file may declare a claim serial, and only as a boolean', () => {
+    expect(validate('claims', load('examples', 'claims-serial.json')).errors).toEqual([]);
+    expect(validate('claims', load('invalid', 'claims.serial-not-boolean.json')).errors.map((e) => e.path)).toContain('/claims/0/serial');
+  });
+
+  it('its records say so, and every probe run is alone', () => {
+    expect(validate('evidence', load('examples', 'evidence-fault-workers-serial-claim.json')).errors).toEqual([]);
+    expect(paths(load('invalid', 'evidence.serial-declared-not-alone.json'))).toEqual(['/records/1/detail/probeRuns']);
+  });
+
+  it('serialDeclared needs a fan-out', () => {
+    const doc = load('examples', 'evidence-fault-workers-serial-claim.json');
+    delete doc.run.faultWorkers;
+    expect(paths(doc)).toContain('/records/1/detail/serialDeclared');
+  });
+});

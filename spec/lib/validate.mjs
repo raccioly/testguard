@@ -447,6 +447,12 @@ const semantic = {
       if (measuredHere && r.detail.remeasuredSerially && !(doc.run.faultWorkers > 1)) {
         errors.push({ path: `${p}/detail/remeasuredSerially`, message: 'remeasuredSerially requires run.faultWorkers above one' });
       }
+      if (measuredHere && r.detail.serialDeclared && !(doc.run.faultWorkers > 1)) {
+        errors.push({ path: `${p}/detail/serialDeclared`, message: 'serialDeclared requires run.faultWorkers above one' });
+      }
+      if (measuredHere && r.detail.serialDeclared && !runsHere0(r).every((run) => run.alone)) {
+        errors.push({ path: `${p}/detail/probeRuns`, message: 'a claim declared serial is probed with every run alone' });
+      }
       if (measuredHere && r.detail.notParallelSafe && !(doc.run.faultWorkers > 1)) {
         errors.push({ path: `${p}/detail/notParallelSafe`, message: 'notParallelSafe requires run.faultWorkers above one' });
       }
@@ -714,6 +720,8 @@ const semantic = {
  * is a probe, an outdated hook is fixed by `init --upgrade`, and every rule
  * but hook-outdated (one line per file and line) says its piece once.
  */
+const runsHere0 = (r) => r.detail.probeRuns ?? [];
+
 function adviceErrors(advice, nextAction) {
   const errors = [];
   if (!advice) return errors;

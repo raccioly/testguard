@@ -69,7 +69,7 @@ Work down this list; each item names how to check it.
 5. **Expensive defender files.** `testguard probe --cost` (or `testguard claims --cost` after the fact) lists the slowest claims, faults and defender files. Split a slow file, or point a claim at a unit test; see [fix a shared defender](#fix-a-shared-defender).
 6. **Python import time.** Every run starts an interpreter and imports the project. Move heavy imports out of module scope in tests, and keep `conftest.py` light.
 7. **Many claims on one slow test file.** Every fault of every claim that names it runs the whole file N times. Give each claim the narrowest defender that still kills its faults (fault-level `defendedBy`).
-8. **A suite that is not parallel-safe.** The probe warns `defender set … is not parallel-safe` and names the files. Their faults are then measured one at a time. Make those tests hermetic (an ephemeral port, a per-run directory) to get the parallelism back.
+8. **A suite that is not parallel-safe.** The probe warns `defender set … is not parallel-safe` and names the files. Their faults are then measured one at a time. Make those tests hermetic to get the parallelism back: every runner process gets `TESTGUARD_WORKER` (the 0-based tree index), so a dev server can listen on `8787 + Number(process.env.TESTGUARD_WORKER ?? 0)`. If that cannot be done, declare the claim `"serial": true` in the claims file: its faults are probed alone without the detection having to find out first.
 
 ## What a probe costs
 

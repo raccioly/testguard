@@ -1,0 +1,483 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.20.1"
+  },
+  "run": {
+    "id": "run-20261110-120000",
+    "startedAt": "2026-11-10T12:00:00.000Z",
+    "finishedAt": "2026-11-10T12:00:04.000Z",
+    "repo": {
+      "head": "c0ffee0000000000000000000000000000000001",
+      "dirty": false
+    },
+    "runner": {
+      "name": "node-test",
+      "version": "24.22.2",
+      "source": "builtin"
+    },
+    "instrument": {
+      "toolVersion": "0.20.1",
+      "digest": "3cba06fa2156a046e9ac1a17736ac9ef76175cecb44750714933b52db003aad4"
+    },
+    "reuse": {
+      "reused": 0,
+      "measured": 3
+    },
+    "confirmRuns": 3,
+    "measurements": {
+      "elapsedMs": 3890.748125,
+      "runnerMs": 3089.2106239999994,
+      "overheadMs": 801.5375010000007,
+      "runnerInvocations": 20,
+      "reuseBaselineRuns": 0,
+      "aloneConfirmRuns": 1,
+      "aloneConfirmMs": 412,
+      "remeasuredFaults": 1,
+      "remeasureMs": 1310
+    },
+    "workers": 1,
+    "serial": true,
+    "faultWorkers": 3,
+    "mode": "worktree",
+    "faultWorkersSource": "auto",
+    "cpus": 8
+  },
+  "records": [
+    {
+      "fingerprint": "cfa5e175803fcf833433f42b1b434aa2d3277bc814f68448df61c9a0901c27a8",
+      "claim": {
+        "id": "FAST",
+        "statement": "FAST holds.",
+        "severity": "high",
+        "source": {
+          "kind": "manual",
+          "ref": "test"
+        },
+        "producedBy": {
+          "producer": "human"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "F1 on src/fast.mjs",
+        "file": "src/fast.mjs",
+        "faultClass": "return-altered",
+        "producedBy": {
+          "producer": "human"
+        },
+        "contentHash": "d758dea2a994dfb19feb81b08092835244d3f7b41e702e2aa0e475046d980e17"
+      },
+      "verdict": "killed",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 90
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 86
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 85
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 335
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 345
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 343,
+            "alone": true
+          }
+        ],
+        "flakeRate": {
+          "runs": 3,
+          "failures": 0
+        },
+        "independence": {
+          "class": "co-authored",
+          "defenderCommit": "0bfdf0c38e6077bf8d711e97c29136aef1c46329",
+          "targetCommit": "0bfdf0c38e6077bf8d711e97c29136aef1c46329",
+          "sameAuthor": true
+        }
+      },
+      "defenders": {
+        "requested": [
+          "test/fast.test.mjs"
+        ],
+        "selectionSource": "claim",
+        "resolved": [
+          "test/fast.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "cd9ca8a3f47df931e44c3a2231100cb46ad600ce6056d6c87d00f53477605e09",
+        "defenderHashes": {
+          "test/fast.test.mjs": "bf18046b57d45bf1b7a0ada085c698934e0f483c5f859f348060dd255bda8edd"
+        },
+        "testUniverseHash": "ea65c81f23731140003d4f4cd4230baa50791c6cc8cf15b11df75242a9f625e8",
+        "discoveryHashes": {},
+        "dependencyHashes": {
+          "package.json": "002f37739f765a9bb8fa6aeaf4865da9e6b215ccbc5de1dcfe4d02ae09e750d7",
+          "src/fast.mjs": "cd9ca8a3f47df931e44c3a2231100cb46ad600ce6056d6c87d00f53477605e09",
+          "test/fast.test.mjs": "bf18046b57d45bf1b7a0ada085c698934e0f483c5f859f348060dd255bda8edd"
+        },
+        "dependencyClosure": "complete"
+      },
+      "rank": {
+        "score": 3.06,
+        "blastRadius": 0,
+        "tier": "high"
+      }
+    },
+    {
+      "fingerprint": "b60f130fa1358f423817a13470be8b5f57ab987890137ae19c92615889f17557",
+      "claim": {
+        "id": "QUIET",
+        "statement": "QUIET holds.",
+        "severity": "high",
+        "source": {
+          "kind": "manual",
+          "ref": "test"
+        },
+        "producedBy": {
+          "producer": "human"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "F1 on src/quiet.mjs",
+        "file": "src/quiet.mjs",
+        "faultClass": "return-altered",
+        "producedBy": {
+          "producer": "human"
+        },
+        "contentHash": "faafb7b6857f7d7649c617c01e9855570a3c435670506b84547e953452ebcaff"
+      },
+      "verdict": "survived",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 84
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 82
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 79
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 376,
+            "alone": true
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 346,
+            "alone": true
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 367,
+            "alone": true
+          }
+        ],
+        "flakeRate": {
+          "runs": 3,
+          "failures": 0
+        },
+        "negativeControl": "reached",
+        "serialDeclared": true
+      },
+      "defenders": {
+        "requested": [
+          "test/quiet.test.mjs"
+        ],
+        "selectionSource": "claim",
+        "resolved": [
+          "test/quiet.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "0dfce6a735a00963920394d7dc7403a79f4b0ba32fd8f95dee191180c0ea8e33",
+        "defenderHashes": {
+          "test/quiet.test.mjs": "496db5a33be50469981afad2ad5bfe739b1e5d31967996d543c8b3812b08ea96"
+        },
+        "testUniverseHash": "ea65c81f23731140003d4f4cd4230baa50791c6cc8cf15b11df75242a9f625e8",
+        "discoveryHashes": {},
+        "dependencyHashes": {
+          "package.json": "002f37739f765a9bb8fa6aeaf4865da9e6b215ccbc5de1dcfe4d02ae09e750d7",
+          "src/quiet.mjs": "0dfce6a735a00963920394d7dc7403a79f4b0ba32fd8f95dee191180c0ea8e33",
+          "test/quiet.test.mjs": "496db5a33be50469981afad2ad5bfe739b1e5d31967996d543c8b3812b08ea96"
+        },
+        "dependencyClosure": "complete"
+      },
+      "rank": {
+        "score": 3.6,
+        "blastRadius": 0,
+        "tier": "high"
+      }
+    },
+    {
+      "fingerprint": "51b8fb6147dd5ff4cd67646be9241acec7694aee9f29afb72593f74dbbeddb78",
+      "claim": {
+        "id": "SLOW",
+        "statement": "SLOW holds.",
+        "severity": "high",
+        "source": {
+          "kind": "manual",
+          "ref": "test"
+        },
+        "producedBy": {
+          "producer": "human"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "F1 on src/slow.mjs",
+        "file": "src/slow.mjs",
+        "faultClass": "return-altered",
+        "producedBy": {
+          "producer": "human"
+        },
+        "contentHash": "93b89cd3ad3a3d300d1036e77c32263fe5e53a48c376269a29558cf638621ec0"
+      },
+      "verdict": "killed",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 83
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 81
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "durationMs": 83
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 349,
+            "alone": true
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 344,
+            "alone": true
+          },
+          {
+            "outcome": "fail",
+            "tests": {
+              "total": 1,
+              "passed": 0,
+              "failed": 1
+            },
+            "assertionFailures": 1,
+            "durationMs": 346,
+            "alone": true
+          }
+        ],
+        "flakeRate": {
+          "runs": 3,
+          "failures": 0
+        },
+        "independence": {
+          "class": "co-authored",
+          "defenderCommit": "0bfdf0c38e6077bf8d711e97c29136aef1c46329",
+          "targetCommit": "0bfdf0c38e6077bf8d711e97c29136aef1c46329",
+          "sameAuthor": true
+        },
+        "remeasuredSerially": true
+      },
+      "defenders": {
+        "requested": [
+          "test/slow.test.mjs"
+        ],
+        "selectionSource": "claim",
+        "resolved": [
+          "test/slow.test.mjs"
+        ],
+        "nocover": false
+      },
+      "inputs": {
+        "targetHash": "9077193178170434074c2ed63ef3d33cfa7735748f81b48f45f38d344b387569",
+        "defenderHashes": {
+          "test/slow.test.mjs": "7b5b2660f955322368eb51561146b82288aaad6edababa12e373339091b5b849"
+        },
+        "testUniverseHash": "ea65c81f23731140003d4f4cd4230baa50791c6cc8cf15b11df75242a9f625e8",
+        "discoveryHashes": {},
+        "dependencyHashes": {
+          "package.json": "002f37739f765a9bb8fa6aeaf4865da9e6b215ccbc5de1dcfe4d02ae09e750d7",
+          "src/slow.mjs": "9077193178170434074c2ed63ef3d33cfa7735748f81b48f45f38d344b387569",
+          "test/slow.test.mjs": "7b5b2660f955322368eb51561146b82288aaad6edababa12e373339091b5b849"
+        },
+        "dependencyClosure": "complete"
+      },
+      "rank": {
+        "score": 3.06,
+        "blastRadius": 0,
+        "tier": "high"
+      }
+    }
+  ],
+  "origins": {
+    "basis": "recorded",
+    "claims": {
+      "total": 3,
+      "byKind": {
+        "spec": 0,
+        "adr": 0,
+        "annotation": 0,
+        "comment": 0,
+        "manual": 3,
+        "doc": 0,
+        "bug": 0,
+        "incident": 0,
+        "review": 0,
+        "inferred": 0
+      },
+      "mixed": 0
+    },
+    "records": {
+      "total": 3,
+      "byKind": {
+        "spec": 0,
+        "adr": 0,
+        "annotation": 0,
+        "comment": 0,
+        "manual": 3,
+        "doc": 0,
+        "bug": 0,
+        "incident": 0,
+        "review": 0,
+        "inferred": 0
+      }
+    }
+  }
+}
