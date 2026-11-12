@@ -213,12 +213,13 @@
           "additionalProperties": false
         },
         "typecheck": {
-          "description": "The type check that judged every fault before any test ran (`probe --typecheck`): a hash of the command's identity (the flags of the project's own `tsc`, or the argv of a custom command) and the checker's version. Absent when the run did not type check. It is an input to reuse: a record measured without it is not reusable by a run with it, and the reverse.",
+          "description": "The type check that judged every fault before any test ran (`probe --typecheck`): a hash of the command's identity (the flags of the project's own `tsc`, or the argv of a custom command), the checker's version and, for the project's own `tsc`, `programDigest` (#293): a hash of tsconfig.json, the resolved configuration and every file `tsc --listFilesOnly` reports for the unmodified tree (a package's files by its name and version, any other file by its content). Absent when the run did not type check. It is an input to reuse and to carrying: a record measured without it is not reusable by a run with it, and the reverse; with equal digests a fault's recorded answer stands without checking it again; with different digests nothing is reused or carried; a record with no digest is checked again fault by fault.",
           "type": "object",
           "required": ["commandHash", "version"],
           "properties": {
             "commandHash": { "$ref": "urn:claimspec:v1:common#/$defs/sha256" },
-            "version": { "type": "string", "minLength": 1, "maxLength": 64 }
+            "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "programDigest": { "$ref": "urn:claimspec:v1:common#/$defs/sha256" }
           },
           "additionalProperties": false
         },

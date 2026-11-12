@@ -14,7 +14,7 @@ describe('probe --typecheck refuses what the checker refuses', () => {
     expect(by.OK).toMatchObject({ verdict: 'killed', detail: { typecheck: 'clean' } });
     expect(by.AFTER).toMatchObject({ verdict: 'killed', detail: { typecheck: 'clean' } });
     expect(by.AFTER.detail.message).toBeUndefined();
-    expect(evidence.run.typecheck).toEqual({ commandHash: expect.stringMatching(/^[0-9a-f]{64}$/), version: '9.9.9' });
+    expect(evidence.run.typecheck).toEqual({ commandHash: expect.stringMatching(/^[0-9a-f]{64}$/), version: '9.9.9', programDigest: expect.stringMatching(/^[0-9a-f]{64}$/) });
   }, 120_000);
 
 });

@@ -29,7 +29,7 @@ import { recordedOriginSummary } from '../../spec/lib/origins.mjs';
 import { persistenceSignalsFor } from '../supply/persistence.mjs';
 import { collectOwnedManifests, hashNativeTestUniverse, hashCustomCommandUniverse } from './universe.mjs';
 import { createDependencyHasher, instrumentOf } from './dependencies.mjs';
-import { createTypechecker, sameTypecheck } from './typecheck.mjs';
+import { createTypechecker, needsFaultRecheck, sameTypecheck } from './typecheck.mjs';
 import { withCommandWorkers, withWorker } from './worker-env.mjs';
 import { fillSlots, treeState } from './tree-reuse.mjs';
 import { aloneDisagrees, contentionRoundDown, createBusyClock, createOverlapTracker, deferLastRun, mustConfirmAlone, needsSerialRemeasure, orderedEmitter, parseFaultWorkers, runPool, singleFlight } from './fan-out.mjs';
@@ -145,7 +145,7 @@ export function carryRefusal(previous, policy) {
   if (previous.run.confirmRuns !== confirmRuns) return `it was measured with --confirm ${previous.run.confirmRuns}, this run with --confirm ${confirmRuns}`;
   if (!sameWorkerPolicy(previous.run, { workers, serial, runnerCommand, faultWorkers, serialRequested: asked })) return 'it was measured under another worker or fault-worker policy';
   if (!sameRunner(previous.run, runner)) return 'it was measured with another test runner';
-  if (!sameTypecheck(previous.run.typecheck, typecheck)) return 'it was measured with a different --typecheck';
+  if (!sameTypecheck(previous.run.typecheck, typecheck)) return previous.run.typecheck && typecheck && previous.run.typecheck.commandHash === typecheck.commandHash && previous.run.typecheck.version === typecheck.version ? 'the type-checked program changed since it was measured (run.typecheck.programDigest)' : 'it was measured with a different --typecheck';
   return undefined;
 }
 
@@ -170,7 +170,7 @@ export function priorRecords(previous, policy) {
   const docs = (Array.isArray(previous) ? previous : [previous]).filter((doc) => reusableRun(doc, policy));
   docs.sort((a, b) => String(a.run.finishedAt ?? '').localeCompare(String(b.run.finishedAt ?? '')));
   const map = new Map();
-  for (const doc of docs) for (const record of doc.records) map.set(`${record.claim.id}/${record.subject.id}`, { record, runId: doc.run.id });
+  for (const doc of docs) for (const record of doc.records) map.set(`${record.claim.id}/${record.subject.id}`, { record, runId: doc.run.id, typecheck: doc.run.typecheck });
   return map;
 }
 
@@ -730,7 +730,7 @@ async function measureProbe({
         if (!declared && mockInfo.indeterminate.length > 0) {
           return { record: discoveryIndeterminateRecord({ ...common, inputs: safeInputs(iso.projectDir, fault, defenders, { testUniverseHash, discoveryHashes }), indeterminate: mockInfo.indeterminate }) };
         }
-        const args = { ...common, typechecker, typecheckBudget: () => commandBudget?.runBudget(budgetMs) ?? budgetMs, typecheckCut: (granted, outcome) => commandBudget?.assertNotCut(granted, budgetMs, outcome.status === 'timeout' ? 1 : 0), allTests, iso, onWarn, confirmRuns, escalate, controlCache, stage, prior: prior.get(`${claim.id}/${fault.id}`)?.record, priorRunId: prior.get(`${claim.id}/${fault.id}`)?.runId, testUniverseHash, discoveryHashes, ensureBaseline, dependencyHasher,
+        const args = { ...common, typechecker, typecheckBudget: () => commandBudget?.runBudget(budgetMs) ?? budgetMs, typecheckCut: (granted, outcome) => commandBudget?.assertNotCut(granted, budgetMs, outcome.status === 'timeout' ? 1 : 0), allTests, iso, onWarn, confirmRuns, escalate, controlCache, stage, prior: prior.get(`${claim.id}/${fault.id}`)?.record, priorRunId: prior.get(`${claim.id}/${fault.id}`)?.runId, priorTypecheck: prior.get(`${claim.id}/${fault.id}`)?.typecheck, testUniverseHash, discoveryHashes, ensureBaseline, dependencyHasher,
           historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root };
         return { args, pre: await prePlanFault(args), common, discoveryHashes };
       } catch (err) {
@@ -802,7 +802,9 @@ async function measureProbe({
         const inputs = faultInputs({ treeDir: iso.projectDir, fault, defenders, testUniverseHash, discoveryHashes, dependencyHasher });
         const contentHash = subjectOf(fault, sha256).contentHash;
         if (!inputsMatch(priorRecord, { claim, inputs, ...defenderSelection(claim, fault), resolved: defenders, contentHash })) return 'inputs-changed';
-        if (typechecker && defenders.length > 0) {
+        // The same program vouches for the recorded answer (#293); evidence
+        // without a digest (0.24.0) is checked fault by fault, once.
+        if (typechecker && defenders.length > 0 && needsFaultRecheck(carry.document.run.typecheck, typechecker.spec)) {
           const targetPath = join(iso.projectDir, fault.file);
           const anchor = existsSync(targetPath) ? locate(readFileSync(targetPath, 'utf8'), fault) : { status: 'file-missing' };
           if (anchor.status === 'ok') {
@@ -1268,7 +1270,7 @@ function faultInputs({ treeDir, fault, defenders, testUniverseHash, discoveryHas
 }
 
 async function prePlanFault(args) {
-  const { typechecker, typecheckBudget, typecheckCut, claim, fault, defenders, iso, dependencyHasher, stage, prior, testUniverseHash, discoveryHashes = {} } = args;
+  const { typechecker, typecheckBudget, typecheckCut, claim, fault, defenders, iso, dependencyHasher, stage, prior, priorTypecheck, testUniverseHash, discoveryHashes = {} } = args;
   const targetPath = join(iso.projectDir, fault.file);
   const targetExists = existsSync(targetPath);
   const inputs = faultInputs({ treeDir: iso.projectDir, fault, defenders, testUniverseHash, discoveryHashes, dependencyHasher });
@@ -1288,14 +1290,19 @@ async function prePlanFault(args) {
   let typecheck; // the type check's outcome for this fault, when one was asked for
   const detail = { baselineRuns: [], probeRuns: [] };
   const reusable = isReusable(prior, { claim, inputs, ...defenderSelection(claim, fault), resolved: defenders, contentHash: subject.contentHash });
-  if (typechecker && anchor?.status === 'ok') {
+  // The same program (#293: `run.typecheck.programDigest` equal) gives the same
+  // answer: a reusable record's recorded one stands, and no check runs. The
+  // check is made later only if reuse fails after all (planFault).
+  const digestVouches = Boolean(typechecker) && reusable && prior?.detail?.typecheck !== undefined && !needsFaultRecheck(priorTypecheck, typechecker.spec);
+  if (typechecker && anchor?.status === 'ok' && !digestVouches) {
     typecheck = await typecheckFault({ typechecker, iso, fault, budgetMs: typecheckBudget(), stage, detail, cut: typecheckCut });
   }
-  const typecheckAgrees = !typechecker || typecheck === undefined || typecheck.status === prior?.detail?.typecheck;
+  const known = typecheck ?? (digestVouches && anchor?.status === 'ok' ? { status: prior.detail.typecheck } : undefined);
+  const typecheckAgrees = !typechecker || known === undefined || known.status === prior?.detail?.typecheck;
   // A fault the type check refused ran no test, so there is no test run to confirm.
-  const reusedOutright = reusable && typecheckAgrees && (defenders.length === 0 || typecheck?.status === 'diagnostics');
+  const reusedOutright = reusable && typecheckAgrees && (defenders.length === 0 || known?.status === 'diagnostics');
   const reuseAsk = reusable && typecheckAgrees && !reusedOutright;
-  const fullAsk = !reusedOutright && anchor?.status === 'ok' && !refusedByTypecheck(typecheck);
+  const fullAsk = !reusedOutright && anchor?.status === 'ok' && !refusedByTypecheck(known);
   return { targetExists, inputs, subject, anchor, typecheck, typecheckAgrees, reusable, detail, reusedOutright, reuseAsk, fullAsk };
 }
 
@@ -1306,7 +1313,8 @@ async function prePlanFault(args) {
  */
 async function planFault(args, pre) {
   const { typechecker, claim, fault, defenders, confirmRuns, ensureBaseline, stage, prior, priorRunId } = args;
-  const { targetExists, inputs, subject, typecheck, detail } = pre;
+  const { targetExists, inputs, subject, detail } = pre;
+  let { typecheck } = pre;
 
   // Same source, same imports, same defenders, same N, same fault — and the
   // defenders still green right now. The hashes cannot see the environment
@@ -1325,6 +1333,11 @@ async function planFault(args, pre) {
   }
 
   let anchor = pre.anchor;
+  // The digest let planning skip this fault's check for a reuse that did not
+  // happen: the measurement needs the real answer (#293).
+  if (typechecker && typecheck === undefined && anchor?.status === 'ok' && defenders.length > 0) {
+    typecheck = await typecheckFault({ typechecker, iso: args.iso, fault, budgetMs: args.typecheckBudget(), stage, detail, cut: args.typecheckCut });
+  }
 
   if (defenders.length > 0) {
     if (anchor.status === 'ok' && typechecker) {

@@ -145,6 +145,7 @@ describe('carryRefusal is the run-level reuse rule, with a reason', () => {
     ['another N', (d) => d, (p) => ({ ...p, confirmRuns: 5 }), /--confirm 3, this run with --confirm 5/],
     ['another worker policy', (d) => d, (p) => ({ ...p, workers: 4, serial: false }), /worker/],
     ['another runner', (d) => d, (p) => ({ ...p, runner: { ...p.runner, version: '0.0.1' } }), /another test runner/],
+    ['another type-checked program', (d) => { d.run.typecheck = { commandHash: sha('1'), version: '5.0.0', programDigest: sha('2') }; return d; }, (p) => ({ ...p, typecheck: { commandHash: sha('1'), version: '5.0.0', programDigest: sha('3') } }), /type-checked program changed/],
   ])('%s', (_, docChange, policyChange, reason) => {
     const d = docChange(structuredClone(canonical));
     const p = policyChange(policy);
