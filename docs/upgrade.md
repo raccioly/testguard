@@ -20,7 +20,7 @@ the new one. A release that changes how a verdict is reached says so in an
 **Upgrading** section (0.7.0 has one), and that section is the migration
 guide for that release.
 
-## 0.23: fast by default
+## 0.24: fast by default
 
 What changed by default:
 

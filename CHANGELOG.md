@@ -85,6 +85,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   remote default branch, a differently named upstream, then the branch's own
   upstream (the commits not pushed yet). With none, it probes every claim.
 
+## [0.23.0] - 2026-11-12
+
+Automated weekly release — everything merged since `v0.22.1`.
+
+### Changed
+
+- fix: defects found by independent verification of 0.22.1 (#262)
+- ci: normalize the self-probe cost ceiling by a reference workload (#255) (#257)
+- chore(deps): bump the all-actions group with 6 updates (#230)
+- chore(deps): bump @vitest/mocker and vitest in /fixtures/known-answer-playwright (#225)
+- ci: bounds that follow the suite's size, not one runner's speed (#256)
+- chore: bump DocGuard to 0.47.0 (#219)
+- test: bring the suite back under its runtime budget (#254)
+- chore(homebrew): sha256 for v0.22.1 (#253)
+
+
 ### Fixed
 
 - **The self-probe cost gate no longer credits a runner that slowed down

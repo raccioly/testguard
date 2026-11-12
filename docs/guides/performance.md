@@ -41,7 +41,7 @@ A project of cheap unit tests:
 
 Work down this list; each item names how to check it.
 
-1. **An old version.** `testguard --version`. Before 0.23 every fault ran one at a time. Upgrade, then run `testguard init --upgrade` ([upgrading](../upgrade.md)).
+1. **An old version.** `testguard --version`. Before 0.24 every fault ran one at a time. Upgrade, then run `testguard init --upgrade` ([upgrading](../upgrade.md)).
 2. **`--serial` in a hook or CI.** It forces one fault at a time. `testguard status` prints an `advice` line when the last probe ran serially on a machine with room; `testguard init` lists every hook and CI line that passes it. Drop it.
 3. **A full probe on every push.** Use `testguard probe --changed auto` in the hook and the pull request job, and keep `testguard probe` for the nightly job. `testguard init --upgrade` rewrites the hooks it wrote.
 4. **No evidence cache in CI.** Without `.testguard/evidence.json` from the last run nothing is reused. Cache it (the CI files `init --ci` writes do).
