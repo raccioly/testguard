@@ -152,6 +152,22 @@ a cobertura. O TestGuard o admite porque ele falha quando a alegação é falsa.
 Requisitos, instalações offline, `ENOVERSIONS` e todas as opções de CI estão
 no [guia de instalação](https://github.com/raccioly/testguard/blob/main/docs/installation.md).
 
+## Deixe rápido
+
+```bash
+testguard probe --changed auto                 # after a change: only the claims it can affect
+testguard probe --claim <ID> --confirm 1       # while writing one test: fast, provisional
+testguard probe                                # nightly, or when asked: every claim
+```
+
+- As falhas já rodam em paralelo: metade das CPUs, no máximo 4 (`--serial` para uma de cada vez).
+- Todo kill é confirmado por uma execução sozinha, então uma suíte que compartilha uma porta ou um banco de dados não consegue fingir um.
+- Veredictos sem mudança são reaproveitados; uma execução com `--changed` ou `--claim` reaproveita o último probe completo.
+- `testguard init` escreve um hook pre-push que roda o primeiro comando, e `init --ci github|gitlab` um job de CI que o roda em cada pull request e o probe completo toda noite.
+
+Ainda lento? `testguard status` mostra `advice` com o comando a rodar, e
+[por que está lento?](https://github.com/raccioly/testguard/blob/main/docs/guides/performance.md#why-is-this-slow) é o checklist.
+
 ## Início rápido
 
 ```bash

@@ -35,8 +35,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`probe --changed` and `--claim` also reuse the last full probe's
   verdicts** (the canonical `.testguard/evidence.json`), under the same reuse
   rules. That is what makes a pre-push probe of a small change cheap.
+- **The pre-commit `testguard-probe` hook runs `probe --changed auto`**, not a
+  full probe on every push. Keep the full probe for a nightly job.
+- **The GitLab component's merge-request job probes the change** (new input
+  `changed`, default `auto`; empty probes every claim) and caches
+  `.testguard/evidence.json` between pipelines. Pipelines on the default
+  branch still probe every claim.
+- **The agent instructions follow the fast loop.** The skill and the
+  `AGENTS.md` section `init` writes state it as commands — `probe --changed
+  auto` after a change, `--claim <ID> --confirm 1` while writing one test, the
+  full probe only when asked or nightly — and point at `init --upgrade`
+  instead of `--force`. The README has a "Make it fast" section;
+  `docs/guides/performance.md` opens with a decision table and a "Why is this
+  slow?" checklist; troubleshooting covers slow probes and failures that only
+  happen beside other probes; `docs/upgrade.md` covers this release and three
+  ways to stay current (npx `@latest`, a pinned devDependency with a
+  Dependabot or Renovate rule, Homebrew).
 
 ### Added
+
+- **`init` writes a pre-push block** that runs `probe --changed auto`, in
+  `.husky/pre-push` when the repository uses husky, otherwise in
+  `.githooks/pre-push` (enable with `git config core.hooksPath .githooks`);
+  never in `.git/hooks`. It runs the project's install, then the repository
+  root's, then a `testguard` on `PATH`, then `npx -y testguard-cli@latest`.
+- **`init --ci github|gitlab`** writes a CI file: pull or merge requests run
+  `probe --changed auto`, scheduled and manual runs run the full probe, and
+  the evidence is cached.
+- **Managed blocks and `init --upgrade`.** Everything `init` writes carries a
+  template marker (`template=<n>` and the hash of its body). `init` reports,
+  with `~` lines, TestGuard blocks from an older template and every hook or CI
+  line that runs `probe --serial`, a full probe on every push or a pinned older
+  `testguard-cli`. `init --upgrade` rewrites the skill, the `AGENTS.md`
+  section, the pre-push block and the CI file where nobody edited them (a skill
+  written before markers is recognized by the hash of every shipped template),
+  and reports the rest; `--force` replaces edited ones.
+- **Speed advice.** `status` (new `advice[]` in the status document, schema,
+  validator and conformance), the brief (`SPEED:` lines, a "Go faster" list in
+  markdown) and the end of a probe say where a run leaves speed on the table:
+  `serial-on-multicore`, `full-probe-where-changed-would-do`,
+  `nothing-reused`, `hook-outdated`, each with the command to run. Read from
+  files on disk only; it never changes `state`, `next` or an exit code.
+- **The MCP `testguard_next_command` returns `loop`** — the fast loop as
+  commands — and the status document's `advice`.
+- **The GitHub Action has a `changed` input** for `probe` (`auto` or a ref),
+  and its `evidence` output also names `evidence-partial.json`.
 
 - **`probe --changed auto`** finds the base offline: the CI base branch, the
   remote default branch, a differently named upstream, then the branch's own

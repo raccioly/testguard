@@ -136,6 +136,23 @@ raises coverage. TestGuard admits it because it fails when the claim is false.
 Requirements, offline installs, `ENOVERSIONS` and every CI option are in the
 [installation guide](https://github.com/raccioly/testguard/blob/main/docs/installation.md).
 
+## Make it fast
+
+```bash
+testguard probe --changed auto                 # after a change: only the claims it can affect
+testguard probe --claim <ID> --confirm 1       # while writing one test: fast, provisional
+testguard probe                                # nightly, or when asked: every claim
+```
+
+- Faults already run in parallel: half the CPUs, at most 4 (`--serial` for one at a time).
+- Every kill is confirmed by a run alone, so a suite that shares a port or a database cannot fake one.
+- Unchanged verdicts are reused; a `--changed` or `--claim` run reuses the last full probe.
+- `testguard init` writes a pre-push hook that runs the first command, and `init --ci github|gitlab` a CI job that runs it on pull requests and the full probe nightly.
+
+Slow anyway? `testguard status` prints `advice` with the command to run, and
+[why is this slow?](https://github.com/raccioly/testguard/blob/main/docs/guides/performance.md#why-is-this-slow)
+is the checklist.
+
 ## Quickstart
 
 ```bash

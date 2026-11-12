@@ -20,7 +20,7 @@ import { resolveFaultWorkers } from '../probe/fan-out.mjs';
 import { availableParallelism } from 'node:os';
 import { computeAdvice, renderAdvice } from '../status/advice.mjs';
 import { resolveProbeScope } from '../probe/scope.mjs';
-import { repoRoot } from '../git.mjs';
+import { repoRoot, headSha } from '../git.mjs';
 import { selectByChange, measuredScope, renderNoSelection, renderUnmatched, scopedView, renderScopedView } from './probe-scope.mjs';
 import { claimResults } from '../probe/claim-results.mjs';
 import { partialExit, partialEvidencePath, isNotReached } from '../probe/partial-budget.mjs';
@@ -181,12 +181,16 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   // `--changed auto` (#270): the base found offline, as a pre-push hook and a
   // CI job need it. Nothing to compare against is a full probe, never a skip.
   if (values.changed === 'auto') {
-    const auto = resolveAutoChangedRef({ projectDir });
+    const detected = resolveAutoChangedRef({ projectDir });
+    // A detected base that does not resolve here (a shallow CI checkout) is
+    // not a reason to probe nothing: say how to fix it, and probe everything.
+    const auto = detected && headSha(repoRoot(projectDir), detected.ref) ? detected : null;
+    if (detected && !auto) io.err(`--changed auto: ${detected.ref} (${detected.from}) does not resolve here, so every claim is probed; fetch it (GitHub Actions: actions/checkout with fetch-depth: 0) to probe only the change`);
     if (auto) {
       if (!values.quiet) io.err(`--changed auto: comparing against ${auto.ref} (${auto.from})`);
       values = { ...values, changed: auto.ref };
     } else {
-      io.err('--changed auto: no base to compare against (no CI base branch, no remote default branch, no upstream), so every claim is probed');
+      if (!detected) io.err('--changed auto: no base to compare against (no CI base branch, no remote default branch, no upstream), so every claim is probed');
       values = { ...values, changed: undefined };
     }
   }

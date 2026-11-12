@@ -81,7 +81,30 @@ describe('a partial run reuses the last full probe', () => {
 });
 
 describe('--changed auto', () => {
-  it('with no base to compare against, probes every claim and says so: never a skip', async () => {
+  // CI variables name a base too; these tests are about a repository alone.
+  const CI_VARS = ['GITHUB_BASE_REF', 'CI_MERGE_REQUEST_DIFF_BASE_SHA', 'CI_MERGE_REQUEST_TARGET_BRANCH_NAME'];
+  const withEnv = async (env, body) => {
+    const saved = Object.fromEntries(CI_VARS.map((k) => [k, process.env[k]]));
+    for (const k of CI_VARS) delete process.env[k];
+    Object.assign(process.env, env);
+    try { return await body(); } finally {
+      for (const k of CI_VARS) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+    }
+  };
+
+  it('a CI base that does not resolve here is a full probe with the fix named, never exit 2', async () => {
+    const project = partialBudgetProject();
+    try {
+      await withEnv({ GITHUB_BASE_REF: 'main' }, async () => {
+        const r = await run(project, { changed: 'auto' });
+        expect(r.code, r.err.join('\n')).toBe(0);
+        expect(r.err.join('\n')).toMatch(/--changed auto: origin\/main \(GITHUB_BASE_REF\) does not resolve here, so every claim is probed; fetch it/);
+        expect(evidenceAt(project, 'evidence.json').records).toHaveLength(4);
+      });
+    } finally { rmSync(project.dir, { recursive: true, force: true }); }
+  }, 60_000);
+
+  it('with no base to compare against, probes every claim and says so: never a skip', async () => withEnv({}, async () => {
     const project = partialBudgetProject();
     try {
       const r = await run(project, { changed: 'auto' });
@@ -89,5 +112,5 @@ describe('--changed auto', () => {
       expect(r.err.join('\n')).toMatch(/--changed auto: no base to compare against .* so every claim is probed/);
       expect(evidenceAt(project, 'evidence.json').records).toHaveLength(4);
     } finally { rmSync(project.dir, { recursive: true, force: true }); }
-  }, 60_000);
+  }), 60_000);
 });

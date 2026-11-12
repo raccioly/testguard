@@ -99,12 +99,18 @@ the same document, so they cannot disagree. It writes nothing.
 `baseline`, `review-fault-change`, `repair-fault`, `none`, and `next.command`
 is the exact shell line to run.
 
+`advice` lists where the project is leaving speed on the table, one line each
+with the command to run: `serial-on-multicore`, `full-probe-where-changed-would-do`,
+`nothing-reused`, `hook-outdated`. It is informational (it never changes
+`state`, `next` or the exit code) and reads only files on disk. The text form
+prints each as a `speed` line.
+
 **`--json` schema:** [`status.schema.json`](../../spec/schemas/status.schema.json).
 
 ## init
 
 ```bash
-npx testguard-cli init [dir] [--here] [--force] [--ci-evidence github|gitlab] [--mcp] [--json]
+npx testguard-cli init [dir] [--here] [--force] [--upgrade] [--ci github|gitlab] [--ci-evidence github|gitlab] [--mcp] [--json]
 ```
 
 Installs two layers. The **agent layer** goes to the git root, where agent
@@ -116,10 +122,20 @@ repository adds a hook line and an `AGENTS.md` bullet, never a duplicate. The
 hook prefers a local install, then a `testguard` on `PATH`, then does nothing;
 it never reaches the network.
 
+It also writes a **pre-push block** that runs `probe --changed auto`: in
+`.husky/pre-push` when the repository has `.husky/`, otherwise in
+`.githooks/pre-push` (enable it once per clone with
+`git config core.hooksPath .githooks`). Anything else in that file stays. It
+never writes `.git/hooks`. Then it reports, with `~` lines, every hook and CI
+line that runs `probe --serial`, a full probe on every push, a pinned older
+`testguard-cli` or an older TestGuard template.
+
 | Flag | Default | Meaning |
 |---|---|---|
 | `--here` | off | Keep the agent layer in `[dir]` instead of the git root, for a subdirectory that is its own agent root. |
-| `--force` | off | Replace an existing skill file (and an existing `.testguard/fetch-ci-evidence.sh`). It does not refresh an `AGENTS.md` section that already lists the project. |
+| `--force` | off | Replace an existing skill file (and an existing `.testguard/fetch-ci-evidence.sh`), and TestGuard blocks edited by hand. It does not refresh an `AGENTS.md` section that already lists the project. |
+| `--upgrade` | off | Rewrite what TestGuard wrote and nobody edited — the skill, the `AGENTS.md` section, the pre-push block, the `--ci` file — to the current template. Each managed block carries `template=<n>` and the hash of its body; an edited one is reported and left alone. See [upgrading](../upgrade.md#023-fast-by-default). |
+| `--ci github\|gitlab` | none | Write `.github/workflows/testguard.yml` (GitHub) or `testguard.gitlab-ci.yml` to `include:` (GitLab): pull or merge requests run `probe --changed auto`, scheduled and manual runs run `probe`, and `.testguard/evidence.json` is cached. It calls `npx -y testguard-cli@latest`. Any other value is a usage error (exit `3`). |
 | `--ci-evidence github\|gitlab` | none | Also write `.testguard/fetch-ci-evidence.sh`, an on-demand helper that downloads CI's evidence artifact and briefs from it. See [artifacts](artifacts.md#fetch-ci-evidencesh). Any other value is a usage error (exit `3`) and nothing is written. |
 | `--mcp` | off | Print the MCP server configuration for Claude Code, Cursor and Codex. Printed, never written. See [MCP](mcp.md#register-the-server). |
 | `--json` | off | Print `{done, skipped, warnings, agentRoot, dir, mcpConfig?}`. |
@@ -199,7 +215,7 @@ spec before it is written.
 | `--baseline <path>` | `<dir>/.testguard/baseline.json` if present | Baseline to gate against. |
 | `--severity <level>` | `low` | Gate only findings whose claim severity is at or above this level. Findings below are still reported and written. |
 | `--claim <ID,ID>` | every claim | Probe only these claims. Repeatable, order-preserving, duplicates collapsed. Writes `evidence-partial.json`. |
-| `--changed <ref>` | none | Probe only the claims the change since `merge-base(<ref>, HEAD)` can have affected: a fault's target, a defender, or anything they import differs (a rename counts through its old and new path; `--include-dirty` reads the working tree). Intersects with `--claim`. Writes `evidence-partial.json`. A change git cannot measure (`ref-unresolved`, `no-merge-base`, `git-timeout`, `git-failed`) exits `2` and probes nothing; it is never read as an empty change. Refused with `--ref` and `--in-place` (exit `3`). See [probing a change](../../spec/GATE-SEMANTICS.md#probing-a-change). |
+| `--changed <ref>` | none | `auto` finds the base offline: the CI base branch, the remote default branch, a differently named upstream, then the branch's own upstream (the commits not pushed yet); with none it probes every claim and says so. Otherwise: probe only the claims the change since `merge-base(<ref>, HEAD)` can have affected: a fault's target, a defender, or anything they import differs (a rename counts through its old and new path; `--include-dirty` reads the working tree). Intersects with `--claim`. Writes `evidence-partial.json`. A change git cannot measure (`ref-unresolved`, `no-merge-base`, `git-timeout`, `git-failed`) exits `2` and probes nothing; it is never read as an empty change. Refused with `--ref` and `--in-place` (exit `3`). See [probing a change](../../spec/GATE-SEMANTICS.md#probing-a-change). |
 | `--fail-on-empty-selection` | off | With `--changed`: a change that selects no claim exits `2` instead of `0`. Either way the run says so, probes nothing, writes no evidence and lists the changed source files no claim covers. Refused without `--changed` (exit `3`). |
 | `--include-dirty` | off | Probe the working tree (snapshotted into a throwaway commit) instead of HEAD, so uncommitted tests count. |
 | `--ref <commit>` | `HEAD` | Probe this commit in the scratch worktree. Honoured even when defender or target files are dirty: a warning names them and the evidence records them as `repo.ignoredDirty`. |
@@ -212,8 +228,8 @@ spec before it is written.
 | `--typecheck[=<cmd>]` | off | Type check every fault before any test runs. Bare, the checker is the project's own `tsc --noEmit -p tsconfig.json --incremental`, resolved from the project or the linked `node_modules`, never a bundled compiler; a project with no `tsconfig.json`, or whose `typescript` does not resolve, needs `=<cmd>` (exit `2` otherwise, never a skipped check). `<cmd>` is split into an argv like `--runner-cmd` and never run through a shell; exit `0` means clean, anything else is diagnostics, and its first line that says `error` is the message. The unmodified tree is checked first: not clean is exit `2` naming the first diagnostic, and no evidence is written. A fault whose replacement does not type-check is `fault-invalid` / `replacement-does-not-typecheck` with zero test runs; a check over `--budget` is `timeout`. The program is the tsconfig's own, listed by `tsc --listFilesOnly`: a tsconfig whose program holds no project file (solution-style, references only) is exit `2`. Targets the checker does not read (`.py`; `.js` unless the tsconfig sets `allowJs` and `checkJs`; a `.ts` file the tsconfig does not include; with `<cmd>`, every non-TypeScript file, since a command cannot say what it reads) are recorded `detail.typecheck: "not-applicable"` and probed as before. Recorded as `run.typecheck` and part of the reuse key; because type validity belongs to the whole program, a reused record is re-checked once (no test run) and carried forward only if the answer is unchanged. A custom command's `version` is best-effort (its own `--version` plus the project's `typescript` when it resolves); use `--no-reuse` if the checker can change without either changing. |
 | `--python <path>` | `TESTGUARD_PYTHON`, then `$VIRTUAL_ENV`, then `.venv`, `venv`, `.env` in the project, then `python3`, `python` on `PATH` | Interpreter for `.py` defenders, resolved against your working tree. A bare name is looked up on `PATH`. An explicit interpreter is the only one tried: it is never replaced by another. |
 | `--workers <n>` | `1` | Maximum built-in runner workers. Python stays serial. |
-| `--serial` | off | One worker, even when `--workers` is higher (vitest `--no-file-parallelism`, jest `--runInBand`, playwright `--workers=1`). With the default `--workers 1` it changes nothing. pytest always runs with `-p no:xdist`, with or without it. |
-| `--fault-workers <n>` | `1` | Probe up to n faults at once, each in its own scratch worktree. Baselines are still measured once per defender set, before any fault is applied; different defender sets run side by side, and one that is not green beside another is re-measured alone (`detail.baselineRemeasuredSerially`). Records keep claim/fault order; a `timeout` or inconsistent probe measured beside other faults is re-measured alone before it is reported (`detail.remeasuredSerially`). Recorded as `run.faultWorkers`; not with `--in-place`. See [performance](../guides/performance.md#probe-several-faults-at-once). |
+| `--serial` | off | One test process at a time: one runner worker even when `--workers` is higher (vitest `--no-file-parallelism`, jest `--runInBand`, playwright `--workers=1`; pytest always runs with `-p no:xdist`) and one fault at a time (`--fault-workers 1`). With `--fault-workers` above 1 it is a usage error. Only for a suite that cannot share the machine. |
+| `--fault-workers <n\|auto>` | `auto` | Probe up to n faults at once, each in its own scratch worktree. `auto` is `min(4, floor(CPUs / 2))`, at least one, halved when other test runners are already running; `TESTGUARD_FAULT_WORKERS` sets it when the flag is absent; `--in-place` means one. Baselines are measured once per defender set, different sets side by side. Every kill rests on at least one probe run with no other fault in flight (`probeRuns[].alone`); runs beside other faults that a run alone contradicts mark the defender set `detail.notParallelSafe` and the fault is measured again alone (`detail.remeasuredSerially`), as is a contended timeout, inconsistent probe or suite-load failure. Records keep claim/fault order. Recorded as `run.faultWorkers` (above one), `run.faultWorkersSource` and, for auto, `run.cpus`. See [performance](../guides/performance.md#probe-several-faults-at-once). |
 | `--no-escalate` | off | Do not re-run survivors against the whole suite. Escalation runs the whole suite up to N times per survivor. |
 | `--no-reuse` | off | Re-probe claims whose recorded inputs have not changed. |
 | `--allow-empty` | off | Adoption only: a valid claims file with zero claims exits `0` instead of `2`, writes no evidence, and says verification was skipped. Has no effect with `--claim`. |
@@ -321,6 +337,9 @@ says which install answered (`local install`, `npx cache`, `pnpm dlx cache`,
 
 **Exit:** `0`; `2` when there is no evidence and neither `--text` nor
 `--markdown` was given; `3` when `--max` is outside 1–50.
+
+The brief carries the status document's `advice` (as `SPEED:` lines in text,
+a "Go faster" list in markdown).
 
 **`--json` schema:** [`brief.schema.json`](../../spec/schemas/brief.schema.json).
 

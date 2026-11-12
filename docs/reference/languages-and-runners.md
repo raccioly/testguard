@@ -39,8 +39,9 @@ extension; they have no Python meaning and are absent there. [Writing claims](..
 | `unittest` | explicit; `python` with the engine pinned | as `python` | as `python` | always serial | always serial | the same fixture, stdlib leg |
 | `auto` | the default | the first of `vitest`, `jest`, `python` that resolves **and** discovers at least one test file | — | — | — | — |
 
-`--workers` defaults to `1`, which already means one file at a time, so
-`--serial` only changes anything when it overrides a `--workers` above 1.
+`--workers` defaults to `1`, which already means one file at a time per run.
+For `probe`, `--serial` also means one fault at a time (`--fault-workers 1`);
+elsewhere it only changes a run that raised `--workers`.
 [Performance](../guides/performance.md) explains when to raise it.
 
 ## How a runner is chosen

@@ -20,6 +20,94 @@ the new one. A release that changes how a verdict is reached says so in an
 **Upgrading** section (0.7.0 has one), and that section is the migration
 guide for that release.
 
+## 0.23: fast by default
+
+What changed by default:
+
+- **Faults run in parallel.** `probe` uses `--fault-workers auto`: `min(4, floor(CPUs / 2))` at once, at least one, halved when other test runners are busy. Every kill rests on at least one run with nothing else in flight, and a suite that shares a port or a database is detected and measured alone, so the default is sound for any suite.
+- **`--serial` means one test process at a time**: one runner worker *and* one fault at a time. Before, it only meant one runner worker, which was already the default.
+- **A `--claim` or `--changed` run reuses the last full probe** (`.testguard/evidence.json`).
+- **`probe --changed auto`** finds the base offline; the pre-commit `testguard-probe` hook, the hook `init` writes and the GitLab component's merge-request job use it.
+- **`status`, `brief` and the end of a probe print `advice`** where a run leaves speed on the table.
+
+The old behavior, if you need it:
+
+```bash
+testguard probe --serial               # one fault at a time, this run
+export TESTGUARD_FAULT_WORKERS=1       # one fault at a time, every run in this shell or CI job
+```
+
+In an existing project, run once and review the diff:
+
+```bash
+testguard init --upgrade
+```
+
+It rewrites what TestGuard wrote and nobody edited — the skill, the `AGENTS.md`
+section, the pre-push block, the CI file from `init --ci` — and leaves
+everything else. It then lists every hook or CI line that still runs `probe
+--serial`, a full probe on every push, or a pinned older version, with what to
+change; those are yours to edit. A block edited by hand is reported too;
+`--force` replaces it.
+
+## Stay current
+
+TestGuard itself never makes a network call. Pick one way to get new releases:
+
+| Way | Prefer it when | What to do |
+|---|---|---|
+| `npx -y testguard-cli@latest` in the pre-push hook and CI | you want the simplest setup | What `testguard init` writes by default: the project install first, then a `testguard` on `PATH`, then the latest release. Nothing to bump. |
+| A pinned devDependency, bumped by a bot | the project pins every dependency | `npm i -D testguard-cli`, then one of the rules below. The hook `init` writes runs the project install first. |
+| Homebrew | one machine runs many repositories | `brew tap raccioly/tap && brew install testguard`, then `brew upgrade testguard`. |
+
+Dependabot (`.github/dependabot.yml`), grouping TestGuard into its own pull
+request:
+
+```yaml
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      testguard:
+        patterns: ["testguard-cli"]
+```
+
+and a workflow that merges that group once CI is green
+(`.github/workflows/testguard-automerge.yml`):
+
+```yaml
+name: TestGuard auto-merge
+on: pull_request
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  automerge:
+    if: github.actor == 'dependabot[bot]' && contains(github.head_ref, 'testguard')
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+`--auto` waits for the required checks, so enable auto-merge and branch
+protection on the repository. Renovate (`renovate.json`):
+
+```json
+{
+  "packageRules": [
+    { "matchPackageNames": ["testguard-cli"], "groupName": "testguard", "automerge": true }
+  ]
+}
+```
+
+After any upgrade, run `testguard init --upgrade` once.
+
 ## Upgrade each channel
 
 | Channel | How to upgrade | Notes |
@@ -44,8 +132,9 @@ changes none of them:
 
 | File | What stays old | How to bring it forward |
 |---|---|---|
-| `.claude/skills/testguard/SKILL.md` | the whole skill, as copied by the `init` you ran | merge by hand, or `init --force` |
-| The `AGENTS.md` section between `<!-- testguard:begin -->` and `<!-- testguard:end -->` | the instructions, once the section lists the project | edit by hand |
+| `.claude/skills/testguard/SKILL.md` | the whole skill, as copied by the `init` you ran | `init --upgrade` when unmodified; merge by hand, or `init --force` |
+| The `AGENTS.md` section between `<!-- testguard:begin … -->` and `<!-- testguard:end -->` | the instructions, once the section lists the project | `init --upgrade` |
+| The pre-push block (`.husky/pre-push` or `.githooks/pre-push`) and the CI file from `init --ci` | the commands | `init --upgrade` when unmodified; `--force` otherwise |
 | The `SessionStart` hook in `.claude/settings.json` | the command, once it is present | usually nothing to do; see below |
 
 Re-running `testguard init` after an upgrade is safe and does a little:
@@ -57,7 +146,13 @@ Re-running `testguard init` after an upgrade is safe and does a little:
   network. It also rewrites a pre-0.6 `AGENTS.md` section that has no project
   list.
 - It leaves an existing skill, and a section that already lists the project,
-  untouched. Its output says so with `=` lines.
+  untouched. Its output says so with `=` lines, and lists with `~` what
+  `init --upgrade` would rewrite and the hook and CI lines that run TestGuard
+  the slow or stale way.
+- `init --upgrade` rewrites every block TestGuard wrote that nobody edited.
+  Each block carries `template=<n>` and the hash of its own body; a skill
+  written before markers is recognized by the hash of every template TestGuard
+  shipped. Anything edited is reported, never overwritten without `--force`.
 - If the new version's hook command differs from the one you have, `init`
   replaces your TestGuard hook in place (for each project, the root and every
   subdirectory alike), keeping its position and any other keys on it, and

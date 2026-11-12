@@ -136,7 +136,35 @@ Choose what you meant:
 Another test process (often your editor's watch mode, or a second agent) is
 competing for the CPU. Verdicts under contention describe the load, not the
 claim. Stop the other runner, or pass `--serial`. The evidence records the
-contention either way.
+contention either way, and an automatic fault-worker count is halved.
+
+### It takes too long, or it gets stuck
+
+Work through [why is this slow?](guides/performance.md#why-is-this-slow): an
+old version, `--serial` in a hook or CI, a full probe on every push, no
+evidence cache in CI, expensive or shared defender files. `testguard status`
+lists `advice` lines, each with the command to run. A probe that prints
+nothing is covered [below](#a-probe-that-seems-to-hang).
+
+### Failures only when several probes run at once
+
+Two things can share a machine: your probe's own fault workers, and other
+probes or test runners.
+
+- **Other runners.** The probe warns before the first run (`N test runners are
+  already running`) and records `run.contention`; an automatic width is
+  halved. Verdicts under load can be `TIMEOUT` or `FLAKY-DEFENDER`.
+- **Two probes of one repository** take turns creating and removing scratch
+  worktrees through a lock (`testguard-worktrees.lock`, outside the
+  repository); a live owner is waited on for up to two minutes.
+- **The probe's own fault workers.** A timeout, an inconsistent probe or a
+  suite that failed to load beside other faults is measured again alone
+  (`detail.remeasuredSerially`) before it is reported.
+- **A suite that shares a port, a database or a temp path** fails beside
+  itself. A kill is never reported from those runs: every kill rests on a
+  run with nothing else in flight, and a run alone that passes marks the set
+  `detail.notParallelSafe` and names its files in a warning. Its faults are
+  then measured one at a time. Make those tests hermetic, or pass `--serial`.
 
 ### Everything is `FLAKY-DEFENDER`
 

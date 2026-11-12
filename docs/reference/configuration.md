@@ -358,6 +358,7 @@ or VM for untrusted code, and give it a writable scratch directory.
 | Variable | Read by | Meaning |
 |---|---|---|
 | `TESTGUARD_CHANGED_REF` | `gate`, `sweep`, `status`, `brief`, the MCP tools | The reference to measure a change against when `--changed` is absent. Checked before the CI variables below. |
+| `TESTGUARD_FAULT_WORKERS` | `probe` | How many faults to probe at once: a positive integer or `auto` (the default: `min(4, floor(CPUs / 2))`). `--fault-workers` and `--serial` win; empty is unset. `1` restores one fault at a time. |
 | `TESTGUARD_NODE_MODULES` | `probe`, `admit`, `sweep`, `replay` | A `node_modules` directory to link into the scratch worktree. `--node-modules` wins. |
 | `TESTGUARD_SCRATCH_DIR` | `probe`, `admit`, `sweep`, `replay` | An existing, writable directory for everything TestGuard creates while it runs tests: scratch worktrees, the temporary git index, runner reports and runner temp directories. `--scratch-dir` wins. Missing or unwritable is an error (exit 2) before anything is written. Default: the OS temp directory. |
 | `TESTGUARD_PYTHON` | `probe`, `claims --check-anchors`, `admit`, `sweep`, `replay` | The Python interpreter for `.py` defenders. `--python` wins when both are given; the two mean the same thing: a bare name such as `python3` is looked up on `PATH`, anything containing `/` is a path. |

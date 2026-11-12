@@ -9,6 +9,21 @@ TestGuard injects the faults a project's claims forbid and reports every one
 the tests fail to detect. It is a **claim verifier**, not a test generator.
 You operate it through one loop and one source of truth.
 
+## The fast loop
+
+```bash
+testguard probe --changed auto              # after changing code: only the claims the change can affect
+testguard probe --claim <ID> --confirm 1    # while writing one test: fast, provisional
+testguard admit <test-file> --claim <ID>    # before committing that test
+testguard probe                             # the full probe
+```
+
+Run the full probe only when the person asks for it, or in the nightly job.
+Faults already run in parallel and every kill is confirmed by a run alone:
+never pass `--serial` unless a suite cannot share the machine. When it is
+slow, `testguard status --json` lists `advice`, each line with the command to
+run.
+
 ## Update advice (once per session, never an automatic install)
 
 Before the operating loop, identify the CLI you will actually run: prefer the
@@ -45,12 +60,10 @@ verdicts and exit codes. The CLI and session-start hook remain offline; the AI
 performs this optional check, not TestGuard. Instructions cannot guarantee that
 every AI checks for updates.
 
-Package upgrades do not refresh an existing copied skill. Preserve customized
-instructions: compare this file with the upgraded package's
-`src/init/templates/SKILL.md` and merge approved changes. Use `testguard init
---force` only with explicit permission to replace the whole skill; review the
-diff afterward. An ordinary `init` preserves existing skills and managed
-sections already listing this project.
+After an approved update, `testguard init --upgrade` refreshes this skill, the
+`AGENTS.md` section, the pre-push block and the CI file where they are
+unmodified TestGuard templates, and lists anything edited by hand; merge those
+yourself. Use `--force` only with explicit permission; review the diff.
 
 ## The one source of truth
 
@@ -73,7 +86,8 @@ operating loop or writes canonical claims/evidence/baselines.
 testguard status --json
 ```
 
-Read `state` and `next`. Do what `next.command` says. Never infer state from
+Read `state` and `next`. Do what `next.command` says. `advice` (and the
+brief's `SPEED:` lines) say how to go faster; they never change `next`. Never infer state from
 which files exist. `state` is one of:
 
 | state | meaning | you do |
@@ -82,7 +96,7 @@ which files exist. `state` is one of:
 | `unclaimed-changes` | files you changed carry no claim (when a reference is explicit, supplied by CI, or safely inferred from local Git's remote default/upstream metadata) | `next.file` names the first; `testguard scaffold <file>` and state the claim, or add a `testguard.ignore.json` path entry with a reason a reviewer will accept. **Before** writing more code. |
 | `invalid-anchors` | an exact fault anchor moved or became ambiguous | run `testguard claims --check-anchors`; repair `next.target` in the claims file without changing what the fault means, then re-probe. Never guess or auto-fix an anchor. |
 | `unprobed` | claims never probed | `testguard probe` |
-| `evidence-stale` | code, tests or claims changed since the evidence | `testguard probe --include-dirty` (or `--claim <ID>` for one) |
+| `evidence-stale` | code, tests or claims changed since the evidence | `next.command` (a full probe refreshes every record, e.g. after a TestGuard upgrade); in the inner loop, `testguard probe --changed auto --include-dirty` re-measures only what your change can affect |
 | `provisional-only` | only `--confirm 1` evidence exists | `testguard probe --confirm 3` |
 | `unproven` | a finding is not covered by the baseline | `next.target` names it; see the verdict table |
 | `clean` | everything killed or baselined | `testguard baseline` if `next` says so; otherwise nothing |
