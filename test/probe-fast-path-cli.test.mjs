@@ -62,8 +62,11 @@ describe('a partial run reuses the last full probe', () => {
       const canonical = evidenceAt(project, 'evidence.json');
       const partial = await run(project, { claim: ['C2', 'C3'] });
       expect(partial.code).toBe(0);
-      const doc = evidenceAt(project, 'evidence-partial.json');
-      expect(doc.records.map((rec) => rec.reusedFrom)).toEqual([canonical.run.id, canonical.run.id]);
+      // The run converges into the canonical file (#293); its two selected records are the reused ones.
+      const doc = evidenceAt(project, 'evidence.json');
+      const selected = doc.records.filter((rec) => ['C2', 'C3'].includes(rec.claim.id));
+      expect(selected.map((rec) => [rec.reusedFrom, rec.carried])).toEqual([[canonical.run.id, undefined], [canonical.run.id, undefined]]);
+      expect(doc.records.filter((rec) => rec.carried).length).toBe(doc.records.length - 2);
       // One live run of each defender set licensed the carry-forward; no fault was applied.
       expect(doc.run.measurements.runnerInvocations).toBe(2);
       expect(doc.run.measurements.reuseBaselineRuns).toBe(2);

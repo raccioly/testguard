@@ -148,7 +148,8 @@ describe('the tools agree with the CLI, on a real project', () => {
 
   it('after a probe, brief and evidence carry the findings, and evidence filters by claim', async () => {
     const { io } = capture();
-    await main(['probe', scratch, '--claim', 'REDACT-001', '--budget', '30000', '--no-escalate', '--quiet', '--out', join(scratch, '.testguard', 'evidence.json')], io);
+    // A full probe: a --claim run reaches the canonical file only by converging into evidence already there (#293).
+    await main(['probe', scratch, '--budget', '30000', '--no-escalate', '--quiet', '--out', join(scratch, '.testguard', 'evidence.json')], io);
     const brief = await call('testguard_brief', { max: 3 });
     expect(validate('brief', brief).errors).toEqual([]);
     expect(brief.items.length).toBeGreaterThan(0);
@@ -169,7 +170,7 @@ describe('init --mcp', () => {
     const keys = Object.keys(r.mcpConfig);
     expect(keys).toHaveLength(3);
     expect(keys.join(' ')).toMatch(/Claude Code.*Cursor.*Codex/s);
-    expect(r.mcpConfig[keys[0]].mcpServers.testguard).toEqual({ command: 'npx', args: ['-y', 'testguard-cli', 'mcp'] });
+    expect(r.mcpConfig[keys[0]].mcpServers.testguard).toEqual({ command: 'npx', args: ['-y', 'testguard-cli@0.0.0', 'mcp'] });
     // printed, never written: a harness config is the person's file
     expect(r.done.some((d) => /mcp\.json|config\.toml/.test(d))).toBe(false);
     expect(initProject({ projectDir: dir }).mcpConfig).toBeUndefined();

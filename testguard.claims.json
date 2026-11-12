@@ -15292,7 +15292,7 @@
     },
     {
       "id": "TG-INIT-WRITES-THE-FAST-HOOKS",
-      "statement": "init writes a pre-push block that probes --changed auto through the project install, then PATH, then the latest release; CI that probes the change and runs the full probe nightly; and init --upgrade rewrites only TestGuard blocks and skills nobody edited.",
+      "statement": "init writes a pre-push block that probes --changed auto through the project install, then PATH, then exactly the version that wrote it; CI that probes the change and runs the full probe nightly; and init --upgrade rewrites only TestGuard blocks and skills nobody edited.",
       "source": {
         "kind": "spec",
         "ref": "issue #270 (fast by default)"
@@ -15311,7 +15311,7 @@
           "description": "The pre-push hook probes every claim.",
           "faultClass": "argument-swapped",
           "file": "src/init/managed.mjs",
-          "find": "  \"$@\" probe --changed auto --quiet",
+          "find": "  \"$@\" probe --changed auto --skip-without-base --quiet",
           "replace": "  \"$@\" probe --quiet",
           "producedBy": {
             "producer": "agent",
@@ -15320,11 +15320,11 @@
         },
         {
           "id": "F2",
-          "description": "The fallback CLI is pinned to an old release.",
+          "description": "The fallback CLI floats to the latest release.",
           "faultClass": "literal-changed",
           "file": "src/init/managed.mjs",
-          "find": "export const NPX_LATEST = 'npx -y testguard-cli@latest';",
-          "replace": "export const NPX_LATEST = 'npx -y testguard-cli@0.22.1';",
+          "find": "  return `npx -y testguard-cli@${version}`;",
+          "replace": "  return 'npx -y testguard-cli@latest';",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -15903,6 +15903,126 @@
           "file": "src/commands/baseline.mjs",
           "find": "  if (carried) io.out(",
           "replace": "  if (false) io.out(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TEMPLATES-PIN-WHAT-THEY-RUN",
+      "statement": "No template init writes can run a floating version: the fallback is the exact version that wrote it, GitHub Actions are pinned by commit SHA, init pins testguard-cli exactly in devDependencies and writes one dependency-update rule, and a floating version already in a hook or CI file is reported.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (templates pin what they run; the hook never starts a full probe)"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/init-pin.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Any version string is accepted as a pin.",
+          "faultClass": "guard-removed",
+          "file": "src/init/managed.mjs",
+          "find": "  if (!/^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$/.test(version ?? '')) throw new TypeError(`a template pins an exact version, not ${JSON.stringify(version)}`);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "checkout is pinned by a movable tag.",
+          "faultClass": "literal-changed",
+          "file": "src/init/managed.mjs",
+          "find": "  checkout: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',",
+          "replace": "  checkout: 'actions/checkout@v7',",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The devDependency floats.",
+          "faultClass": "literal-changed",
+          "file": "src/init/pin.mjs",
+          "find": "  pkg.devDependencies = { ...(pkg.devDependencies ?? {}), [PACKAGE]: version };",
+          "replace": "  pkg.devDependencies = { ...(pkg.devDependencies ?? {}), [PACKAGE]: 'latest' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A second npm rule is appended to a Dependabot file that has one.",
+          "faultClass": "condition-forced",
+          "file": "src/init/pin.mjs",
+          "find": "  if (!npm && lastTop && /^updates:\\s*$/.test(lastTop)) return",
+          "replace": "  if (lastTop && /^updates:\\s*$/.test(lastTop)) return",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A floating version is never reported.",
+          "faultClass": "condition-forced",
+          "file": "src/init/managed.mjs",
+          "find": "      if (floating) findings.push(",
+          "replace": "      if (false) findings.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-HOOK-NEVER-STARTS-A-FULL-PROBE",
+      "statement": "probe --changed auto --skip-without-base probes nothing, writes nothing and exits 0 in one line when no base is found, and --no-full-fallback refuses with kind no-base; without either, the run says first that it probes every claim.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (templates pin what they run; the hook never starts a full probe)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/changed-auto-no-base.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A skip probes every claim instead.",
+          "faultClass": "statement-deleted",
+          "file": "src/commands/probe.mjs",
+          "find": "    if (decision.skip) { io.err(decision.message); return 0; }\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "--no-full-fallback falls back to a full probe.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/probe.mjs",
+          "find": "  if (noFullFallback) return",
+          "replace": "  if (false) return",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

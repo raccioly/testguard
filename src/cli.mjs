@@ -75,7 +75,11 @@ probe
                        or timed out) exits 2 and probes nothing; it is never read as an empty change. Refused with --ref and
                        --in-place (exit 3). --json: run.scope.changed. --changed auto finds the base offline: the CI base
                        branch, the remote default branch, a differently named upstream, then the branch's own upstream
-                       (the commits not pushed yet); with none of them it probes every claim. The pre-push form
+                       (the commits not pushed yet); with none of them it probes every claim and says so first. The pre-push
+                       form adds --skip-without-base, so a hook never starts a full probe.
+  --no-full-fallback   with --changed auto: no base found is a refusal (exit 2, kind no-base), never a probe of every claim
+  --skip-without-base  with --changed auto: no base found prints one line saying why and what to run, and exits 0 without
+                       probing (what the pre-push hook uses: CI and the nightly job are the gate). Not with --json.
   --fail-on-empty-selection  with --changed: a change that selects no claim exits 2 instead of 0 (either way it says so and
                        lists the changed source files no claim covers: absence from the results is not a pass)
   --include-dirty      probe the working tree (a snapshot commit) instead of HEAD; uncommitted tests count
@@ -285,6 +289,8 @@ async function dispatch(argv, io, seen) {
         'include-dirty': { type: 'boolean', default: false },
         changed: { type: 'string' },
         'fail-on-empty-selection': { type: 'boolean', default: false },
+        'no-full-fallback': { type: 'boolean', default: false },
+        'skip-without-base': { type: 'boolean', default: false },
         since: { type: 'string' },
         exclude: { type: 'string', multiple: true },
         cap: { type: 'string' },

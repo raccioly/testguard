@@ -175,11 +175,10 @@
         "newSinceBaseline": { "type": "integer", "minimum": 0 },
         "exitCode": { "enum": [0, 1, 2] },
         "reuse": {
-          "description": "Copied from the evidence's run.reuse: records carried forward versus measured by this invocation; for a converged scoped run (#293), of the written document, with `carried` and `stale`.",
+          "description": "Copied from the evidence's run.reuse: records carried forward versus measured by this invocation. A converged scoped run (#293) reports what it carried without a run in `converged`, not here.",
           "type": "object",
           "required": ["reused", "measured"],
-          "properties": { "reused": { "type": "integer", "minimum": 0 }, "measured": { "type": "integer", "minimum": 0 }, "carried": { "type": "integer", "minimum": 0 }, "stale": { "type": "integer", "minimum": 0 } },
-          "dependentRequired": { "carried": ["stale"], "stale": ["carried"] },
+          "properties": { "reused": { "type": "integer", "minimum": 0 }, "measured": { "type": "integer", "minimum": 0 } },
           "additionalProperties": false
         },
         "converged": {
@@ -410,7 +409,7 @@
       }
     },
     "advice": {
-      "description": "Where the run is leaving speed on the table (#270), one line each with the exact command to run: `serial-on-multicore` (the last probe ran one fault at a time by request on a machine where the automatic width is above one), `full-probe-where-changed-would-do` (the next step is a probe and the change since a known base can affect fewer claims than there are), `nothing-reused` (the last probe, a minute or longer, carried no verdict forward), `hook-outdated` (a hook or CI file runs TestGuard with `--serial`, a full probe on every push, a pinned older version, or an older managed template). Informational: advice never changes `state`, `next`, a verdict or an exit code, and computing it makes no network call. Absent when nothing applies, and for a selection's view.",
+      "description": "Where the run is leaving speed on the table (#270), one line each with the exact command to run: `serial-on-multicore` (the last probe ran one fault at a time by request on a machine where the automatic width is above one), `full-probe-where-changed-would-do` (the next step is a probe and the change since a known base can affect fewer claims than there are), `nothing-reused` (the last probe, a minute or longer, carried no verdict forward), `hook-outdated` (a hook or CI file runs TestGuard with `--serial`, a full probe on every push, a pinned older version, a floating version such as testguard-cli@latest, or an older managed template). Informational: advice never changes `state`, `next`, a verdict or an exit code, and computing it makes no network call. Absent when nothing applies, and for a selection's view.",
       "type": "array",
       "items": {
         "type": "object",

@@ -244,8 +244,10 @@ describe('probe --partial-on-budget through the command', () => {
     const project = partialBudgetProject();
     try {
       const canonical = join(project.dir, '.testguard', 'evidence.json');
-      // A real evidence document at the canonical path, from one claim: how much it holds is not what is under test.
-      const first = await run(project, { 'command-budget': undefined, 'partial-on-budget': false, claim: ['C1'], out: canonical }, 99);
+      // A real evidence document at the canonical path, from a full probe. (A
+      // --claim run names the canonical file only by converging into existing
+      // evidence, #293; with none there it writes the partial file.)
+      const first = await run(project, { 'command-budget': undefined, 'partial-on-budget': false, out: canonical }, 99);
       expect(first.code).toBe(0);
       expect(existsSync(canonical)).toBe(true);
       const before = readFileSync(canonical, 'utf8');

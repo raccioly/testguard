@@ -128,14 +128,23 @@ It also writes a **pre-push block** that runs `probe --changed auto`: in
 `git config core.hooksPath .githooks`). Anything else in that file stays. It
 never writes `.git/hooks`. Then it reports, with `~` lines, every hook and CI
 line that runs `probe --serial`, a full probe on every push, a pinned older
-`testguard-cli` or an older TestGuard template.
+`testguard-cli`, a floating version (the `latest` tag, or `npx
+testguard-cli` with no version) or an older TestGuard template.
+
+Every hook and CI file it writes runs the project's installed TestGuard first,
+else exactly the version that ran `init` through `npx`, never a floating tag.
+With a `package.json`, `init` also adds `testguard-cli` at that exact version to
+`devDependencies` (run your install so the lockfile records it) and writes a
+Dependabot rule for it in `.github/dependabot.yml`, or a Renovate rule when the
+repository has a Renovate config, so a new release arrives as a pull request
+your CI gates.
 
 | Flag | Default | Meaning |
 |---|---|---|
 | `--here` | off | Keep the agent layer in `[dir]` instead of the git root, for a subdirectory that is its own agent root. |
 | `--force` | off | Replace an existing skill file (and an existing `.testguard/fetch-ci-evidence.sh`), and TestGuard blocks edited by hand. It does not refresh an `AGENTS.md` section that already lists the project. |
 | `--upgrade` | off | Rewrite what TestGuard wrote and nobody edited — the skill, the `AGENTS.md` section, the pre-push block, the `--ci` file — to the current template. Each managed block carries `template=<n>` and the hash of its body; an edited one is reported and left alone. See [upgrading](../upgrade.md#024-fast-by-default). |
-| `--ci github\|gitlab` | none | Write `.github/workflows/testguard.yml` (GitHub) or `testguard.gitlab-ci.yml` to `include:` (GitLab): pull or merge requests run `probe --changed auto`, scheduled and manual runs run `probe`, and `.testguard/evidence.json` is cached. It calls `npx -y testguard-cli@latest`. Any other value is a usage error (exit `3`). |
+| `--ci github\|gitlab` | none | Write `.github/workflows/testguard.yml` (GitHub) or `testguard.gitlab-ci.yml` to `include:` (GitLab): pull or merge requests run `probe --changed auto`, scheduled and manual runs run `probe`, and `.testguard/evidence.json` is cached. It runs the project's installed TestGuard, else `npx -y testguard-cli@<the version that ran init>`, and pins every action by commit SHA. Any other value is a usage error (exit `3`). |
 | `--ci-evidence github\|gitlab` | none | Also write `.testguard/fetch-ci-evidence.sh`, an on-demand helper that downloads CI's evidence artifact and briefs from it. See [artifacts](artifacts.md#fetch-ci-evidencesh). Any other value is a usage error (exit `3`) and nothing is written. |
 | `--mcp` | off | Print the MCP server configuration for Claude Code, Cursor and Codex. Printed, never written. See [MCP](mcp.md#register-the-server). |
 | `--json` | off | Print `{done, skipped, warnings, agentRoot, dir, mcpConfig?}`. |
@@ -215,7 +224,9 @@ spec before it is written.
 | `--baseline <path>` | `<dir>/.testguard/baseline.json` if present | Baseline to gate against. |
 | `--severity <level>` | `low` | Gate only findings whose claim severity is at or above this level. Findings below are still reported and written. |
 | `--claim <ID,ID>` | every claim | Probe only these claims. Repeatable, order-preserving, duplicates collapsed. A confirmed run converges into `evidence.json`: measured records replace the old ones, the rest are carried only when their inputs are unchanged (`carried`); a provisional, budget-cut, `--ref`, `--no-reuse` or `--out`-elsewhere run writes `evidence-partial.json` and says why. |
-| `--changed <ref>` | none | `auto` finds the base offline: the CI base branch, the remote default branch, a differently named upstream, then the branch's own upstream (the commits not pushed yet); with none it probes every claim and says so. Otherwise: probe only the claims the change since `merge-base(<ref>, HEAD)` can have affected: a fault's target, a defender, or anything they import differs (a rename counts through its old and new path; `--include-dirty` reads the working tree). Intersects with `--claim`. Writes `evidence-partial.json`. A change git cannot measure (`ref-unresolved`, `no-merge-base`, `git-timeout`, `git-failed`) exits `2` and probes nothing; it is never read as an empty change. Refused with `--ref` and `--in-place` (exit `3`). See [probing a change](../../spec/GATE-SEMANTICS.md#probing-a-change). |
+| `--changed <ref>` | none | `auto` finds the base offline: the CI base branch, the remote default branch, a differently named upstream, then the branch's own upstream (the commits not pushed yet); with none it probes every claim and says so. Otherwise: probe only the claims the change since `merge-base(<ref>, HEAD)` can have affected: a fault's target, a defender, or anything they import differs (a rename counts through its old and new path; `--include-dirty` reads the working tree). Intersects with `--claim`. A confirmed run converges into `evidence.json` (records it did not measure are carried only when their inputs are unchanged); otherwise it writes `evidence-partial.json`. A change git cannot measure (`ref-unresolved`, `no-merge-base`, `git-timeout`, `git-failed`) exits `2` and probes nothing; it is never read as an empty change. Refused with `--ref` and `--in-place` (exit `3`). See [probing a change](../../spec/GATE-SEMANTICS.md#probing-a-change). |
+| `--skip-without-base` | off | With `--changed auto`: when no base is found, probe nothing, write nothing, print one line saying why and what to run, and exit `0`. The pre-push block passes it, so a hook never starts a full probe. Refused without `--changed auto` and with `--json` (exit `3`). |
+| `--no-full-fallback` | off | With `--changed auto`: when no base is found, refuse (exit `2`, error kind `no-base`) instead of probing every claim. Refused without `--changed auto` (exit `3`). |
 | `--fail-on-empty-selection` | off | With `--changed`: a change that selects no claim exits `2` instead of `0`. Either way the run says so, probes nothing, writes no evidence and lists the changed source files no claim covers. Refused without `--changed` (exit `3`). |
 | `--include-dirty` | off | Probe the working tree (snapshotted into a throwaway commit) instead of HEAD, so uncommitted tests count. |
 | `--ref <commit>` | `HEAD` | Probe this commit in the scratch worktree. Honoured even when defender or target files are dirty: a warning names them and the evidence records them as `repo.ignoredDirty`. |

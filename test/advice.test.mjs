@@ -72,9 +72,11 @@ describe('hook-outdated', () => {
         expect.stringMatching(/^\.github\/workflows\/ci\.yml:4: pins testguard-cli@0\.18\.0; 0\.23\.0 is installed here/),
       ]);
       expect(advice.every((a) => a.id === 'hook-outdated' && a.command === 'testguard init --upgrade')).toBe(true);
-      // The current version and the latest tag are not stale.
+      // The current version is not stale; a floating tag is a finding (#293).
       writeFileSync(join(root, '.github/workflows/ci.yml'), 'jobs:\n  t:\n    steps:\n      - run: npx -y testguard-cli@0.23.0 probe .\n      - run: npx -y testguard-cli@latest probe --changed auto\n');
-      expect(hookAdvice({ root, toolVersion: '0.23.0' }).filter((a) => a.message.includes('ci.yml'))).toEqual([]);
+      expect(hookAdvice({ root, toolVersion: '0.23.0' }).filter((a) => a.message.includes('ci.yml')).map((a) => a.message)).toEqual([
+        expect.stringMatching(/^\.github\/workflows\/ci\.yml:5: runs testguard-cli@latest: a floating version/),
+      ]);
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 

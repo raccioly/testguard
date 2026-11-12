@@ -1301,7 +1301,10 @@ async function planFault(args, pre) {
   if (pre.reusedOutright || pre.reuseAsk) {
     const live = pre.reuseAsk ? await ensureBaseline(defenders, 1, stage, { reuse: true }) : null;
     if (!live || live.runs.every((run) => run.outcome === 'pass')) {
-      return { record: { ...prior, defenders: { ...prior.defenders, ...defenderSelection(claim, fault) }, reusedFrom: prior.reusedFrom ?? priorRunId } };
+      // A record a converging run carried (#293) is reused here under the full
+      // rule, live baseline included: it is no longer a carried record.
+      const { carried, ...reused } = prior;
+      return { record: { ...reused, defenders: { ...prior.defenders, ...defenderSelection(claim, fault) }, reusedFrom: prior.reusedFrom ?? priorRunId } };
     }
   }
 

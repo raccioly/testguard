@@ -38,6 +38,16 @@ async function probedThenEdited() {
 }
 
 describe('a change-scoped probe converges the canonical evidence', () => {
+  it('a later scoped run reuses a carried record under the full rule, and it is no longer marked carried', async () => {
+    const p = await probedThenEdited();
+    expect((await run(['probe', p.dir, ...node, '--changed', 'HEAD~1', '--quiet'])).code).toBe(0);
+    expect(read(canonical(p.dir)).records.filter((x) => x.claim.id === 'PRICE-TOTAL').map((x) => x.carried)).toEqual(['inputs-match', 'inputs-match']);
+    const r = await run(['probe', p.dir, ...node, '--claim', 'PRICE-TOTAL', '--json']);
+    expect(r.code).toBe(0);
+    const price = read(canonical(p.dir)).records.filter((x) => x.claim.id === 'PRICE-TOTAL');
+    expect(price.map((x) => [Boolean(x.reusedFrom), x.carried])).toEqual([[true, undefined], [true, undefined]]);
+  });
+
   it('names the records it kept stale, and baseline refuses the document', async () => {
     const p = await probedThenEdited();
     touch(p.dir, 'src/price.mjs');

@@ -16,6 +16,7 @@ import { assertionPolicyRequest, evaluateAssertionPolicy, renderAssertionPolicy,
 import { readNativeTestUniverse } from '../probe/universe.mjs';
 import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
 import { runnerOptions } from './runner-options.mjs';
+import { PreconditionError } from '../probe/precondition-error.mjs';
 import { resolveFaultWorkers } from '../probe/fan-out.mjs';
 import { availableParallelism } from 'node:os';
 import { computeAdvice, renderAdvice } from '../status/advice.mjs';
@@ -36,8 +37,14 @@ export const baselinePath = (projectDir) => join(projectDir, '.testguard', 'base
  * shallow CI checkout), is a full probe — never a skip — and the second says
  * how to fix it. `warn` lines are printed even under --quiet.
  */
-export function autoChangedDecision(detected, resolves) {
+export function autoChangedDecision(detected, resolves, { noFullFallback = false, skip = false } = {}) {
   if (detected && resolves) return { changed: detected.ref, message: `--changed auto: comparing against ${detected.ref} (${detected.from})`, warn: false };
+  const why = detected
+    ? `${detected.ref} (${detected.from}) does not resolve here; fetch it (GitHub Actions: actions/checkout with fetch-depth: 0)`
+    : 'no base to compare against (no CI base branch, no remote default branch, no upstream)';
+  // A hook never starts a full probe (#293): skip, or refuse, and say what to run instead.
+  if (skip) return { changed: undefined, skip: true, message: `testguard: --changed auto found ${detected ? 'a base that ' + why : why}, so nothing was probed; CI and the nightly job probe this change. To probe it here: testguard probe --changed <base-branch>` };
+  if (noFullFallback) return { changed: undefined, refuse: true, message: `--changed auto: ${why}, and --no-full-fallback refuses to probe every claim instead; pass --changed <ref>` };
   if (detected) return { changed: undefined, message: `--changed auto: ${detected.ref} (${detected.from}) does not resolve here, so every claim is probed; fetch it (GitHub Actions: actions/checkout with fetch-depth: 0) to probe only the change`, warn: true };
   return { changed: undefined, message: '--changed auto: no base to compare against (no CI base branch, no remote default branch, no upstream), so every claim is probed', warn: true };
 }
@@ -145,6 +152,14 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     io.err('--changed selects against the tree being probed, so it cannot be combined with --ref or --in-place');
     return 3;
   }
+  if ((values['no-full-fallback'] || values['skip-without-base']) && values.changed !== 'auto') {
+    io.err(`--${values['no-full-fallback'] ? 'no-full-fallback' : 'skip-without-base'} needs --changed auto: only a base TestGuard looks for itself can be missing`);
+    return 3;
+  }
+  if (values['skip-without-base'] && values.json) {
+    io.err('--skip-without-base cannot be combined with --json: a skipped run has no document to print; use --no-full-fallback for a JSON refusal');
+    return 3;
+  }
   if (values['fail-on-empty-selection'] && values.changed === undefined) {
     io.err('--fail-on-empty-selection needs --changed <ref>: only a change-based selection can come up empty');
     return 3;
@@ -211,7 +226,11 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   // CI job need it. Nothing to compare against is a full probe, never a skip.
   if (values.changed === 'auto') {
     const detected = resolveAutoChangedRef({ projectDir });
-    const decision = autoChangedDecision(detected, Boolean(detected && headSha(repoRoot(projectDir), detected.ref)));
+    const decision = autoChangedDecision(detected, Boolean(detected && headSha(repoRoot(projectDir), detected.ref)), { noFullFallback: values['no-full-fallback'], skip: values['skip-without-base'] });
+    // #293: a hook never starts a full probe. No base is a skip (exit 0: CI and
+    // the nightly job are the gate) or a refusal, said in one line.
+    if (decision.skip) { io.err(decision.message); return 0; }
+    if (decision.refuse) throw new PreconditionError(decision.message, 'no-base');
     if (decision.message && (decision.warn || !values.quiet)) io.err(decision.message);
     values = { ...values, changed: decision.changed };
   }
@@ -392,7 +411,7 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
         baseline: values.baseline ? resolve(values.baseline) : baselinePath(projectDir),
       },
     }), io.err);
-    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: measured.length, newSinceBaseline: g.new.length, exitCode, ...(evidence.run.reuse ? { reuse: evidence.run.reuse } : {}), ...(only ? { converged: converged ? { into: outPath, carriedFrom: converged.from, carried: converged.carried, stale: converged.stale } : { into: null, reason: convergeReason ?? 'not requested' } } : {}), ...(policy ? { originPolicy: policy } : {}), ...(weak ? { assertionPolicy: weak } : {}), ...(scope ? { scope: { ...scope, state: view.state, next: view.next } } : {}), ...(evidence.run.budget ? { budget: evidence.run.budget } : {}), ...(incomplete ? { failureKind: incomplete.failureKind, ...(incomplete.unprovenAtLeast !== undefined ? { unprovenAtLeast: incomplete.unprovenAtLeast } : {}) } : {}), claims: claimResults(measured) }, ...(values.cost ? { cost: costReport(measured, { run: probed.run }) } : {}) };
+    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: measured.length, newSinceBaseline: g.new.length, exitCode, ...(probed.run.reuse ? { reuse: probed.run.reuse } : {}), ...(only ? { converged: converged ? { into: outPath, carriedFrom: converged.from, carried: converged.carried, stale: converged.stale } : { into: null, reason: convergeReason ?? 'not requested' } } : {}), ...(policy ? { originPolicy: policy } : {}), ...(weak ? { assertionPolicy: weak } : {}), ...(scope ? { scope: { ...scope, state: view.state, next: view.next } } : {}), ...(evidence.run.budget ? { budget: evidence.run.budget } : {}), ...(incomplete ? { failureKind: incomplete.failureKind, ...(incomplete.unprovenAtLeast !== undefined ? { unprovenAtLeast: incomplete.unprovenAtLeast } : {}) } : {}), claims: claimResults(measured) }, ...(values.cost ? { cost: costReport(measured, { run: probed.run }) } : {}) };
     const result = validate('status', doc);
     if (!result.ok) throw new Error(`probe JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
     io.out(JSON.stringify(doc, null, 2));
