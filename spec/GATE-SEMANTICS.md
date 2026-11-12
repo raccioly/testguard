@@ -713,11 +713,20 @@ check order is this rule.
    different command or checker version. A record carrying `detail.typecheck`
    requires a run that declares `run.typecheck`.
    **Type validity belongs to the whole program**, which no per-fault hash sees
-   (a file added elsewhere can make a clean fault invalid). So when a run that
-   type checks would carry a record forward, it first type checks that fault
-   again — one check, no test run — and carries the record forward only if
-   `detail.typecheck` comes out the same; a `diagnostics` record is carried
-   forward without any test run, since none produced it. A custom command's
+   (a file added elsewhere, or an ambient `.d.ts` nothing imports, can make a
+   clean fault invalid). So the project's own `tsc` records, once per run,
+   `run.typecheck.programDigest` (#293): a hash of tsconfig.json, the resolved
+   configuration (`--showConfig`) and every file `tsc --listFilesOnly` reports
+   for the unmodified tree, a package's files by its name and version and any
+   other file by its content. Reuse and carrying need the same `commandHash`,
+   `version` and `programDigest`, and the run's own clean baseline type check;
+   a fault's recorded `detail.typecheck` then stands with no check of the fault.
+   A different digest reuses and carries nothing. A record from a run that
+   recorded no digest (0.24.0, or a custom command, which cannot list its
+   program) is checked again, fault by fault (one check, no test run), and is
+   carried forward only if `detail.typecheck` comes out the same; after such a
+   run the default command's evidence has a digest. A `diagnostics` record is
+   carried forward without any test run, since none produced it. A custom command's
    `version` is best-effort (the command's own `--version` plus the project's
    `typescript` when it resolves); `--no-reuse` covers a checker that changes
    under neither.
@@ -1374,9 +1383,11 @@ next full probe (#293). The written document holds, in claims-file order:
   check is the input half of rule 8's reuse rule (target, defenders, test
   universe, discovery, import closure, fault content, claim metadata), plus
   the same run-level rule (tool version and instrument digest, N, worker
-  policy, runner, type-check command). Under `--typecheck`, the fault is type
-  checked once more and is carried only if `detail.typecheck` agrees. What it
-  leaves out is the live baseline: no defender runs for a carried record;
+  policy, runner, type-check command and program digest). Under `--typecheck`
+  with equal digests no fault is checked again; evidence without a digest is
+  checked fault by fault, and a fault is carried only if `detail.typecheck`
+  agrees. What it leaves out is the live baseline: no defender runs for a
+  carried record;
 - **kept stale** (`carried: "inputs-changed"`, with `reusedFrom`): every other
   record, unchanged. It describes another tree. It is kept so that its verdict
   is not lost (`changedFaults` and `review-fault-change` depend on it), never

@@ -11338,8 +11338,8 @@
           "description": "A different checker version is the same instrument.",
           "faultClass": "condition-forced",
           "file": "src/probe/typecheck.mjs",
-          "find": "  return recorded.commandHash === current.commandHash && recorded.version === current.version;",
-          "replace": "  return recorded.commandHash === current.commandHash;",
+          "find": "  if (recorded.commandHash !== current.commandHash || recorded.version !== current.version) return false;",
+          "replace": "  if (recorded.commandHash !== current.commandHash) return false;",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -11402,14 +11402,15 @@
           "description": "A clean verdict is carried forward without checking that the fault still type-checks.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "  if (typechecker && anchor?.status === 'ok') {",
+          "find": "  if (typechecker && anchor?.status === 'ok' && !digestVouches) {",
           "replace": "  if (typechecker && anchor?.status === 'ok' && !reusable) {",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
           },
           "defendedBy": [
-            "test/typecheck-reuse-program.test.mjs"
+            "test/typecheck-reuse-program.test.mjs",
+            "test/typecheck-program-digest.test.mjs"
           ]
         }
       ]
@@ -15153,8 +15154,8 @@
           "description": "A reused verdict loses the id of the run it came from.",
           "faultClass": "field-dropped",
           "file": "src/probe/probe.mjs",
-          "find": "{ record, runId: doc.run.id }",
-          "replace": "{ record, runId: undefined }",
+          "find": "{ record, runId: doc.run.id, typecheck: doc.run.typecheck }",
+          "replace": "{ record, runId: undefined, typecheck: doc.run.typecheck }",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -16196,6 +16197,114 @@
           "faultClass": "statement-deleted",
           "file": "src/probe/origin-policy.mjs",
           "find": "    if (record.carried === 'inputs-changed') reasons.add('stale-inputs');\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TYPECHECK-PROGRAM-DIGEST-VOUCHES",
+      "statement": "Under --typecheck one program digest per run (tsconfig, resolved configuration, every listed file; packages by name and version) stands in for a type check per reused or carried fault; a different program reuses nothing, and evidence without a digest is checked fault by fault once.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #293 (orchestrator decision 2)"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/typecheck-program-digest.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A program file's content is left out of the digest.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/typecheck.mjs",
+          "find": "    entries.add(`file ${rel} ${hash}`);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Different program digests count as the same type check.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/typecheck.mjs",
+          "find": "  if (recorded.programDigest && current.programDigest) return recorded.programDigest === current.programDigest;",
+          "replace": "  if (recorded.programDigest && current.programDigest) return true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Every reused fault is type checked again.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "  if (typechecker && anchor?.status === 'ok' && !digestVouches) {",
+          "replace": "  if (typechecker && anchor?.status === 'ok') {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CHANGED-SELECTS-DISCOVERY-INPUTS",
+      "statement": "probe --changed selects a claim with discovered defenders when one of its discovery inputs changed, found now or recorded in its evidence, and names the reason discovery.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #297"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-scope-discovery.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Current discovery inputs are ignored.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/scope.mjs",
+          "find": "      for (const file of detailed.dependencies) discovery.add(file);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Recorded discovery inputs are ignored.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/scope.mjs",
+          "find": "  const discovery = new Set(recorded);",
+          "replace": "  const discovery = new Set();",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A discovery match is not a reason to select.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/scope.mjs",
+          "find": "    else if (byDiscovery) reasons.set(claim.id, { claimId: claim.id, kind: 'discovery', file: byDiscovery });\n",
           "replace": "",
           "producedBy": {
             "producer": "agent",
