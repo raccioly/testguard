@@ -77,7 +77,7 @@
     },
     {
       "name": "js-playwright-gallery-partial",
-      "args": "--subject js-playwright-gallery --mode partial --mode typecheck --mode changed",
+      "args": "--subject js-playwright-gallery --mode partial --mode typecheck --mode changed --mode converge",
       "timeout": 20,
       "browser": true
     },
