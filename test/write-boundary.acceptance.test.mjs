@@ -13,7 +13,7 @@
 // written to either is a write outside the boundary. Expectations come from
 // the fixtures' own expected.json, which was verified by hand.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { cpSync, existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -169,30 +169,55 @@ describe.each(FIXTURES)('write boundary: $name', (fixture) => {
 
 // #279: a git worktree whose node_modules (root and per package) are SYMLINKS
 // to the main checkout's install, probed with the built-in runner and with a
-// runner command that runs the package manager (`pnpm vitest`, `npx vitest`).
-// The install is WRITABLE: a read-only one would have hidden the write. 0.22.1
-// rewrote the main checkout's links to point into a scratch directory that it
-// then deleted. Every entry under the main checkout's node_modules trees is
-// listed before and after; the listing must be non-empty and unchanged.
-const VITEST_VERSION = JSON.parse(readFileSync(join(ROOT, 'node_modules', 'vitest', 'package.json'), 'utf8')).version;
-const HAS_PNPM = spawnSync('pnpm', ['--version'], { encoding: 'utf8' }).status === 0;
-const PNPM = HAS_PNPM ? ['pnpm'] : ['npx', '--yes', 'pnpm@11.11.0'];
-const MANAGERS = [
-  { pm: 'npm', install: ['npm', 'install', '--no-audit', '--no-fund', '--prefer-offline'], runnerCmd: 'npx vitest run {files} --reporter=json --outputFile={out}' },
-  { pm: 'pnpm', install: [...PNPM, 'install', '--prefer-offline'], runnerCmd: `${PNPM.join(' ')} vitest run {files} --reporter=json --outputFile={out}`, skip: !HAS_PNPM && !FULL },
-];
-
-// The package manager and the probes run outside any outer `npm test`: its
-// npm_* variables (prefix, workspace, lifecycle) would point the nested npm at
-// the testguard repository (CI: "Cannot read properties of null (reading 'edgesOut')").
-const CLEAN_ENV = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^npm_/i.test(key) && key !== 'INIT_CWD'));
+// runner command, with and without --include-dirty. The install is WRITABLE:
+// a read-only one would have hidden a write. 0.22.1 rewrote the main
+// checkout's links to point into a scratch directory it then deleted.
+//
+// The install is built by hand, in the exact shape npm and pnpm produce
+// (workspace links, scope directories, `.bin`, metadata, and for pnpm the
+// `.pnpm/<name>@<version>/node_modules/<name>` store with links into it), with
+// the repository's own vitest as the package the links resolve to. No package
+// manager runs and nothing touches the network (the hermeticity job proves it).
+// test/manual/repro-279-pnpm.sh is the real-pnpm reproduction this shape was
+// taken from; it runs outside `npm test`. Every entry under the main
+// checkout's node_modules trees is listed before and after each probe: the
+// listing must be non-empty and unchanged.
+const VITEST_DIR = realpathSync(join(ROOT, 'node_modules', 'vitest'));
+const VITEST_VERSION = JSON.parse(readFileSync(join(VITEST_DIR, 'package.json'), 'utf8')).version;
 // A tool's own cache directory in the caller's tree (`node_modules/.vitest-cache`, `.vite`) is not the install: test
 // discovery over a dirty tree runs in the caller's tree, which GATE-SEMANTICS documents as not redirectable. What #279
 // protects is the install itself: every package entry, link, bin and metadata file.
 const TOOL_CACHE = /\/node_modules\/\.(?:vite|vite-temp|vitest|vitest-cache|cache)(?:\/|$)/;
+const SHIM = '#!/bin/sh\nbasedir=$(dirname "$(echo "$0" | sed -e \'s,\\\\,/,g\')")\nexec node "$basedir/../vitest/vitest.mjs" "$@"\n';
 
-describe.each(MANAGERS)('write boundary: a worktree whose node_modules are symlinks into the main checkout\'s $pm workspace install (#279)', ({ pm, install, runnerCmd, skip }) => {
-  let base; let main; let wt; let installListing; let runs = [];
+/** The install a package manager leaves in `main`, by hand. */
+function handBuiltInstall(main, pm) {
+  const file = (rel, text) => { makeDir(dirname(join(main, rel))); writeFileSync(join(main, rel), text); };
+  const link = (rel, to) => { makeDir(dirname(join(main, rel))); symlinkSync(to, join(main, rel), 'dir'); };
+  if (pm === 'npm') {
+    link('node_modules/vitest', VITEST_DIR); // npm installs a real directory; the repository's own package stands in for it
+    link('node_modules/@ws/a', '../../packages/a');
+    link('node_modules/@ws/b', '../../packages/b');
+    file('node_modules/.bin/vitest', SHIM);
+    file('node_modules/.package-lock.json', JSON.stringify({ name: 'ws279', lockfileVersion: 3, packages: { 'node_modules/@ws/a': { resolved: 'packages/a', link: true }, 'node_modules/@ws/b': { resolved: 'packages/b', link: true } } }, null, 2));
+    return;
+  }
+  const store = `node_modules/.pnpm/vitest@${VITEST_VERSION}/node_modules/vitest`;
+  link(store, VITEST_DIR); // the store holds the package (a hard-linked copy); the repository's own stands in for it
+  link('node_modules/vitest', `.pnpm/vitest@${VITEST_VERSION}/node_modules/vitest`);
+  link(`node_modules/.pnpm/node_modules/vitest`, `../vitest@${VITEST_VERSION}/node_modules/vitest`);
+  file('node_modules/.bin/vitest', SHIM);
+  file('node_modules/.pnpm/node_modules/.bin/vitest', SHIM);
+  file('node_modules/.pnpm/lock.yaml', "lockfileVersion: '9.0'\n");
+  file('node_modules/.modules.yaml', `{\n  "layoutVersion": 5,\n  "nodeLinker": "isolated",\n  "virtualStoreDir": ".pnpm"\n}\n`);
+  file('node_modules/.pnpm-workspace-state-v1.json', JSON.stringify({ lastValidatedTimestamp: 1, projects: { [main]: { name: 'ws279' }, [join(main, 'packages/a')]: { name: '@ws/a' }, [join(main, 'packages/b')]: { name: '@ws/b' } } }, null, 2));
+  link('packages/a/node_modules/vitest', `../../../node_modules/.pnpm/vitest@${VITEST_VERSION}/node_modules/vitest`);
+  link('packages/a/node_modules/@ws/b', '../../../b');
+  file('packages/a/node_modules/.bin/vitest', SHIM);
+}
+
+describe.each([{ pm: 'npm' }, { pm: 'pnpm' }])('write boundary: a worktree whose node_modules are symlinks into the main checkout\'s $pm workspace install (#279)', ({ pm }) => {
+  let base; let main; let wt; let installListing; const runs = [];
   const mainInstalls = () => {
     const all = new Map();
     for (const dir of [join(main, 'node_modules'), join(main, 'packages', 'a', 'node_modules'), join(main, 'packages', 'b', 'node_modules')]) {
@@ -201,14 +226,13 @@ describe.each(MANAGERS)('write boundary: a worktree whose node_modules are symli
     return all;
   };
   beforeAll(() => {
-    if (skip) return;
-    base = mkdtempSync(join(tmpdir(), `tg-279-${pm}-`));
+    base = realpathSync(mkdtempSync(join(tmpdir(), `tg-279-${pm}-`)));
     main = join(base, 'main');
     const files = {
       'package.json': JSON.stringify({ name: 'ws279', private: true, type: 'module', ...(pm === 'npm' ? { workspaces: ['packages/*'] } : {}), devDependencies: { vitest: VITEST_VERSION } }),
       ...(pm === 'pnpm' ? { 'pnpm-workspace.yaml': "packages:\n  - 'packages/*'\n" } : {}),
       '.gitignore': 'node_modules/\n.testguard/\n',
-      'packages/a/package.json': JSON.stringify({ name: '@ws/a', version: '1.0.0', type: 'module', exports: './src/area.js', dependencies: { '@ws/b': pm === 'pnpm' ? 'workspace:*' : '1.0.0' }, devDependencies: { vitest: VITEST_VERSION } }),
+      'packages/a/package.json': JSON.stringify({ name: '@ws/a', version: '1.0.0', type: 'module', exports: './src/area.js', dependencies: { '@ws/b': pm === 'pnpm' ? 'workspace:*' : '1.0.0' } }),
       'packages/a/src/area.js': "import { mul } from '@ws/b';\nexport const area = (w, h) => mul(w, h);\n",
       'packages/a/test/area.test.js': "import { test, expect } from 'vitest';\nimport { area } from '../src/area.js';\ntest('area', () => { expect(area(3, 4)).toBe(12); });\n",
       'packages/b/package.json': JSON.stringify({ name: '@ws/b', version: '1.0.0', type: 'module', exports: './src/mul.js' }),
@@ -216,8 +240,7 @@ describe.each(MANAGERS)('write boundary: a worktree whose node_modules are symli
       'testguard.claims.json': JSON.stringify({ schemaVersion: 1, claims: [{ id: 'AREA', statement: 'Area multiplies.', source: { kind: 'spec', ref: 'README.md' }, severity: 'high', producedBy: { producer: 'agent', by: 'fixture' }, defendedBy: ['packages/a/test/area.test.js'], faults: [{ id: 'F1', description: 'Add instead.', faultClass: 'return-altered', file: 'packages/b/src/mul.js', find: 'a * b', replace: 'a + b', producedBy: { producer: 'agent', by: 'fixture' } }] }] }),
     };
     for (const [name, text] of Object.entries(files)) { makeDir(dirname(join(main, name))); writeFileSync(join(main, name), text); }
-    const installed = spawnSync(install[0], install.slice(1), { cwd: main, encoding: 'utf8', timeout: 600_000, env: CLEAN_ENV });
-    if (installed.status !== 0) throw new Error(`${install.join(' ')} failed: ${installed.stderr || installed.stdout}`);
+    handBuiltInstall(main, pm);
     git(main, 'init', '-q'); git(main, 'add', '-A'); git(main, 'commit', '-q', '-m', 'workspace');
     wt = join(base, 'wt');
     git(main, 'worktree', 'add', '-q', '--detach', wt, 'HEAD');
@@ -226,23 +249,27 @@ describe.each(MANAGERS)('write boundary: a worktree whose node_modules are symli
     const probe = (label, extra) => {
       const out = join(base, `${label}.evidence.json`);
       const scratch = makeDir(join(base, `scratch-${label}`));
-      const r = spawnSync('node', [CLI, 'probe', wt, '--scratch-dir', scratch, '--out', out, '--confirm', '1', '--no-reuse', '--no-escalate', '--quiet', ...extra], { encoding: 'utf8', timeout: 900_000, env: CLEAN_ENV });
-      runs.push({ label, status: r.status, stderr: r.stderr, evidence: existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : undefined, after: mainInstalls(), scratchLeft: readdirSync(scratch).filter((name) => name !== 'testguard-locks') });
+      const networkLog = join(base, `${label}.net.log`);
+      writeFileSync(networkLog, '');
+      const r = spawnSync('node', [CLI, 'probe', wt, '--scratch-dir', scratch, '--out', out, '--confirm', '1', '--no-reuse', '--no-escalate', '--quiet', ...extra], { encoding: 'utf8', timeout: 900_000, env: { ...process.env, NODE_OPTIONS: `--import=${NETWORK_GUARD}`, TESTGUARD_NETWORK_LOG: networkLog } });
+      runs.push({ label, status: r.status, stderr: r.stderr, network: readFileSync(networkLog, 'utf8'), evidence: existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : undefined, after: mainInstalls(), scratchLeft: readdirSync(scratch).filter((name) => name !== 'testguard-locks') });
     };
+    const runnerCmd = 'node node_modules/vitest/vitest.mjs run {files} --reporter=json --outputFile={out}';
     probe('builtin', ['--runner', 'vitest']);
     probe('runner-cmd', ['--runner-cmd', runnerCmd]);
     probe('runner-cmd-dirty', ['--runner-cmd', runnerCmd, '--include-dirty']);
   }, 1_800_000);
   afterAll(() => { if (base) rmSync(base, { recursive: true, force: true }); });
 
-  it.skipIf(skip)('measures the fault and leaves every entry of the main checkout\'s install as it was', () => {
-    expect(installListing.size).toBeGreaterThan(100);
+  it('measures the fault and leaves every entry of the main checkout\'s install as it was', () => {
+    expect(installListing.size).toBeGreaterThanOrEqual(8); // npm: 8 entries, pnpm: 20; an empty walk cannot pass
     expect(runs.map((run) => run.label)).toEqual(['builtin', 'runner-cmd', 'runner-cmd-dirty']);
     for (const run of runs) {
       expect(run.evidence, `${run.label}: ${run.stderr}`).toBeDefined();
       expect(verdicts(run.evidence), run.label).toEqual({ 'AREA/F1': 'killed' });
       expect(run.evidence.run.writeBoundary.installUnchanged, run.label).toBe(true);
       expect(changes(installListing, run.after), run.label).toEqual({ created: [], removed: [], modified: [] });
+      expect(run.network, run.label).toBe('');
       expect(run.scratchLeft, run.label).toEqual([]);
     }
   });
