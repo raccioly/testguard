@@ -23,19 +23,40 @@ What the defaults already do:
 
 ## Measured
 
-This repository's self-probe (fault injection on TestGuard's own claims):
+Measured for the 0.24 change (#270). Fault workers were 2 in every row: the
+CI runner has 4 CPUs, and the 18-CPU workstation had other test runners busy,
+so the automatic width halved itself from 4. "Guard" is the time spent on
+confirmation runs taken alone after the fan-out (`run.measurements.aloneConfirmMs`).
 
-| Run | Machine and load | Serial | Auto workers | Speedup | Guard cost (confirm runs + re-measures) |
+This repository's self-probe (666 faults, almost all killed, unit and acceptance defenders):
+
+| Run | Machine and load | Before (one fault at a time) | Now (default) | Speedup | Guard |
 |---|---|---|---|---|---|
-| From scratch | MEASURED-TBD | MEASURED-TBD | MEASURED-TBD | MEASURED-TBD | MEASURED-TBD |
-| No change since the last probe | MEASURED-TBD | MEASURED-TBD | MEASURED-TBD | MEASURED-TBD | MEASURED-TBD |
+| From scratch | GitHub-hosted runner, 4 CPUs, idle | ≈ 3640 s (estimated: 3303 normalized s for 604 faults, `testguard.cost-budget.json`, scaled to 666) | 1626 s (1807 normalized) | ≈ 2.0× | 607 s (37%) |
+| From scratch | workstation, 18 CPUs, load average 22–60 | not run | 4597 s | — | 1613 s (35%) |
+| No change since the last probe | workstation, 18 CPUs, load average 40 | — | 454 s: 663 reused after 215 live baselines, measured side by side | — | 0 s |
 
-A project of cheap unit tests:
+A project of cheap unit tests (`node bench/cheap-units.mjs`: 24 vitest modules, 72 faults, every fault killed):
 
-| Run | Machine and load | Serial | Auto workers | Speedup | Guard cost (confirm runs + re-measures) |
-|---|---|---|---|---|---|
-| From scratch | MEASURED-TBD | MEASURED-TBD | MEASURED-TBD | MEASURED-TBD | MEASURED-TBD |
-| No change since the last probe | MEASURED-TBD | MEASURED-TBD | MEASURED-TBD | MEASURED-TBD | MEASURED-TBD |
+| Run | Machine and load | Wall time | Runner invocations | Guard |
+|---|---|---|---|---|
+| From scratch, `--serial` (the 0.23 behavior) | workstation, 18 CPUs, load average 22 | 126.5 s | 288 | — |
+| From scratch, default | same | 79.1 s (1.6×) | 288 | 71 confirmations, 32.0 s |
+| No change since the last probe | same | 6.5 s | 24 | — |
+| `--changed HEAD~1` after touching one module | same | 5.9 s | 12 | 2 confirmations, 0.9 s |
+
+A CPU-bound `node:test` project on the CI runner (the native-performance job,
+3 fault workers, medians of five interleaved rounds against one fault at a
+time): 0.52× the serial time with the guard, 0.40× before it.
+
+What the guard costs: every kill measured beside another fault takes its last
+run alone, one after another, after the fan-out. That run replaces a run, so
+the number of runs does not change, but those runs are not parallel. On a suite
+where almost every fault is killed, they are a third of the wall time. Every
+kill still rests on a run with nothing else in flight, and that is what the
+time buys. For a nightly job the absolute numbers matter less than the
+pre-push and pull-request paths, which `--changed auto` and verdict reuse keep
+to seconds.
 
 ## Why is this slow?
 
