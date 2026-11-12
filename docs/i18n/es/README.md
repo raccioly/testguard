@@ -155,6 +155,22 @@ Los requisitos, las instalaciones sin conexión, `ENOVERSIONS` y todas las
 opciones de CI están en la
 [guía de instalación](https://github.com/raccioly/testguard/blob/main/docs/installation.md).
 
+## Hazlo rápido
+
+```bash
+testguard probe --changed auto                 # after a change: only the claims it can affect
+testguard probe --claim <ID> --confirm 1       # while writing one test: fast, provisional
+testguard probe                                # nightly, or when asked: every claim
+```
+
+- Los fallos ya se prueban en paralelo: la mitad de las CPU, como máximo 4 (`--serial` para uno a la vez).
+- Cada kill se confirma con una ejecución en solitario, así que una suite que comparte un puerto o una base de datos no puede fingir uno.
+- Los veredictos sin cambios se reutilizan; una ejecución con `--changed` o `--claim` reutiliza el último probe completo.
+- `testguard init` escribe un hook pre-push que ejecuta el primer comando, e `init --ci github|gitlab` un job de CI que lo ejecuta en cada pull request y el probe completo cada noche.
+
+¿Sigue siendo lento? `testguard status` muestra `advice` con el comando a ejecutar, y
+[¿por qué es lento?](https://github.com/raccioly/testguard/blob/main/docs/guides/performance.md#why-is-this-slow) es la lista de comprobación.
+
 ## Inicio rápido
 
 ```bash

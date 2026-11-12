@@ -14,7 +14,7 @@ const dir = mkdtempSync(join(tmpdir(), 'tg-cost-holes-'));
 const write = (name, value) => { const p = join(dir, name); writeFileSync(p, JSON.stringify(value)); return p; };
 const CLASS = { cpus: budget.reference.cpus, platform: budget.reference.platform };
 const measurement = write('ref.json', { workload: budget.reference.workload, medianMs: budget.reference.baselineMs, ...CLASS });
-const oneClaim = (seconds) => write(`one-${seconds}.json`, { records: [{ claim: { id: 'BIG-CLAIM' }, subject: { id: 'F1' }, defenders: { resolved: ['a.test.mjs'] }, detail: { baselineRuns: [], probeRuns: [{ durationMs: seconds * 1000 }] } }] });
+const oneClaim = (seconds) => write(`one-${seconds}.json`, { run: { measurements: { elapsedMs: seconds * 1000 }, ...(budget.faultWorkers > 1 ? { faultWorkers: budget.faultWorkers } : {}) }, records: [{ claim: { id: 'BIG-CLAIM' }, subject: { id: 'F1' }, defenders: { resolved: ['a.test.mjs'] }, detail: { baselineRuns: [], probeRuns: [{ durationMs: seconds * 1000 }] } }] });
 const gate = (evidence) => spawnSync(process.execPath, [join(ROOT, '.github/scripts/check-cost-budget.mjs'), evidence, '--reference-before', measurement, '--reference-after', measurement], { encoding: 'utf8', cwd: dir, env: { ...process.env, GITHUB_STEP_SUMMARY: '' } });
 
 describe('J: the per-claim ceiling is wired into the script', () => {

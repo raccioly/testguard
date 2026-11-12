@@ -161,7 +161,7 @@ The exact shell command to run next, with the reason. It never runs anything.
 
 | Input | Output |
 |---|---|
-| `dir`, `changed`, `evidence` | `{state, action, command, why, target?, file?}`, taken from the status document's `next`. |
+| `dir`, `changed`, `evidence` | `{state, action, command, why, target?, file?, loop, advice?}`: the status document's `next`; `loop`, the commands an agent runs between steps (`afterChangingCode`: `testguard probe --changed auto`, `whileWritingOneTest`: `testguard probe --claim <ID> --confirm 1`, `beforeCommittingATest`: `testguard admit <test-file> --claim <ID>`, `full`: `testguard probe`, and `rule`: the full probe only when the person asks, or nightly); and the status document's `advice`, when any. |
 
 A call and its answer, on the known-answer fixture:
 
@@ -175,7 +175,14 @@ A call and its answer, on the known-answer fixture:
   "action": "repair-fault",
   "command": "testguard claims --check-anchors",
   "why": "2 fault anchors no longer locate exactly. Repair REDACT-005/F1 in testguard.claims.json without changing what the fault means, then re-probe.",
-  "target": { "claimId": "REDACT-005", "subjectId": "F1", "file": "src/redact.mjs" }
+  "target": { "claimId": "REDACT-005", "subjectId": "F1", "file": "src/redact.mjs" },
+  "loop": {
+    "afterChangingCode": "testguard probe --changed auto",
+    "whileWritingOneTest": "testguard probe --claim <ID> --confirm 1",
+    "beforeCommittingATest": "testguard admit <test-file> --claim <ID>",
+    "full": "testguard probe",
+    "rule": "Run the full probe only when the person asks for it, or in the nightly job. Faults already run in parallel; do not pass --serial."
+  }
 }
 ```
 

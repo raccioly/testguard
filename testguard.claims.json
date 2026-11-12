@@ -5160,7 +5160,7 @@
           "description": "Any total passes the budget, so the check reports success on a gate that has tripled and nothing ever fails.",
           "faultClass": "condition-forced",
           "file": "src/probe/cost.mjs",
-          "find": "    ...(totalMs > budgetMs ? ['over-budget'] : []),",
+          "find": "    ...(!widthMismatch && !elapsedMissing && totalMs > budgetMs ? ['over-budget'] : []),",
           "replace": "    ...(false ? ['over-budget'] : []),",
           "producedBy": {
             "producer": "human",
@@ -7574,7 +7574,7 @@
           "description": "Omit the worker-policy reuse admission check.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "    && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand, faultWorkers })",
+          "find": "    && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand, faultWorkers, serialRequested })",
           "replace": "    && true",
           "producedBy": {
             "producer": "agent",
@@ -8326,8 +8326,8 @@
           "description": "Every run is told to pass --serial, including the default run that already has it.",
           "faultClass": "guard-removed",
           "file": "src/probe/contention.mjs",
-          "find": "  if (serial || workers <= 1) return",
-          "replace": "  if (false) return",
+          "find": "  if (serial || workers <= 1) {",
+          "replace": "  if (false) {",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -10162,8 +10162,8 @@
           "description": "The run's type check is not passed to the reuse decision.",
           "faultClass": "argument-swapped",
           "file": "src/probe/probe.mjs",
-          "find": "runner: recordedRunner, instrument, typecheck: typechecker?.spec, faultWorkers })",
-          "replace": "runner: recordedRunner, instrument, faultWorkers })",
+          "find": "runner: recordedRunner, instrument, typecheck: typechecker?.spec, faultWorkers, serialRequested:",
+          "replace": "runner: recordedRunner, instrument, faultWorkers, serialRequested:",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -10482,8 +10482,8 @@
           "description": "A verdict only contention produced is reported as measured.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "        if (contended && needsSerialRemeasure(record)) remeasure.push({ index, state });",
-          "replace": "        if (false) remeasure.push({ index, state });",
+          "find": "        else if (o.contended && needsSerialRemeasure(o.result)) remeasure.push(o);",
+          "replace": "        else if (false) remeasure.push(o);",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -10494,8 +10494,8 @@
           "description": "Fan-out records are published in completion order, bypassing the ordered emitter.",
           "faultClass": "call-removed",
           "file": "src/probe/probe.mjs",
-          "find": "        else settle(index, record);",
-          "replace": "        else { records.push(record); onProgress(record); }",
+          "find": "      for (const f of finals) settle(f.index, tagUnsafe(f.state, f.record));",
+          "replace": "      for (const f of finals) { records.push(f.record); onProgress(f.record); }",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -10524,8 +10524,8 @@
           "description": "The fan-out believes it is uncontended and never re-measures.",
           "faultClass": "literal-changed",
           "file": "src/probe/probe.mjs",
-          "find": "      const contended = slots.length > 1;",
-          "replace": "      const contended = false;",
+          "find": "        outcomes.push({ index, state, result, contended: token.contended });",
+          "replace": "        outcomes.push({ index, state, result, contended: false });",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -10578,7 +10578,7 @@
           "description": "Every flaky-defender, including a red baseline, is re-measured.",
           "faultClass": "condition-forced",
           "file": "src/probe/fan-out.mjs",
-          "find": "  return record.verdict === 'flaky-defender' && record.detail?.reason === 'inconsistent-probe';",
+          "find": "  return record.verdict === 'flaky-defender' && reason === 'inconsistent-probe';",
           "replace": "  return record.verdict === 'flaky-defender';",
           "producedBy": {
             "producer": "agent",
@@ -10704,7 +10704,7 @@
           "description": "Reuse ignores the fault fan-out entirely.",
           "faultClass": "return-altered",
           "file": "src/probe/probe.mjs",
-          "find": "  return previous === current || previous === 1;",
+          "find": "  return !(current === 1 && serialRequested);",
           "replace": "  return true;",
           "producedBy": {
             "producer": "agent",
@@ -10716,7 +10716,7 @@
           "description": "The worker policy no longer consults the fan-out.",
           "faultClass": "statement-deleted",
           "file": "src/probe/probe.mjs",
-          "find": "  if (!sameFaultWorkers(previousRun?.faultWorkers, faultWorkers)) return false;\n",
+          "find": "  if (!sameFaultWorkers(previousRun?.faultWorkers, faultWorkers, { serialRequested })) return false;\n",
           "replace": "",
           "producedBy": {
             "producer": "agent",
@@ -10757,9 +10757,9 @@
           "id": "F2",
           "description": "The CLI passes an in-place fan-out through.",
           "faultClass": "condition-forced",
-          "file": "src/commands/probe.mjs",
-          "find": "  if (faultWorkers > 1 && values['in-place']) {",
-          "replace": "  if (false) {",
+          "file": "src/probe/fan-out.mjs",
+          "find": "    if (asked.source === 'flag' && !asked.auto && asked.n > 1) return { error: '--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place' };",
+          "replace": "    if (false) return { error: '' };",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -10785,7 +10785,7 @@
           "description": "The validator admits a serial re-measure with no fan-out.",
           "faultClass": "condition-forced",
           "file": "spec/lib/validate.mjs",
-          "find": "      if (r.detail.remeasuredSerially && !(doc.run.faultWorkers > 1)) {",
+          "find": "      if (measuredHere && r.detail.remeasuredSerially && !(doc.run.faultWorkers > 1)) {",
           "replace": "      if (false) {",
           "defendedBy": [
             "spec/conformance/fault-workers.test.mjs"
@@ -10983,8 +10983,8 @@
           "description": "The CLI drops the requested fan-out.",
           "faultClass": "literal-changed",
           "file": "src/commands/probe.mjs",
-          "find": "    faultWorkers,\n    commandBudget,",
-          "replace": "    faultWorkers: 1,\n    commandBudget,",
+          "find": "    faultWorkers,\n    faultWorkersSource: fanOut.source,",
+          "replace": "    faultWorkers: 1,\n    faultWorkersSource: fanOut.source,",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -11112,8 +11112,8 @@
           "description": "The re-measure inherits the first tree and its stale state.",
           "faultClass": "argument-swapped",
           "file": "src/probe/probe.mjs",
-          "find": "          record = await measureOne(state, freshTree());",
-          "replace": "          record = await measureOne(state, primary);",
+          "find": "const tree = o.again ? freshTree() :",
+          "replace": "const tree = o.again ? primary :",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -12124,7 +12124,7 @@
           "description": "The validator admits a baseline re-measure with no fan-out.",
           "faultClass": "condition-forced",
           "file": "spec/lib/validate.mjs",
-          "find": "      if (r.detail.baselineRemeasuredSerially && !(doc.run.faultWorkers > 1)) {",
+          "find": "      if (measuredHere && r.detail.baselineRemeasuredSerially && !(doc.run.faultWorkers > 1)) {",
           "replace": "      if (false) {",
           "defendedBy": [
             "spec/conformance/fault-workers.test.mjs"
@@ -12592,8 +12592,8 @@
           "description": "The contention guard is dropped, so a lone timing-out fault is measured twice.",
           "faultClass": "guard-removed",
           "file": "src/probe/probe.mjs",
-          "find": "if (contended && needsSerialRemeasure(record))",
-          "replace": "if (needsSerialRemeasure(record))",
+          "find": "else if (o.contended && needsSerialRemeasure(o.result))",
+          "replace": "else if (needsSerialRemeasure(o.result))",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -12604,8 +12604,8 @@
           "description": "Every fan-out counts as contended.",
           "faultClass": "literal-changed",
           "file": "src/probe/probe.mjs",
-          "find": "const contended = slots.length > 1;",
-          "replace": "const contended = true;",
+          "find": "deferLastRun(probeRuns, confirmRuns, overlap.active > 1)",
+          "replace": "deferLastRun(probeRuns, confirmRuns, overlap.active > 0)",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -13661,6 +13661,825 @@
             "producer": "agent",
             "by": "claude",
             "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-NEVER-REPORTS-A-NEIGHBOURS-KILL",
+      "statement": "Under a fault fan-out, a suite that shares a fixed port across scratch trees gets the serial verdicts: a run alone that contradicts contended red runs marks the defender set not parallel-safe and the fault is measured again alone, never reported killed.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #270 (fast by default)"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fixed-port.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A run alone that passes after contended red runs is no longer read as a disagreement.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "        if (fanOut && aloneDisagrees(probeRuns)) return { disagreed: true, runs: probeRuns };\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-GUARD-RULES",
+      "statement": "A kill-shaped fault with no run alone defers its last run while another fault is in flight; N kills with none alone are never final; a run alone that passes beside contended red runs is a disagreement; a run is alone only when no other measurement overlapped it; and contended suite-load failures and undeclared-killer attributions are re-measured alone.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #270 (fast by default)"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out-guard.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A kill-shaped fault never defers its last run.",
+          "faultClass": "return-altered",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  return runsSoFar.every((run) => isKillRun(run) && !run.alone);",
+          "replace": "  return false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "N contended kills are accepted as final.",
+          "faultClass": "return-altered",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  return runs.length === confirmRuns && runs.every((run) => isKillRun(run) && !run.alone);",
+          "replace": "  return false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A disagreement between a run alone and contended runs is never seen.",
+          "faultClass": "return-altered",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  return runs.some((run) => run.alone && run.outcome === 'pass') && runs.some((run) => !run.alone && run.outcome !== 'pass');",
+          "replace": "  return false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Every run counts as alone.",
+          "faultClass": "return-altered",
+          "file": "src/probe/fan-out.mjs",
+          "find": "      return () => othersAtStart <= 0 && entered === enteredAtStart;",
+          "replace": "      return () => true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A measurement already in flight is not marked contended when another begins.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/fan-out.mjs",
+          "find": "      for (const other of inFlight) other.contended = true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "A contended undeclared-killer attribution is reported as measured.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  if (reason === 'killed-by-undeclared-tests') return true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-AUTO-FAULT-WORKERS-FOLLOW-THE-MACHINE",
+      "statement": "The CLI probes min(4, floor(cpus/2)) faults at once (at least one) unless --serial, --fault-workers or TESTGUARD_FAULT_WORKERS say otherwise, halves an automatic width under foreign contention, and records the source and, for auto, the CPUs.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #270 (fast by default)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out-guard.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Auto takes every CPU, uncapped.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  return Math.max(1, Math.min(AUTO_FAULT_WORKERS_CAP, Math.floor(cpus / 2)));",
+          "replace": "  return Math.max(1, cpus);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "--serial no longer means one fault at a time.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  if (serial) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An automatic width is not lowered when other runners are busy.",
+          "faultClass": "return-altered",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  return source === 'auto' && detected ? Math.max(1, Math.floor(faultWorkers / 2)) : faultWorkers;",
+          "replace": "  return faultWorkers;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The CPUs an automatic width came from are not recorded.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/probe.mjs",
+          "find": "  return { faultWorkersSource, ...(faultWorkersSource === 'auto' && cpus !== undefined ? { cpus } : {}) };",
+          "replace": "  return { faultWorkersSource };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "An explicit request for one fault at a time is forgotten, so a fan-out stands in for it.",
+          "faultClass": "return-altered",
+          "file": "src/probe/probe.mjs",
+          "find": "export const serialRequested = (faultWorkers, source) => faultWorkers === 1 && ['serial', 'flag', 'env'].includes(source);",
+          "replace": "export const serialRequested = () => false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-GUARD-IS-VALIDATED",
+      "statement": "A validator rejects a fan-out kill with no probe run alone, a re-measured record or a not-parallel-safe kill with a run that was not alone, alone marks in a document without a fan-out, and an automatic width without its CPUs.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #270 (fast by default)"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "spec/conformance/fault-workers.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A fan-out kill with no run alone passes validation.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (measuredHere && doc.run.faultWorkers > 1 && r.verdict === 'killed' && !runsHere.some((run) => run.alone)) {",
+          "replace": "      if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A re-measured record may keep contended runs.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (measuredHere && doc.run.faultWorkers > 1 && (r.detail.remeasuredSerially || (r.detail.notParallelSafe && r.verdict === 'killed')) && !runsHere.every((run) => run.alone)) {",
+          "replace": "      if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An automatic width without its CPUs passes.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "    if (source === 'auto' && doc.run.cpus === undefined) errors.push(",
+          "replace": "    if (false) errors.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Alone marks pass in a serial document.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "        runsHere.forEach((run, j) => { if (run.alone) errors.push(",
+          "replace": "        runsHere.forEach((run, j) => { if (false) errors.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PARTIAL-RUNS-REUSE-THE-LAST-FULL-PROBE",
+      "statement": "A --claim or --changed run reuses the canonical evidence of the last full probe under the reuse rules, after one live baseline per defender set, and names the run each verdict came from.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #270 (fast by default)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fast-path-pure.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A partial run reads only its own output file.",
+          "faultClass": "element-removed",
+          "file": "src/commands/probe.mjs",
+          "find": "  return [...new Set([outPath, ...(partial ? [canonical] : [])])];",
+          "replace": "  return [outPath];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A reused verdict loses the id of the run it came from.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/probe.mjs",
+          "find": "{ record, runId: doc.run.id }",
+          "replace": "{ record, runId: undefined }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CHANGED-AUTO-FINDS-THE-BASE-OFFLINE",
+      "statement": "probe --changed auto compares against the CI base, the remote default branch, a differently named upstream, then the branch's own upstream, all offline, and probes every claim when none resolves, never nothing.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #270 (fast by default)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/changed-auto.test.mjs",
+        "test/probe-fast-path-pure.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The branch's own upstream is not used.",
+          "faultClass": "statement-deleted",
+          "file": "src/gate/changed.mjs",
+          "find": "  if (upstream && headSha(root, upstream)) return { ref: upstream, from: 'branch upstream (the commits not pushed yet)', required: false };\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/changed-auto.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "A detected base that does not resolve here is used anyway, so the probe refuses instead of probing everything.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/probe.mjs",
+          "find": "  if (detected && resolves) return",
+          "replace": "  if (detected) return",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/probe-fast-path-pure.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-SPEED-ADVICE-IS-OFFLINE-AND-ACTIONABLE",
+      "statement": "Speed advice names a run made serial by request on a machine with room, a change that affects fewer claims than a full probe measures, a long run that reused nothing, and hooks or CI that probe serially, on every push, with an older pin or template, each with the command to run, from files on disk only.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #270 (fast by default)"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/advice.test.mjs",
+        "spec/conformance/advice.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An automatic or in-place width is told it ran serially.",
+          "faultClass": "statement-deleted",
+          "file": "src/status/advice.mjs",
+          "find": "  if (source === 'auto' || source === 'in-place') return undefined;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A change that reaches every claim is still advised.",
+          "faultClass": "guard-removed",
+          "file": "src/status/advice.mjs",
+          "find": "  if (!ref || !(total > 0) || !(selected < total)) return undefined;",
+          "replace": "  if (!ref) return undefined;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A short run is told to keep its evidence.",
+          "faultClass": "statement-deleted",
+          "file": "src/status/advice.mjs",
+          "find": "  if (seconds < 60) return undefined;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A hook running probe --serial is not reported.",
+          "faultClass": "condition-forced",
+          "file": "src/init/managed.mjs",
+          "find": "      if (/\\bprobe\\b/.test(line) && /--serial\\b/.test(line)) findings.push(",
+          "replace": "      if (false) findings.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "Versions compare the wrong way round.",
+          "faultClass": "variable-swap",
+          "file": "src/init/managed.mjs",
+          "find": "  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i];",
+          "replace": "  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-INIT-WRITES-THE-FAST-HOOKS",
+      "statement": "init writes a pre-push block that probes --changed auto through the project install, then PATH, then the latest release; CI that probes the change and runs the full probe nightly; and init --upgrade rewrites only TestGuard blocks and skills nobody edited.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #270 (fast by default)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/init-fast-path.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The pre-push hook probes every claim.",
+          "faultClass": "argument-swapped",
+          "file": "src/init/managed.mjs",
+          "find": "  \"$@\" probe --changed auto --quiet",
+          "replace": "  \"$@\" probe --quiet",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The fallback CLI is pinned to an old release.",
+          "faultClass": "literal-changed",
+          "file": "src/init/managed.mjs",
+          "find": "export const NPX_LATEST = 'npx -y testguard-cli@latest';",
+          "replace": "export const NPX_LATEST = 'npx -y testguard-cli@0.22.1';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "--upgrade overwrites a block edited by hand.",
+          "faultClass": "guard-removed",
+          "file": "src/init/init.mjs",
+          "find": "  } else if ((upgrade && !ourBlock.modified) || force) {",
+          "replace": "  } else if (upgrade || force) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "An edited skill with a marker counts as unmodified.",
+          "faultClass": "statement-deleted",
+          "file": "src/init/managed.mjs",
+          "find": "    if (short(body) !== m[2]) return 'modified';\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A managed block never knows it was edited.",
+          "faultClass": "return-altered",
+          "file": "src/init/managed.mjs",
+          "find": "modified: m[4] ? short(body) !== m[4] : true",
+          "replace": "modified: false",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-BRIEF-AND-MCP-CARRY-THE-FAST-LOOP",
+      "statement": "The session-start brief and the status document carry the speed advice with its commands, and the MCP next_command states the fast loop: probe --changed auto after a change, --confirm 1 while writing one test, the full probe only when asked or nightly.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #270 (fast by default)"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/brief-advice.test.mjs",
+        "test/mcp-next.test.mjs",
+        "test/advice.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The brief text drops the advice.",
+          "faultClass": "statement-deleted",
+          "file": "src/brief/brief.mjs",
+          "find": "  if (brief.advice?.length) lines.push('', ...brief.advice.map((a) => `SPEED: ${a.message} → ${a.command}`));\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/brief-advice.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "The loop after a change is the full probe.",
+          "faultClass": "literal-changed",
+          "file": "src/mcp/tools.mjs",
+          "find": "  afterChangingCode: 'testguard probe --changed auto',",
+          "replace": "  afterChangingCode: 'testguard probe',",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/mcp-next.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "The status document drops the advice.",
+          "faultClass": "statement-deleted",
+          "file": "src/status/status.mjs",
+          "find": "  if (advice.length) doc.advice = advice;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/advice.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-FAN-OUT-NEVER-FINALIZES-A-CONTENDED-LOAD-FAILURE",
+      "statement": "A record measured beside another fault is never reported fault-invalid (except a type-check refusal), unverifiable, or from a probe run whose outcome is error: it is measured again alone; and every runner process learns the index of the tree it runs in as TESTGUARD_WORKER.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #287 (a suite sharing a fixed port under the fan-out)"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/fan-out-guard.test.mjs",
+        "test/worker-env.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A contended fault-invalid is reported as measured.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  if (record.verdict === 'fault-invalid' && reason !== 'replacement-does-not-typecheck') return true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/fan-out-guard.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "A contended unverifiable is reported as measured.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  if (record.verdict === 'unverifiable') return true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/fan-out-guard.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "A contended record with an error run is reported as measured.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/fan-out.mjs",
+          "find": "  if ((record.detail?.probeRuns ?? []).some((run) => run.outcome === 'error')) return true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/fan-out-guard.test.mjs"
+          ]
+        },
+        {
+          "id": "F4",
+          "description": "The worker index is never set.",
+          "faultClass": "return-altered",
+          "file": "src/probe/worker-env.mjs",
+          "find": "export const workerEnv = () => ({ TESTGUARD_WORKER: String(context.getStore() ?? 0) });",
+          "replace": "export const workerEnv = () => ({});",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/worker-env.test.mjs"
+          ]
+        },
+        {
+          "id": "F5",
+          "description": "Runner processes do not receive the worker index.",
+          "faultClass": "element-removed",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "...workerEnv(), ...extraEnv",
+          "replace": "...extraEnv",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/worker-env.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-SERIAL-CLAIMS-ARE-PROBED-ALONE",
+      "statement": "A claim declared serial: true is probed after the fan-out with every probe run alone, its records say serialDeclared, and a validator rejects a declared-serial record with a run that was not alone.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #287 (a suite sharing a fixed port under the fan-out)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-serial-claim.test.mjs",
+        "spec/conformance/fault-workers.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The declaration is ignored: the claim stays in the fan-out.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "|| planned.state.claim.serial === true) serialLane",
+          "replace": ") serialLane",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/probe-serial-claim.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "The record does not say it was declared serial.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "        if (state.claim.serial === true) record.detail.serialDeclared = true;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/probe-serial-claim.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "A declared-serial record with a contended run passes validation.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "      if (measuredHere && r.detail.serialDeclared && !runsHere0(r).every((run) => run.alone)) {",
+          "replace": "      if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "spec/conformance/fault-workers.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-A-CONTENDED-BASELINE-MARKS-THE-SET",
+      "statement": "A defender set whose baseline was red beside other sets and green alone is not parallel-safe: its faults are probed alone after the fan-out and its records say notParallelSafe.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #287 (a suite sharing a fixed port under the fan-out)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-fault-workers-baselines.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A baseline that needed a solo re-measure leaves the set in the fan-out.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "          if (baselineCache.get(key).runs.every((run) => run.outcome === 'pass')) markUnsafe(key, 'its baseline failed beside other defender sets and passed alone');\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COST-GATE-IS-ON-ELAPSED-TIME",
+      "statement": "The self-probe cost gate compares normalized elapsed time with a ceiling valid for one fault-worker count: summed defender seconds are reported and never gated, a run at another width or with no elapsed time fails closed, and the per-claim ceiling stays on summed seconds.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #284 (gate on elapsed time)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/cost-elapsed.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The gate still compares the summed seconds.",
+          "faultClass": "variable-swap",
+          "file": "src/probe/cost.mjs",
+          "find": "  const rawMs = byElapsed ? elapsedMs : summedRawMs;",
+          "replace": "  const rawMs = summedRawMs;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A run at another fault-worker count is compared anyway.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "  const widthMismatch = byElapsed && budgetFaultWorkers !== undefined && faultWorkers !== budgetFaultWorkers;",
+          "replace": "  const widthMismatch = false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Evidence with no elapsed time is compared by its sum.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "  const elapsedMissing = unit === 'normalized-elapsed-seconds' && !byElapsed;",
+          "replace": "  const elapsedMissing = false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
           }
         }
       ]

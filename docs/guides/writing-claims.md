@@ -68,6 +68,7 @@ Claims live in `testguard.claims.json` beside your project's `package.json` or
 | `severity` | yes | `critical`, `high`, `medium` or `low`. Drives ranking and the `--severity` gate floor. |
 | `producedBy` | yes | `{ "producer": "human" \| "agent" \| "operator" \| "derived", "by", "reviewedBy", "at" }`. Only `producer` is required. |
 | `defendedBy` | no | Globs for the test files that defend the claim. Absent or empty means discover them. |
+| `serial` | no | `true`: this claim's tests cannot share the machine (a fixed port, one database), so under the fault fan-out its faults are probed alone, after the others, and the records say `serialDeclared`. Prefer making the tests parallel-safe with `TESTGUARD_WORKER`. |
 | `faults` | yes | At least one fault. |
 | `tags` | no | Unique identifiers for your own grouping. |
 

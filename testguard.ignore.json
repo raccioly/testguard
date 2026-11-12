@@ -210,6 +210,48 @@
     },
     {
       "kind": "path",
+      "pattern": "test/probe-shared-server.test.mjs",
+      "reason": "Acceptance for raccioly/testguard#287: suites that start a server on one fixed port when they load, probed serially, as one defender set and as two under the fan-out, and with a TESTGUARD_WORKER-derived port. Four probes, about thirty seconds. Mandatory in npm test and CI; its four wrong builds are recorded in PR #275. The behavior is claimed on cheap defenders: TG-FAN-OUT-NEVER-FINALIZES-A-CONTENDED-LOAD-FAILURE (test/fan-out-guard.test.mjs, test/worker-env.test.mjs), TG-A-CONTENDED-BASELINE-MARKS-THE-SET (test/probe-fault-workers-baselines.test.mjs), TG-SERIAL-CLAIMS-ARE-PROBED-ALONE (test/probe-serial-claim.test.mjs).",
+      "by": "claude",
+      "at": "2026-11-12T08:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/helpers/shared-server-project.mjs",
+      "reason": "The shared-server project generator for raccioly/testguard#287: test files that take one fixed port at load (or one derived from TESTGUARD_WORKER). Its behavior is the oracle of test/probe-shared-server.test.mjs, whose serial case re-derives the verdicts on every npm test, and test/probe-serial-claim.test.mjs defends TG-SERIAL-CLAIMS-ARE-PROBED-ALONE through it.",
+      "by": "claude",
+      "at": "2026-11-12T08:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/helpers/fixed-port-project.mjs",
+      "reason": "The fixed-port project generator (#270): a test suite that binds one port and fails when another copy of itself is running. Its behavior is the oracle of test/probe-fixed-port.test.mjs, which defends TG-FAN-OUT-NEVER-REPORTS-A-NEIGHBOURS-KILL, and test/probe-fixed-port-serial.test.mjs re-derives its serial answer on every npm test. A fault in the helper costs a 7 s defender six runs (38 s on CI) to prove what the serial test already shows: that the suite interferes with itself.",
+      "by": "claude",
+      "at": "2026-11-12T06:30:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/probe-fast-path-cli.test.mjs",
+      "reason": "Acceptance for the fast path through the command (#270): the default width from the CPUs, --serial, partial runs reusing the last full probe, --changed auto with no base and with a CI base that does not resolve, and the status advice after a serial run. It probes a generated four-claim project six times, about fifteen seconds per run; named as a self-probe defender it cost 601 s on CI. The behavior is claimed where it lives and defended by fast tests: TG-PARTIAL-RUNS-REUSE-THE-LAST-FULL-PROBE and TG-CHANGED-AUTO-FINDS-THE-BASE-OFFLINE name test/probe-fast-path-pure.test.mjs, TG-AUTO-FAULT-WORKERS-FOLLOW-THE-MACHINE names test/fan-out-guard.test.mjs, TG-BRIEF-AND-MCP-CARRY-THE-FAST-LOOP names test/advice.test.mjs. Mandatory in npm test and CI.",
+      "by": "claude",
+      "at": "2026-11-12T05:30:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "bench/*.mjs",
+      "reason": "Hand-run measurement scripts (#270): the fixture verdict-equality check across every runner (serial against the default fan-out) and the cheap-unit-test timing table in docs/guides/performance.md. They ship in no package (package.json files excludes bench/), change no verdict, and their own output is the evidence they produce; the behavior they measure is claimed where it lives (TG-FAN-OUT-GUARD-RULES, TG-AUTO-FAULT-WORKERS-FOLLOW-THE-MACHINE, TG-FAN-OUT-MATCHES-THE-KNOWN-ANSWERS).",
+      "by": "claude",
+      "at": "2026-11-12T04:30:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/probe-fixed-port-serial.test.mjs",
+      "reason": "The measured serial answer for the fixed-port project (#270): the oracle that test/probe-fixed-port.test.mjs holds the fan-out to, re-derived on every npm test instead of written down. It asserts no behavior of its own beyond serial probing, which every known-answer fixture already defends; the fan-out guard it calibrates is claimed as TG-FAN-OUT-NEVER-REPORTS-A-NEIGHBOURS-KILL.",
+      "by": "claude",
+      "at": "2026-11-12T04:00:00Z"
+    },
+    {
+      "kind": "path",
       "pattern": "test/probe-partial-budget.test.mjs",
       "reason": "Acceptance for --partial-on-budget: it probes a generated four-claim project (serial, --fault-workers 3, a budget-capped hang, a reuse round trip, and the command in-process) with an injected clock, about twenty seconds in total. Mandatory in npm test and CI. The behavior it exercises is claimed where it lives and defended by fast pure tests: TG-PARTIAL-BUDGET-NEVER-REPORTS-UNMEASURED-AS-MEASURED, TG-NOT-REACHED-RECORD-IS-NEVER-REUSED, TG-COMMAND-BUDGET-EXPIRY-IS-TOLD-BY-IDENTITY-AND-A-CUT-RUN-IS-THE-DEADLINE and TG-EXHAUSTED-EVIDENCE-IS-CROSS-CHECKED name test/partial-budget.test.mjs and the conformance suite; naming this file would re-run all of it for every fault.",
       "by": "claude",

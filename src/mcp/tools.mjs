@@ -33,6 +33,18 @@ const statusFor = (args) => {
     computeStatus({ projectDir, toolVersion: args?.__version, changedRef, evidence: evidenceOf(args) }));
 };
 
+/**
+ * The loop an agent follows between `next` steps (#270): stated as commands,
+ * fast by default, the full probe only when asked or nightly.
+ */
+export const FAST_LOOP = Object.freeze({
+  afterChangingCode: 'testguard probe --changed auto',
+  whileWritingOneTest: 'testguard probe --claim <ID> --confirm 1',
+  beforeCommittingATest: 'testguard admit <test-file> --claim <ID>',
+  full: 'testguard probe',
+  rule: 'Run the full probe only when the person asks for it, or in the nightly job. Faults already run in parallel; do not pass --serial.',
+});
+
 export const TOOLS = [
   {
     name: 'testguard_status',
@@ -102,11 +114,11 @@ export const TOOLS = [
   },
   {
     name: 'testguard_next_command',
-    description: 'The exact shell command to run next, with the reason. Run it yourself in a terminal: a probe is long-running and budgeted, and the person should see it happen. This tool never runs anything.',
+    description: 'The exact shell command to run next, with the reason, plus the fast loop to follow between steps (`loop`: probe --changed auto after a change, --claim <ID> --confirm 1 while writing one test, the full probe only when asked or nightly) and any speed `advice`. Run it yourself in a terminal: a probe is long-running and budgeted, and the person should see it happen. This tool never runs anything.',
     inputSchema: { type: 'object', properties: { dir: DIR, changed: CHANGED, evidence: EVIDENCE }, additionalProperties: false },
     handler: (args) => {
       const doc = statusFor(args);
-      return { state: doc.state, action: doc.next.action, command: doc.next.command, why: doc.next.why, ...(doc.next.target ? { target: doc.next.target } : {}), ...(doc.next.file ? { file: doc.next.file } : {}) };
+      return { state: doc.state, action: doc.next.action, command: doc.next.command, why: doc.next.why, ...(doc.next.target ? { target: doc.next.target } : {}), ...(doc.next.file ? { file: doc.next.file } : {}), loop: FAST_LOOP, ...(doc.advice?.length ? { advice: doc.advice } : {}) };
     },
   },
 ];

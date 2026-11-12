@@ -25,6 +25,7 @@ dependencies; your workflow does both before it.
 | `budget` | `120000` | `probe` | Wall-clock budget per test run, in milliseconds. A run past it is `TIMEOUT`, never a kill. |
 | `no-escalate` | `false` | `probe` | `true` skips re-running survivors against the whole suite. |
 | `allow-empty` | `false` | `probe` | `true` skips a valid claims file with no claims, exits 0 and writes no evidence. For adoption only; see [below](#adopting-with-zero-claims). |
+| `changed` | `''` | `probe` | `auto` probes only the claims the pull request can affect (the base is found offline: the pull request's base branch, then the remote default branch); a ref names the base. Empty probes every claim: keep that for the nightly or `push` job. Faults already run in parallel (half the CPUs, at most 4) and every kill is confirmed by a run alone. Check out with `fetch-depth: 0`. |
 | `changed-ref` | `''` | `gate` | The reference the change is measured against. Empty on a `pull_request` event means `origin/<base branch>`, which the action fetches first. |
 | `strict` | `false` | `gate` | `true` fails a change whose files were all excluded (non-source, or never-claimed patterns) instead of passing with a note. |
 | `version` | the CLI release published with this action tag | all | The `testguard-cli` version to run. Leave it alone unless you deliberately run a different CLI from the same action. |

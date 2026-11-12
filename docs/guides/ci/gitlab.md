@@ -28,7 +28,7 @@ That adds two jobs to your pipeline:
 | Job | Runs on | What it does | Artifacts (kept on failure too) |
 |---|---|---|---|
 | `testguard:gate` | merge request pipelines | `testguard gate .`: fails when a changed source file carries no claim and no excusing ignore entry. Runs no tests. | `<dir>/.testguard/gate.json` |
-| `testguard:probe` | merge request pipelines and the default branch | `testguard probe . --quiet` with the probe inputs, then writes the brief whatever the probe's exit code, then posts the note if asked. The job's exit code is the probe's. | `<dir>/.testguard/evidence.json` (or `evidence-provisional.json` when `confirm` is below 3), `<dir>/.testguard/brief.json`, `<dir>/.testguard/brief.md` |
+| `testguard:probe` | merge request pipelines and the default branch | `testguard probe . --quiet` with the probe inputs (on a merge request, `--changed auto` unless `changed` is empty), then writes the brief whatever the probe's exit code, then posts the note if asked. The job's exit code is the probe's. | `<dir>/.testguard/evidence.json` (or `evidence-provisional.json` when `confirm` is below 3), `<dir>/.testguard/brief.json`, `<dir>/.testguard/brief.md` |
 
 `<dir>` is the `dir` input; with the default `.` the artifacts are under
 `.testguard/` at the repository root.
@@ -60,6 +60,7 @@ runs as `npx -y "testguard-cli@${TESTGUARD_VERSION}"`.
 | `no_escalate` | `false` | probe | `true` skips re-running survivors against the whole suite. |
 | `runner` | `auto` | probe | `vitest`, `jest`, `playwright`, `python`, `pytest`, `unittest`, `node-test` or `auto` (GitLab rejects any other value); any value other than `auto` is passed as `--runner`. `python` picks pytest when the interpreter can import it and stdlib `unittest` otherwise; `pytest` and `unittest` pin that choice and fail rather than fall back. |
 | `python` | `""` | probe | Python interpreter for `.py` defenders. Empty means `$VIRTUAL_ENV`, then the project's `.venv`/`venv`, then `python3` on `PATH`. |
+| `changed` | `auto` | probe | On a merge request pipeline, `--changed auto`: only the claims the change can affect (the base is `CI_MERGE_REQUEST_DIFF_BASE_SHA`). Empty probes every claim. Pipelines on the default branch always probe every claim. The job caches `.testguard/evidence.json`, so unchanged verdicts are carried forward. |
 | `strict` | `false` | gate | `true` fails a change whose files were all excluded instead of passing with a note. |
 | `post_note` | `false` | probe | `true` posts the markdown brief as a merge-request note. Needs `TESTGUARD_GITLAB_TOKEN`; see [below](#the-merge-request-note). |
 | `stage` | `test` | both jobs | Pipeline stage for both jobs. |

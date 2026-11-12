@@ -45,7 +45,9 @@ const speedDir = mkdtempSync(join(tmpdir(), 'tg-direct-speed-'));
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', timeout: 10000 }).trim();
 // The base commit predates `exceptionFailures`; a kill there was counted wholly in `assertionFailures`. Compare the sum.
-const comparable = ({ durationMs, exceptionFailures, kindNotReported, ...run }) => ({ ...run, assertionFailures: run.assertionFailures + (exceptionFailures ?? 0) });
+// `alone` marks which runs a fan-out measured with nothing else in flight (#270): a
+// property of the schedule, not of the verdict, so it is not compared.
+const comparable = ({ durationMs, exceptionFailures, kindNotReported, alone, ...run }) => ({ ...run, assertionFailures: run.assertionFailures + (exceptionFailures ?? 0) });
 const projection = (record) => ({
   id: record.claim.id + '/' + record.subject.id,
   subject: record.subject,
@@ -86,9 +88,12 @@ try {
     const evidence = await ({ before, after, fanout: after }[strategy])({ projectDir: dir, claims, runnerName: 'node-test', confirmRuns: 3, workers: 1, serial: true, budgetMs: 10000, escalate: false, ...(strategy === 'fanout' ? { faultWorkers } : {}) });
     if (strategy === 'fanout') {
       assert.equal(evidence.run.faultWorkers, fanOut);
-      // Only a contended timeout or inconsistent probe may be re-measured.
+      // Only what contention could have caused may be re-measured: a timeout,
+      // an inconsistent probe, a load failure or an unverifiable (#287), or a
+      // kill whose contended runs a run alone contradicted (never here).
+      const remeasurable = (o) => o.verdict === 'timeout' || o.reason === 'inconsistent-probe' || o.verdict === 'fault-invalid' || o.verdict === 'unverifiable';
       for (const record of evidence.records.filter((r) => r.detail.remeasuredSerially)) {
-        assert(record.verdict === 'timeout' || record.detail.reason === 'inconsistent-probe' || expected[record.claim.id + '/' + record.subject.id].verdict === 'timeout' || expected[record.claim.id + '/' + record.subject.id].reason === 'inconsistent-probe', 'unexpected serial re-measure of ' + record.claim.id);
+        assert(remeasurable({ verdict: record.verdict, reason: record.detail.reason }) || remeasurable(expected[record.claim.id + '/' + record.subject.id]), 'unexpected serial re-measure of ' + record.claim.id);
       }
     }
     const elapsedMs = performance.now() - start;

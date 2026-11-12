@@ -30,7 +30,8 @@ import { persistenceSignalsFor } from '../supply/persistence.mjs';
 import { collectOwnedManifests, hashNativeTestUniverse, hashCustomCommandUniverse } from './universe.mjs';
 import { createDependencyHasher, instrumentOf } from './dependencies.mjs';
 import { createTypechecker, sameTypecheck } from './typecheck.mjs';
-import { createBusyClock, needsSerialRemeasure, orderedEmitter, parseFaultWorkers, runPool, singleFlight } from './fan-out.mjs';
+import { withWorker } from './worker-env.mjs';
+import { aloneDisagrees, contentionRoundDown, createBusyClock, createOverlapTracker, deferLastRun, mustConfirmAlone, needsSerialRemeasure, orderedEmitter, parseFaultWorkers, runPool, singleFlight } from './fan-out.mjs';
 
 
 /** Is `child` the same file as `root`, or under it? Both must already be real paths. */
@@ -72,13 +73,18 @@ export function selectClaims(claims, only) {
  * nor for a different fan-out, because its contention was different (#237).
  * Evidence written before the field existed was serial.
  */
-export function sameFaultWorkers(previous = 1, current = 1) {
-  return previous === current || previous === 1;
+export function sameFaultWorkers(previous = 1, current = 1, { serialRequested = false } = {}) {
+  if (previous === 1) return true;
+  // Every fan-out of this tool version is guarded the same way (every kill
+  // rests on a run alone, GATE-SEMANTICS "Fault fan-out"), so its width is not
+  // part of what was measured: a laptop at four and CI at two share evidence.
+  // A run that asked for one fault at a time asked not to rely on it.
+  return !(current === 1 && serialRequested);
 }
 
 /** Reuse cannot stand in for a measurement under a different worker policy. */
-export function sameWorkerPolicy(previousRun, { workers = 1, serial = workers === 1, runnerCommand, faultWorkers = 1 } = {}) {
-  if (!sameFaultWorkers(previousRun?.faultWorkers, faultWorkers)) return false;
+export function sameWorkerPolicy(previousRun, { workers = 1, serial = workers === 1, runnerCommand, faultWorkers = 1, serialRequested = false } = {}) {
+  if (!sameFaultWorkers(previousRun?.faultWorkers, faultWorkers, { serialRequested })) return false;
   if (runnerCommand) return previousRun?.workers === undefined && !previousRun?.serial;
   return previousRun?.workers === (serial ? 1 : workers) && Boolean(previousRun?.serial) === serial;
 }
@@ -113,10 +119,10 @@ export function sameRunner(previousRun, current) {
  * check is part of the instrument: a verdict measured without it cannot vouch
  * for a run that has it (a fault it would have refused), nor the reverse.
  */
-export function reusableRun(previous, { confirmRuns, workers, serial, runnerCommand, runner, instrument, typecheck, faultWorkers = 1 }) {
+export function reusableRun(previous, { confirmRuns, workers, serial, runnerCommand, runner, instrument, typecheck, faultWorkers = 1, serialRequested = false }) {
   return Boolean(previous)
     && previous.run.confirmRuns === confirmRuns
-    && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand, faultWorkers })
+    && sameWorkerPolicy(previous.run, { workers, serial, runnerCommand, faultWorkers, serialRequested })
     && sameRunner(previous.run, runner)
     && previous.tool?.version === instrument.toolVersion
     && previous.run.instrument?.toolVersion === instrument.toolVersion
@@ -132,6 +138,31 @@ export function reuseSummary(records) {
   const reused = records.filter((record) => record.reusedFrom).length;
   return { reused, measured: records.length - reused };
 }
+
+/**
+ * Every record a reuse may carry forward, keyed by claim/fault, from one
+ * previous document or several (#270: a `--changed` or `--claim` run reads its
+ * own partial file and the canonical evidence of the last full probe). Each
+ * document must pass `reusableRun` on its own; where two hold the same fault,
+ * the one that finished later wins. Every record keeps the id of the run it
+ * comes from.
+ */
+export function priorRecords(previous, policy) {
+  const docs = (Array.isArray(previous) ? previous : [previous]).filter((doc) => reusableRun(doc, policy));
+  docs.sort((a, b) => String(a.run.finishedAt ?? '').localeCompare(String(b.run.finishedAt ?? '')));
+  const map = new Map();
+  for (const doc of docs) for (const record of doc.records) map.set(`${record.claim.id}/${record.subject.id}`, { record, runId: doc.run.id });
+  return map;
+}
+
+/** How the fan-out width was chosen, as the evidence records it (#270). */
+export function fanOutPolicy({ faultWorkersSource, cpus } = {}) {
+  if (!faultWorkersSource) return {};
+  return { faultWorkersSource, ...(faultWorkersSource === 'auto' && cpus !== undefined ? { cpus } : {}) };
+}
+
+/** Did this run ask for one fault at a time? Then no fan-out may stand in for it. */
+export const serialRequested = (faultWorkers, source) => faultWorkers === 1 && ['serial', 'flag', 'env'].includes(source);
 
 /**
  * Probe every fault of every claim. Returns a spec-conformant evidence
@@ -194,7 +225,8 @@ function partialDocument(options, ctx) {
       measurements,
       ...(!runnerCommand ? { workers: serial ? 1 : workers } : {}),
       ...(serial && !runnerCommand ? { serial: true } : {}),
-      ...(faultWorkers > 1 ? { faultWorkers } : {}),
+      ...((ctx.faultWorkers ?? faultWorkers) > 1 ? { faultWorkers: ctx.faultWorkers ?? faultWorkers } : {}),
+      ...fanOutPolicy(options),
       ...(ctx.contention?.detected ? { contention: ctx.contention } : {}),
       ...(confirmRuns < 3 ? { provisional: true } : {}),
       mode: ctx.mode ?? options.mode ?? 'worktree',
@@ -216,6 +248,8 @@ async function measureProbe({
   workers = 1,
   serial = workers === 1,
   faultWorkers = 1,
+  faultWorkersSource,
+  cpus,
   onWarn = () => {},
   budgetMs = 120_000,
   commandBudget,
@@ -364,6 +398,14 @@ async function measureProbe({
   // reader of a TIMEOUT or FLAKY-DEFENDER knows the machine was loaded.
   const contention = detectContention();
   ctx.contention = contention;
+  // Other runners already busy: an automatic width is halved, because the
+  // machine is not the probe's to divide (#270). A chosen width is kept.
+  const roundedDown = contentionRoundDown({ faultWorkers, source: faultWorkersSource }, contention.detected);
+  if (roundedDown !== faultWorkers) {
+    onWarn(`other test runners are already running, so the automatic fault-worker count drops from ${faultWorkers} to ${roundedDown}; pass --fault-workers <n> to choose it yourself.`);
+    faultWorkers = roundedDown;
+  }
+  ctx.faultWorkers = faultWorkers;
   if (contention.detected) onWarn(contentionWarning(contention, { serial, workers, custom: Boolean(runnerCommand), faultWorkers }));
   const selfLoad = fanOutWarning({ faultWorkers, workers, serial: serial || Boolean(runnerCommand), cpus: availableParallelism() });
   if (selfLoad) onWarn(selfLoad);
@@ -482,9 +524,7 @@ async function measureProbe({
       typechecker = await createTypechecker({ projectDir: iso.projectDir, command: typecheck, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, scratchBase });
       commandBudget?.assertOpen();
     }
-    const prior = reusableRun(previous, { confirmRuns, workers, serial, runnerCommand, runner: recordedRunner, instrument, typecheck: typechecker?.spec, faultWorkers })
-      ? new Map(previous.records.map((r) => [`${r.claim.id}/${r.subject.id}`, r]))
-      : new Map();
+    const prior = priorRecords(previous, { confirmRuns, workers, serial, runnerCommand, runner: recordedRunner, instrument, typecheck: typechecker?.spec, faultWorkers, serialRequested: serialRequested(faultWorkers, faultWorkersSource) });
     const partitionConfigured = (files) => {
       if (commandTemplate) return partitionByRunner(iso.projectDir, files, runner);
       const groups = new Map([[runner, []]]);
@@ -526,12 +566,14 @@ async function measureProbe({
      * path maps back to the repository. One per tree; a fault only ever uses
      * the tree it was handed.
      */
-    const treeContext = (scratch) => {
+    const treeContext = (scratch, worker = 0) => {
       const real = scratch === iso ? isoReal : realpathSync(scratch.projectDir);
       return {
         iso: scratch,
         isoReal: real,
-        runDefenders: (files, targets = []) => runDefenders(files, targets, scratch.projectDir),
+        worker,
+        // Every runner process this tree starts sees its index (#287).
+        runDefenders: (files, targets = []) => withWorker(worker, () => runDefenders(files, targets, scratch.projectDir)),
         // The runner that will LOAD the subject, which is not always the project
         // runner — a `.py` source file is Python's whatever the project runs.
         fatalEditFor: (file) => runnerFor(scratch.projectDir, file, runner).fatalEdit?.(),
@@ -652,7 +694,7 @@ async function measureProbe({
         if (!declared && mockInfo.indeterminate.length > 0) {
           return { record: discoveryIndeterminateRecord({ ...common, inputs: safeInputs(iso.projectDir, fault, defenders, { testUniverseHash, discoveryHashes }), indeterminate: mockInfo.indeterminate }) };
         }
-        const args = { ...common, typechecker, typecheckBudget: () => commandBudget?.runBudget(budgetMs) ?? budgetMs, typecheckCut: (granted, outcome) => commandBudget?.assertNotCut(granted, budgetMs, outcome.status === 'timeout' ? 1 : 0), allTests, iso, onWarn, confirmRuns, escalate, controlCache, stage, prior: prior.get(`${claim.id}/${fault.id}`), priorRunId: previous?.run.id, testUniverseHash, discoveryHashes, ensureBaseline, dependencyHasher,
+        const args = { ...common, typechecker, typecheckBudget: () => commandBudget?.runBudget(budgetMs) ?? budgetMs, typecheckCut: (granted, outcome) => commandBudget?.assertNotCut(granted, budgetMs, outcome.status === 'timeout' ? 1 : 0), allTests, iso, onWarn, confirmRuns, escalate, controlCache, stage, prior: prior.get(`${claim.id}/${fault.id}`)?.record, priorRunId: prior.get(`${claim.id}/${fault.id}`)?.runId, testUniverseHash, discoveryHashes, ensureBaseline, dependencyHasher,
           historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root };
         return { args, pre: await prePlanFault(args), common, discoveryHashes };
       } catch (err) {
@@ -701,16 +743,17 @@ async function measureProbe({
     // A precondition failure is about the whole run; anything else a baseline
     // throws belongs to the faults that ask for that baseline.
     const fatalToTheRun = (err) => err instanceof PreconditionError;
-    const freshTree = () => {
+    const freshTree = (worker = 0) => {
       const scratch = createScratch({ repoRoot: root, projectDir, ref: snapshot ?? ref, scratchBase, nodeModules });
       extraTrees.push(scratch);
-      return treeContext(scratch);
+      return treeContext(scratch, worker);
     };
     const releaseTrees = () => { while (extraTrees.length) extraTrees.pop().cleanup(); };
+    const releaseTree = (tree) => { extraTrees.splice(extraTrees.indexOf(tree.iso), 1); tree.iso.cleanup(); };
     /** Apply, probe, control, escalate and restore one fault in `tree`. */
-    const measureOne = async (state, tree) => {
+    const measureOne = async (state, tree, opts) => {
       try {
-        return await measureFault(state, tree);
+        return await measureFault(state, tree, opts);
       } catch (err) {
         return failed(state.common, err, tree, state.discoveryHashes);
       }
@@ -725,6 +768,24 @@ async function measureProbe({
         settle(index, planned.record ?? await measureOne(planned.state, primary));
       }
     } else {
+      // Defender sets that have shown they share something with the other
+      // trees (#270): every fault of theirs is measured with nothing else in
+      // flight, and every record says so.
+      const unsafe = new Set();
+      const setKey = (state) => state.defenders.join('\n');
+      const markUnsafe = (key, why) => {
+        if (unsafe.has(key)) return;
+        unsafe.add(key);
+        onWarn(`defender set ${key.split('\n').join(', ')} is not parallel-safe: ${why}, so its tests share something across scratch trees (a fixed port, a database, a temp path). Its faults are measured with nothing else in flight. Make those tests hermetic (an ephemeral port, a per-run directory) to get the fan-out back for them.`);
+      };
+      const tagUnsafe = (state, record) => {
+        if (record.reusedFrom || !record.detail) return record;
+        if (unsafe.has(setKey(state))) record.detail.notParallelSafe = true;
+        // Declared, not detected (#287): the claim says its tests cannot share the machine.
+        if (state.claim.serial === true) record.detail.serialDeclared = true;
+        return record;
+      };
+      Object.assign(measurements, { aloneConfirmRuns: 0, aloneConfirmMs: 0, remeasuredFaults: 0, remeasureMs: 0 });
       // 1. Everything before a baseline, for every fault, in order, on the
       //    clean first tree: input hashes, anchors and type checks are read
       //    before any fault is applied anywhere and before any baseline runs.
@@ -752,7 +813,7 @@ async function measureProbe({
       const baselineSlots = [primary];
       for (let i = 1; i < Math.min(faultWorkers, sets.length); i++) {
         commandBudget?.assertOpen();
-        baselineSlots.push(freshTree());
+        baselineSlots.push(freshTree(i));
       }
       const baselineContended = baselineSlots.length > 1;
       await runPool(sets, baselineSlots, async (set, tree) => {
@@ -781,48 +842,115 @@ async function measureProbe({
             releaseTrees();
           }
           baselineCache.get(key).remeasuredSerially = true;
+          // Red beside other sets, green alone: the red was theirs, so this
+          // set shares something with the other trees. Its faults are probed
+          // with nothing else in flight (#270).
+          if (baselineCache.get(key).runs.every((run) => run.outcome === 'pass')) markUnsafe(key, 'its baseline failed beside other defender sets and passed alone');
         }
       }
       baselinesFrozen = true;
       // 3. The rest of planning, in order, against the measured baselines.
       const pending = [];
+      const serialLane = []; // faults of a set already known not to be parallel-safe
       for (const [index, p] of prePlanned.entries()) {
         if (p.record) continue;
         const planned = await finishPlanOne(p);
         if (planned.record) settle(index, planned.record);
         else if (!planned.state.mutate) settle(index, await measureOne(planned.state, primary));
+        else if (unsafe.has(setKey(planned.state)) || planned.state.claim.serial === true) serialLane.push({ index, state: planned.state });
         else pending.push({ index, state: planned.state });
       }
       // 4. Faults: one tree per fault in flight, never more trees than faults.
+      //    Every run records whether it was alone; a fault whose runs were all
+      //    kills beside other faults stops before its last run (#270).
       const slots = [primary];
       for (let i = 1; i < Math.min(faultWorkers, pending.length); i++) {
         commandBudget?.assertOpen();
-        slots.push(freshTree());
+        slots.push(freshTree(i));
       }
-      const contended = slots.length > 1;
-      const remeasure = [];
+      const overlap = createOverlapTracker();
+      const outcomes = [];
       await runPool(pending, slots, async ({ index, state }, tree) => {
-        const record = await measureOne(state, tree);
-        // Held back (and everything after it, by the ordered emitter) until
-        // it has been measured again with nothing else running.
-        if (contended && needsSerialRemeasure(record)) remeasure.push({ index, state });
-        else settle(index, record);
+        const token = overlap.enter();
+        let result;
+        try {
+          result = await measureOne(state, tree, { overlap });
+        } finally {
+          overlap.leave(token);
+        }
+        outcomes.push({ index, state, result, contended: token.contended });
       }, { beforeEach: () => commandBudget?.assertOpen() });
       // The fan-out is over: its trees go now, so no more than n ever exist.
       releaseTrees();
-      // Each re-measure gets a fresh tree: the contended run may have left
-      // state behind in its tree (a counter, a cache, a half-written file from
-      // a killed process), and the serial answer must not inherit it.
-      for (const { index, state } of remeasure.sort((a, b) => a.index - b.index)) {
-        commandBudget?.assertOpen();
-        let record;
+      outcomes.sort((a, b) => a.index - b.index);
+      // Nothing is settled before it is believed: a deferred kill, a
+      // disagreement and a contended outcome a loaded machine can manufacture
+      // stay unpublished — and a command budget that runs out now reports
+      // them not reached, never as what the contended runs said.
+      const finals = [];
+      const remeasure = [];
+      const confirm = [];
+      for (const o of outcomes) {
+        if (o.result.deferred) confirm.push(o);
+        else if (o.result.disagreed) { markUnsafe(setKey(o.state), 'its runs beside other faults failed where a run alone passed'); remeasure.push(o); }
+        else if (o.contended && needsSerialRemeasure(o.result)) remeasure.push(o);
+        else finals.push({ index: o.index, state: o.state, record: o.result });
+      }
+      // 5. Each deferred kill takes its last run alone, in order, in one tree
+      //    of its own that nothing else touches while it runs.
+      if (confirm.length) {
+        const solo = freshTree();
         try {
-          record = await measureOne(state, freshTree());
+          for (const o of confirm) {
+            if (unsafe.has(setKey(o.state))) { remeasure.push(o); continue; }
+            commandBudget?.assertOpen();
+            const started = performance.now();
+            const result = await measureOne(o.state, solo, { priorRuns: o.result.runs, allAlone: true });
+            measurements.aloneConfirmRuns++;
+            measurements.aloneConfirmMs += performance.now() - started;
+            if (result.disagreed) { markUnsafe(setKey(o.state), 'its runs beside other faults failed where a run alone passed'); remeasure.push(o); }
+            else if (result.verdict === 'killed') finals.push({ index: o.index, state: o.state, record: result });
+            else remeasure.push(o); // anything but the kill the contended runs suggested: measured again, alone, in full
+          }
         } finally {
           releaseTrees();
         }
-        record.detail.remeasuredSerially = true;
-        settle(index, record);
+      }
+      // A kill in a set that is not parallel-safe rests on runs a neighbour may
+      // have caused; unless every one of them was alone, it is measured again.
+      for (const f of finals.splice(0)) {
+        const runs = f.record.detail?.probeRuns ?? [];
+        if (f.record.verdict === 'killed' && unsafe.has(setKey(f.state)) && !runs.every((run) => run.alone)) remeasure.push(f);
+        else finals.push(f);
+      }
+      for (const f of finals) settle(f.index, tagUnsafe(f.state, f.record));
+      // 6. Measured alone, in claim/fault order. A re-measure gets a fresh tree
+      //    each: the contended run may have left state behind in its tree (a
+      //    counter, a cache, a half-written file from a killed process), and
+      //    the serial answer must not inherit it. A set known unsafe before the
+      //    fan-out is probed in one tree, as a serial run would.
+      const alone = [...remeasure.map((o) => ({ ...o, again: true })), ...serialLane].sort((a, b) => a.index - b.index);
+      let laneTree;
+      try {
+        for (const o of alone) {
+          commandBudget?.assertOpen();
+          const started = performance.now();
+          const tree = o.again ? freshTree() : (laneTree ??= freshTree());
+          let record;
+          try {
+            record = await measureOne(o.state, tree, { allAlone: true });
+          } finally {
+            if (o.again && tree !== primary) releaseTree(tree);
+          }
+          if (o.again) {
+            record.detail.remeasuredSerially = true;
+            measurements.remeasuredFaults++;
+            measurements.remeasureMs += performance.now() - started;
+          }
+          settle(o.index, tagUnsafe(o.state, record));
+        }
+      } finally {
+        releaseTrees();
       }
     }
   } finally {
@@ -872,6 +1000,7 @@ async function measureProbe({
       ...(serial && !runnerCommand ? { serial: true } : {}),
       // Recorded only for a fan-out, so a serial run's evidence is unchanged.
       ...(faultWorkers > 1 ? { faultWorkers } : {}),
+      ...fanOutPolicy({ faultWorkersSource, cpus }),
       ...(contention.detected ? { contention } : {}),
       ...(confirmRuns < 3 ? { provisional: true } : {}),
       // The isolation that was actually created, not the mode that was asked
@@ -1130,28 +1259,42 @@ async function planFault(args, pre) {
  * Reads nothing it did not get from `planFault` except what it measures, so
  * it can run in any scratch tree, and again for a serial re-measure.
  */
-async function measureFault(state, tree) {
+async function measureFault(state, tree, { priorRuns = [], overlap, allAlone = false } = {}) {
   const { claim, fault, defenders, allTests, onWarn = () => {}, confirmRuns, escalate, controlCache, stage } = state;
   const detail = { ...state.detail, baselineRuns: [...state.detail.baselineRuns], probeRuns: [] };
-  const rawProbeRuns = []; // spec testRun + the runner's timeout count, which classify needs
+  const rawProbeRuns = [...priorRuns]; // spec testRun + the runner's timeout count, which classify needs
   let subjectReached; // the negative control's answer; undefined until it is worth asking
+  // Under a fan-out (#270) every run says whether it was measured alone, and
+  // a kill may not rest only on runs beside other faults.
+  const fanOut = Boolean(overlap) || allAlone;
 
   if (state.mutate) {
     const { iso, isoReal, runDefenders, fatalEditFor } = tree;
     const mutation = applyFault(iso.projectDir, fault, { inPlace: iso.mode === 'in-place' });
     try {
       const probeRuns = rawProbeRuns;
-      for (let i = 0; i < confirmRuns; i++) {
+      for (let i = priorRuns.length; i < confirmRuns; i++) {
+        // Every run so far was a kill and none was alone: the last one is
+        // taken later, with nothing else in flight, in a tree of its own.
+        if (overlap && deferLastRun(probeRuns, confirmRuns, overlap.active > 1)) return { deferred: true, runs: probeRuns };
+        const alone = overlap?.runStarted();
         stage('probe', i + 1, confirmRuns);
         const { run, timeouts, loadMessage, failedTests, provenance } = await runDefenders(defenders, [fault.file]);
-        probeRuns.push({ ...run, timeouts, loadMessage, failedTests });
+        probeRuns.push({ ...run, ...(allAlone || alone?.() ? { alone: true } : {}), timeouts, loadMessage, failedTests });
         // Only when the suite actually loaded. A run that failed to load
         // explains an absent import by itself — saying the defenders never
         // reached the file would be true and useless, and it would put the
-        // signal on every fault whose replacement does not parse.
-        if (i === 0 && run.outcome !== 'error') checkProvenance({ claim, fault, provenance, isoReal, detail, onWarn });
+        // signal on every fault whose replacement does not parse. Checked in
+        // every tree the fault is measured in.
+        if (i === priorRuns.length && run.outcome !== 'error') checkProvenance({ claim, fault, provenance, isoReal, detail, onWarn });
+        // Red beside other faults, green alone: the red was theirs. Never a
+        // verdict about this fault, and never `inconsistent-probe`.
+        if (fanOut && aloneDisagrees(probeRuns)) return { disagreed: true, runs: probeRuns };
         if (shouldStopEarly(probeRuns)) break;
       }
+      // Another fault started during the last run after all: that run is set
+      // aside, and the kill waits for one taken alone.
+      if (overlap && mustConfirmAlone(probeRuns, confirmRuns)) return { deferred: true, runs: probeRuns.slice(0, -1) };
       detail.probeRuns = probeRuns.map(({ timeouts, loadMessage, failedTests, ...run }) => run);
       const provisional = classify({ defenders, anchor: state.anchor, baselineRuns: detail.baselineRuns, probeRuns, confirmRuns });
       // `provisional` is deliberately computed BEFORE the control: the control is what turns a survivor into an unverifiable, so asking it first would be circular.

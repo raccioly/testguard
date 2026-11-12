@@ -13,7 +13,10 @@ import { evaluateOriginPolicy } from '../probe/origin-policy.mjs';
 import { declaredOriginSummary } from '../../spec/lib/origins.mjs';
 import { intentHandoff } from '../scaffold/intent.mjs';
 import { computeChangedGate, defaultIgnorePath } from '../gate/changed.mjs';
-import { headSha, isAncestor } from '../git.mjs';
+import { headSha, isAncestor, repoRoot } from '../git.mjs';
+import { availableParallelism } from 'node:os';
+import { computeAdvice, renderAdvice } from './advice.mjs';
+import { resolveProbeScope } from '../probe/scope.mjs';
 import { checkAnchorLocations } from '../claims/anchors.mjs';
 import { computeClaimedSurface, needsClaimExpansion } from './surface.mjs';
 import { projectAnnotationAdvisory } from '../claims/annotations.mjs';
@@ -50,7 +53,42 @@ const P = (projectDir) => ({
  * `run.scope.state`/`run.scope.next`, so the selection is never told to repair
  * something it did not select. The whole-file answer is the call without `only`.
  */
-export function computeStatus({ projectDir, toolVersion, generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20, changedRef, includeDirty = false, evidence: evidenceOverride, only }) {
+export function computeStatus(options) {
+  const doc = computeStatusCore(options);
+  // Speed advice (#270) is about the whole project: a selection's view and a
+  // caller that asked for none get none.
+  if (options.only || options.advice === false) return doc;
+  const advice = statusAdvice(doc, options);
+  if (advice.length) doc.advice = advice;
+  return doc;
+}
+
+/**
+ * The advice lines for a status document: read the evidence it read, ask the
+ * machine its CPU count, and — when the next step is a probe and a base is
+ * known — how many claims the change since that base can affect.
+ */
+function statusAdvice(doc, { projectDir, toolVersion, paths = P(projectDir), changedRef, includeDirty = false, evidence: evidenceOverride, cpus = availableParallelism(), adviseChange = false }) {
+  let evidence;
+  const evidenceFile = evidenceOverride ?? paths.evidence;
+  try { if (existsSync(evidenceFile)) evidence = readSpecDoc('evidence', evidenceFile); } catch { evidence = undefined; }
+  let changed;
+  // Selecting by change walks every claim's import closure: seconds on a large
+  // project. Only a caller that asked about a change pays for it, never a
+  // session-start brief (#270).
+  if (adviseChange && changedRef && doc.next?.action === 'probe' && doc.counts.claims > 0 && existsSync(paths.claims)) {
+    try {
+      const claims = loadClaims(paths.claims);
+      const scope = resolveProbeScope({ projectDir, claims, ref: changedRef, includeDirty, timeoutMs: 10_000 });
+      if (scope.outcome !== 'undetermined') changed = { selected: scope.selected.length, total: claims.claims.length, ref: changedRef };
+    } catch { changed = undefined; }
+  }
+  let root;
+  try { root = repoRoot(projectDir); } catch { root = undefined; }
+  return computeAdvice({ evidence, cpus, changed, root, toolVersion: toolVersion ?? '0.0.0' });
+}
+
+function computeStatusCore({ projectDir, toolVersion, generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20, changedRef, includeDirty = false, evidence: evidenceOverride, only }) {
   const rel = (p) => relative(projectDir, p) || '.';
   const doc = {
     schemaVersion: 1,
@@ -362,6 +400,7 @@ export function renderStatus(doc) {
   for (const f of doc.invalidFaults ?? []) lines.push(`INVALID   ${f.claimId}/${f.subjectId} ${f.reason}: ${f.hits} hits, expected ${f.expected} (${f.file})`);
   for (const s of doc.stale.slice(0, 8)) lines.push(`stale     ${s}`);
   for (const n of doc.notes ?? []) lines.push(`note      ${n}`);
+  lines.push(...renderAdvice(doc.advice ?? []));
   lines.push(`next:     [${doc.next.action}] ${doc.next.command}`);
   lines.push(`why:      ${doc.next.why}`);
   return lines.join('\n');

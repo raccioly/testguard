@@ -107,6 +107,20 @@ unchanged.
 
 ## The operating loop
 
+Between those steps the agent follows the fast loop, stated as commands:
+
+```bash
+testguard probe --changed auto              # after changing code
+testguard probe --claim <ID> --confirm 1    # while writing one test (provisional)
+testguard admit <test-file> --claim <ID>    # before committing that test
+testguard probe                             # the full probe: only when asked, or nightly
+```
+
+Faults already run in parallel and every kill is confirmed by a run alone, so
+the agent never passes `--serial` unless a suite cannot share the machine.
+`status` and the brief carry `advice` lines when a run leaves speed on the
+table, each with the command to run.
+
 The skill teaches one loop. The agent never infers state from which files
 exist; it asks:
 
@@ -122,7 +136,7 @@ and acts on `state` and `next`:
 | `unclaimed-changes` | changed source files carry no claim (computed when a base reference is known) | state the claim for `next.file` (or add an ignore entry with a reason) **before writing more code** |
 | `invalid-anchors` | an exact fault anchor moved or became ambiguous | `testguard claims --check-anchors`, then repair `next.target` without changing what the fault means, and re-probe |
 | `unprobed` | claims that were never probed | `testguard probe` |
-| `evidence-stale` | code, tests, claims or a fault changed since the evidence | `testguard probe --include-dirty`, or review the fault edit `next` names |
+| `evidence-stale` | code, tests, claims or a fault changed since the evidence | `next.command` (or review the fault edit `next` names); in the inner loop, `testguard probe --changed auto --include-dirty` |
 | `provisional-only` | only `--confirm 1` evidence exists | `testguard probe --confirm 3` |
 | `unproven` | a finding not covered by the baseline | `next.target` names it; apply the verdict's fix below |
 | `clean` | everything killed or baselined | `testguard baseline` if `next` says so; otherwise nothing, or expand the claimed surface when `next` points at an unclaimed module |
@@ -230,7 +244,8 @@ same documents over the Model Context Protocol on stdio, and
 `testguard init --mcp` prints a ready config for Claude Code, Cursor and Codex
 (printed, never written: a harness config is yours to place). Its five tools
 are read-only, and none runs a probe: `testguard_next_command` returns the
-shell line for the agent to run where you can see it. Tools and config are in
+shell line for the agent to run where you can see it, plus the fast loop
+(`loop`) and any speed `advice`. Tools and config are in
 [the MCP reference](../reference/mcp.md).
 
 ## CI evidence in a local session

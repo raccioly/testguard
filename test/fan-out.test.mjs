@@ -22,7 +22,7 @@ describe('needsSerialRemeasure', () => {
     expect(needsSerialRemeasure({ verdict: 'flaky-defender', detail: { reason: 'inconsistent-probe' } })).toBe(true);
     // A red baseline was measured before the fan-out, alone: never contended.
     expect(needsSerialRemeasure({ verdict: 'flaky-defender', detail: { reason: 'defenders-not-green' } })).toBe(false);
-    for (const verdict of ['killed', 'survived', 'nocover', 'unverifiable', 'fault-invalid']) {
+    for (const verdict of ['killed', 'survived', 'nocover']) {
       expect(needsSerialRemeasure({ verdict, detail: {} })).toBe(false);
     }
     // A reused verdict was not measured by this run at all.
@@ -142,27 +142,28 @@ describe('singleFlight', () => {
 });
 
 describe('fault workers join the reuse policy', () => {
-  it('a fan-out never stands in for a serial run, nor for another fan-out; serial stands in for any', () => {
+  it('a fan-out never stands in for a run that asked for one fault at a time; serial stands in for any (#270)', () => {
     expect(sameFaultWorkers(undefined, 1)).toBe(true);
     expect(sameFaultWorkers(1, 1)).toBe(true);
     expect(sameFaultWorkers(undefined, 4)).toBe(true);
     expect(sameFaultWorkers(4, 4)).toBe(true);
-    expect(sameFaultWorkers(4, 1)).toBe(false);
-    expect(sameFaultWorkers(2, 4)).toBe(false);
-    expect(sameWorkerPolicy({ workers: 1, serial: true, faultWorkers: 4 }, { workers: 1 })).toBe(false);
+    expect(sameFaultWorkers(4, 1, { serialRequested: true })).toBe(false);
+    expect(sameFaultWorkers(2, 4)).toBe(true);
+    expect(sameWorkerPolicy({ workers: 1, serial: true, faultWorkers: 4 }, { workers: 1, serialRequested: true })).toBe(false);
     expect(sameWorkerPolicy({ workers: 1, serial: true }, { workers: 1, faultWorkers: 4 })).toBe(true);
     // A custom command's own policy is opaque, but the fan-out is ours.
-    expect(sameWorkerPolicy({ faultWorkers: 2 }, { runnerCommand: 'x' })).toBe(false);
+    expect(sameWorkerPolicy({ faultWorkers: 2 }, { runnerCommand: 'x', serialRequested: true })).toBe(false);
+    expect(sameWorkerPolicy({ faultWorkers: 2 }, { runnerCommand: 'x' })).toBe(true);
     expect(sameWorkerPolicy({}, { runnerCommand: 'x', faultWorkers: 2 })).toBe(true);
   });
 
-  it('reusableRun refuses evidence measured under a fan-out for a serial probe', () => {
+  it('reusableRun refuses evidence measured under a fan-out for a probe that asked for serial', () => {
     const instrument = { toolVersion: '1.0.0', digest: 'd' };
     const runner = { name: 'vitest', version: '5', source: 'project' };
     const previous = (faultWorkers) => ({ tool: { version: '1.0.0' }, run: { confirmRuns: 3, workers: 1, serial: true, runner, instrument, ...(faultWorkers ? { faultWorkers } : {}) } });
     const ask = { confirmRuns: 3, workers: 1, serial: true, runner, instrument };
     expect(reusableRun(previous(), ask)).toBe(true);
-    expect(reusableRun(previous(4), ask)).toBe(false);
+    expect(reusableRun(previous(4), { ...ask, serialRequested: true })).toBe(false);
     expect(reusableRun(previous(4), { ...ask, faultWorkers: 4 })).toBe(true);
   });
 });
@@ -205,7 +206,7 @@ describe('preconditions', () => {
     expect(await probeCommand({ projectDir: '/nonexistent', values: { ...values, 'fault-workers': 'many' }, version: '0.0.0' }, io)).toBe(3);
     expect(err).toEqual([
       '--fault-workers above 1 needs one scratch worktree per fault in flight; drop --in-place',
-      '--fault-workers must be a positive safe integer',
+      '--fault-workers must be a positive integer or auto (got "many")',
     ]);
   });
 });

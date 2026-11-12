@@ -54,6 +54,10 @@
         "producedBy": {
           "$ref": "urn:claimspec:v1:common#/$defs/provenance"
         },
+        "serial": {
+          "description": "This claim's tests cannot share the machine (a fixed port, one database, a shared path), so under a fault fan-out every fault of the claim is probed alone, after the fan-out, and its records say `detail.serialDeclared`. A declaration, not detection: TestGuard also detects a set that interferes (`detail.notParallelSafe`). Prefer making the suite parallel-safe, for example a port derived from `TESTGUARD_WORKER`. Absent or false: probed with the fan-out. Changes no verdict.",
+          "type": "boolean"
+        },
         "defendedBy": {
           "description": "Globs (project-relative) for the test files that supposedly defend this claim. Empty or absent means: discover defenders as the test files that import each fault's target file (relative paths and resolved aliases). If nothing resolves, the verdict is `nocover`.",
           "type": "array",

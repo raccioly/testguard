@@ -295,16 +295,26 @@ export function referenceFrom({ before, after, budget } = {}) {
  *
  * Pure. Reads a report, returns a decision; the caller owns exit codes and I/O.
  */
-export function checkCostBudget(report, { budgetSeconds, perClaimSeconds, previousMs, worst = 5, reference } = {}) {
+export function checkCostBudget(report, { budgetSeconds, perClaimSeconds, previousMs, worst = 5, reference, elapsedMs, faultWorkers, budgetFaultWorkers, unit } = {}) {
   if (typeof budgetSeconds !== 'number' || !Number.isFinite(budgetSeconds) || budgetSeconds <= 0) {
     throw new TypeError('checkCostBudget: budgetSeconds must be a positive number');
   }
   const budgetMs = budgetSeconds * 1000;
-  const rawMs = report.totalMs ?? 0;
+  const summedRawMs = report.totalMs ?? 0;
   const assessment = reference === undefined ? undefined : assessReference(reference, { reusedRecords: report.reusedRecords ?? 0 });
   const factor = assessment?.status === 'ok' ? assessment.speedFactor : 1;
-  const basis = assessment === undefined ? 'raw' : assessment.status === 'ok' ? 'normalized' : 'unnormalized';
+  // #284: given the run's elapsed time, the ceiling is on ELAPSED time. Summed
+  // defender seconds rise when faults run side by side while the job gets
+  // faster, so under a fan-out the sum measures overlap, not cost: it is
+  // reported, never gated. The ceiling is valid only for the width it was
+  // measured at, so a run at another width fails closed.
+  const byElapsed = typeof elapsedMs === 'number';
+  const rawMs = byElapsed ? elapsedMs : summedRawMs;
+  const basis = (assessment === undefined ? 'raw' : assessment.status === 'ok' ? 'normalized' : 'unnormalized') + (byElapsed ? '-elapsed' : '');
   const totalMs = normalize(rawMs, factor);
+  const widthMismatch = byElapsed && budgetFaultWorkers !== undefined && faultWorkers !== budgetFaultWorkers;
+  // A ceiling in elapsed seconds compared with a sum would be a unit error, not a measurement.
+  const elapsedMissing = unit === 'normalized-elapsed-seconds' && !byElapsed;
 
   // ── Why a SECOND ceiling, on the claim. ──
   // The total alone is a treadmill: claims should grow forever, so it can only
@@ -331,10 +341,12 @@ export function checkCostBudget(report, { budgetSeconds, perClaimSeconds, previo
 
   const overCeiling = totalMs > budgetMs || overPerClaim.length > 0;
   const failures = [
+    ...(elapsedMissing ? ['elapsed-missing'] : []),
+    ...(widthMismatch ? ['fault-workers-mismatch'] : []),
     ...(assessment?.status === 'missing' ? ['reference-missing'] : []),
     ...(assessment?.status === 'out-of-range' ? ['reference-out-of-range'] : []),
     ...(assessment?.status === 'runner-mismatch' ? ['reference-runner-mismatch'] : []),
-    ...(totalMs > budgetMs ? ['over-budget'] : []),
+    ...(!widthMismatch && !elapsedMissing && totalMs > budgetMs ? ['over-budget'] : []),
     ...(overPerClaim.length > 0 ? ['per-claim-over-ceiling'] : []),
     ...(assessment?.status === 'ok' && assessment.lowConfidence && overCeiling ? ['low-confidence-over-ceiling'] : []),
   ];
@@ -346,6 +358,7 @@ export function checkCostBudget(report, { budgetSeconds, perClaimSeconds, previo
     rawMs,
     ...(assessment === undefined ? {} : { reference: assessment }),
     totalMs,
+    ...(byElapsed ? { summedRawMs, summedMs: normalize(summedRawMs, factor), faultWorkers, ...(budgetFaultWorkers !== undefined ? { budgetFaultWorkers } : {}) } : {}),
     budgetMs,
     overByMs: Math.max(0, totalMs - budgetMs),
     headroomMs: Math.max(0, budgetMs - totalMs),
@@ -387,19 +400,25 @@ export function renderCostBudget(d) {
     ? ` (${d.deltaMs >= 0 ? '+' : ''}${secs(Math.abs(d.deltaMs))} raw against the previous run's ${secs(d.previousMs)})`
     : '';
   const overTotal = d.totalMs > d.budgetMs;
-  const unit = d.basis === 'normalized' ? 'normalized ' : '';
-  if (d.failures.includes('reference-missing')) {
+  const unit = d.basis.startsWith('normalized') ? 'normalized ' : '';
+  const what = d.basis.endsWith('-elapsed') ? `${unit}elapsed ` : unit;
+  if (d.failures.includes('elapsed-missing')) {
+    out.push('COST ELAPSED TIME MISSING: the ceiling is in normalized elapsed seconds and this evidence records no run.measurements.elapsedMs, so it cannot be compared. Not falling back to summed seconds (#284).');
+  } else if (d.failures.includes('fault-workers-mismatch')) {
+    out.push(`COST FAULT-WORKER MISMATCH: this run probed ${d.faultWorkers ?? 'an unrecorded number of'} faults at a time; the ceiling is valid only for ${d.budgetFaultWorkers}. Elapsed time at another width is a different measurement, so it is not compared (#284). Run at the recorded width, or take a new ceiling at this one.`);
+  } else if (d.failures.includes('reference-missing')) {
     out.push('COST REFERENCE MISSING: the runner-speed measurement is absent or not a positive number, so the cost cannot be compared with its ceiling. Not falling back to raw seconds.');
   } else if (d.failures.includes('reference-runner-mismatch')) {
     out.push(`COST REFERENCE RUNNER MISMATCH: ${d.reference.mismatch.join(' ')} The reference tracks probe speed only within one kind of machine, so it cannot normalize across them. Not falling back to raw seconds: run on the class the baseline was taken on, or take a new baseline there (reference.cpus and reference.platform in testguard.cost-budget.json).`);
   } else if (d.failures.includes('reference-out-of-range')) {
     out.push(`COST REFERENCE OUT OF RANGE: speed factor ${d.reference.speedFactor.toFixed(2)} is outside ${d.reference.factorRange[0]}–${d.reference.factorRange[1]}; the reference no longer measures what the probe does, or the runner is not comparable. Not falling back to raw seconds.`);
   } else if (overTotal) {
-    out.push(`COST BUDGET EXCEEDED: ${unit}${secs(d.totalMs)} against a ${secs(d.budgetMs)} budget, over by ${secs(d.overByMs)}${delta}.`);
+    out.push(`COST BUDGET EXCEEDED: ${what}${secs(d.totalMs)} against a ${secs(d.budgetMs)} budget, over by ${secs(d.overByMs)}${delta}.`);
   } else {
-    out.push(`cost ${unit}${secs(d.totalMs)} of a ${secs(d.budgetMs)} budget — ${secs(d.headroomMs)} to spare${delta}.`);
+    out.push(`cost ${what}${secs(d.totalMs)} of a ${secs(d.budgetMs)} budget — ${secs(d.headroomMs)} to spare${delta}.`);
   }
   out.push(...renderReference(d));
+  if (d.summedMs !== undefined) out.push(`summed defender seconds ${secs(d.summedMs)} (reported, not gated; inflated by overlap at ${d.faultWorkers ?? 1} fault worker${(d.faultWorkers ?? 1) === 1 ? '' : 's'}, #284).`);
   if (d.failures.includes('low-confidence-over-ceiling')) {
     out.push('LOW-CONFIDENCE RUN OVER THE CEILING: the runner-speed correction cannot be trusted here, so it does not excuse the overage. Re-run the job; if it repeats, the suite grew.');
   }

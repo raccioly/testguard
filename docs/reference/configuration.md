@@ -281,9 +281,21 @@ neither the file nor the script ships in the package. To see what your own
 probe costs, use `probe --cost` or `claims --cost`; see the
 [performance guide](../guides/performance.md).
 
+The total ceiling (`seconds`) is on the self-probe's **normalized elapsed
+time** at one fault-worker count (`unit: "normalized-elapsed-seconds"`,
+`faultWorkers`), since #284. The probe fans faults out by default, and summed
+defender seconds rise when two faults run at once while the job gets faster
+(4243 summed against 1807 elapsed on one run), so the sum is printed beside
+the decision and never gated. A run at another fault-worker count fails closed
+(`fault-workers-mismatch`), as one on another runner class does, and evidence
+with no `run.measurements.elapsedMs` fails closed (`elapsed-missing`). The
+per-claim ceiling (`perClaimSeconds`) is still on summed seconds, which overlap
+inflates; #284 tracks its unit.
+
 The ceilings are in **normalized seconds**. A CI runner's speed moved the same
-592 faults between 2876 s and 4159 s, so the check divides the summed run
-durations by a speed factor measured in the same job. The job times a fixed
+592 faults between 2876 s and 4159 s, so the check divides by a speed factor
+measured in the same job — the elapsed time for the total ceiling, the summed
+run durations for the per-claim one. The job times a fixed
 workload (`.github/scripts/measure-reference.mjs`: it starts `node --test` on
 a tiny project nine times and takes the median) immediately before and after
 the self-probe. The factor is the mean of those two medians over the
@@ -358,6 +370,8 @@ or VM for untrusted code, and give it a writable scratch directory.
 | Variable | Read by | Meaning |
 |---|---|---|
 | `TESTGUARD_CHANGED_REF` | `gate`, `sweep`, `status`, `brief`, the MCP tools | The reference to measure a change against when `--changed` is absent. Checked before the CI variables below. |
+| `TESTGUARD_WORKER` | set by `probe` | Set by TestGuard, not read: every test runner process a probe starts gets the 0-based index of the scratch tree it runs in. Trees running side by side have different indices; a run with nothing else in flight is `0`. Derive a port, a database name or a directory from it (`8787 + TESTGUARD_WORKER`) and a suite that needs one of its own stays parallel. |
+| `TESTGUARD_FAULT_WORKERS` | `probe` | How many faults to probe at once: a positive integer or `auto` (the default: `min(4, floor(CPUs / 2))`). `--fault-workers` and `--serial` win; empty is unset. `1` restores one fault at a time. |
 | `TESTGUARD_NODE_MODULES` | `probe`, `admit`, `sweep`, `replay` | A `node_modules` directory to link into the scratch worktree. `--node-modules` wins. |
 | `TESTGUARD_SCRATCH_DIR` | `probe`, `admit`, `sweep`, `replay` | An existing, writable directory for everything TestGuard creates while it runs tests: scratch worktrees, the temporary git index, runner reports and runner temp directories. `--scratch-dir` wins. Missing or unwritable is an error (exit 2) before anything is written. Default: the OS temp directory. |
 | `TESTGUARD_PYTHON` | `probe`, `claims --check-anchors`, `admit`, `sweep`, `replay` | The Python interpreter for `.py` defenders. `--python` wins when both are given; the two mean the same thing: a bare name such as `python3` is looked up on `PATH`, anything containing `/` is a path. |

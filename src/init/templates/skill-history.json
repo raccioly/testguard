@@ -1,0 +1,17 @@
+{
+  "description": "sha256 of every SKILL.md template TestGuard shipped before template markers (#270). An installed skill with one of these hashes is unmodified, so init --upgrade may replace it.",
+  "sha256": [
+    "17c0595c54de52ff63889a3e8e692dd9138d698db6b4bbb4258493a1df0459de",
+    "367448fae003d5e878f666f22de2bcaa736bc50fa3164a957bd48188e118620b",
+    "39d34c3edd63439f396d0b76b09aa803ad3d52ede4daf32ee4df89fcf9731a4d",
+    "6e356244804b490d5bec953467cea397d28cf0455d092f4869e8a35611b79c52",
+    "9a236dcbbcc80f29a4ddfebd869c8890b1dcd7cdabf513de55ed2e2ee773b19a",
+    "9c36b8bf23233438c96850d8c02d8e3e441724c184c318a1287727a678e2ceee",
+    "a21ddfca820781d7ef240b9ac9c39973e00699c553f40fab58ea23b07bac4655",
+    "c3c3fa20e2cd704a00d989c6da4a7b056fe6e49f67122173d4c9534c1973fce2",
+    "c42032385a162270bf81df6ed7747cc5e1b20c7d226428308454fd7074efb305",
+    "e07d5f3a2e1ba7da81447c62fe2f30ca07f8c0ce589f7b11e381dc5df7dd0977",
+    "e2ee70444ceff6b0dc63032223d13445ce139bc0f3d33cb948f6091da8878ece",
+    "e5e56849711e703023a1c0ff0fdaeb8468ea924a055fbefaaebd3620f126f503"
+  ]
+}
