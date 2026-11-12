@@ -5160,7 +5160,7 @@
           "description": "Any total passes the budget, so the check reports success on a gate that has tripled and nothing ever fails.",
           "faultClass": "condition-forced",
           "file": "src/probe/cost.mjs",
-          "find": "    ...(totalMs > budgetMs ? ['over-budget'] : []),",
+          "find": "    ...(!widthMismatch && !elapsedMissing && totalMs > budgetMs ? ['over-budget'] : []),",
           "replace": "    ...(false ? ['over-budget'] : []),",
           "producedBy": {
             "producer": "human",
@@ -14423,6 +14423,60 @@
           "file": "src/probe/probe.mjs",
           "find": "          if (baselineCache.get(key).runs.every((run) => run.outcome === 'pass')) markUnsafe(key, 'its baseline failed beside other defender sets and passed alone');\n",
           "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-COST-GATE-IS-ON-ELAPSED-TIME",
+      "statement": "The self-probe cost gate compares normalized elapsed time with a ceiling valid for one fault-worker count: summed defender seconds are reported and never gated, a run at another width or with no elapsed time fails closed, and the per-claim ceiling stays on summed seconds.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #284 (gate on elapsed time)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/cost-elapsed.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The gate still compares the summed seconds.",
+          "faultClass": "variable-swap",
+          "file": "src/probe/cost.mjs",
+          "find": "  const rawMs = byElapsed ? elapsedMs : summedRawMs;",
+          "replace": "  const rawMs = summedRawMs;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A run at another fault-worker count is compared anyway.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "  const widthMismatch = byElapsed && budgetFaultWorkers !== undefined && faultWorkers !== budgetFaultWorkers;",
+          "replace": "  const widthMismatch = false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Evidence with no elapsed time is compared by its sum.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/cost.mjs",
+          "find": "  const elapsedMissing = unit === 'normalized-elapsed-seconds' && !byElapsed;",
+          "replace": "  const elapsedMissing = false;",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

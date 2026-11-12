@@ -60,35 +60,26 @@ const decision = checkCostBudget(report, {
   budgetSeconds: budget.seconds,
   perClaimSeconds: budget.perClaimSeconds,
   previousMs,
+  // #284: the ceiling is on normalized elapsed time, valid for one width.
+  elapsedMs: evidence.run?.measurements?.elapsedMs,
+  faultWorkers: evidence.run?.faultWorkers ?? 1,
+  budgetFaultWorkers: budget.faultWorkers,
+  unit: budget.unit,
   reference: referenceFrom({ before: tryRead(values['reference-before']), after: tryRead(values['reference-after']), budget: budget.reference }),
 });
-// Reporting only (#284): the ceiling above counts summed defender seconds,
-// which rise when faults run side by side while the job's wall-clock falls.
-// Elapsed time and the fan-out width are printed beside it, normalized the
-// same way, so a gate on elapsed time has a baseline before it exists.
-const factor = decision.reference?.speedFactor;
-const elapsedMs = evidence.run?.measurements?.elapsedMs;
-const width = evidence.run?.faultWorkers ?? 1;
-const elapsed = elapsedMs === undefined ? undefined : {
-  seconds: Math.round(elapsedMs / 100) / 10,
-  ...(factor ? { normalizedSeconds: Math.round(elapsedMs / factor / 100) / 10 } : {}),
-};
-const elapsedLine = elapsed
-  ? `elapsed ${elapsed.seconds}s wall-clock${elapsed.normalizedSeconds !== undefined ? ` (${elapsed.normalizedSeconds}s normalized)` : ''} at ${width} fault worker${width === 1 ? '' : 's'}${evidence.run?.faultWorkersSource ? ` (${evidence.run.faultWorkersSource})` : ''}; the ceiling counts summed defender seconds, not this (reported for #284)`
-  : undefined;
-const text = [renderCostBudget(decision), ...(elapsedLine ? [elapsedLine] : [])].join('\n');
+const text = renderCostBudget(decision);
 console.log(text);
 // One machine-readable line, so the figures a ceiling is derived from can be
 // read back out of a log without parsing prose.
 console.log(`cost-measurement ${JSON.stringify({
-  rawSeconds: Math.round(decision.rawMs / 100) / 10,
+  rawSeconds: Math.round(decision.rawMs / 100) / 10, // elapsed when the run recorded it (#284)
   ...(decision.reference ? { referenceBeforeMs: decision.reference.beforeMs, referenceAfterMs: decision.reference.afterMs, speedFactor: decision.reference.speedFactor, factorBasis: decision.reference.factorBasis } : {}),
   normalizedSeconds: Math.round(decision.totalMs / 100) / 10,
   basis: decision.basis,
   faults: report.records,
   reusedRecords: report.reusedRecords,
-  ...(elapsed ? { elapsedSeconds: elapsed.seconds, ...(elapsed.normalizedSeconds !== undefined ? { normalizedElapsedSeconds: elapsed.normalizedSeconds } : {}) } : {}),
-  faultWorkers: width,
+  ...(decision.summedMs !== undefined ? { summedRawSeconds: Math.round(decision.summedRawMs / 100) / 10, summedNormalizedSeconds: Math.round(decision.summedMs / 100) / 10 } : {}),
+  faultWorkers: evidence.run?.faultWorkers ?? 1,
   ...(evidence.run?.faultWorkersSource ? { faultWorkersSource: evidence.run.faultWorkersSource } : {}),
   ok: decision.ok,
   failures: decision.failures,

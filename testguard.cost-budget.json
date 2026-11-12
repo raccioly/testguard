@@ -1,6 +1,6 @@
 {
-  "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine.",
-  "seconds": 4650,
+  "$comment": "The self-probe gate's cost ceiling, in seconds, checked in CI against the evidence the probe already writes. Raising this is a reviewable diff with a reason, which is the entire point: the gate went from 9.6 to 23.6 minutes across one merged pull request and nothing said a word. Growth is allowed; going unnoticed is not. Budget the TOTAL and never a per-fault average — the regression that prompted this raised the fault count from 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine. Since #284 (PR #275) the ceiling is on the self-probe's NORMALIZED ELAPSED time at one fault-worker count (`unit`, `faultWorkers`): summed defender seconds rise when faults run side by side while the job gets faster, so the sum is printed and never gated.",
+  "seconds": 2290,
   "measured": {
     "seconds": 816,
     "at": "2026-09-18",
@@ -86,6 +86,13 @@
       "seconds": 4650,
       "at": "2026-11-12",
       "why": "PR #275 (#270, fast by default) makes the CI self-probe fan out (--fault-workers auto: 2 at a time on the 4-CPU runner, every kill confirmed by a run alone) and adds 34 faults in 9 claims (632 to 666). Two from-scratch measurements of ci.yml test (22), 0 reused records, every fault killed: 4243 normalized s (3812 raw, factor 0.90) and, after the cuts below, 4215 (4286 raw, factor 1.02), against 4200. GROWTH: the new claims cost about 190 s raw; before this raise 601 s raw of CLI-acceptance defenders were moved onto unit tests (45 s) and a 38 s helper fault became an ignore entry. INFLATION FROM OVERLAP: with two faults running at once each run takes longer, so the summed per-run seconds this ceiling counts rise while the job gets faster: the same runs took 1626 s and 1839 s wall-clock (1807 and 1803 normalized) against 4243 and 4215 summed. raccioly/testguard#284 moves the gate to normalized elapsed time; check-cost-budget.mjs now prints normalized elapsed and the fault-worker width beside the summed figure to give it a baseline. 4650 is 9% above the higher measurement, the rule that set 3600 and 4200; the per-claim ceiling is unchanged."
+    },
+    {
+      "seconds": 2290,
+      "unit": "normalized-elapsed-seconds",
+      "faultWorkers": 2,
+      "at": "2026-11-12",
+      "why": "The series resets: the unit changed from summed defender seconds to normalized ELAPSED seconds at 2 fault workers (#284, PR #275). PR #275 makes the CI self-probe fan out by default (2 at a time on the 4-CPU runner, every kill confirmed by a run alone), and from then on summed seconds rose while the job got faster: from-scratch runs on its heads summed 4243, 4215 and 4812 normalized seconds while their elapsed time was 1807, 1803 and 2041 normalized seconds. Growth since the last entry: 666 to 723 faults; claims new on main since the branch started cost 232 s summed and this PR's 302 s; elapsed per fault 2.71, 2.71 and 2.82 normalized seconds. The ceiling comes from the one from-scratch run on the final code (2041 s normalized elapsed, head a5039ec, 723/723 killed, 1823 s wall-clock, factor 0.89) plus 12% because fewer than three runs exist on it: 2286, rounded to 2290. Tighten it from main's next three from-scratch runs by the headroom rule. A run at another fault-worker count fails closed (fault-workers-mismatch), like the runner-class check."
     }
   ],
   "measuredInCI": {
@@ -150,7 +157,7 @@
   "perClaimSeconds": 100,
   "perClaim": {
     "seconds": 100,
-    "why": "A SECOND ceiling, because neither unit works alone. The total can only ever be raised - claims should grow forever - so a number that always goes up stops being read. A per-fault average is worse: the regression that prompted this budget raised the fault count 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine. The measured pathology is per-CLAIM, and specifically a claim naming an expensive SHARED defender file, because a claim pays for every test in the file it names. TG-ADMIT-NEEDS-ALL-KILLED costs 67 s for ONE fault; a new calibration claim landed at 51 s for two purely by being written into replay.test.mjs rather than calibration.test.mjs, and re-pointing it took it to 4.9 s. The total absorbed that silently; this does not.",
+    "why": "A SECOND ceiling, because neither unit works alone. The total can only ever be raised - claims should grow forever - so a number that always goes up stops being read. A per-fault average is worse: the regression that prompted this budget raised the fault count 59 to 91 while per-fault cost barely moved, so an average would have reported everything fine. The measured pathology is per-CLAIM, and specifically a claim naming an expensive SHARED defender file, because a claim pays for every test in the file it names. TG-ADMIT-NEEDS-ALL-KILLED costs 67 s for ONE fault; a new calibration claim landed at 51 s for two purely by being written into replay.test.mjs rather than calibration.test.mjs, and re-pointing it took it to 4.9 s. The total absorbed that silently; this does not. Since #284 the per-claim figure is still SUMMED seconds, and under the default fan-out those are inflated by overlap (a run takes longer while another fault is in flight); it stays a gate for now, and #284 tracks deciding its unit.",
     "rule": "No new claim may be worse than the worst we already have. 75 s sits just above today's worst, so the ceiling stays meaningful as claims are added and should be tightened as the shared-defender cut lands.",
     "todayWorst": {
       "id": "TG-ADMIT-NEEDS-ALL-KILLED",
@@ -205,5 +212,7 @@
         "normalizedSeconds": 3306.3
       }
     ]
-  }
+  },
+  "unit": "normalized-elapsed-seconds",
+  "faultWorkers": 2
 }

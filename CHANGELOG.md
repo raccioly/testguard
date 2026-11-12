@@ -95,6 +95,11 @@ Automated weekly release — everything merged since `v0.23.0`.
   commands — and the status document's `advice`.
 - **The GitHub Action has a `changed` input** for `probe` (`auto` or a ref),
   and its `evidence` output also names `evidence-partial.json`.
+- **The self-probe cost gate is on elapsed time** (#284, repository CI only):
+  normalized elapsed seconds at a recorded fault-worker count, ceiling 2290.
+  Summed defender seconds rise under the default fan-out while the job gets
+  faster, so they are printed and no longer gated; a run at another width, or
+  with no elapsed time, fails closed. The per-claim ceiling is unchanged.
 - **`TESTGUARD_WORKER`** (#287): every test runner process a probe starts gets
   the 0-based index of the scratch tree it runs in, so a suite that needs a
   port of its own can derive one (`8787 + TESTGUARD_WORKER`) and stay parallel.
