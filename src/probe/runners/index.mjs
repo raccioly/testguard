@@ -122,25 +122,5 @@ export function partitionByRunner(projectDir, files, primary) {
   return groups;
 }
 
-/**
- * Merge the runs of several runners into one testRun, pessimistically: any
- * load error is an error, any timeout is a timeout, any failure is a failure.
- * Counts add; failed test ids concatenate.
- */
-export function mergeRuns(parts) {
-  if (parts.length === 1) return parts[0];
-  // Import provenance is per-target and never contradictory between runners:
-  // only the Python runner reports any, and only for its own targets.
-  const provenance = Object.assign({}, ...parts.map((p) => p.provenance ?? {}));
-  const runs = parts.map((p) => p.run);
-  const outcome = runs.some((r) => r.outcome === 'error') ? 'error' : runs.some((r) => r.outcome === 'timeout') ? 'timeout' : runs.some((r) => r.outcome === 'fail') ? 'fail' : 'pass';
-  const sum = (k) => runs.reduce((n, r) => n + (r.tests[k] ?? 0), 0);
-  const kindNotReported = runs.reduce((n, r) => n + (r.kindNotReported ?? 0), 0);
-  return {
-    run: { outcome, tests: { total: sum('total'), passed: sum('passed'), failed: sum('failed') }, assertionFailures: runs.reduce((n, r) => n + r.assertionFailures, 0), exceptionFailures: runs.reduce((n, r) => n + (r.exceptionFailures ?? 0), 0), ...(kindNotReported ? { kindNotReported } : {}), durationMs: runs.reduce((n, r) => n + r.durationMs, 0) },
-    timeouts: parts.reduce((n, p) => n + (p.timeouts ?? 0), 0),
-    loadMessage: parts.find((p) => p.loadMessage)?.loadMessage,
-    failedTests: parts.flatMap((p) => p.failedTests ?? []),
-    provenance,
-  };
-}
+// Pessimistic merge of several runs; it lives beside the runners that use it.
+export { mergeRuns } from './shared.mjs';

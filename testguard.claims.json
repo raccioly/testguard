@@ -3364,7 +3364,7 @@
           "id": "F1",
           "description": "A load error in one runner is hidden unless every runner errored.",
           "faultClass": "condition-forced",
-          "file": "src/probe/runners/index.mjs",
+          "file": "src/probe/runners/shared.mjs",
           "find": "const outcome = runs.some((r) => r.outcome === 'error') ? 'error'",
           "replace": "const outcome = runs.every((r) => r.outcome === 'error') ? 'error'",
           "producedBy": {
@@ -12693,6 +12693,412 @@
           "producedBy": {
             "producer": "agent",
             "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONFIG-PACKAGE-IMPORT-IS-NAME-AND-VERSION",
+      "statement": "A bare import in a test configuration that resolves to an installed package is bound by the package name and the version in its package.json, wherever Node finds it (plain, nested, pnpm store, an ESM-only export map), and is never read or refused for its size (#278).",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 13"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/discovery-config-packages.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An installed package is treated as linked source and its module files are read, so vite refuses the run again.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    if (installed(real)) return installedPackageEntry(fromLabel, specifier, parsed.name, real);",
+          "replace": "    if (false) return installedPackageEntry(fromLabel, specifier, parsed.name, real);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The resolved version is dropped from the package identity, so upgrading a config package keeps the old test universe.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    version: typeof pkg.version === 'string' ? pkg.version : null,",
+          "replace": "    version: null,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The package is no longer looked up where Node looks; require.resolve decides and an ESM-only package reads as unresolved.",
+          "faultClass": "call-removed",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "  const dir = parsed ? findPackageDir(fromPath, parsed.name) : null;",
+          "replace": "  const dir = null;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONFIG-WORKSPACE-PACKAGE-IS-FOLLOWED",
+      "statement": "A bare import in a test configuration that resolves to a workspace package linked from inside the project is followed like a relative import: its files are hashed under their project names (#278).",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 13"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/discovery-config-packages.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A workspace package inside the project is hashed as one opaque entry instead of being followed file by file.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    if (inside(root, realEntry)) return { follow: [realEntry, ...(inside(root, real) ? [join(real, 'package.json')] : [])] };",
+          "replace": "    if (false) return { follow: [realEntry, ...(inside(root, real) ? [join(real, 'package.json')] : [])] };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The files a workspace import names are never enqueued.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "      for (const dependency of moduleDependency.follow ?? []) enqueuePath(dependency);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONFIG-LINKS-STAY-INSIDE-THE-PROJECT",
+      "statement": "Configuration reached through a symbolic link is read when its real path stays inside the project, and refused by name when a link, a linked directory or a dangling link leaves it, or when links form a cycle (#199).",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 13"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/discovery-config-packages.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every symbolic link is refused again, whatever its target.",
+          "faultClass": "other",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    const real = realConfigPath(root, absolute, `discovery config ${name}`);",
+          "replace": "    const real = lstatSync(absolute, { throwIfNoEntry: false })?.isSymbolicLink() ? (() => { throw new DiscoveryError('symbolic links are not allowed'); })() : realConfigPath(root, absolute, `discovery config ${name}`);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A dangling link that points out of the project is treated as a missing file.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    if (target && !inside(root, target)) throw new DiscoveryError(`${label} is a symbolic link that resolves outside the project: ${displayPath(root, path)} -> ${target}`);",
+          "replace": "    if (false) throw new DiscoveryError(`${label} is a symbolic link that resolves outside the project: ${displayPath(root, path)} -> ${target}`);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A link cycle is reported as an unreadable file instead of naming the cycle.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    if (error?.code === 'ELOOP') throw new DiscoveryError(`${label} is a symbolic link cycle: ${displayPath(root, path)}`, { cause: error });\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONFIG-LARGE-DATA-IS-HASHED-NOT-REFUSED",
+      "statement": "A configuration dependency that is not a module and exceeds the scan bound (a lockfile, a data file a config names) is hashed in chunks under its own bound instead of refusing discovery, and a string literal too long to be a path names no file.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 13"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/discovery-config-packages.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Large data files go through the scan bound and refuse the run.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    if (!script && statSync(real).size > maxConfigBytes) {",
+          "replace": "    if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The chunked hash has no bound.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "      if (length > maxBytes) throw new DiscoveryError(`${label} exceeded ${maxBytes} bytes; ${hint}`);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A string literal longer than a path refuses the run as an unreadable file.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    if (error?.code === 'ENAMETOOLONG') return null;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-VITEST-LISTING-KEEPS-EACH-FILE-PROJECT",
+      "statement": "Vitest discovery reads each listed file with its project, from the JSON listing or from the text listing's [project] prefix, as recorded from vitest 3, 4 and 5, and a whole line that names an existing file stays a file (#277).",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 13"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/vitest-projects.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The text listing is read line by line as paths again.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/vitest.mjs",
+          "find": "    return prefixed && !exists(line) ? { file: prefixed[2], project: prefixed[1] } : { file: line };",
+          "replace": "    return { file: line };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The JSON listing drops the project name.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/runners/vitest.mjs",
+          "find": "    return entry.projectName ? { file: entry.file, project: entry.projectName } : { file: entry.file };",
+          "replace": "    return { file: entry.file };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A [slug] directory is read as a project name.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/vitest.mjs",
+          "find": "    return prefixed && !exists(line) ? { file: prefixed[2], project: prefixed[1] } : { file: line };",
+          "replace": "    return prefixed ? { file: prefixed[2], project: prefixed[1] } : { file: line };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-VITEST-DEFENDER-RUNS-UNDER-EACH-OF-ITS-PROJECTS",
+      "statement": "A vitest defender runs under every project that lists it, one run per project selected with a --project value that matches that project alone, so another project's file whose path contains the defender's can never run in its place (#277).",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 13"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/vitest-projects.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The run no longer names its project, so vitest filters by path alone.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/runners/vitest.mjs",
+          "find": ", ...(project ? [`--project=${project}`] : [])];",
+          "replace": "];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A file listed under two projects runs under the first only.",
+          "faultClass": "other",
+          "file": "src/probe/runners/vitest.mjs",
+          "find": "    for (const project of names) {",
+          "replace": "    for (const project of names.slice(0, 1)) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A selector that also matches another listed project is accepted.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/vitest.mjs",
+          "find": "  if (!filter.test(project) || allProjects.some((other) => other !== project && filter.test(other))) {",
+          "replace": "  if (!filter.test(project)) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "An unnamed project is passed as a bare number, which vitest cannot select.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/vitest.mjs",
+          "find": "  const selector = project.startsWith('!') ? `*${project}` : numeric ? `${project}*` : project;",
+          "replace": "  const selector = project;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-VITEST-PROJECT-MEMBERSHIP-IS-IN-THE-UNIVERSE-HASH",
+      "statement": "Which projects list each file is part of the test universe hash and survives the universe rebinding; a universe without projects hashes exactly as before, and membership for a file the universe does not list is refused (#277).",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#verdicts rule 13"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude",
+        "at": "2026-11-12T00:00:00Z"
+      },
+      "defendedBy": [
+        "test/vitest-projects.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Membership is left out of the hashed preimage.",
+          "faultClass": "field-dropped",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    ...(membership.length ? { projects: Object.fromEntries(membership) } : {}),\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Membership for a file outside the universe is accepted.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "    if (!fileSet.has(file)) throw new DiscoveryError(`a discovery manifest names projects for a file it does not list: ${file}`);",
+          "replace": "    if (false) throw new DiscoveryError(`a discovery manifest names projects for a file it does not list: ${file}`);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The universe rebinding drops membership, so a projects manifest no longer verifies.",
+          "faultClass": "argument-swapped",
+          "file": "src/probe/universe.mjs",
+          "find": ", source: manifest.source, projects: manifest.projects });",
+          "replace": ", source: manifest.source });",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude",
+            "at": "2026-11-12T00:00:00Z"
           }
         }
       ]

@@ -3,10 +3,9 @@ import { dirname, join } from 'node:path';
 import { scratchRoot } from '../../scratch-dir.mjs';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { TEST_GLOBS, runProcess, checkRunner, runnerArgv, listTestFiles, parseReport, resolveRunner } from './shared.mjs';
+import { TEST_GLOBS, runProcess, checkRunner, runnerArgv, listTestFiles, parseReport, resolveRunner, mergeRuns } from './shared.mjs';
 import { nearestNodeModulesWritable } from '../node-modules-link.mjs';
 import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs, normalizeDiscoveredEntries, readBoundedJsonFile, runDiscoveryProcess } from './discovery.mjs';
-import { mergeRuns } from './index.mjs';
 
 export const name = 'vitest';
 export const testGlobs = TEST_GLOBS;
