@@ -96,11 +96,17 @@ export const RUN = {
     const mayReuse = (r) => !['timeout', 'flaky-defender'].includes(r.verdict)
       && !['probe-error', 'defenders-failed-to-load', 'not-reached-within-budget'].includes(r.detail?.reason)
       && r.inputs?.dependencyClosure === 'complete';
+    // Rule 8 also needs one live green baseline of the defender set before a
+    // carry-forward: on a set the seed found not green (a planted flaky test)
+    // that run may pass or fail, so either outcome is accepted there.
+    const setOf = (r) => JSON.stringify([...(r.defenders?.requested ?? [])].sort());
+    const unstable = new Set((seed.evidence?.records ?? []).filter((r) => r.detail?.reason === 'defenders-not-green').map(setOf));
     const seedById = new Map((seed.evidence?.records ?? []).map((r) => [`${r.claim.id}/${r.subject.id}`, r]));
     const wrongReuse = (unchanged.evidence?.records ?? []).flatMap((r) => {
       const id = `${r.claim.id}/${r.subject.id}`;
       const prior = seedById.get(id);
       const want = Boolean(prior && mayReuse(prior));
+      if (want && unstable.has(setOf(prior))) return [];
       return want === Boolean(r.reusedFrom) ? [] : [{ fault: id, reused: Boolean(r.reusedFrom), mayReuse: want, closure: prior?.inputs?.dependencyClosure ?? null }];
     });
     checks.push(check('unchanged-reuses-exactly-the-reusable', wrongReuse.length === 0 && (unchanged.evidence?.records ?? []).length > 0, wrongReuse.length ? wrongReuse : unchanged.evidence?.run?.reuse));
