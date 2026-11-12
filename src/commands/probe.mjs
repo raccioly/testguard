@@ -29,6 +29,28 @@ export const provisionalEvidencePath = (projectDir) => join(projectDir, '.testgu
 export const evidencePath = (projectDir) => join(projectDir, '.testguard', 'evidence.json');
 export const baselinePath = (projectDir) => join(projectDir, '.testguard', 'baseline.json');
 
+/**
+ * What `--changed auto` does with the base it found (#270). A base that
+ * resolves narrows the probe; none, or one that does not resolve here (a
+ * shallow CI checkout), is a full probe — never a skip — and the second says
+ * how to fix it. `warn` lines are printed even under --quiet.
+ */
+export function autoChangedDecision(detected, resolves) {
+  if (detected && resolves) return { changed: detected.ref, message: `--changed auto: comparing against ${detected.ref} (${detected.from})`, warn: false };
+  if (detected) return { changed: undefined, message: `--changed auto: ${detected.ref} (${detected.from}) does not resolve here, so every claim is probed; fetch it (GitHub Actions: actions/checkout with fetch-depth: 0) to probe only the change`, warn: true };
+  return { changed: undefined, message: '--changed auto: no base to compare against (no CI base branch, no remote default branch, no upstream), so every claim is probed', warn: true };
+}
+
+/**
+ * The evidence files a probe may carry verdicts forward from (#270): its own
+ * output file, and for a partial run (--claim, --changed) the canonical
+ * evidence of the last full probe too. None under --no-reuse.
+ */
+export function reuseSources({ outPath, canonical, partial, noReuse }) {
+  if (noReuse) return [];
+  return [...new Set([outPath, ...(partial ? [canonical] : [])])];
+}
+
 /** One line on how wide the run was and what its guard cost, for a fan-out. */
 export function renderFanOut(run) {
   if (!(run.faultWorkers > 1)) return undefined;
@@ -182,17 +204,9 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   // CI job need it. Nothing to compare against is a full probe, never a skip.
   if (values.changed === 'auto') {
     const detected = resolveAutoChangedRef({ projectDir });
-    // A detected base that does not resolve here (a shallow CI checkout) is
-    // not a reason to probe nothing: say how to fix it, and probe everything.
-    const auto = detected && headSha(repoRoot(projectDir), detected.ref) ? detected : null;
-    if (detected && !auto) io.err(`--changed auto: ${detected.ref} (${detected.from}) does not resolve here, so every claim is probed; fetch it (GitHub Actions: actions/checkout with fetch-depth: 0) to probe only the change`);
-    if (auto) {
-      if (!values.quiet) io.err(`--changed auto: comparing against ${auto.ref} (${auto.from})`);
-      values = { ...values, changed: auto.ref };
-    } else {
-      if (!detected) io.err('--changed auto: no base to compare against (no CI base branch, no remote default branch, no upstream), so every claim is probed');
-      values = { ...values, changed: undefined };
-    }
+    const decision = autoChangedDecision(detected, Boolean(detected && headSha(repoRoot(projectDir), detected.ref)));
+    if (decision.message && (decision.warn || !values.quiet)) io.err(decision.message);
+    values = { ...values, changed: decision.changed };
   }
   if (values.changed !== undefined) {
     const selection = selectByChange({ projectDir, claims, ref: values.changed, includeDirty: values['include-dirty'], only: requested, failOnEmpty: values['fail-on-empty-selection'] });
@@ -223,7 +237,7 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   // A partial run (--claim, --changed) also reuses the last full probe's
   // verdicts: the canonical evidence, under the same reuse rule (#270). That is
   // what makes the pre-push path cheap.
-  const previousPaths = values['no-reuse'] ? [] : [...new Set([outPath, ...(only ? [evidencePath(projectDir)] : [])])].filter((path) => existsSync(path));
+  const previousPaths = reuseSources({ outPath, canonical: evidencePath(projectDir), partial: Boolean(only), noReuse: values['no-reuse'] }).filter((path) => existsSync(path));
   const previous = previousPaths.map((path) => readSpecDoc('evidence', path));
   const basePath = values.baseline ? resolve(values.baseline) : baselinePath(projectDir);
   const baseline = existsSync(basePath) ? readSpecDoc('baseline', basePath) : undefined;

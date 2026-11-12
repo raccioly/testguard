@@ -12728,7 +12728,7 @@
         {
           "id": "F2",
           "description": "The fixture takes an ephemeral port, so its suite is hermetic and no longer exercises a shared one.",
-          "faultClass": "return-altered",
+          "faultClass": "literal-changed",
           "file": "test/helpers/fixed-port-project.mjs",
           "find": "const PORT = Number(process.env.TG_FIXED_PORT);",
           "replace": "const PORT = 0;",
@@ -12986,7 +12986,7 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/probe-fast-path-cli.test.mjs"
+        "test/probe-fast-path-pure.test.mjs"
       ],
       "faults": [
         {
@@ -12994,8 +12994,8 @@
           "description": "A partial run reads only its own output file.",
           "faultClass": "element-removed",
           "file": "src/commands/probe.mjs",
-          "find": "[...new Set([outPath, ...(only ? [evidencePath(projectDir)] : [])])]",
-          "replace": "[outPath]",
+          "find": "  return [...new Set([outPath, ...(partial ? [canonical] : [])])];",
+          "replace": "  return [outPath];",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -13029,7 +13029,7 @@
       },
       "defendedBy": [
         "test/changed-auto.test.mjs",
-        "test/probe-fast-path-cli.test.mjs"
+        "test/probe-fast-path-pure.test.mjs"
       ],
       "faults": [
         {
@@ -13042,19 +13042,25 @@
           "producedBy": {
             "producer": "agent",
             "by": "claude"
-          }
+          },
+          "defendedBy": [
+            "test/changed-auto.test.mjs"
+          ]
         },
         {
           "id": "F2",
-          "description": "With no base, the probe is skipped instead of run in full.",
-          "faultClass": "return-altered",
+          "description": "A detected base that does not resolve here is used anyway, so the probe refuses instead of probing everything.",
+          "faultClass": "guard-removed",
           "file": "src/commands/probe.mjs",
-          "find": "      values = { ...values, changed: undefined };",
-          "replace": "      return 0;",
+          "find": "  if (detected && resolves) return",
+          "replace": "  if (detected) return",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
-          }
+          },
+          "defendedBy": [
+            "test/probe-fast-path-pure.test.mjs"
+          ]
         }
       ]
     },
@@ -13230,7 +13236,7 @@
       "defendedBy": [
         "test/brief-advice.test.mjs",
         "test/mcp-next.test.mjs",
-        "test/probe-fast-path-cli.test.mjs"
+        "test/advice.test.mjs"
       ],
       "faults": [
         {
@@ -13243,7 +13249,10 @@
           "producedBy": {
             "producer": "agent",
             "by": "claude"
-          }
+          },
+          "defendedBy": [
+            "test/brief-advice.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -13255,7 +13264,10 @@
           "producedBy": {
             "producer": "agent",
             "by": "claude"
-          }
+          },
+          "defendedBy": [
+            "test/mcp-next.test.mjs"
+          ]
         },
         {
           "id": "F3",
@@ -13267,7 +13279,10 @@
           "producedBy": {
             "producer": "agent",
             "by": "claude"
-          }
+          },
+          "defendedBy": [
+            "test/advice.test.mjs"
+          ]
         }
       ]
     }

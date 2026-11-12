@@ -90,3 +90,22 @@ describe('computeAdvice', () => {
     expect(renderAdvice(advice)[1]).toMatch(/^speed {5}Your change since origin\/main can affect 1 of 9 claims.* → testguard probe --changed auto$/);
   });
 });
+
+describe('the status document carries the advice', () => {
+  it('a project whose last probe ran with --serial is told so, with the command', async () => {
+    const { computeStatus } = await import('../src/status/status.mjs');
+    const { writeSpecDoc } = await import('../src/evidence/writer.mjs');
+    const dir = mkdtempSync(join(tmpdir(), 'tg-advice-status-'));
+    try {
+      spawnSync('git', ['init', '-q'], { cwd: dir });
+      const evidence = JSON.parse((await import('node:fs')).readFileSync(new URL('../spec/conformance/examples/evidence.json', import.meta.url), 'utf8'));
+      evidence.run.faultWorkersSource = 'serial';
+      writeSpecDoc('evidence', join(dir, '.testguard', 'evidence.json'), evidence);
+      writeFileSync(join(dir, 'testguard.claims.json'), JSON.stringify({ schemaVersion: 1, claims: [] }));
+      const status = computeStatus({ projectDir: dir, toolVersion: '0.24.0', cpus: 8 });
+      expect(status.advice).toEqual([expect.objectContaining({ id: 'serial-on-multicore', command: 'testguard probe' })]);
+      // A selection's view gets none, and so does a caller that asked for none.
+      expect(computeStatus({ projectDir: dir, toolVersion: '0.24.0', cpus: 8, advice: false }).advice).toBeUndefined();
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
