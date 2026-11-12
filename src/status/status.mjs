@@ -237,6 +237,11 @@ function computeStatusCore({ projectDir, toolVersion, generatedAt = new Date().t
     const cur = faultIndex.get(key);
     if (!cur) { doc.stale.push(`fault ${key} was probed but is no longer in the claims file`); continue; }
     if (!sameClaimMetadata(r.claim, cur.claim)) doc.stale.push(`claim metadata for ${key} changed since it was probed`);
+    // A converging probe found this record's inputs did not match the tree it
+    // probed (#293), by the full reuse predicate, which sees more than this
+    // loop does (the test universe, discovery, the type check): stale, so
+    // status and baseline give the same answer.
+    if (r.carried === 'inputs-changed') doc.stale.push(`${key} was kept by a scoped probe whose tree no longer matched its inputs; it describes an earlier tree`);
     for (const [file, recordedHash] of Object.entries(r.inputs.discoveryHashes ?? {})) {
       if (!discoveryHashCache.has(file)) {
         let currentHash = null;

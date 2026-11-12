@@ -48,6 +48,23 @@ describe('a change-scoped probe converges the canonical evidence', () => {
     expect(price.map((x) => [Boolean(x.reusedFrom), x.carried])).toEqual([[true, undefined], [true, undefined]]);
   });
 
+  it('status and baseline agree when a record is kept for an input status does not hash (a new test file)', async () => {
+    const p = project();
+    roots.push(p.root);
+    expect((await run(['probe', p.dir, ...node, '--quiet'])).code).toBe(0);
+    // One commit: the change TAX-DOUBLES is selected for, and a new test file
+    // that touches no claim but changes the runner's test universe.
+    touch(p.dir, 'src/tax.mjs');
+    writeFileSync(join(p.dir, 'test/unrelated.test.mjs'), "import { test } from 'node:test';\ntest('unrelated', () => {});\n");
+    commit(p.root, 'tax and an unrelated test');
+    const r = JSON.parse((await run(['probe', p.dir, ...node, '--changed', 'HEAD~1', '--json'])).out);
+    expect(r.run.converged.stale).toEqual(['PRICE-TOTAL/F1', 'PRICE-TOTAL/F2']);
+    const status = await statusOf(p.dir);
+    expect(status.state).toBe('evidence-stale');
+    expect(status.stale.join('\n')).toMatch(/PRICE-TOTAL\/F1 was kept by a scoped probe/);
+    expect((await run(['baseline', p.dir])).code).toBe(2);
+  });
+
   it('names the records it kept stale, and baseline refuses the document', async () => {
     const p = await probedThenEdited();
     touch(p.dir, 'src/price.mjs');

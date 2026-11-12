@@ -1368,10 +1368,12 @@ next full probe (#293). The written document holds, in claims-file order:
   checked once more and is carried only if `detail.typecheck` agrees. What it
   leaves out is the live baseline: no defender runs for a carried record;
 - **kept stale** (`carried: "inputs-changed"`, with `reusedFrom`): every other
-  record, unchanged. It describes another tree. It is kept so that `status`
-  still names it stale with the verdict it had (`changedFaults` and
-  `review-fault-change` depend on that verdict), never as a statement about
-  this tree.
+  record, unchanged. It describes another tree. It is kept so that its verdict
+  is not lost (`changedFaults` and `review-fault-change` depend on it), never
+  as a statement about this tree. `status` names every such record stale by
+  its mark, whatever its own hashing says: the probe's check sees inputs
+  `status` does not (the test universe, discovery, the type check), and
+  `status` and `baseline` must give the same answer about one document.
 
 A fault with no earlier record stays absent, so `status` still says it was
 never probed. `run.reuse` counts `carried` and `stale` (both part of `reused`).
@@ -1423,6 +1425,11 @@ Validators reject:
 - a record without `carried` whose claim was not selected;
 - `run.scope` on a provisional or budget-cut run;
 - `run.reuse` counts that disagree with the records.
+
+Run ids name their start time to the millisecond (`run-20261112T153612123`;
+earlier releases wrote seconds). A converging run checks that nobody else
+wrote the canonical file by comparing ids, and it carries from an earlier run,
+so two runs that start in the same second must not share one.
 
 `probe --json` reports `run.converged`: `into` (the canonical file),
 `carriedFrom`, `carried` and the `stale` fault ids, or `into: null` with the
@@ -1494,7 +1501,8 @@ file under the scratch root's `testguard-locks/worker-slots/`, beside the
 worktree lock, and removed when the command ends. A slot whose owner is
 provably gone (same host, pid not running) is taken over. A lone command holds
 slot 0 and hands out 0, 1, 2… as before. Commands that use different scratch
-roots do not coordinate; with every slot held, a command starts at 0.
+roots do not coordinate; with every slot held, or a scratch root that cannot
+hold a lock file, a command starts at 0.
 
 ## Speed advice
 

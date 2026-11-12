@@ -60,7 +60,13 @@ export const workerSlotDir = (base = scratchRoot()) => join(base, 'testguard-loc
  * another host or unreadable is left alone. With every slot held, slot 0 is
  * returned unheld: the old behavior, never a refusal.
  */
-export function claimWorkerSlot(dir, { alive = defaultAlive, host = hostname(), slots = WORKER_SLOTS } = {}) {
+export function claimWorkerSlot(dir, options = {}) {
+  // Coordination is a courtesy: a scratch root that cannot hold a lock file
+  // (read-only, full) starts at 0 unheld, as every command did before #293.
+  try { return claimSlot(dir, options); } catch { return { slot: 0, held: false, release: () => {} }; }
+}
+
+function claimSlot(dir, { alive = defaultAlive, host = hostname(), slots = WORKER_SLOTS }) {
   mkdirSync(dir, { recursive: true });
   for (let slot = 0; slot < slots; slot++) {
     const path = join(dir, `slot-${slot}.lock`);
@@ -70,7 +76,7 @@ export function claimWorkerSlot(dir, { alive = defaultAlive, host = hostname(), 
       if (fd !== undefined) {
         try { writeSync(fd, JSON.stringify({ pid: process.pid, host, at: new Date().toISOString() })); } finally { closeSync(fd); }
         let released = false;
-        return { slot, held: true, release: () => { if (!released) { released = true; rmSync(path, { force: true }); } } };
+        return { slot, held: true, release: () => { if (!released) { released = true; try { rmSync(path, { force: true }); } catch { /* gone or unwritable: nothing to hold */ } } } };
       }
       let owner = null;
       try { owner = parseLock(readFileSync(path, 'utf8')); } catch { owner = null; }

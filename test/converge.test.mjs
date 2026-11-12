@@ -185,3 +185,28 @@ describe('run ids', () => {
     expect(runId('2026-11-12T15:36:12.123Z')).not.toBe(runId('2026-11-12T15:36:12.456Z'));
   });
 });
+
+describe('status names every record a converging probe kept stale', () => {
+  it('whatever its own hashing says, so status and baseline agree', async () => {
+    const { project: scopeProject, claimsDoc } = await import('./helpers/scope-project.mjs');
+    const { computeStatus } = await import('../src/status/status.mjs');
+    const claimsFile = claimsDoc();
+    const half = structuredClone(claimsFile.claims[1]);
+    half.id = 'HALF-HALVES'; half.defendedBy = ['test/half.test.mjs'];
+    half.faults = half.faults.map((f) => ({ ...f, file: 'src/half.mjs' }));
+    half.faults[0].find = 'n / 2'; half.faults[0].replace = 'n / 3';
+    half.faults[1].find = '=> n'; half.faults[1].replace = '=> 0 * n';
+    claimsFile.claims.push(half);
+    const p = scopeProject({ claims: claimsFile, files: { 'src/half.mjs': 'export const half = (n) => n / 2;\n', 'test/half.test.mjs': "import { test } from 'node:test';\nimport { half } from '../src/half.mjs';\ntest('half', () => half(4));\n" } });
+    try {
+      mkdirSync(join(p.dir, '.testguard'));
+      writeFileSync(join(p.dir, '.testguard', 'evidence.json'), JSON.stringify(example));
+      const status = computeStatus({ projectDir: p.dir, toolVersion: example.tool.version, advice: false });
+      expect(status.stale.filter((s) => /was kept by a scoped probe/.test(s))).toEqual([
+        'TAX-DOUBLES/F1 was kept by a scoped probe whose tree no longer matched its inputs; it describes an earlier tree',
+        'TAX-DOUBLES/F2 was kept by a scoped probe whose tree no longer matched its inputs; it describes an earlier tree',
+      ]);
+      expect(status.state).toBe('evidence-stale');
+    } finally { rmSync(p.root, { recursive: true, force: true }); }
+  });
+});

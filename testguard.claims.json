@@ -15882,7 +15882,7 @@
     },
     {
       "id": "TG-BASELINE-REFUSES-STALE-CARRIED",
-      "statement": "baseline refuses a converged document that keeps records whose inputs changed, naming them, and says how many records of a document it freezes were carried.",
+      "statement": "baseline refuses a converged document that keeps records whose inputs changed, naming them, and status names each of those records stale so the two agree; baseline says how many records of a document it freezes were carried.",
       "source": {
         "kind": "spec",
         "ref": "issue #293 (the fast path must converge)"
@@ -15915,6 +15915,18 @@
           "file": "src/commands/baseline.mjs",
           "find": "  if (carried) io.out(",
           "replace": "  if (false) io.out(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "status trusts its own hashing over the probe and calls a kept record fresh.",
+          "faultClass": "condition-forced",
+          "file": "src/status/status.mjs",
+          "find": "    if (r.carried === 'inputs-changed') doc.stale.push(",
+          "replace": "    if (false) doc.stale.push(",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

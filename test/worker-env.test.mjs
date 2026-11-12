@@ -67,3 +67,13 @@ it('TESTGUARD_WORKER_BASE sets the base and holds no slot; anything but a non-ne
     expect(workerBaseFromEnv({})).toBeUndefined();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+it('a scratch root that cannot hold a lock file starts at 0, unheld, never a failure', async () => {
+  const dir = slotDir();
+  try {
+    writeFileSync(join(dir, 'not-a-dir'), 'x');
+    const claim = claimWorkerSlot(join(dir, 'not-a-dir', 'slots'));
+    expect(claim).toMatchObject({ slot: 0, held: false });
+    await withCommandWorkers(async () => { expect(workerEnv().TESTGUARD_WORKER).toBe('0'); }, { env: {}, dir: join(dir, 'not-a-dir', 'slots') });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
