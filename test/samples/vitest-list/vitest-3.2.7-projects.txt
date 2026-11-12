@@ -1,0 +1,4 @@
+[ui] tests/shared/both.test.mjs
+[ui] tests/ui/a.test.mjs
+[node] tests/shared/both.test.mjs
+[node] tests/node/b.test.mjs

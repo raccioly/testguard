@@ -1,0 +1,13 @@
+{
+  "$schema": "../../spec/schemas/ignore.schema.json",
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "kind": "path",
+      "pattern": "legacy/tests/ui/round.test.mjs",
+      "reason": "The trap, not a defender: another project's test whose path contains tests/ui/round.test.mjs. A run that filters by path alone executes it, and its failure would read as a kill of PROJECT-UI-ROUNDS-HALF-UP, which must survive.",
+      "by": "claude",
+      "at": "2026-11-12T00:00:00Z"
+    }
+  ]
+}

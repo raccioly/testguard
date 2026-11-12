@@ -509,7 +509,7 @@ async function measureProbe({
         commandBudget?.assertOpen();
         if (r !== runner) await ensureOwned(r, group[0]);
         const granted = commandBudget?.runBudget(budgetMs) ?? budgetMs;
-        const part = await timedRun(r, { projectDir: treeDir, sourceDir: projectDir, python, files: group, budgetMs: granted, serial, workers, targets });
+        const part = await timedRun(r, { projectDir: treeDir, sourceDir: projectDir, python, files: group, budgetMs: granted, serial, workers, targets, projects: manifests.get(r)?.projects });
         parts.push(part);
         commandBudget?.assertOpen();
         commandBudget?.assertNotCut(granted, budgetMs, part.timeouts);

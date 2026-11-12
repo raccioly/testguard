@@ -447,11 +447,22 @@ Rules that follow from the table:
    files is also a precondition failure; `auto` may continue past a successful
    empty listing, but must fail when every eligible runner is empty.
    `inputs.testUniverseHash` binds the normalized file set, runner identity,
-   and hashed configuration dependencies. Those dependencies include absent
+   the project each file is listed under (when the runner has projects), and
+   hashed configuration dependencies. Those dependencies include absent
    root candidates, nested workspace configs, Python collection hooks, and the
-   bounded static closure of local or package-imported config helpers and setup
-   files; creating or editing any of them forces remeasurement. Evidence that
-   predates this hash, or whose hash
+   bounded static closure of local config helpers and setup files; creating or
+   editing any of them forces remeasurement. A bare import that resolves to an
+   installed package (its real path is under a `node_modules` directory,
+   including pnpm's store and a scratch tree's link to the source install) is
+   recorded by package name and the version in its `package.json`, never by
+   reading its module files, and never fails discovery for size or file count;
+   lockfiles and manifests bind it as well. A bare import that resolves to
+   source linked from inside the project (a workspace package) is followed like
+   a relative import. Project files keep a scan bound per file, in total and in
+   number, and a refusal names the file and the limit. A file that is not a
+   module and exceeds the scan bound (a lockfile, a data file a configuration
+   names) is hashed in chunks under its own bound and is not scanned. Evidence
+   that predates this hash, or whose hash
    changed, is readable but never reusable for a current native discovery run.
    A custom `--runner-cmd` has no native listing; its `testUniverseHash` binds
    the static file set **and the parsed command argv**, so a changed command
@@ -462,6 +473,16 @@ Rules that follow from the table:
    assigns each file. An owned runner takes precedence over the project runner;
    competing owned runners or a declared defender absent from every manifest
    are precondition failures, never heuristic routing decisions.
+
+   Vitest `test.projects`: the listing (`vitest list --json=<file>` on vitest 3
+   and later, else the text form with its `[project] ` prefix parsed) names the
+   projects each file belongs to. A defender runs under every project that
+   lists it, one run per project selected with `--project`, and the runs merge
+   like the runs of several runners: any load error, timeout or failure under
+   any project is one for the defender set. A run never relies on the file path
+   alone, because vitest's path filter also matches another project's file whose
+   path contains it. A project that no `--project` value selects alone among the
+   listed projects is a discovery failure.
 
    The explicit `node-test` adapter uses Node's native collection with test
    bodies excluded by a never-matching name pattern. Collection still loads
@@ -499,9 +520,12 @@ Rules that follow from the table:
    outside this adapter's initial admission boundary.
 
    Static string literals are conservative dependency candidates, not proof
-   of a filesystem dependency. Missing candidates and ordinary directories
-   (including `/` in URL bases and string separators) are ignored. An existing
-   candidate file outside the project, or a candidate symlink, is rejected.
+   of a filesystem dependency. Missing candidates, ordinary directories
+   (including `/` in URL bases and string separators) and strings too long to
+   be a path are ignored. Symbolic links are followed while the real path stays
+   inside the project; containment is decided on the real path. An existing
+   candidate file whose real path is outside the project, a link (or dangling
+   link) that leaves it, and a link cycle are rejected, naming the path.
 
 14. **Barrel resolution follows symbols, not module reachability.** Automatic
    discovery may traverse a re-export chain only for the binding the test
