@@ -1,0 +1,2 @@
+[0] tests/ui/a.test.mjs
+[node] tests/node/b.test.mjs

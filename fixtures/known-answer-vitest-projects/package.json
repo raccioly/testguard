@@ -1,0 +1,8 @@
+{
+  "name": "testguard-known-answer-fixture-vitest-projects",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A vitest config with test.projects: each defender must run under the projects that list it, and only those.",
+  "scripts": { "test": "vitest run" }
+}

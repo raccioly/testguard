@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "claims": [
+    {
+      "id": "PROJECT-UI-ADULT-BOUNDARY",
+      "statement": "18 is the first adult age.",
+      "severity": "high",
+      "source": { "kind": "manual", "ref": "README.md" },
+      "producedBy": { "producer": "human", "by": "fixture" },
+      "defendedBy": ["tests/ui/age.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "The boundary moves to 19.", "faultClass": "other", "file": "src/age.mjs", "find": "age >= 18", "replace": "age > 18", "producedBy": { "producer": "human", "by": "fixture" } }
+      ]
+    },
+    {
+      "id": "PROJECT-SHARED-NODE-GREETING",
+      "statement": "The node environment gets its own greeting.",
+      "severity": "medium",
+      "source": { "kind": "manual", "ref": "README.md" },
+      "producedBy": { "producer": "human", "by": "fixture" },
+      "defendedBy": ["tests/shared/greet.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "The node greeting is the generic one.", "faultClass": "literal-changed", "file": "src/greet.mjs", "find": "'hello from node'", "replace": "'hello'", "producedBy": { "producer": "human", "by": "fixture" } }
+      ]
+    },
+    {
+      "id": "PROJECT-UI-ROUNDS-HALF-UP",
+      "statement": "A half rounds up.",
+      "severity": "medium",
+      "source": { "kind": "manual", "ref": "README.md" },
+      "producedBy": { "producer": "human", "by": "fixture" },
+      "defendedBy": ["tests/ui/round.test.mjs"],
+      "faults": [
+        { "id": "F1", "description": "Halves round down.", "faultClass": "other", "file": "src/round.mjs", "find": "Math.round(value)", "replace": "Math.floor(value)", "producedBy": { "producer": "human", "by": "fixture" } }
+      ]
+    }
+  ]
+}
