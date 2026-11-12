@@ -31,8 +31,10 @@ const write = (root, rel, text) => {
 // Recorded `vitest list --filesOnly` output (text and `--json=<file>`) of
 // vitest 3.2.7, 4.1.12 and 5.1.0 over one layout: tests/ui/a (ui only),
 // tests/node/b (node only), tests/shared/both (both projects). `unnamed`
-// leaves the first project without a name, which vitest lists as "0".
+// leaves the first project without a name, which vitest lists as "0";
+// `empty` includes nothing, and the JSON form is still written, as `[]`.
 const EXPECTED = {
+  empty: [],
   plain: [['tests/node/b.test.mjs', null], ['tests/shared/both.test.mjs', null], ['tests/ui/a.test.mjs', null]],
   projects: [['tests/node/b.test.mjs', 'node'], ['tests/shared/both.test.mjs', 'node'], ['tests/shared/both.test.mjs', 'ui'], ['tests/ui/a.test.mjs', 'ui']],
   unnamed: [['tests/node/b.test.mjs', 'node'], ['tests/ui/a.test.mjs', '0']],
@@ -43,7 +45,7 @@ const pairs = (entries) => entries.map(({ file, project }) => [file.replace(/^<r
 describe('reading vitest list output, recorded from vitest 3, 4 and 5', () => {
   const samples = readdirSync(SAMPLES).filter((name) => name.endsWith('.txt'));
   it('has a recording for every version, layout and form', () => {
-    expect(samples.length).toBe(9);
+    expect(samples.length).toBe(12);
     for (const sample of samples) expect(readdirSync(SAMPLES)).toContain(sample.replace(/\.txt$/, '.json'));
   });
 

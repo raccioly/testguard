@@ -23,7 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   count caps, and a cap refusal now names the file, the limit and what to do. A
   large data file a configuration names (a lockfile, a JSON list, a claims
   file) is hashed in chunks and not scanned, under its own bound, and a string
-  literal longer than any path no longer refuses the run.
+  literal longer than any path no longer refuses the run. Almost every vitest
+  config imports `vitest/config` or `vite`, so the test universe hash of an
+  existing vitest project changes once on upgrade: the first probe after it
+  remeasures instead of reusing earlier verdicts.
 - **Symbolic links inside the repository are followed (#199).** A configuration
   file or directory reached through a link is read when its real path stays
   inside the project, and refused by name when the link, a linked directory or

@@ -71,11 +71,14 @@ export async function discoverTests({ projectDir, version, timeoutMs, maxOutputB
     const jsonFile = join(scratchRoot(), `testguard-vitest-list-${randomBytes(8).toString('hex')}.json`);
     try {
       await runDiscoveryProcess({ projectDir, argv: discoveryArgvFor(projectDir, { jsonFile }), timeoutMs, maxOutputBytes });
-      entries = parseDiscoveryReport(readBoundedJsonFile(jsonFile, maxOutputBytes));
+      // Recorded on 3.2.7, 4.1.12 and 5.1.0, empty listings included (`[]`).
+      // A version that exits 0 without writing it falls back to the text form.
+      if (existsSync(jsonFile)) entries = parseDiscoveryReport(readBoundedJsonFile(jsonFile, maxOutputBytes));
     } finally {
       rmSync(jsonFile, { force: true });
     }
-  } else {
+  }
+  if (!entries) {
     const result = await runDiscoveryProcess({ projectDir, argv: discoveryArgvFor(projectDir), timeoutMs, maxOutputBytes });
     entries = parseDiscoveryOutput(result.stdout, (line) => existsSync(join(projectDir, line)));
   }
