@@ -1,0 +1,10 @@
+{
+  "rule": "Fixed before the claim and test authors ran: a claim tied to a requirement is defended by the test file the test author was told to write for that requirement. R12 is defended by the planner's estimate test, which reaches the geometry core only through the workspace package link (@floorplan/geometry).",
+  "byRequirement": {
+    "R1": ["packages/geometry/test/shapes.test.js"], "R2": ["packages/geometry/test/shapes.test.js"], "R3": ["packages/geometry/test/shapes.test.js"],
+    "R4": ["packages/geometry/test/units.test.js"], "R5": ["packages/geometry/test/units.test.js"], "R6": ["packages/geometry/test/units.test.js"],
+    "R7": ["packages/planner/test/layout.test.js"], "R8": ["packages/planner/test/layout.test.js"], "R9": ["packages/planner/test/layout.test.js"],
+    "R10": ["packages/planner/test/estimate.test.js"], "R11": ["packages/planner/test/estimate.test.js"], "R12": ["packages/planner/test/estimate.test.js"],
+    "R13": ["packages/planner/test/summary.test.js"], "R14": ["packages/planner/test/summary.test.js"]
+  }
+}

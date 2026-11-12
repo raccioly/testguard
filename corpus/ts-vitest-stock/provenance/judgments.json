@@ -1,0 +1,207 @@
+{
+  "expected": {
+    "RESERVE-SUCCEEDS-WITHIN-AVAILABLE/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Baseline green 3/3; duplicate ids fail the unique-id assertion in all three runs."
+    },
+    "RESERVE-SUCCEEDS-WITHIN-AVAILABLE/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Available stock no longer drops; assertions fail in all three runs."
+    },
+    "RESERVE-SUCCEEDS-WITHIN-AVAILABLE/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Reserving exactly the available quantity throws InsufficientStock (an exception in that test) and other tests fail by assertion; every run has at least one assertion failure, so the kill is by assertion."
+    },
+    "RESERVE-REJECTS-INVALID-INPUT/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Every run has assertion failures (the InvalidQuantity checks) beside exceptions."
+    },
+    "RESERVE-REJECTS-INVALID-INPUT/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "An unknown SKU fails with InsufficientStock; the toBeInstanceOf(UnknownSku) assertion fails in all three runs."
+    },
+    "SWEEP-EXPIRES-AT-EXPIRY-INSTANT/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The exact-expiry-instant assertions fail in all three runs."
+    },
+    "SWEEP-EXPIRES-AT-EXPIRY-INSTANT/F2": {
+      "verdict": "fault-invalid",
+      "reason": "replacement-does-not-compile",
+      "why": "`r.expiresAt <= )` does not parse: vitest reports the suite failed to load in all three runs (tsc: TS1109 Expression expected)."
+    },
+    "RECEIVE-ADDS-STOCK/F1": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "Receiving any new SKU throws a TypeError (seedWarehouse calls receive), so every test fails by exception and none by assertion, in all three runs."
+    },
+    "RECEIVE-ADDS-STOCK/F2": {
+      "verdict": "survived",
+      "why": "test/adjustments.test.ts never tries an over-long SKU: green 3/3. Control red (it executes adjustments.ts). No test in the whole suite fails in every run."
+    },
+    "RECEIVE-ADDS-STOCK/F3": {
+      "verdict": "survived",
+      "why": "As F2: InvalidSku is never tested."
+    },
+    "WRITEOFF-PROTECTS-RESERVED/F1": {
+      "verdict": "unverifiable",
+      "reason": "anchor-missing",
+      "why": "`current - quantity` does not occur in src/adjustments.ts (the source says onHand - quantity)."
+    },
+    "WRITEOFF-PROTECTS-RESERVED/F2": {
+      "verdict": "survived",
+      "why": "writeOff is never called by any test: declared defender green 3/3, control red, no whole-suite killer."
+    },
+    "WRITEOFF-PROTECTS-RESERVED/F3": {
+      "verdict": "survived",
+      "why": "As F2."
+    },
+    "PRICING-BULK-DISCOUNT-AND-ROUNDING/F1": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Without the type check the string '5' concatenates into the percent and the bulk assertions fail in all three runs. (Under --typecheck the key differs: see modes.typecheck.)"
+    },
+    "PRICING-BULK-DISCOUNT-AND-ROUNDING/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Truncation gives 1851; the spec-example assertion fails in all three runs."
+    },
+    "PRICING-BULK-DISCOUNT-AND-ROUNDING/F3": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "Pricing throws a TypeError; several tests use toThrow/toEqual around it and fail by assertion in every run."
+    },
+    "STOCK-REPORT-STATUS-AND-RESERVED/F1": {
+      "verdict": "unverifiable",
+      "reason": "anchor-ambiguous",
+      "why": "`r.status === 'active'` occurs twice in src/reservations.ts; expectHits is 1."
+    },
+    "STOCK-REPORT-STATUS-AND-RESERVED/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "The threshold assertions (10 available is 'ok') fail in all three runs."
+    },
+    "STOCK-REPORT-STATUS-AND-RESERVED/F3": {
+      "verdict": "killed",
+      "killKind": "exception-only",
+      "why": "stockReport throws a TypeError whenever a SKU exists; every failing test fails by exception, none by assertion, in all three runs."
+    },
+    "REPORT-TOTALS-SUMS/F1": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "The declared defender test/totals.test.ts checks only skuCount and the empty case: green 3/3, control red. In the whole suite test/report.test.ts fails in every run (its column-sum test), so the suite is not blind but the declared chain is broken."
+    },
+    "REPORT-TOTALS-SUMS/F2": {
+      "verdict": "killed",
+      "killKind": "assertion",
+      "why": "skuCount pinned to 1 fails the declared skuCount assertion in all three runs."
+    },
+    "REPORT-TOTALS-SUMS/F3": {
+      "verdict": "survived",
+      "reason": "killed-by-undeclared-tests",
+      "why": "As F1: totals.test.ts green 3/3, control red, report.test.ts fails every whole-suite run."
+    }
+  },
+  "modes": {
+    "typecheck": {
+      "expected": {
+        "PRICING-BULK-DISCOUNT-AND-ROUNDING/F1": {
+          "verdict": "fault-invalid",
+          "reason": "replacement-does-not-typecheck",
+          "why": "tsc --noEmit -p tsconfig.json exits 2 with the fault applied: TS2322 Type 'string' is not assignable to type 'number' (src/pricing.ts). The unmodified tree type-checks clean."
+        },
+        "SWEEP-EXPIRES-AT-EXPIRY-INSTANT/F2": {
+          "verdict": "fault-invalid",
+          "why": "tsc reports TS1109 (Expression expected) and the suite cannot load. The verdict is fault-invalid either way; whether the reason is replacement-does-not-compile or replacement-does-not-typecheck is not settled by GATE-SEMANTICS, so the key fixes the verdict only."
+        }
+      }
+    },
+    "reuse-edit": {
+      "why": "test/helpers.ts is imported by every defender except test/pricing.test.ts. The edit makes seedWarehouse() check its own on-hand total, which turns REPORT-TOTALS-SUMS/F3 (on-hand total keeps only the last SKU) from survived into an exception-only kill: derived by running corpus/derive.mjs --edits with this exact edit (provenance/derivation-reuse-edit.json); every other answer is unchanged. A reuse that ignores the import closure would carry the old survived forward.",
+      "edits": [
+        {
+          "file": "test/helpers.ts",
+          "find": "  w.receive('SCREW-03', 12);\n  return w;",
+          "replace": "  w.receive('SCREW-03', 12);\n  // corpus reuse edit: a seed that checks its own totals\n  if (w.reportTotals().onHand !== 67) throw new Error('seed drift: on-hand total is not 67');\n  return w;"
+        }
+      ],
+      "expected": {
+        "REPORT-TOTALS-SUMS/F3": {
+          "verdict": "killed",
+          "killKind": "exception-only",
+          "why": "With the edit, every test that calls seedWarehouse() throws 'seed drift' under this fault; test/totals.test.ts fails by exception in all three runs."
+        }
+      },
+      "mustRemeasure": [
+        "RESERVE-SUCCEEDS-WITHIN-AVAILABLE/F1",
+        "RESERVE-SUCCEEDS-WITHIN-AVAILABLE/F2",
+        "RESERVE-SUCCEEDS-WITHIN-AVAILABLE/F3",
+        "RESERVE-REJECTS-INVALID-INPUT/F1",
+        "RESERVE-REJECTS-INVALID-INPUT/F2",
+        "SWEEP-EXPIRES-AT-EXPIRY-INSTANT/F1",
+        "SWEEP-EXPIRES-AT-EXPIRY-INSTANT/F2",
+        "RECEIVE-ADDS-STOCK/F1",
+        "RECEIVE-ADDS-STOCK/F2",
+        "RECEIVE-ADDS-STOCK/F3",
+        "WRITEOFF-PROTECTS-RESERVED/F2",
+        "WRITEOFF-PROTECTS-RESERVED/F3",
+        "STOCK-REPORT-STATUS-AND-RESERVED/F2",
+        "STOCK-REPORT-STATUS-AND-RESERVED/F3",
+        "REPORT-TOTALS-SUMS/F1",
+        "REPORT-TOTALS-SUMS/F2",
+        "REPORT-TOTALS-SUMS/F3"
+      ]
+    },
+    "changed": {
+      "why": "Selections derived by reading the imports: every test imports the barrel '@/index', which re-exports every module, so a change to any src module can affect every claim; a change to one test file affects only the claims it defends.",
+      "steps": [
+        {
+          "name": "pricing-source",
+          "edits": [
+            {
+              "file": "src/pricing.ts",
+              "find": "const MEMBER_PERCENT = 10;",
+              "replace": "// corpus: a scripted change, behavior-neutral\nconst MEMBER_PERCENT = 10;"
+            }
+          ],
+          "expectedClaims": [
+            "PRICING-BULK-DISCOUNT-AND-ROUNDING",
+            "RECEIVE-ADDS-STOCK",
+            "REPORT-TOTALS-SUMS",
+            "RESERVE-REJECTS-INVALID-INPUT",
+            "RESERVE-SUCCEEDS-WITHIN-AVAILABLE",
+            "STOCK-REPORT-STATUS-AND-RESERVED",
+            "SWEEP-EXPIRES-AT-EXPIRY-INSTANT",
+            "WRITEOFF-PROTECTS-RESERVED"
+          ],
+          "why": "src/pricing.ts is in every defender's closure through the barrel (and Warehouse extends PricedBook)."
+        },
+        {
+          "name": "adjustments-test",
+          "edits": [
+            {
+              "file": "test/adjustments.test.ts",
+              "find": "describe('receive (R6, partial)', () => {",
+              "replace": "// corpus: a scripted change, behavior-neutral\ndescribe('receive (R6, partial)', () => {"
+            }
+          ],
+          "expectedClaims": [
+            "RECEIVE-ADDS-STOCK",
+            "WRITEOFF-PROTECTS-RESERVED"
+          ],
+          "why": "Only the two claims tied to R6/R7 declare test/adjustments.test.ts; no target or other defender imports a test file."
+        }
+      ],
+      "badRef": {
+        "ref": "refs/heads/corpus-no-such-branch",
+        "exit": 2,
+        "why": "A reference git cannot resolve is a change TestGuard cannot measure: a precondition failure (exit 2), never an empty change."
+      }
+    }
+  }
+}

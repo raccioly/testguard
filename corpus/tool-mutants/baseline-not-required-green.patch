@@ -1,0 +1,9 @@
+diff --git a/src/probe/classify.mjs b/src/probe/classify.mjs
+index 4003912..3fd31df 100644
+--- a/src/probe/classify.mjs
++++ b/src/probe/classify.mjs
+@@ -27,3 +27,3 @@ export function classify({ defenders, anchor, baselineRuns, probeRuns, confirmRu
+   if (typecheck?.status === 'timeout') return { verdict: 'timeout', reason: 'typecheck-timed-out' };
+-  if (baselineRuns.length === 0 || baselineRuns.some((r) => r.outcome !== 'pass')) {
++  if (baselineRuns.length === 0 || baselineRuns.every((r) => r.outcome !== 'pass')) {
+     return { verdict: 'flaky-defender', reason: 'defenders-not-green' };

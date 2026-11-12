@@ -1,0 +1,227 @@
+[
+  {
+    "id": "ESCAPE-BY-DEFAULT",
+    "requirement": "R2",
+    "statement": "Substituted values are HTML-escaped by default (& < > \" '), while the triple-brace form inserts the value unescaped.",
+    "severity": "critical",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The less-than character is escaped to the greater-than entity.",
+        "faultClass": "literal-changed",
+        "file": "src/template.js",
+        "find": "'<': '&lt;'",
+        "replace": "'<': '&gt;'"
+      },
+      {
+        "id": "F2",
+        "description": "Raw triple-brace values are escaped as well.",
+        "faultClass": "condition-forced",
+        "file": "src/template.js",
+        "find": "out += raw ? value : escapeHtml(value);",
+        "replace": "out += escapeHtml(value);"
+      },
+      {
+        "id": "F3",
+        "description": "A missing comma in the escape table makes the module fail to load.",
+        "faultClass": "statement-deleted",
+        "file": "src/template.js",
+        "find": "'>': '&gt;'",
+        "replace": "'>': '&gt;' '\"': '&quot;'"
+      }
+    ]
+  },
+  {
+    "id": "MISSING-VALUE-HANDLING",
+    "requirement": "R3",
+    "statement": "In strict mode a placeholder with no value fails with MissingValueError 'missing value: <name>', and a name present with an empty-string value is not missing.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "Presence is judged by truthiness, so an empty-string value is treated as missing.",
+        "faultClass": "condition-forced",
+        "file": "src/template.js",
+        "find": "Object.prototype.hasOwnProperty.call(map, name)",
+        "replace": "map[name]"
+      },
+      {
+        "id": "F2",
+        "description": "The error message drops the 'value' word.",
+        "faultClass": "literal-changed",
+        "file": "src/template.js",
+        "find": "`missing value: ${name}`",
+        "replace": "`missing: ${name}`"
+      }
+    ]
+  },
+  {
+    "id": "UNCLOSED-PLACEHOLDER-ERROR",
+    "requirement": "R4",
+    "statement": "A template with an unclosed '{{' fails with TemplateSyntaxError reporting the zero-based index of the opening '{{'.",
+    "severity": "medium",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The error reports the position after the braces instead of the opening braces.",
+        "faultClass": "variable-swap",
+        "file": "src/template.js",
+        "find": "position ${open}",
+        "replace": "position ${start}"
+      },
+      {
+        "id": "F2",
+        "description": "Stale anchor for the closer definition under an older variable name.",
+        "faultClass": "literal-changed",
+        "file": "src/template.js",
+        "find": "const closing = raw ? '}}}' : '}}';",
+        "replace": "const closing = '}}';"
+      }
+    ]
+  },
+  {
+    "id": "SLUG-FORMAT",
+    "requirement": "R5",
+    "statement": "slugify lowercases the title, turns each run of non-alphanumeric characters into a single hyphen, and strips leading and trailing hyphens.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "Calls a non-existent string method, so slugify throws for any ordinary title.",
+        "faultClass": "literal-changed",
+        "file": "src/slug.js",
+        "find": ".toLowerCase()",
+        "replace": ".toLowerCaseAll()"
+      },
+      {
+        "id": "F2",
+        "description": "Only leading hyphens are stripped, so slugs for titles like 'Hello!' keep a trailing hyphen.",
+        "faultClass": "guard-removed",
+        "file": "src/slug.js",
+        "find": ".replace(/^-+|-+$/g, '')",
+        "replace": ".replace(/^-+/, '')"
+      }
+    ]
+  },
+  {
+    "id": "SLUG-LIMIT",
+    "requirement": "R7",
+    "statement": "slugify cuts a slug longer than the limit at the limit and removes any trailing hyphen, and a limit below 1 fails with InvalidLimitError.",
+    "severity": "medium",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The trailing hyphen left by the cut is no longer removed.",
+        "faultClass": "call-removed",
+        "file": "src/slug.js",
+        "find": ".replace(/-+$/, '')",
+        "replace": ""
+      },
+      {
+        "id": "F2",
+        "description": "A limit of 0 is accepted instead of rejected.",
+        "faultClass": "literal-changed",
+        "file": "src/slug.js",
+        "find": "limit < 1",
+        "replace": "limit < 0"
+      }
+    ]
+  },
+  {
+    "id": "COUNT-WORDS",
+    "requirement": "R8",
+    "statement": "countWords returns the number of maximal runs of non-whitespace characters, and 0 for empty or whitespace-only text.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "countWords loops forever for any input.",
+        "faultClass": "condition-forced",
+        "file": "src/reading.js",
+        "find": "const trimmed = String(text).trim();",
+        "replace": "const trimmed = String(text).trim();\n  while (true) {}"
+      },
+      {
+        "id": "F2",
+        "description": "Words are split on single spaces only, so tabs, newlines and repeated spaces miscount.",
+        "faultClass": "literal-changed",
+        "file": "src/reading.js",
+        "find": "split(/\\s+/)",
+        "replace": "split(' ')"
+      }
+    ]
+  },
+  {
+    "id": "READING-TIME-MINUTES",
+    "requirement": "R9",
+    "statement": "readingTime returns whole minutes rounded up at 400 words per minute for skimmers and 200 for careful readers, with at least 1 minute for any positive count.",
+    "severity": "high",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "Rounds down instead of up, so 201 careful words gives 1 minute.",
+        "faultClass": "return-altered",
+        "file": "src/reading.js",
+        "find": "Math.ceil(count / RATES[readerClass])",
+        "replace": "Math.floor(count / RATES[readerClass])"
+      },
+      {
+        "id": "F2",
+        "description": "The skimmer rate is changed from 400 to 300 words per minute.",
+        "faultClass": "literal-changed",
+        "file": "src/reading.js",
+        "find": "skimmer: 400",
+        "replace": "skimmer: 300"
+      }
+    ]
+  },
+  {
+    "id": "SCHEDULE-VALIDATION",
+    "requirement": "R13",
+    "statement": "An empty day set fails with EmptyScheduleError 'at least one send day is required', and a time that is not a valid 24-hour HH:MM fails with InvalidTimeError.",
+    "severity": "medium",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The first EmptyScheduleError message is reworded, so an empty day set reports the wrong message.",
+        "faultClass": "literal-changed",
+        "file": "src/schedule.js",
+        "find": "at least one send day is required",
+        "replace": "at least one day is required",
+        "expectHits": 1
+      },
+      {
+        "id": "F2",
+        "description": "The hour pattern accepts 24 to 29, so a time like 24:00 is no longer rejected.",
+        "faultClass": "guard-removed",
+        "file": "src/schedule.js",
+        "find": "([01]\\d|2[0-3])",
+        "replace": "([0-2]\\d)"
+      }
+    ]
+  },
+  {
+    "id": "FOOTER-BY-AUDIENCE",
+    "requirement": "R14",
+    "statement": "footer greets a subscriber by name, gives guests the fixed subscribe line, and rejects any other recipient kind with UnknownRecipientError.",
+    "severity": "medium",
+    "faults": [
+      {
+        "id": "F1",
+        "description": "The subscriber footer prints the recipient kind instead of the name.",
+        "faultClass": "variable-swap",
+        "file": "src/footer.js",
+        "find": "${recipient.name}",
+        "replace": "${kind}"
+      },
+      {
+        "id": "F2",
+        "description": "Any kind other than subscriber gets the guest footer, so unknown kinds no longer fail.",
+        "faultClass": "condition-forced",
+        "file": "src/footer.js",
+        "find": "if (kind === 'guest') {",
+        "replace": "if (kind !== 'subscriber') {"
+      }
+    ]
+  }
+]
