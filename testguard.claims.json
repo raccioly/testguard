@@ -16132,8 +16132,8 @@
           "description": "The probe shards drop to three while the plan still has four slices, so a quarter of the claims is never probed.",
           "faultClass": "literal-changed",
           "file": ".github/workflows/ci.yml",
-          "find": "shard: [0, 1, 2, 3] # the partition",
-          "replace": "shard: [0, 1, 2] # the partition",
+          "find": "shard: ${{ fromJSON(needs.scope.outputs.indexes) }} # one per slice",
+          "replace": "shard: [0, 1, 2] # one per slice",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -16409,7 +16409,7 @@
     },
     {
       "id": "TG-SHARDED-COST-GATE-IS-THE-SUM-OF-NORMALIZED-SHARDS",
-      "statement": "The cost ceiling of a sharded full probe is on the sum of every shard's normalized elapsed time, each normalized by the speed that shard measured on its own runner, so it does not depend on the shard count; the slowest shard is reported beside it and every per-shard failure of the unsharded gate still fails.",
+      "statement": "The cost ceiling of a sharded full probe is on the sum of every shard's normalized elapsed time, each normalized by the speed that shard measured on its own runner, per fault (perFaultSeconds times the faults in the merged evidence, so a growing suite passes and a dearer fault fails); the shard count is read from the cost budget, the one place it is written; the slowest shard is reported beside it and every per-shard failure of the unsharded gate still fails.",
       "source": {
         "kind": "manual",
         "ref": "GitHub issue #294"
@@ -16442,7 +16442,7 @@
           "description": "The sum is never compared with the ceiling.",
           "faultClass": "condition-forced",
           "file": ".github/scripts/check-shard-cost.mjs",
-          "find": "if (sumMs > cfg.seconds * 1000) failures.push(",
+          "find": "if (sumMs > budgetMs) failures.push(",
           "replace": "if (false) failures.push(",
           "producedBy": {
             "producer": "human",
@@ -16487,6 +16487,30 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "The ceiling is perFaultSeconds without multiplying by the faults, so a growing suite fails again.",
+          "faultClass": "other",
+          "file": ".github/scripts/check-shard-cost.mjs",
+          "find": "const budgetMs = cfg.perFaultSeconds * faults * 1000;",
+          "replace": "const budgetMs = cfg.perFaultSeconds * 1000;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "plan ignores the cost budget's shard count when --shards is absent.",
+          "faultClass": "guard-removed",
+          "file": ".github/scripts/shard-probe.mjs",
+          "find": "values.shards === undefined ? shardCount() : Number(values.shards)",
+          "replace": "Number(values.shards)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
           }
         }
       ]
