@@ -150,7 +150,8 @@ describe('a language\'s batches run through a pool (#320)', { timeout: T }, () =
 
   it('one failing batch kills its siblings, every child is gone when it rejects, and it rejects once with the count', async () => {
     const pids = [];
-    const failure = await settled(pooled([{ n: 0, mode: 'hang' }, { n: 1, mode: 'hang' }, { n: 2, mode: 'fail' }, { n: 3, delay: 0 }], { poolSize: 3, timeoutMs: 1_200, onSpawn: (c) => pids.push(c.pid) }));
+    // the siblings hang for 2 s unless the failure stops them, so 900 ms is the bound
+    const failure = await bounded(pooled([{ n: 0, mode: 'hang' }, { n: 1, mode: 'hang' }, { n: 2, mode: 'fail' }, { n: 3, delay: 0 }], { poolSize: 3, timeoutMs: 2_000, onSpawn: (c) => pids.push(c.pid) }), 900).then(() => undefined, (e) => e);
     expect(failure.message).toMatch(/syntax check failed: SyntaxError: stand-in failure \(0 of 4 javascript faults checked\)$/); // not a sibling's timeout
     expect(pids).toHaveLength(3);
     for (const pid of pids) expect(alive(pid)).toBe(false);
@@ -160,7 +161,7 @@ describe('a language\'s batches run through a pool (#320)', { timeout: T }, () =
     const abort = new AbortController();
     const pids = [];
     const pending = pooled([{ n: 0, mode: 'hang' }, { n: 1, mode: 'hang' }], { poolSize: 2, timeoutMs: 1_200, signal: abort.signal, onSpawn: (c) => pids.push(c.pid) });
-    while (pids.length < 2) await new Promise((r) => setTimeout(r, 5)); // both parsers are up
+    for (let i = 0; i < 40 && pids.length < 2; i++) await new Promise((r) => setTimeout(r, 5)); // both parsers are up (bounded: a pool of one never gets there)
     abort.abort();
     expect((await settled(pending)).message).toMatch(/another check failed/);
     for (const pid of pids) expect(alive(pid)).toBe(false);
