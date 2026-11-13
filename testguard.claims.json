@@ -18399,8 +18399,8 @@
           "description": "A young run directory with no owner file is swept.",
           "faultClass": "guard-removed",
           "file": "test/helpers/run-temp.mjs",
-          "find": "if (!old || alive(Number(match[1]))) continue;",
-          "replace": "if (alive(Number(match[1]))) continue;",
+          "find": "if (!old || alive(Number(match?.[1]))) continue;",
+          "replace": "if (alive(Number(match?.[1]))) continue;",
           "defendedBy": [
             "test/run-temp.test.mjs"
           ],
@@ -18414,7 +18414,7 @@
           "description": "A run directory with no owner file whose pid is alive is swept.",
           "faultClass": "condition-forced",
           "file": "test/helpers/run-temp.mjs",
-          "find": "if (!old || alive(Number(match[1]))) continue;",
+          "find": "if (!old || alive(Number(match?.[1]))) continue;",
           "replace": "if (!old) continue;",
           "defendedBy": [
             "test/run-temp.test.mjs"

@@ -48,7 +48,7 @@ export function sweepStaleRuns(base, { alive = defaultAlive, host = hostname(), 
       // Killed between mkdtemp and the owner write: the pid is in the name, and a directory this old with a dead pid is not a live run.
       let old = false;
       try { old = now() - statSync(join(base, name)).mtimeMs > OWNERLESS_AGE_MS; } catch { continue; }
-      if (!old || alive(Number(match[1]))) continue;
+      if (!old || alive(Number(match?.[1]))) continue;
     }
     try { removeRunDir(join(base, name)); removed.push(name); } catch { /* another run is removing it */ }
   }
