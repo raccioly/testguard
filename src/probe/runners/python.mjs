@@ -4,7 +4,7 @@ import { registerChild } from './lifecycle.mjs';
 import { spawn } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runProcess, listTestFiles, firstInformativeLine, terminateProcessTree } from './shared.mjs';
+import { runProcess, listTestFiles, firstInformativeLine, terminateProcessTree, terminateAtBudget } from './shared.mjs';
 
 /**
  * The Python runner. Selected **per file**: any `.py` defender runs here
@@ -141,7 +141,7 @@ function ask(path, budgetMs) {
     child.on('error', () => resolve(null));
     child.stdout.on('data', (d) => (out = (out + d).slice(-65536)));
     child.stderr.on('data', () => {});
-    const timer = setTimeout(() => terminateProcessTree(child), budgetMs);
+    const timer = setTimeout(() => terminateAtBudget(child), budgetMs);
     child.on('close', (code) => {
       clearTimeout(timer);
       if (code !== 0) return resolve(null);

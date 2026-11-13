@@ -17,19 +17,38 @@ export const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 /** Node's own advisory warnings about the probed project's configuration; never about the fault. */
 export const NODE_NOISE = /MODULE_TYPELESS_PACKAGE_JSON|ExperimentalWarning|--trace-warnings|Reparsing as ES module|To eliminate this warning/;
 
-function descendantPids(rootPid) {
-  if (process.platform === 'win32') return [];
-  const result = spawnSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8', timeout: 1000, maxBuffer: 4 * 1024 * 1024 });
-  if (result.status !== 0) return [];
-  const children = new Map();
+/** How long a run may take to end after its budget fires. Internal: not a flag, not a verdict input. */
+export const BUDGET_GRACE_MS = 5000;
+
+/** The only signal a teardown sends: a child that ignores SIGTERM changes nothing. */
+const KILL = 'SIGKILL';
+
+/**
+ * The process table, or `null` when `ps` could not be read in time. Never an
+ * empty list for a failure: under heavy load `ps` can exceed its timeout, and
+ * an unread table is an unverified teardown, not a tree with no descendants.
+ */
+export function processRows({ timeoutMs = 3000, run = spawnSync } = {}) {
+  if (process.platform === 'win32') return null;
+  const result = run('ps', ['-axo', 'pid=,ppid=,pgid=,stat='], { encoding: 'utf8', timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 });
+  if (result.status !== 0 || typeof result.stdout !== 'string') return null;
+  const rows = [];
   for (const line of result.stdout.split('\n')) {
-    const [pid, ppid] = line.trim().split(/\s+/).map(Number);
-    if (!Number.isInteger(pid) || !Number.isInteger(ppid)) continue;
+    const [pid, ppid, pgid, stat = ''] = line.trim().split(/\s+/);
+    if (Number.isInteger(Number(pid)) && Number.isInteger(Number(ppid)) && Number.isInteger(Number(pgid)) && pid) rows.push({ pid: Number(pid), ppid: Number(ppid), pgid: Number(pgid), stat });
+  }
+  return rows;
+}
+
+function descendantPids(rows, rootPid) {
+  const children = new Map();
+  for (const { pid, ppid } of rows) {
     if (!children.has(ppid)) children.set(ppid, []);
     children.get(ppid).push(pid);
   }
   const out = [];
-  const visit = (pid) => { for (const child of children.get(pid) ?? []) { visit(child); out.push(child); } };
+  const seen = new Set([rootPid]);
+  const visit = (pid) => { for (const child of children.get(pid) ?? []) { if (seen.has(child)) continue; seen.add(child); visit(child); out.push(child); } };
   visit(rootPid);
   return out;
 }
@@ -42,23 +61,83 @@ export const TIMEOUT_CLEANUP_WARNING = 'cleanup-unverified: TestGuard hard-kille
  * no portable cgroup/job-object/subreaper primitive, so a daemon that already
  * reparented cannot be proven dead here. Callers must keep the result a
  * timeout and surface TIMEOUT_CLEANUP_WARNING rather than claiming containment.
+ *
+ * Everything is SIGKILL: there is no graceful phase, so a child that ignores
+ * SIGTERM changes nothing. Returns what it signaled and whether the process
+ * table could be read; a table that could not be read in `listMs` is retried
+ * while the group is frozen (nothing can fork or reparent), then reported as
+ * `listed: false` rather than treated as an empty tree.
  */
-export function terminateProcessTree(child) {
-  if (!child.pid) return;
+export function terminateProcessTree(child, { list = processRows, listMs = 3000 } = {}) {
+  const signaled = { pids: [], listed: true };
+  if (!child.pid) return signaled;
   if (process.platform === 'win32') {
     spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore', timeout: 1000 });
     try { child.kill('SIGKILL'); } catch {}
-    return;
+    return signaled;
   }
   // Freeze the main group before enumerating so it cannot fork between the
   // snapshot and the kill. A deliberately detached descendant is outside the
   // group but remains visible through PPID and is killed explicitly.
   try { process.kill(-child.pid, 'SIGSTOP'); } catch {}
-  for (const pid of descendantPids(child.pid)) {
-    try { process.kill(pid, 'SIGKILL'); } catch {}
+  const until = Date.now() + listMs;
+  let rows = null;
+  do { rows = list({ timeoutMs: Math.max(200, until - Date.now()) }); } while (rows === null && Date.now() < until);
+  signaled.listed = rows !== null;
+  for (const pid of descendantPids(rows ?? [], child.pid)) {
+    signaled.pids.push(pid);
+    try { process.kill(pid, KILL); } catch {}
   }
-  try { process.kill(-child.pid, 'SIGKILL'); } catch {}
-  try { child.kill('SIGKILL'); } catch {}
+  try { process.kill(-child.pid, KILL); } catch {}
+  try { child.kill(KILL); } catch {}
+  return signaled;
+}
+
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+const isLive = (row) => !row.stat.startsWith('Z');
+
+/**
+ * After the kill: is every process we know of gone? Sweeps again, with the
+ * table re-read each round, until nothing live remains or `deadline` passes.
+ * Zombies are dead (`kill(pid, 0)` would call them alive). Returns how many
+ * known processes were still alive at the end, and whether the table could
+ * never be read (then nothing could be enumerated or confirmed).
+ */
+export async function confirmTreeDead(child, signaled, { deadline, list = processRows } = {}) {
+  if (process.platform === 'win32' || !child.pid) return { alive: 0, unlisted: false };
+  const known = new Set([child.pid, ...signaled.pids]);
+  let listedOnce = signaled.listed;
+  let alive = 0;
+  for (;;) {
+    const remaining = deadline - Date.now();
+    const rows = list({ timeoutMs: Math.max(200, Math.min(3000, remaining)) });
+    if (rows === null) {
+      alive = [...known].filter((pid) => pid !== child.pid && (() => { try { process.kill(pid, 0); return true; } catch { return false; } })()).length;
+    } else {
+      listedOnce = true;
+      // Whatever the table shows as a descendant of, or in the group of, a known process is one too.
+      for (const pid of descendantPids(rows, child.pid)) known.add(pid);
+      for (const row of rows) { if (known.has(row.pgid) && row.pgid !== process.pid) known.add(row.pid); }
+      const live = rows.filter((row) => known.has(row.pid) && isLive(row));
+      alive = live.length;
+      for (const row of live) { try { process.kill(row.pid, KILL); } catch {} }
+      if (known.has(child.pid)) { try { process.kill(-child.pid, KILL); } catch {} }
+    }
+    if ((rows !== null && alive === 0) || Date.now() >= deadline) return { alive, unlisted: !listedOnce };
+    await sleep(40);
+  }
+}
+
+/**
+ * A bounded kill for a child whose caller waits on `close`: SIGKILL the tree,
+ * and when something that survives (or reparented) still holds the output
+ * pipes after `graceMs`, destroy them so `close` fires and the caller moves on.
+ */
+export function terminateAtBudget(child, graceMs = BUDGET_GRACE_MS) {
+  terminateProcessTree(child, { listMs: Math.floor(graceMs / 2) });
+  const giveUp = setTimeout(() => { child.stdout?.destroy(); child.stderr?.destroy(); }, graceMs);
+  giveUp.unref?.();
+  child.once('close', () => clearTimeout(giveUp));
 }
 
 /**
@@ -160,7 +239,7 @@ export function checkRunner({ projectDir, pkg, bin, budgetMs = 60_000, env = pro
     child.on('error', () => resolve({ ok: false, message: `${pkg} is not installed in the project and \`${bin}\` is not on PATH (npm i -D ${pkg})` }));
     child.stdout.on('data', (d) => (out = (out + d).slice(-65536)));
     child.stderr.on('data', (d) => (err = (err + d).slice(-65536)));
-    const timer = setTimeout(() => terminateProcessTree(child), budgetMs);
+    const timer = setTimeout(() => terminateAtBudget(child), budgetMs);
     child.on('close', (code) => {
       clearTimeout(timer);
       const version = out.trim().replace(/^vitest\//, '').replace(/^Version\s+/i, '').split('\n').pop();
@@ -301,7 +380,7 @@ export function parseReport(report, durationMs, kinds) {
  * runner's command line; `command` (tests) or `commandTemplate` (--runner-cmd)
  * override it.
  */
-export function runProcess({ projectDir, files, budgetMs = 120_000, command, commandTemplate, argv, env = {}, parse = parseReport, cleanupOnClose = false }) {
+export function runProcess({ projectDir, files, budgetMs = 120_000, command, commandTemplate, argv, env = {}, parse = parseReport, cleanupOnClose = false, graceMs = BUDGET_GRACE_MS, processList = processRows }) {
   assertNotCancelled();
   const outFile = join(scratchRoot(), `testguard-run-${randomBytes(6).toString('hex')}.json`);
   const [cmd, ...args] = command
@@ -324,34 +403,73 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
     child.on('error', (e) => (stderr += e.message));
     let killed = false;
     let exit = '';
-    const timer = setTimeout(() => {
-      killed = true;
-      terminateProcessTree(child);
-    }, budgetMs);
-
-    child.on('close', (code, signal) => {
-      exit = signal ? `signal ${signal}` : `code ${code}`;
-      clearTimeout(timer);
-      if (cleanupOnClose) terminateProcessTree(child);
-      const durationMs = Date.now() - started;
-      let result;
-      if (killed) {
-        result = { run: { outcome: 'timeout', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, exceptionFailures: 0, durationMs }, timeouts: 1, loadMessage: `budget of ${budgetMs}ms exceeded; ${TIMEOUT_CLEANUP_WARNING}`, failedTests: [] };
-      } else if (!existsSync(outFile)) {
-        result = { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, exceptionFailures: 0, durationMs }, timeouts: 0, loadMessage: stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? `runner produced no report (exited with ${exit})`, failedTests: [] };
-      } else {
-        try {
-          result = parse(readBoundedJsonFile(outFile), durationMs);
-        } catch (e) {
-          result = { run: { outcome: 'error', tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, exceptionFailures: 0, durationMs }, timeouts: 0, loadMessage: `unreadable report: ${e.message}`, failedTests: [] };
-        }
-      }
+    let settled = false;
+    let openPipes = 2;
+    for (const pipe of [child.stdout, child.stderr]) pipe.once('close', () => { openPipes--; });
+    const noRun = (outcome) => ({ outcome, tests: { total: 0, passed: 0, failed: 0 }, assertionFailures: 0, exceptionFailures: 0 });
+    // One exit for every path: the run is over once, its scratch is released once.
+    const settle = (result) => {
+      if (settled) return;
+      settled = true;
+      scope.dispose();
       rmSync(outFile, { force: true });
       // The net under every parser: an `error` run that arrived without words gets the runner's last stderr line, else its exit status.
       if (result.run.outcome === 'error' && !String(result.loadMessage ?? '').trim()) {
         result.loadMessage = stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? `the runner reported an error without a message (exited with ${exit})`;
       }
       resolve(result);
+    };
+    // The budget fired. The run ended then: `durationMs` is the time to this
+    // moment, never the teardown that follows. The teardown has `graceMs`
+    // (from the moment the budget fired) to confirm the tree dead; after that
+    // the pipes are destroyed and the run is over whatever still lives.
+    const timer = setTimeout(async () => {
+      killed = true;
+      const durationMs = Date.now() - started;
+      const deadline = Date.now() + graceMs;
+      let confirmed = { alive: 0, unlisted: true };
+      try {
+        const signaled = terminateProcessTree(child, { list: processList, listMs: Math.floor(graceMs / 2) });
+        confirmed = await confirmTreeDead(child, signaled, { deadline, list: processList });
+      } catch {} // a teardown that threw confirmed nothing: reported as unlisted below
+      // A tree confirmed dead closes its pipes at once; a pipe still open belongs to a process nobody could find.
+      const pipeBy = Math.min(deadline, Date.now() + Math.min(500, graceMs));
+      while (openPipes > 0 && Date.now() < pipeBy) await sleep(25);
+      const pipeHeld = openPipes > 0;
+      child.stdout.destroy();
+      child.stderr.destroy();
+      const unconfirmed = confirmed.alive > 0 || confirmed.unlisted || pipeHeld;
+      const why = [
+        confirmed.alive > 0 ? `${confirmed.alive} process${confirmed.alive === 1 ? '' : 'es'} of the run's tree still alive` : '',
+        confirmed.unlisted ? 'the process table could not be read, so the run\'s descendants could not be enumerated or confirmed dead' : '',
+        pipeHeld ? 'the run\'s output pipe was still held by a process TestGuard could not find' : '',
+      ].filter(Boolean);
+      settle({
+        run: { ...noRun('timeout'), durationMs },
+        timeouts: 1,
+        loadMessage: `budget of ${budgetMs}ms exceeded; the run ended there and its teardown was given ${graceMs}ms${unconfirmed ? `; teardown NOT confirmed: ${why.join('; ')}` : '; every process of its tree was confirmed dead'}; ${TIMEOUT_CLEANUP_WARNING}`,
+        failedTests: [],
+        ...(unconfirmed ? { teardown: { unconfirmed: true, alive: confirmed.alive, unlisted: confirmed.unlisted, pipeHeld } } : {}),
+      });
+    }, budgetMs);
+
+    child.on('close', (code, signal) => {
+      exit = signal ? `signal ${signal}` : `code ${code}`;
+      if (killed) return; // the budget path settles the run
+      clearTimeout(timer);
+      const durationMs = Date.now() - started;
+      if (cleanupOnClose) terminateProcessTree(child);
+      let result;
+      if (!existsSync(outFile)) {
+        result = { run: { ...noRun('error'), durationMs }, timeouts: 0, loadMessage: stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? `runner produced no report (exited with ${exit})`, failedTests: [] };
+      } else {
+        try {
+          result = parse(readBoundedJsonFile(outFile), durationMs);
+        } catch (e) {
+          result = { run: { ...noRun('error'), durationMs }, timeouts: 0, loadMessage: `unreadable report: ${e.message}`, failedTests: [] };
+        }
+      }
+      settle(result);
     });
   });
 }

@@ -3,7 +3,7 @@ import { copyFileSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSy
 import { childScope, scratchRoot } from '../scratch-dir.mjs';
 import { dirname, extname, join, relative, sep } from 'node:path';
 import { registerChild } from './runners/lifecycle.mjs';
-import { resolveRunner, splitCommandWords, terminateProcessTree } from './runners/shared.mjs';
+import { resolveRunner, splitCommandWords, terminateProcessTree, terminateAtBudget } from './runners/shared.mjs';
 import { PreconditionError } from './worktree.mjs';
 import { sha256 } from '../util/hash.mjs';
 
@@ -66,7 +66,7 @@ function execute({ argv, cwd, budgetMs }) {
     let timedOut = false;
     let spawnError;
     child.on('error', (error) => { spawnError = error.code === 'ENOENT' ? `${argv[0]}: command not found` : error.message; });
-    const timer = setTimeout(() => { timedOut = true; terminateProcessTree(child); }, budgetMs);
+    const timer = setTimeout(() => { timedOut = true; terminateAtBudget(child); }, budgetMs);
     child.on('close', (code, signal) => {
       clearTimeout(timer);
       resolve({ code, signal, output, timedOut, spawnError, durationMs: Date.now() - started });

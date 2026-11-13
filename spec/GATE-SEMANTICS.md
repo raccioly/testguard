@@ -820,6 +820,21 @@ diagnostics state `cleanup-unverified`. Such a run remains a timeout and never
 becomes evidence of detection. Daemonizing or untrusted commands require an
 OS or container boundary that TestGuard does not claim to provide.
 
+A run ends in bounded time after its budget. The budget fires, the run is
+recorded as a `timeout` whose `durationMs` is the time to that moment (the
+run, never the teardown), and the teardown has a fixed grace of 5 seconds
+(`BUDGET_GRACE_MS`, internal: no flag) to confirm the tree dead. Every process
+is sent SIGKILL (there is no graceful phase); the process table is re-read and
+the sweep repeated until no live process of the tree remains. When the grace
+expires the runner's output pipes are destroyed and the run is over, whatever
+still lives, so a run takes at most its budget plus the grace. A teardown that
+could not be confirmed (processes still alive, a process table that could not
+be read, or an output pipe held by a process TestGuard could not find) is said
+so in the run's message and in one warning line (a count, never names); it is
+never reported as success. A `timeout` recorded while other test runners were
+busy says so in `detail.message`; the verdict stays `timeout`. The same bound
+applies to a run whose budget the command budget capped.
+
 ## Replay reports; it never gates
 
 A replayed bug is history. It escaped, by definition, which means the suite

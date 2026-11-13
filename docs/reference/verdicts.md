@@ -73,7 +73,7 @@ tags each unproven record `[NEW]`, `[baseline]` or `[below floor]`.
 | `fault-invalid` | `replacement-does-not-compile` | The runner reported a parse or transform error. |
 | `fault-invalid` | `suite-failed-to-load` | The suite failed to load for another reason. |
 | `fault-invalid` | `replacement-does-not-typecheck` | `--typecheck`: the project's own type checker refuses the replacement. `detail.message` is the first diagnostic and `detail.typecheck` is `diagnostics`; no test ran (`baselineRuns` and `probeRuns` are empty). |
-| `timeout` | `test-timed-out` | A probe run timed out. |
+| `timeout` | `test-timed-out` | A probe run timed out. `detail.message` says the run ended at the budget (with 5 s at most to kill its process tree), whether that teardown was confirmed, and whether other test runners were busy on the machine (then the timeout is an environment condition; the verdict stays `timeout`). |
 | `timeout` | `typecheck-timed-out` | `--typecheck`: the type check of this fault exceeded `--budget`. `detail.typecheck` is `timeout`. |
 | `flaky-defender` | `defenders-not-green` | Not N/N green on unmodified code. `detail.flakeRate` says how often. |
 | `flaky-defender` | `inconsistent-probe` | Some probe runs killed the fault and some did not. |

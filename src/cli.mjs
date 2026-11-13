@@ -56,7 +56,7 @@ probe
                        (probe, claims, admit, status): fault files and defendedBy stay project-relative; evidence records
                        run.claimsSource {external, sha256}, never the path
   --confirm <n>        runs per verdict        (default: 3)
-  --budget <ms>        wall clock per run      (default: 120000)
+  --budget <ms>        wall clock per run      (default: 120000); a run over it is a timeout, killed (whole process tree) within 5 s more, so no run lasts longer than the budget plus 5 s
   --command-budget <ms> cooperative measurement deadline for probe, sweep, replay, or admit. Caps async children; expiry exits 2 and writes no partial result
   --partial-on-budget (probe) with --command-budget: when the budget runs out, stop starting work, restore every tree, and write
                        the document anyway. Faults fully measured keep their record; the ones in flight and not started

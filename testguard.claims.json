@@ -7084,6 +7084,268 @@
       ]
     },
     {
+      "id": "TG-RUN-ENDS-WITHIN-BUDGET-PLUS-GRACE",
+      "statement": "A run whose budget fires is recorded as a timeout whose durationMs is the time to that moment, and it is over within a fixed 5 s grace whatever its process tree does: every process is sent SIGKILL (a child that ignores SIGTERM changes nothing), the process table is re-read and the sweep repeated, a table that cannot be read is retried while the tree is frozen, and when the grace expires the output pipes are destroyed so a survivor holding them cannot hold the run. A teardown that could not be confirmed (a process alive, an unreadable table, a pipe held by a process nobody can find) is reported with its count in the run result and never as success.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#per-run-and-whole-command-budgets-are-different"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/run-budget-pipes.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The teardown signals SIGTERM, which a child may ignore, instead of SIGKILL.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "const KILL = 'SIGKILL';",
+          "replace": "const KILL = 'SIGTERM';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/run-budget-sigterm.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "The run waits for a pipe held by a process nobody can find for as long as it is held.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "const pipeBy = Math.min(deadline, Date.now() + Math.min(500, graceMs));",
+          "replace": "const pipeBy = Infinity;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/run-budget-pipes.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "The sweep after the kill has no deadline: a process that cannot be removed holds the run forever.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "|| Date.now() >= deadline) return",
+          "replace": "|| false) return",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/run-budget-alive.test.mjs"
+          ]
+        },
+        {
+          "id": "F4",
+          "description": "durationMs of a timed-out run includes its teardown.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "run: { ...noRun('timeout'), durationMs },",
+          "replace": "run: { ...noRun('timeout'), durationMs: Date.now() - started },",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/run-budget-orphan.test.mjs"
+          ]
+        },
+        {
+          "id": "F5",
+          "description": "A process still alive at the end of the grace is not counted as an unconfirmed teardown.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "const unconfirmed = confirmed.alive > 0 || confirmed.unlisted || pipeHeld;",
+          "replace": "const unconfirmed = confirmed.unlisted || pipeHeld;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/run-budget-alive.test.mjs"
+          ]
+        },
+        {
+          "id": "F6",
+          "description": "A pipe still held at the end of the grace is not reported.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "const pipeHeld = openPipes > 0;",
+          "replace": "const pipeHeld = false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/run-budget-orphan.test.mjs"
+          ]
+        },
+        {
+          "id": "F7",
+          "description": "A process table that could never be read is not reported.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "return { alive, unlisted: !listedOnce };",
+          "replace": "return { alive, unlisted: false };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/run-budget-unlisted.test.mjs"
+          ]
+        },
+        {
+          "id": "F8",
+          "description": "A process table that fails to read is not retried while the tree is frozen, so a detached server is lost when its parent dies.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "} while (rows === null && Date.now() < until);",
+          "replace": "} while (false);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/run-budget-retry.test.mjs"
+          ]
+        },
+        {
+          "id": "F9",
+          "description": "The bounded kill used by the type check and the interpreter check never destroys a pipe a survivor holds.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "setTimeout(() => { child.stdout?.destroy(); child.stderr?.destroy(); }, graceMs);",
+          "replace": "setTimeout(() => {}, graceMs);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/run-budget-at-budget.test.mjs"
+          ]
+        },
+        {
+          "id": "F10",
+          "description": "The fixtures stop recording their pids, so a test can neither prove them dead nor kill them afterwards.",
+          "faultClass": "call-removed",
+          "file": "test/helpers/process-tree.mjs",
+          "find": "require('fs').appendFileSync(",
+          "replace": "require('fs').existsSync(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/run-budget-sigterm.test.mjs"
+          ]
+        },
+        {
+          "id": "F11",
+          "description": "The shared bound check stops requiring that the run counts as a timeout.",
+          "faultClass": "literal-changed",
+          "file": "test/helpers/process-tree.mjs",
+          "find": "expect(result.timeouts).toBe(1);",
+          "replace": "expect(result.timeouts).toBe(0);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/run-budget-sigterm.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-TIMEOUT-RECORD-SAYS-WHAT-THE-MACHINE-WAS-DOING",
+      "statement": "A timeout recorded while other test runners were busy says so in its detail.message, as a count and never names, and an unconfirmed teardown produces one warning line; the verdict stays timeout, and the message of the first timed-out run is recorded.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/GATE-SEMANTICS.md#per-run-and-whole-command-budgets-are-different"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/timeout-note.test.mjs",
+        "test/timeout-record.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The contention note is never produced.",
+          "faultClass": "return-altered",
+          "file": "src/probe/contention.mjs",
+          "find": "export const timeoutContentionNote = (c) => (c?.detected",
+          "replace": "export const timeoutContentionNote = (c) => (false && c?.detected",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/timeout-note.test.mjs"
+          ]
+        },
+        {
+          "id": "F2",
+          "description": "An unconfirmed teardown produces no warning line.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/contention.mjs",
+          "find": "if (result.teardown?.unconfirmed) onWarn(",
+          "replace": "if (false) onWarn(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/timeout-note.test.mjs"
+          ]
+        },
+        {
+          "id": "F3",
+          "description": "The probe never annotates a timed-out run.",
+          "faultClass": "call-removed",
+          "file": "src/probe/probe.mjs",
+          "find": "if (result.run.outcome === 'timeout') annotateTimeout(result,",
+          "replace": "if (false) annotateTimeout(result,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/timeout-record.test.mjs"
+          ]
+        },
+        {
+          "id": "F4",
+          "description": "The record of a timeout carries no message.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/probe.mjs",
+          "find": "if (run.outcome === 'timeout' && loadMessage && !detail.message)",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/timeout-record.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
       "id": "TG-PROGRESS-EXPLICIT-WINS",
       "statement": "An explicit --progress overrides every inference, including --quiet and --json. An operator who asks for a stream of events has said what they want; nothing else may silence it.",
       "source": {
@@ -9951,7 +10213,8 @@
         "at": "2026-09-27T00:00:00Z"
       },
       "defendedBy": [
-        "test/runner-vitest.test.mjs"
+        "test/runner-vitest.test.mjs",
+        "test/run-budget-kill.test.mjs"
       ],
       "faults": [
         {
@@ -9959,13 +10222,17 @@
           "description": "Still-attributable detached descendants are omitted from timeout cleanup and can mutate the project after TestGuard returns.",
           "faultClass": "return-altered",
           "file": "src/probe/runners/shared.mjs",
-          "find": "  for (const pid of descendantPids(child.pid)) {",
+          "find": "  for (const pid of descendantPids(rows ?? [], child.pid)) {",
           "replace": "  for (const pid of []) {",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-27T00:00:00Z"
-          }
+          },
+          "defendedBy": [
+            "test/run-budget-kill.test.mjs",
+            "test/runner-vitest.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -9978,7 +10245,10 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-29T00:00:00Z"
-          }
+          },
+          "defendedBy": [
+            "test/runner-vitest.test.mjs"
+          ]
         }
       ]
     },

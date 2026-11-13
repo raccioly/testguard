@@ -9,7 +9,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { repoRoot as gitRoot, headSha, isDirty, snapshotWorkingTree } from '../git.mjs';
 import { discoverDefendersDetailed } from './discover.mjs';
 import { classifyDefenders } from './mocks.mjs';
-import { detectContention, contentionWarning, fanOutWarning } from './contention.mjs';
+import { detectContention, contentionWarning, fanOutWarning, annotateTimeout } from './contention.mjs';
 import { availableParallelism } from 'node:os';
 import { withScratchBase } from '../scratch-dir.mjs';
 import { createScratch, inPlace, installsChangedSince, installsFingerprint, PreconditionError, writeBoundary } from './worktree.mjs';
@@ -17,7 +17,7 @@ import { UsageError } from './precondition-error.mjs';
 import { BudgetExhaustedError } from '../command-budget.mjs';
 import { completeRecords, budgetSummary, notReachedRecord, isNotReached } from './partial-budget.mjs';
 import { applyContent, applyFault, locate } from './inject.mjs';
-import { resolveDefenders, parseCommandTemplate } from './runners/shared.mjs';
+import { resolveDefenders, parseCommandTemplate, BUDGET_GRACE_MS } from './runners/shared.mjs';
 import { selectRunner, discoverRunnerManifest, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns, runnerLabel, runnerFor } from './runners/index.mjs';
 import { classify, shouldStopEarly } from './classify.mjs';
 import { blastRadius, rank } from './rank.mjs';
@@ -339,8 +339,12 @@ async function measureProbe({
     assertNotCancelled();
     runnerClock.start();
     measurements.runnerInvocations++;
-    try { return await runner.run(opts); }
-    finally { runnerClock.stop(); }
+    try {
+      const result = await runner.run(opts);
+      // A timeout says what the machine was doing and whether its teardown is confirmed (#310); the verdict is untouched.
+      if (result.run.outcome === 'timeout') annotateTimeout(result, { contention: detectContention(), onWarn, graceMs: BUDGET_GRACE_MS });
+      return result;
+    } finally { runnerClock.stop(); }
   };
   commandBudget?.assertOpen();
   // realpath: git reports the repository root by its real path (/private/var
@@ -1433,6 +1437,7 @@ async function measureFault(state, tree, { priorRuns = [], overlap, allAlone = f
         stage('probe', i + 1, confirmRuns);
         const { run, timeouts, loadMessage, failedTests, provenance } = await runDefenders(defenders, [fault.file]);
         probeRuns.push({ ...run, ...(allAlone || alone?.() ? { alone: true } : {}), timeouts, loadMessage, failedTests });
+        if (run.outcome === 'timeout' && loadMessage && !detail.message) detail.message = String(loadMessage).slice(0, 1024);
         // Only when the suite actually loaded. A run that failed to load
         // explains an absent import by itself — saying the defenders never
         // reached the file would be true and useless, and it would put the
