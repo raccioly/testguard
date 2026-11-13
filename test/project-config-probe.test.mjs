@@ -50,7 +50,8 @@ describe('testguard.config.json through measured probes', () => {
 
     // A deleted copy is as uncommitted as an edited one: refused, never read as "no file".
     rmSync(join(p.dir, CONFIG_FILE));
-    const deleted = await run(['probe', p.dir]);
+    // The flag stands in for the deleted file's runner, so discovery succeeds and the refusal is about the file.
+    const deleted = await run(['probe', p.dir, '--runner', 'node-test']);
     expect(deleted.code).toBe(2);
     expect(deleted.err).toContain(CONFIG_FILE);
 
