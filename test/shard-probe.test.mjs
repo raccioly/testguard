@@ -179,12 +179,26 @@ describe('shard-probe as a command', () => {
     const r = run(['plan', '--shards', '2', '--claims', claims], { GITHUB_OUTPUT: out });
     expect(r.status, r.stderr).toBe(0);
     expect(r.stdout).toMatch(/shard plan \(fault count\): #0 \d claims\/\d faults/);
-    const line = readFileSync(out, 'utf8').trim();
+    const [line, indexes] = readFileSync(out, 'utf8').trim().split('\n');
+    expect(JSON.parse(indexes.replace(/^indexes=/, ''))).toEqual([0, 1]);
     const shards = JSON.parse(line.replace(/^shards=/, ''));
     expect(shards).toHaveLength(2);
     expect(shards.join(',').split(',').sort()).toEqual(['A', 'B', 'C', 'D', 'E']);
     expect(run(['plan', '--shards', '0', '--claims', claims]).status).toBe(2);
     expect(run(['bogus']).status).toBe(2);
+  });
+
+  it('plan with no --shards takes the count from the cost budget, the one place it is written', () => {
+    const budget = JSON.parse(readFileSync(join(ROOT, 'testguard.cost-budget.json'), 'utf8'));
+    const out = join(dir, 'default-out.txt');
+    writeFileSync(out, '');
+    const many = join(dir, 'many.json');
+    writeFileSync(many, JSON.stringify({ ...claimsDoc, claims: Array.from({ length: budget.sharded.shards + 3 }, (_, i) => ({ id: `C${i}`, faults: [{ id: 'F1' }] })) }));
+    const r = run(['plan', '--claims', many], { GITHUB_OUTPUT: out });
+    expect(r.status, r.stderr).toBe(0);
+    const [line, indexes] = readFileSync(out, 'utf8').trim().split('\n');
+    expect(JSON.parse(line.replace(/^shards=/, ''))).toHaveLength(budget.sharded.shards);
+    expect(JSON.parse(indexes.replace(/^indexes=/, ''))).toEqual(Array.from({ length: budget.sharded.shards }, (_, i) => i));
   });
 
   it('compare exits 1 on a disagreement and when nothing is shared, 0 when verdicts agree', () => {
@@ -212,29 +226,40 @@ describe('shard-probe as a command', () => {
 
 describe('check-shard-cost: the ceilings are on the sum and on the slowest shard, for this many shards', () => {
   const cfg = JSON.parse(readFileSync(join(ROOT, 'testguard.cost-budget.json'), 'utf8'));
-  const budget = { ...cfg, sharded: { shards: 2, seconds: 1000, slowestShardSeconds: 600 } };
+  const budget = { ...cfg, sharded: { shards: 2, perFaultSeconds: 3, slowestShardSeconds: 720 } };
   const ref = (ms = budget.reference.baselineMs) => ({ workload: budget.reference.workload, medianMs: ms, cpus: budget.reference.cpus, platform: budget.reference.platform });
-  const shard = (name, elapsedSeconds, over = {}) => ({ name, evidence: { records: [rec('A', 'F1', 'killed', 1000)], run: { faultWorkers: budget.faultWorkers ?? 1, measurements: { elapsedMs: elapsedSeconds * 1000 } } }, before: ref(), after: ref(), ...over });
+  const shard = (name, elapsedSeconds, over = {}, faults = 1) => ({ name, evidence: { records: Array.from({ length: faults }, (_, i) => rec(`${name}-C${i}`, 'F1', 'killed', 1000)), run: { faultWorkers: budget.faultWorkers ?? 1, measurements: { elapsedMs: elapsedSeconds * 1000 } } }, before: ref(), after: ref(), ...over });
 
   it('sums the shards and reports the slowest beside it', () => {
-    const d = decideShardCost([shard('s0', 600), shard('s1', 400)], budget);
+    const d = decideShardCost([shard('s0', 600, {}, 200), shard('s1', 400, {}, 200)], budget);
     expect(d.ok).toBe(true);
     expect(d.sumMs).toBe(1000000);
     expect(d.slowestMs).toBe(600000);
+    expect(d.faults).toBe(400);
+    expect(d.budgetMs).toBe(3 * 400 * 1000);
   });
 
-  it('fails when the SUM is over its ceiling even though every shard alone is under it', () => {
-    const d = decideShardCost([shard('s0', 520), shard('s1', 520)], budget);
+  it('more faults at the same cost per fault pass: the suite may grow', () => {
+    // 2.5 s per fault at 400 faults, then the same 2.5 s per fault at 800 faults (a total that an absolute ceiling of 1000 s would refuse).
+    expect(decideShardCost([shard('s0', 500, {}, 200), shard('s1', 500, {}, 200)], budget).ok).toBe(true);
+    const grown = decideShardCost([shard('s0', 700, {}, 400), shard('s1', 700, {}, 400)], budget);
+    expect(grown.sumMs).toBe(1400000);
+    expect(grown.ok).toBe(true);
+  });
+
+  it('the same faults at a higher cost per fault fail, naming the per-fault ceiling', () => {
+    const d = decideShardCost([shard('s0', 700, {}, 200), shard('s1', 700, {}, 200)], budget);
     expect(d.ok).toBe(false);
-    expect(d.failures.join()).toMatch(/over-budget: the shards' normalized compute/);
+    expect(d.failures.join()).toMatch(/over-budget: .*3\.50s per fault, over the 3s per-fault ceiling \(1200s for this many faults\): a fault got dearer/);
     expect(d.failures.join()).not.toMatch(/over-wall-budget/);
   });
 
-  it('fails when the SLOWEST shard is over its own ceiling even though the sum is under', () => {
-    const d = decideShardCost([shard('s0', 601), shard('s1', 100)], budget);
+  it('fails when the SLOWEST shard is over 720s even though the cost per fault is fine, and says to add a shard', () => {
+    const d = decideShardCost([shard('s0', 721, {}, 400), shard('s1', 100, {}, 400)], budget);
     expect(d.ok).toBe(false);
-    expect(d.failures.join()).toMatch(/over-wall-budget: the slowest shard's normalized 601s is over its 600s ceiling/);
+    expect(d.failures.join()).toMatch(/over-wall-budget: the slowest shard's normalized 721s is over its 720s ceiling\. If the suite only grew .*add a shard: change `sharded\.shards` in testguard\.cost-budget\.json/);
     expect(d.failures.join()).not.toMatch(/over-budget:/);
+    expect(decideShardCost([shard('s0', 720, {}, 400), shard('s1', 100, {}, 400)], budget).ok).toBe(true);
   });
 
   it('fails closed on another number of shards than the ceilings were derived for, in either direction', () => {
@@ -277,7 +302,9 @@ describe('check-shard-cost: the ceilings are on the sum and on the slowest shard
   it('the real budget names the sharded configuration and its two ceilings', () => {
     expect(cfg.shards).toBe(1);
     expect(Number.isInteger(cfg.sharded.shards) && cfg.sharded.shards > 1).toBe(true);
-    expect(cfg.sharded.seconds).toBeGreaterThan(cfg.sharded.slowestShardSeconds);
+    expect(cfg.sharded.perFaultSeconds).toBe(3);
+    expect(cfg.sharded.slowestShardSeconds).toBe(720);
+    expect(cfg.sharded.seconds).toBeUndefined();
     expect(cfg.sharded.slowestShardSeconds).toBeGreaterThan(0);
   });
 });

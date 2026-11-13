@@ -2210,6 +2210,316 @@
       ]
     },
     {
+      "id": "TG-INIT-LEAVES-A-HAND-WRITTEN-HOOK-ALONE",
+      "statement": "A pre-push hook file that mentions TestGuard outside a managed block is the project's own: init and init --upgrade write no block there on any path (after an early exit 0 included), report it with the block they would have written, never re-enable a paused probe, and only --force writes the block, outside which nothing is replaced. --upgrade adds no hook block to a file that had none from TestGuard.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301 (init and hook rough edges)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/init-owned-hooks.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "init appends its block beside a hand-written TestGuard hook.",
+          "faultClass": "guard-removed",
+          "file": "src/init/init.mjs",
+          "find": "  if (own && !force) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A managed block's own lines count as hand-written, so a current hook is never upgraded or recognized.",
+          "faultClass": "guard-removed",
+          "file": "src/init/managed.mjs",
+          "find": "    if (blocks.some((b) => i >= b.start && i <= b.end)) continue;\n    return { line: i + 1, text: lines[i].trim() };",
+          "replace": "    return { line: i + 1, text: lines[i].trim() };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "--upgrade adds a block to a hook file TestGuard never wrote in.",
+          "faultClass": "guard-removed",
+          "file": "src/init/init.mjs",
+          "find": "  } else if (!ourBlock && upgrade && !force) {",
+          "replace": "  } else if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A paused probe's comment does not count as TestGuard being there (the match is case-sensitive).",
+          "faultClass": "literal-changed",
+          "file": "src/init/managed.mjs",
+          "find": "    if (!/testguard/i.test(lines[i])) continue;",
+          "replace": "    if (!/testguard/.test(lines[i])) continue;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The fake testguard the executed-hook tests put on PATH logs no call, so a second probe beside the owner's would go unseen.",
+          "faultClass": "statement-deleted",
+          "file": "test/helpers/owned-repo.mjs",
+          "find": "echo \"$*\" >> \"${log}\"",
+          "replace": "true",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ],
+      "tags": [
+        "init",
+        "hooks",
+        "issue-301"
+      ]
+    },
+    {
+      "id": "TG-INIT-LEAVES-AN-EDITED-AGENTS-SECTION-ALONE",
+      "statement": "An AGENTS.md TestGuard section is rewritten by init --upgrade only when it is byte-for-byte a template TestGuard shipped (its sha256 with the per-project bullets removed is in agents-history.json); an edited one, or one nothing can prove unmodified, is left as it is and reported, never rewritten and never given boilerplate.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301 (init and hook rough edges)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/init-agents-section.test.mjs",
+        "test/init-fast-path.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every section counts as unmodified, so --upgrade rewrites a customized one.",
+          "faultClass": "guard-removed",
+          "file": "src/init/init.mjs",
+          "find": "    const unmodified = AGENTS_HISTORY.includes(agentsSectionHash(block));",
+          "replace": "    const unmodified = true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The project bullets stay in the hash, so listing a second project makes a pristine section look edited.",
+          "faultClass": "literal-changed",
+          "file": "src/init/managed.mjs",
+          "find": "  return sha256(block.split('\\n').filter((l) => !/^- (?:This project|`[^`]+\\/`)/.test(l)).join('\\n'));",
+          "replace": "  return sha256(block);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ],
+      "tags": [
+        "init",
+        "agents",
+        "issue-301"
+      ]
+    },
+    {
+      "id": "TG-INIT-RECOMMENDS-THE-PIN-UNLESS-ASKED",
+      "statement": "init writes no package.json pin, .github/dependabot.yml or Renovate rule unless --pin is given: it reports the exact lines instead; --pin writes them as 0.25.0 did; --upgrade never writes them, with or without --pin.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301 (init and hook rough edges)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/init-pin-default.test.mjs",
+        "test/init-pin.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "init writes the pin and the update rule without --pin.",
+          "faultClass": "literal-changed",
+          "file": "src/init/init.mjs",
+          "find": "  const writePins = pin && !upgrade;",
+          "replace": "  const writePins = true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "--upgrade writes the pin and the update rule when --pin is also given.",
+          "faultClass": "literal-changed",
+          "file": "src/init/init.mjs",
+          "find": "  const writePins = pin && !upgrade;",
+          "replace": "  const writePins = pin;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ],
+      "tags": [
+        "init",
+        "pin",
+        "issue-301"
+      ]
+    },
+    {
+      "id": "TG-INIT-REPORTS-A-HOOK-GIT-NEVER-RUNS",
+      "statement": "init and status advice report a pre-push hook file that is not on the clone's active hooks path (core.hooksPath, husky, or a hook there that calls it) as a finding with the fix: a wrapper that keeps the other hooks in .git/hooks when it holds any, core.hooksPath when it holds none; init changes no git config and writes nothing under .git/ unless --activate-hook is given, and never edits a pre-push that already exists there. Works from a linked worktree.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301 (init and hook rough edges)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/init-hook-activation.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A hook in another directory is reported as active.",
+          "faultClass": "guard-removed",
+          "file": "src/init/activation.mjs",
+          "find": "  if (hookDir === dir) return { active: true, how: 'core.hooksPath' };",
+          "replace": "  return { active: true, how: 'core.hooksPath' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Other hooks in .git/hooks are ignored, so core.hooksPath is advised and would disable them.",
+          "faultClass": "guard-removed",
+          "file": "src/init/activation.mjs",
+          "find": "  if (otherHooks(dir).length) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An existing .git/hooks/pre-push is treated as free and the wrapper overwrites it.",
+          "faultClass": "guard-removed",
+          "file": "src/init/activation.mjs",
+          "find": "  if (existsSync(there)) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A hook that calls the tracked file is not recognized, so the wrapper is advised again after it is written.",
+          "faultClass": "literal-changed",
+          "file": "src/init/activation.mjs",
+          "find": "readFileSync(there, 'utf8').includes(hookRel)",
+          "replace": "readFileSync(there, 'utf8').includes('never')",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "init sets core.hooksPath without being asked.",
+          "faultClass": "guard-removed",
+          "file": "src/init/init.mjs",
+          "find": "      if (activate) pendingActivation = { hookFile: hookPath, activation };",
+          "replace": "      pendingActivation = { hookFile: hookPath, activation };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ],
+      "tags": [
+        "init",
+        "hooks",
+        "advice",
+        "issue-301"
+      ]
+    },
+    {
+      "id": "TG-ADVICE-FULL-PROBE-NAMES-A-RUNNING-LINE",
+      "statement": "The advice \"probes every claim on every push\" names only an executable line (continued lines joined) that runs probe with neither --changed nor --claim: never a comment, an echo or a printf that mentions probing, and never a probe whose --changed is on the continuation line.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301 (init and hook rough edges)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/advice-full-probe.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A comment or echo that mentions probing every claim is reported.",
+          "faultClass": "guard-removed",
+          "file": "src/init/managed.mjs",
+          "find": "!/^\\s*(#|echo\\b|printf\\b)/.test(line) && ",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A probe continued over lines is judged by its first line only.",
+          "faultClass": "literal-changed",
+          "file": "src/init/managed.mjs",
+          "find": "      const run = command(i);",
+          "replace": "      const run = line;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ],
+      "tags": [
+        "advice",
+        "hooks",
+        "issue-301"
+      ]
+    },
+    {
       "id": "TG-ANNOTATION-RESULT-IS-NON-OPTIMISTIC",
       "statement": "Annotation authoring validation rejects applied results without complete verified targets, recovery and owned-lock release.",
       "source": {
@@ -16131,8 +16441,8 @@
           "description": "The probe shards drop to three while the plan still has four slices, so a quarter of the claims is never probed.",
           "faultClass": "literal-changed",
           "file": ".github/workflows/ci.yml",
-          "find": "shard: [0, 1, 2, 3] # the partition",
-          "replace": "shard: [0, 1, 2] # the partition",
+          "find": "shard: ${{ fromJSON(needs.scope.outputs.indexes) }} # one per slice",
+          "replace": "shard: [0, 1, 2] # one per slice",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -16408,7 +16718,7 @@
     },
     {
       "id": "TG-SHARDED-COST-GATE-IS-THE-SUM-OF-NORMALIZED-SHARDS",
-      "statement": "The cost ceiling of a sharded full probe is on the sum of every shard's normalized elapsed time, each normalized by the speed that shard measured on its own runner, so it does not depend on the shard count; the slowest shard is reported beside it and every per-shard failure of the unsharded gate still fails.",
+      "statement": "The cost ceiling of a sharded full probe is on the sum of every shard's normalized elapsed time, each normalized by the speed that shard measured on its own runner, per fault (perFaultSeconds times the faults in the merged evidence, so a growing suite passes and a dearer fault fails); the shard count is read from the cost budget, the one place it is written; the slowest shard is reported beside it and every per-shard failure of the unsharded gate still fails.",
       "source": {
         "kind": "manual",
         "ref": "GitHub issue #294"
@@ -16441,7 +16751,7 @@
           "description": "The sum is never compared with the ceiling.",
           "faultClass": "condition-forced",
           "file": ".github/scripts/check-shard-cost.mjs",
-          "find": "if (sumMs > cfg.seconds * 1000) failures.push(",
+          "find": "if (sumMs > budgetMs) failures.push(",
           "replace": "if (false) failures.push(",
           "producedBy": {
             "producer": "human",
@@ -16486,6 +16796,30 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-11-12T00:00:00Z"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "The ceiling is perFaultSeconds without multiplying by the faults, so a growing suite fails again.",
+          "faultClass": "other",
+          "file": ".github/scripts/check-shard-cost.mjs",
+          "find": "const budgetMs = cfg.perFaultSeconds * faults * 1000;",
+          "replace": "const budgetMs = cfg.perFaultSeconds * 1000;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "plan ignores the cost budget's shard count when --shards is absent.",
+          "faultClass": "guard-removed",
+          "file": ".github/scripts/shard-probe.mjs",
+          "find": "values.shards === undefined ? shardCount() : Number(values.shards)",
+          "replace": "Number(values.shards)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
           }
         }
       ]
@@ -17694,316 +18028,6 @@
             "by": "claude"
           }
         }
-      ]
-    },
-    {
-      "id": "TG-INIT-LEAVES-A-HAND-WRITTEN-HOOK-ALONE",
-      "statement": "A pre-push hook file that mentions TestGuard outside a managed block is the project's own: init and init --upgrade write no block there on any path (after an early exit 0 included), report it with the block they would have written, never re-enable a paused probe, and only --force writes the block, outside which nothing is replaced. --upgrade adds no hook block to a file that had none from TestGuard.",
-      "source": {
-        "kind": "spec",
-        "ref": "issue #301 (init and hook rough edges)"
-      },
-      "severity": "high",
-      "producedBy": {
-        "producer": "agent",
-        "by": "claude"
-      },
-      "defendedBy": [
-        "test/init-owned-hooks.test.mjs"
-      ],
-      "faults": [
-        {
-          "id": "F1",
-          "description": "init appends its block beside a hand-written TestGuard hook.",
-          "faultClass": "guard-removed",
-          "file": "src/init/init.mjs",
-          "find": "  if (own && !force) {",
-          "replace": "  if (false) {",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
-          "id": "F2",
-          "description": "A managed block's own lines count as hand-written, so a current hook is never upgraded or recognized.",
-          "faultClass": "guard-removed",
-          "file": "src/init/managed.mjs",
-          "find": "    if (blocks.some((b) => i >= b.start && i <= b.end)) continue;\n    return { line: i + 1, text: lines[i].trim() };",
-          "replace": "    return { line: i + 1, text: lines[i].trim() };",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
-          "id": "F3",
-          "description": "--upgrade adds a block to a hook file TestGuard never wrote in.",
-          "faultClass": "guard-removed",
-          "file": "src/init/init.mjs",
-          "find": "  } else if (!ourBlock && upgrade && !force) {",
-          "replace": "  } else if (false) {",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
-          "id": "F4",
-          "description": "A paused probe's comment does not count as TestGuard being there (the match is case-sensitive).",
-          "faultClass": "literal-changed",
-          "file": "src/init/managed.mjs",
-          "find": "    if (!/testguard/i.test(lines[i])) continue;",
-          "replace": "    if (!/testguard/.test(lines[i])) continue;",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
-          "id": "F5",
-          "description": "The fake testguard the executed-hook tests put on PATH logs no call, so a second probe beside the owner's would go unseen.",
-          "faultClass": "statement-deleted",
-          "file": "test/helpers/owned-repo.mjs",
-          "find": "echo \"$*\" >> \"${log}\"",
-          "replace": "true",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        }
-      ],
-      "tags": [
-        "init",
-        "hooks",
-        "issue-301"
-      ]
-    },
-    {
-      "id": "TG-INIT-LEAVES-AN-EDITED-AGENTS-SECTION-ALONE",
-      "statement": "An AGENTS.md TestGuard section is rewritten by init --upgrade only when it is byte-for-byte a template TestGuard shipped (its sha256 with the per-project bullets removed is in agents-history.json); an edited one, or one nothing can prove unmodified, is left as it is and reported, never rewritten and never given boilerplate.",
-      "source": {
-        "kind": "spec",
-        "ref": "issue #301 (init and hook rough edges)"
-      },
-      "severity": "high",
-      "producedBy": {
-        "producer": "agent",
-        "by": "claude"
-      },
-      "defendedBy": [
-        "test/init-agents-section.test.mjs",
-        "test/init-fast-path.test.mjs"
-      ],
-      "faults": [
-        {
-          "id": "F1",
-          "description": "Every section counts as unmodified, so --upgrade rewrites a customized one.",
-          "faultClass": "guard-removed",
-          "file": "src/init/init.mjs",
-          "find": "    const unmodified = AGENTS_HISTORY.includes(agentsSectionHash(block));",
-          "replace": "    const unmodified = true;",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
-          "id": "F2",
-          "description": "The project bullets stay in the hash, so listing a second project makes a pristine section look edited.",
-          "faultClass": "literal-changed",
-          "file": "src/init/managed.mjs",
-          "find": "  return sha256(block.split('\\n').filter((l) => !/^- (?:This project|`[^`]+\\/`)/.test(l)).join('\\n'));",
-          "replace": "  return sha256(block);",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        }
-      ],
-      "tags": [
-        "init",
-        "agents",
-        "issue-301"
-      ]
-    },
-    {
-      "id": "TG-INIT-RECOMMENDS-THE-PIN-UNLESS-ASKED",
-      "statement": "init writes no package.json pin, .github/dependabot.yml or Renovate rule unless --pin is given: it reports the exact lines instead; --pin writes them as 0.25.0 did; --upgrade never writes them, with or without --pin.",
-      "source": {
-        "kind": "spec",
-        "ref": "issue #301 (init and hook rough edges)"
-      },
-      "severity": "high",
-      "producedBy": {
-        "producer": "agent",
-        "by": "claude"
-      },
-      "defendedBy": [
-        "test/init-pin-default.test.mjs",
-        "test/init-pin.test.mjs"
-      ],
-      "faults": [
-        {
-          "id": "F1",
-          "description": "init writes the pin and the update rule without --pin.",
-          "faultClass": "literal-changed",
-          "file": "src/init/init.mjs",
-          "find": "  const writePins = pin && !upgrade;",
-          "replace": "  const writePins = true;",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
-          "id": "F2",
-          "description": "--upgrade writes the pin and the update rule when --pin is also given.",
-          "faultClass": "literal-changed",
-          "file": "src/init/init.mjs",
-          "find": "  const writePins = pin && !upgrade;",
-          "replace": "  const writePins = pin;",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        }
-      ],
-      "tags": [
-        "init",
-        "pin",
-        "issue-301"
-      ]
-    },
-    {
-      "id": "TG-INIT-REPORTS-A-HOOK-GIT-NEVER-RUNS",
-      "statement": "init and status advice report a pre-push hook file that is not on the clone's active hooks path (core.hooksPath, husky, or a hook there that calls it) as a finding with the fix: a wrapper that keeps the other hooks in .git/hooks when it holds any, core.hooksPath when it holds none; init changes no git config and writes nothing under .git/ unless --activate-hook is given, and never edits a pre-push that already exists there. Works from a linked worktree.",
-      "source": {
-        "kind": "spec",
-        "ref": "issue #301 (init and hook rough edges)"
-      },
-      "severity": "high",
-      "producedBy": {
-        "producer": "agent",
-        "by": "claude"
-      },
-      "defendedBy": [
-        "test/init-hook-activation.test.mjs"
-      ],
-      "faults": [
-        {
-          "id": "F1",
-          "description": "A hook in another directory is reported as active.",
-          "faultClass": "guard-removed",
-          "file": "src/init/activation.mjs",
-          "find": "  if (hookDir === dir) return { active: true, how: 'core.hooksPath' };",
-          "replace": "  return { active: true, how: 'core.hooksPath' };",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
-          "id": "F2",
-          "description": "Other hooks in .git/hooks are ignored, so core.hooksPath is advised and would disable them.",
-          "faultClass": "guard-removed",
-          "file": "src/init/activation.mjs",
-          "find": "  if (otherHooks(dir).length) {",
-          "replace": "  if (false) {",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
-          "id": "F3",
-          "description": "An existing .git/hooks/pre-push is treated as free and the wrapper overwrites it.",
-          "faultClass": "guard-removed",
-          "file": "src/init/activation.mjs",
-          "find": "  if (existsSync(there)) {",
-          "replace": "  if (false) {",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
-          "id": "F4",
-          "description": "A hook that calls the tracked file is not recognized, so the wrapper is advised again after it is written.",
-          "faultClass": "literal-changed",
-          "file": "src/init/activation.mjs",
-          "find": "readFileSync(there, 'utf8').includes(hookRel)",
-          "replace": "readFileSync(there, 'utf8').includes('never')",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
-          "id": "F5",
-          "description": "init sets core.hooksPath without being asked.",
-          "faultClass": "guard-removed",
-          "file": "src/init/init.mjs",
-          "find": "      if (activate) pendingActivation = { hookFile: hookPath, activation };",
-          "replace": "      pendingActivation = { hookFile: hookPath, activation };",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        }
-      ],
-      "tags": [
-        "init",
-        "hooks",
-        "advice",
-        "issue-301"
-      ]
-    },
-    {
-      "id": "TG-ADVICE-FULL-PROBE-NAMES-A-RUNNING-LINE",
-      "statement": "The advice \"probes every claim on every push\" names only an executable line (continued lines joined) that runs probe with neither --changed nor --claim: never a comment, an echo or a printf that mentions probing, and never a probe whose --changed is on the continuation line.",
-      "source": {
-        "kind": "spec",
-        "ref": "issue #301 (init and hook rough edges)"
-      },
-      "severity": "high",
-      "producedBy": {
-        "producer": "agent",
-        "by": "claude"
-      },
-      "defendedBy": [
-        "test/advice-full-probe.test.mjs"
-      ],
-      "faults": [
-        {
-          "id": "F1",
-          "description": "A comment or echo that mentions probing every claim is reported.",
-          "faultClass": "guard-removed",
-          "file": "src/init/managed.mjs",
-          "find": "!/^\\s*(#|echo\\b|printf\\b)/.test(line) && ",
-          "replace": "",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
-          "id": "F2",
-          "description": "A probe continued over lines is judged by its first line only.",
-          "faultClass": "literal-changed",
-          "file": "src/init/managed.mjs",
-          "find": "      const run = command(i);",
-          "replace": "      const run = line;",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        }
-      ],
-      "tags": [
-        "advice",
-        "hooks",
-        "issue-301"
       ]
     }
   ]

@@ -7,13 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- **`init` and `init --upgrade` no longer overwrite what a project owns (#301).** A pre-push hook that mentions TestGuard outside a managed block (runner flags, a probe somebody paused, an early `exit 0`) gets no block: it is reported as "hand-written TestGuard hook: left alone" with the block printed, and only `--force` writes it. An `AGENTS.md` section is rewritten only when its sha256 (project bullets removed, `src/init/templates/agents-history.json`) is a template TestGuard shipped; an edited one is left and reported. `package.json`, `.github/dependabot.yml` and Renovate are recommended, not written, unless `--pin`; `--upgrade` never writes them and adds no hook block where TestGuard wrote none.
-- **A pre-push hook git never runs is a finding, not a footnote (#301).** `init` and the `hook-outdated` advice check `core.hooksPath`, husky and a calling hook in the active directory, from a linked worktree too. With other hooks in `.git/hooks` they print a `.git/hooks/pre-push` wrapper that keeps them; with none, `git config core.hooksPath`. New `--activate-hook` does the recommended one; `init` alone changes no git config and writes nothing under `.git/`. The advice command for it is `testguard init --activate-hook` (spec: `hook-outdated` accepts it).
-- **The "probes every claim on every push" advice no longer fires on a comment, an echo or a probe whose `--changed` is on a continuation line (#301).**
-
 ### Changed
+
+- **The sharded cost gate is per fault, and the shard count has one home (#284, repository only).** The total ceiling is `perFaultSeconds` (3.0) times the faults in the merged evidence, so adding claims passes and a dearer fault fails; the slowest-shard ceiling is the wall-time guard (720 normalized seconds) and its failure says to add a shard. `sharded.shards` in `testguard.cost-budget.json` is read by `shard-probe.mjs plan` and, through its `indexes` output, by the CI matrix.
 
 - **The Playwright gallery's reference runs once, in its own CI job (#305, repository only).** Modes that only compare with the reference run with `--reference-later` and the scorecard job compares them (`corpus/lib/deferred.mjs`): a missing reference, one of another subject or size, a comparison that never arrived, claim halves of `twice` that do not cover every fault exactly once, and a mode that applies with no shard are all failures. Modes that do not apply to a subject are recorded as such from `applies()`.
 

@@ -42,9 +42,11 @@ describe('ci.yml: pull requests probe what changed, everything else probes in fu
   });
 
   it('shards the full probe four ways from one partition computed once, each shard probing exactly its slice', () => {
-    expect(ci.jobs.selfprobe.strategy.matrix.shard).toEqual([0, 1, 2, 3]);
+    // The shard count is written once, in the cost budget: the matrix and the plan both come from it.
+    expect(ci.jobs.selfprobe.strategy.matrix.shard).toBe('${{ fromJSON(needs.scope.outputs.indexes) }}');
     expect(ci.jobs.selfprobe.strategy['fail-fast']).toBe(false);
-    expect(step(ci, 'scope', 'Plan the shards of the full probe').run).toContain('shard-probe.mjs plan --shards 4');
+    expect(step(ci, 'scope', 'Plan the shards of the full probe').run).toContain('shard-probe.mjs plan --weights-from');
+    expect(step(ci, 'scope', 'Plan the shards of the full probe').run).not.toMatch(/--shards/);
     const probe = step(ci, 'selfprobe', "probe this shard's claims");
     expect(probe.env.SHARD_CLAIMS).toBe('${{ fromJSON(needs.scope.outputs.shards)[matrix.shard] }}');
     expect(probe.run).toContain('--claim "$SHARD_CLAIMS"');
