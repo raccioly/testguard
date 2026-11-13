@@ -17759,6 +17759,18 @@
             "producer": "agent",
             "by": "claude"
           }
+        },
+        {
+          "id": "F5",
+          "description": "The fake testguard the executed-hook tests put on PATH logs no call, so a second probe beside the owner's would go unseen.",
+          "faultClass": "statement-deleted",
+          "file": "test/helpers/owned-repo.mjs",
+          "find": "echo \"$*\" >> \"${log}\"",
+          "replace": "true",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
         }
       ],
       "tags": [

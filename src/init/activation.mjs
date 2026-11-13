@@ -82,7 +82,7 @@ export function hookActivation({ root, hookFile }) {
   }
   if (otherHooks(dir).length) {
     const wrapper = wrapperScript(hookRel);
-    return { ...base, kind: 'wrapper', wrapper, short: `add a .git/hooks/pre-push that calls ${hookRel} (core.hooksPath would disable the other hooks there); testguard init --activate-hook writes it`, fix: `.git/hooks holds other hooks (${otherHooks(dir).join(', ')}), so repointing core.hooksPath would silently disable them. Create .git/hooks/pre-push that calls the tracked file (testguard init --activate-hook writes it):\n${wrapper.replace(/^/gm, '  ')}` };
+    return { ...base, kind: 'wrapper', wrapper, short: `add a .git/hooks/pre-push that calls ${hookRel} (core.hooksPath would disable the other hooks there); testguard init --activate-hook writes it`, fix: `.git/hooks holds other hooks (${otherHooks(dir).join(', ')}), so repointing core.hooksPath would silently disable them. Create .git/hooks/pre-push that calls the tracked file (testguard init --activate-hook writes it):\n${wrapper.trimEnd().replace(/^/gm, '  ')}` };
   }
   return { ...base, kind: 'config', short: `git config core.hooksPath ${posix(relative(root, hookDir)) || '.'}; testguard init --activate-hook runs it`, command: `git config core.hooksPath ${posix(relative(root, hookDir)) || '.'}`, fix: `git config core.hooksPath ${posix(relative(root, hookDir)) || '.'} (testguard init --activate-hook runs it)` };
 }
