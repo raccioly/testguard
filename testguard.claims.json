@@ -17801,8 +17801,8 @@
           "description": "The registry is never pruned after the trees are removed.",
           "faultClass": "call-removed",
           "file": "src/clean/orphans.mjs",
-          "find": "    if (!usableGitDir(repo) || now() > deadline) continue;",
-          "replace": "    continue;",
+          "find": "  if (repo && now() <= deadline) {",
+          "replace": "  if (false) {",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -17875,6 +17875,18 @@
           "file": "src/git.mjs",
           "find": "...(dryRun ? ['--dry-run'] : [])",
           "replace": "...[]",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F15",
+          "description": "The runner and temporary-file names this tool creates are not recognised as scratch.",
+          "faultClass": "guard-removed",
+          "file": "src/clean/orphans.mjs",
+          "find": "|(?:run|discovery|vitest-list|vitest-kinds|playwright-kinds)-[0-9a-f]{12,16}\\.json",
+          "replace": "",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18019,7 +18031,7 @@
           "description": "A scratch tree is created with no owner record.",
           "faultClass": "call-removed",
           "file": "src/probe/worktree.mjs",
-          "find": "const dropOwner = recordOwner(scratchBase, dest, { repo: gitCommonDir(repoRoot) });",
+          "find": "const dropOwner = recordOwner(scratchBase, dest);",
           "replace": "const dropOwner = () => {};",
           "producedBy": {
             "producer": "agent",
@@ -18069,6 +18081,18 @@
           "file": "src/cli.mjs",
           "find": "new Set(['probe', 'sweep', 'replay', 'admit', 'clean'])",
           "replace": "new Set(['probe', 'sweep', 'replay', 'admit'])",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F8",
+          "description": "The note about what was cleaned goes through the command's own error stream under --json, and becomes the message of a refusal.",
+          "faultClass": "argument-swapped",
+          "file": "src/cli.mjs",
+          "find": "const say = values.json ? (line) => process.stderr.write(`${line}\\n`) : io.err;",
+          "replace": "const say = io.err;",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

@@ -17,12 +17,12 @@ export const ownersDir = (base) => join(base, 'testguard-locks', 'owners');
  * root that cannot hold a record leaves the tree ownerless (removable only by
  * age), never fails the command.
  */
-export function recordOwner(base, path, { repo, host = hostname() } = {}) {
+export function recordOwner(base, path, { host = hostname() } = {}) {
   const file = join(ownersDir(base), `${basename(path)}.json`);
   try {
     mkdirSync(ownersDir(base), { recursive: true });
     const fd = openSync(file, 'w');
-    try { writeSync(fd, JSON.stringify({ pid: process.pid, host, at: new Date().toISOString(), ...(repo ? { repo } : {}) })); } finally { closeSync(fd); }
+    try { writeSync(fd, JSON.stringify({ pid: process.pid, host, at: new Date().toISOString() })); } finally { closeSync(fd); }
   } catch { return () => {}; }
   return () => { try { rmSync(file, { force: true }); } catch { /* gone or unwritable */ } };
 }

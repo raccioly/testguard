@@ -67,9 +67,9 @@ describe('which scratch trees are orphans', () => {
     const base = root();
     const path = join(base, 'testguard-dddddd');
     mkdirSync(path);
-    const drop = recordOwner(base, path, { host: 'elsewhere', repo: '/some/repo/.git' });
+    const drop = recordOwner(base, path, { host: 'elsewhere' });
     const record = JSON.parse(readFileSync(join(ownersDir(base), 'testguard-dddddd.json')));
-    expect(record).toMatchObject({ pid: process.pid, host: 'elsewhere', repo: '/some/repo/.git' });
+    expect(record).toMatchObject({ pid: process.pid, host: 'elsewhere' });
     // A tree on another machine's record is not this host's to judge, even once its pid is not running here.
     expect(scanOrphans(base, { alive: () => false, host: HOST }).orphans).toEqual([]);
     drop();
@@ -93,15 +93,19 @@ describe('which scratch trees are orphans', () => {
     expect(names(base)).toHaveLength(5);
   });
 
-  it('a child scope and a temporary index are scratch too, by the same rules', () => {
+  it('every other shape this tool creates is scratch too, by the same rules: child scopes, type-check and runner directories, and its random-named files', () => {
     const base = root();
     tree(base, 'testguard-child-ab12Cd', { pid: DEAD, host: HOST });
-    const index = join(base, 'testguard-index-0123456789ab');
-    writeFileSync(index, 'x');
-    age(index, 2 * ORPHAN_AGE_MS);
-    const kinds = cleanOrphans({ base, ...options }).removed.map((r) => r.kind).sort();
-    expect(kinds).toEqual(['scratch-file', 'scratch-tree']);
-    expect(names(base)).toEqual([]);
+    for (const dirName of ['testguard-tc-ab12Cd', 'testguard-node-ab12Cd']) age(tree(base, dirName), 2 * ORPHAN_AGE_MS);
+    const files = ['testguard-index-0123456789ab', 'testguard-run-0123456789ab.json', 'testguard-discovery-0123456789abcdef.json', 'testguard-vitest-list-0123456789abcdef.json', 'testguard-vitest-kinds-0123456789ab.json', 'testguard-playwright-kinds-0123456789ab.json'];
+    for (const name of files) { writeFileSync(join(base, name), 'x'); age(join(base, name), 2 * ORPHAN_AGE_MS); }
+    // A young one is a run in flight; a name that only looks similar is not ours.
+    writeFileSync(join(base, 'testguard-run-fedcba987654.json'), 'x');
+    writeFileSync(join(base, 'testguard-run-0123456789ab.txt'), 'x'); age(join(base, 'testguard-run-0123456789ab.txt'), 2 * ORPHAN_AGE_MS);
+    const kinds = cleanOrphans({ base, ...options }).removed.map((r) => r.kind);
+    expect(kinds.filter((k) => k === 'scratch-tree')).toHaveLength(3);
+    expect(kinds.filter((k) => k === 'scratch-file')).toHaveLength(files.length);
+    expect(names(base)).toEqual(['testguard-run-0123456789ab.txt', 'testguard-run-fedcba987654.json']);
   });
 });
 
@@ -142,18 +146,27 @@ describe('--dry-run, the time cap and failure', () => {
     expect(existsSync(join(ownersDir(base), 'testguard-gggggg.json'))).toBe(true);
   });
 
-  it('the work is bounded: past its budget it stops, says so, and leaves the rest for the next run', () => {
-    const base = root();
-    for (const n of ['hhhhh1', 'hhhhh2', 'hhhhh3', 'hhhhh4']) tree(base, `testguard-${n}`, { pid: DEAD, host: HOST });
+  const four = () => { const base = root(); for (const n of ['hhhhh1', 'hhhhh2', 'hhhhh3', 'hhhhh4']) tree(base, `testguard-${n}`, { pid: DEAD, host: HOST }); return base; };
+
+  it('the scan is bounded: past its budget it stops looking, says so, and a later run finishes', () => {
+    const base = four();
     // Each look at the clock costs 10 ms against a 25 ms budget.
     let t = 0;
     const report = cleanOrphans({ base, budgetMs: 25, now: () => (t += 10), ...options });
     expect(report.capped).toBe(true);
-    expect(report.removed.length).toBeLessThan(4);
     expect(names(base).length).toBe(4 - report.removed.length);
-    // The next run, with time, finishes the job.
+    expect(names(base).length).toBeGreaterThan(0);
     expect(cleanOrphans({ base, ...options }).capped).toBe(false);
     expect(names(base)).toEqual([]);
+  });
+
+  it('the removal is bounded too: the scan finds all four in time, each removal costs 100 ms of a 150 ms budget, and exactly two are removed', () => {
+    const base = four();
+    let t = 0;
+    const report = cleanOrphans({ base, budgetMs: 150, now: () => t, rm: (path, opts) => { rmSync(path, opts); t += 100; }, ...options });
+    expect(report.capped).toBe(true);
+    expect(report.removed).toHaveLength(2);
+    expect(names(base)).toHaveLength(2);
   });
 
   it('the cleanup a command does first never fails it: a bad scratch root is one warning line', () => {
@@ -199,32 +212,37 @@ describe('worktree registrations', () => {
     return dir;
   };
 
-  it('a scratch tree is created with an owner record naming this process and its repository, and cleanup drops the record', () => {
+  it('a scratch tree is created with an owner record naming this process, and cleanup drops the record', () => {
     const dir = repo();
     const base = root();
     const scratch = createScratch({ repoRoot: dir, projectDir: dir, scratchBase: base });
     const file = join(ownersDir(base), `${scratch.root.slice(scratch.root.lastIndexOf('/') + 1)}.json`);
-    expect(JSON.parse(readFileSync(file))).toMatchObject({ pid: process.pid, repo: gitCommonDir(dir) });
+    expect(JSON.parse(readFileSync(file))).toMatchObject({ pid: process.pid });
     expect(scanOrphans(base, { alive: () => true }).orphans).toEqual([]);
     scratch.cleanup();
     expect(existsSync(file)).toBe(false);
   });
 
-  it('removing a dead probe\'s tree also removes its git worktree registration, in the repository its record names', () => {
+  it('removing a dead probe\'s tree also removes its git worktree registration in the repository the command works on, and prunes no other', () => {
     const dir = repo();
     const other = repo();
     const base = root();
+    const foreign = join(base, 'foreign-worktree');
+    git(other, 'worktree', 'add', '--detach', foreign, 'HEAD');
+    rmSync(foreign, { recursive: true, force: true });
     // A probe killed after `git worktree add`: the tree and its registration are left, the record names a dead pid.
     const name = 'testguard-jjjjjj';
     git(dir, 'worktree', 'add', '--detach', join(base, name), 'HEAD');
     mkdirSync(ownersDir(base), { recursive: true });
-    writeFileSync(join(ownersDir(base), `${name}.json`), JSON.stringify({ pid: DEAD, host: HOST, repo: gitCommonDir(dir) }));
+    writeFileSync(join(ownersDir(base), `${name}.json`), JSON.stringify({ pid: DEAD, host: HOST }));
     expect(registered(dir)).toBe(2);
-    const report = cleanOrphans({ base, repoRoot: other, ...options });
+    const report = cleanOrphans({ base, repoRoot: dir, ...options });
     expect(report.removed.map((r) => r.kind)).toEqual(['scratch-tree']);
     expect(report.worktrees).toHaveLength(1);
     expect(existsSync(join(base, name))).toBe(false);
     expect(registered(dir)).toBe(1);
+    // The other repository's dangling registration is its own business: this command was not pointed at it.
+    expect(registered(other)).toBe(2);
   });
 
   it('a dry run reports the registration it would prune and prunes nothing', () => {

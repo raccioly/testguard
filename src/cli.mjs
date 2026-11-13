@@ -427,8 +427,10 @@ async function dispatch(argv, io, seen) {
       if (CLEANS_ON_START.has(command)) {
         let root;
         try { root = repoRoot(projectDir); } catch { root = undefined; }
-        const report = cleanOnStart({ base: scratchRoot(), repoRoot: root, warn: io.err });
-        if (report?.removed.length && !values.quiet) io.err(`cleaned ${report.removed.length} leftover scratch ${report.removed.length === 1 ? 'entry' : 'entries'} from interrupted runs${report.capped ? ' (more remain; testguard clean removes the rest)' : ''}`);
+        // Straight to stderr under --json: the error document of a refusal is built from what the command printed, and must name the refusal, not this note.
+        const say = values.json ? (line) => process.stderr.write(`${line}\n`) : io.err;
+        const report = cleanOnStart({ base: scratchRoot(), repoRoot: root, warn: say });
+        if (report?.removed.length && !values.quiet) say(`cleaned ${report.removed.length} leftover scratch ${report.removed.length === 1 ? 'entry' : 'entries'} from interrupted runs${report.capped ? ' (more remain; testguard clean removes the rest)' : ''}`);
       }
       return handler({ projectDir, file: dirArg, files: positionals.slice(1), values, suppliedOptions, version: VERSION }, io);
     });

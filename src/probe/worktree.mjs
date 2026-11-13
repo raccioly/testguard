@@ -69,7 +69,7 @@ export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase 
   const dest = mkdtempSync(join(scratchBase, 'testguard-'));
   // Who owns this tree, written before anything else so an interrupted probe's
   // tree is provably an orphan for the next run (#311).
-  const dropOwner = recordOwner(scratchBase, dest, { repo: gitCommonDir(repoRoot) });
+  const dropOwner = recordOwner(scratchBase, dest);
   const remove = () => withWorktreeLock(lockDir, () => removeWorktree(repoRoot, dest));
   const unregister = registerCleanup(remove);
   withWorktreeLock(lockDir, () => addWorktree(repoRoot, dest, sha));

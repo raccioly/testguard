@@ -618,8 +618,8 @@ one), and says how much it freed:
   version before 0.26 left) is removed only when it is older than 24 hours;
 - **stale locks**: worker-slot and worktree-allocation lock files whose owner is
   gone;
-- **stale `git worktree` registrations** of this repository, and of the
-  repository an orphaned tree was registered with.
+- **stale `git worktree` registrations** of the repository `[dir]` is in (never
+  another repository's).
 
 A tree whose owner is alive, one another host owns, a young tree with no owner
 record and any directory this tool does not name that way are never touched.

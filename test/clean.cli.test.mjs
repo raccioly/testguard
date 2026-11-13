@@ -114,6 +114,19 @@ describe('a probe cleans before it starts', () => {
     expect(existsSync(tree)).toBe(true);
   });
 
+  it('under --json the note never becomes the message of a refusal\'s error document', async () => {
+    const base = dir('tg-clean-cli-');
+    const tree = orphan(base);
+    const p = project();
+    roots.push(p.root);
+    // sweep with no base to compare against refuses (exit 3) after the cleanup ran.
+    const r = await run(['sweep', p.dir, '--json', '--scratch-dir', base]);
+    expect(r.code).toBe(3);
+    expect(existsSync(tree)).toBe(false);
+    expect(JSON.parse(r.out).error.message).toMatch(/^sweep needs a reference/);
+    expect(r.err).not.toContain('leftover');
+  });
+
   it('--quiet drops the note, not the cleanup', async () => {
     const base = dir('tg-clean-cli-');
     const tree = orphan(base);
