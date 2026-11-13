@@ -368,8 +368,8 @@
           "description": "The registry prune does not wait for the repository's lock.",
           "faultClass": "call-removed",
           "file": "src/clean/orphans.mjs",
-          "find": "withWorktreeLock(worktreeLockDir(repo, base), () => pruneWorktrees(repo), { timeoutMs: lockWaitMs, ...(alive ? { alive } : {}) })",
-          "replace": "pruneWorktrees(repo)",
+          "find": "withWorktreeLock(worktreeLockDir(repo, base), () => {",
+          "replace": "((fn) => fn())(() => {",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
