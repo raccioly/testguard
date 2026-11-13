@@ -103,6 +103,28 @@ export function handWrittenTestguard(text) {
 }
 
 /**
+ * A hand-written TestGuard section in a Markdown file (#320): a heading line (levels 1-6) whose text
+ * names TestGuard, outside a fenced code block, and outside the managed markers. Body text that merely
+ * mentions it is not a section. Returns { line, text } of the first such heading, or null.
+ */
+export function handWrittenTestguardHeading(text) {
+  let fence = null; // { ch, len } of the open fenced block
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const f = /^ {0,3}(`{3,}|~{3,})/.exec(lines[i]);
+    if (f) {
+      if (!fence) fence = { ch: f[1][0], len: f[1].length };
+      else if (f[1][0] === fence.ch && f[1].length >= fence.len && /^ {0,3}[`~]+\s*$/.test(lines[i])) fence = null;
+      continue;
+    }
+    if (fence) continue;
+    const h = /^ {0,3}#{1,6}[ \t]+(.*)$/.exec(lines[i]);
+    if (h && /testguard/i.test(h[1])) return { line: i + 1, text: lines[i].trim() };
+  }
+  return null;
+}
+
+/**
  * The sha256 of an AGENTS.md TestGuard section with its per-project bullets
  * removed, so listing another project does not change it. A section whose hash
  * is in agents-history.json is a template TestGuard shipped, unmodified; any

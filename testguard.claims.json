@@ -3305,6 +3305,89 @@
       ]
     },
     {
+      "id": "TG-INIT-LEAVES-A-HAND-WRITTEN-AGENTS-SECTION",
+      "statement": "init and init --upgrade append no managed TestGuard block to an AGENTS.md that has no markers but already has a hand-written TestGuard section (a Markdown heading, levels 1-6, naming TestGuard in any case, outside a fenced code block): the file stays byte for byte, the section is reported as left as it is, and the block it would have added is printed; body text that only mentions TestGuard is not a section, and --force appends the block once.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #320 (init --upgrade rough edges)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/init-agents-heading.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A hand-written section no longer stops the append: a second block lands beside it.",
+          "faultClass": "guard-removed",
+          "file": "src/init/init.mjs",
+          "find": "} else if (!force && handWrittenTestguardHeading(agents)) {",
+          "replace": "} else if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A heading inside a fenced code block counts as a section.",
+          "faultClass": "guard-removed",
+          "file": "src/init/managed.mjs",
+          "find": "    if (fence) continue;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The heading match is case-sensitive, so a lowercase or uppercase TESTGUARD heading is missed.",
+          "faultClass": "literal-changed",
+          "file": "src/init/managed.mjs",
+          "find": "/testguard/i.test(h[1])",
+          "replace": "/TestGuard/.test(h[1])",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Only level 1-2 headings count as a section.",
+          "faultClass": "literal-changed",
+          "file": "src/init/managed.mjs",
+          "find": "/^ {0,3}#{1,6}[ \\t]+(.*)$/",
+          "replace": "/^ {0,3}#{1,2}[ \\t]+(.*)$/",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "--force no longer appends the block beside a hand-written section.",
+          "faultClass": "guard-removed",
+          "file": "src/init/init.mjs",
+          "find": "} else if (!force && handWrittenTestguardHeading(agents)) {",
+          "replace": "} else if (handWrittenTestguardHeading(agents)) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ],
+      "tags": [
+        "init",
+        "agents-md",
+        "issue-320"
+      ]
+    },
+    {
       "id": "TG-ANNOTATION-RESULT-IS-NON-OPTIMISTIC",
       "statement": "Annotation authoring validation rejects applied results without complete verified targets, recovery and owned-lock release.",
       "source": {
