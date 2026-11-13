@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-11-13
+
+Automated weekly release — everything merged since `v0.26.0`.
+
+### Changed
+
+- fix: five field-report defects in init, claims --check-anchors, --out and runnerCmd (#320) (#321)
+- chore(homebrew): sha256 for v0.26.0 (#319)
+
+
 ### Fixed
 
 - **`init --upgrade` no longer reads message text as a full probe on push (#320).** The advice "probes every claim on every push" now judges each simple command, not each line: an `echo` in an `else` or `then` branch, `testguard probe --help | grep …` and a comment are not runs. A command after `;`, `&&`, `||`, `|` or `&` is judged on its own, so `echo start; testguard probe` is still one.
