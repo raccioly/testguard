@@ -25,6 +25,7 @@ import { concernsCommand } from './commands/concerns.mjs';
 import { originPolicyRequest } from './probe/origin-policy.mjs';
 import { assertionPolicyRequest } from './probe/assertion-policy.mjs';
 import { draftAppendRequest, intentInputRequest } from './scaffold/request.mjs';
+import { CONFIG_COMMANDS, readProjectConfig, applyProjectConfig, configKeys } from './config/project-config.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
 const ISSUES = 'https://github.com/raccioly/testguard/issues';
@@ -82,6 +83,13 @@ probe
                        (kind no-base). A named base that cannot be measured, and any runner failure, still exit 2. skip: not with --json.
   --fail-on-empty-selection  with --changed: a change that selects no claim exits 2 instead of 0 (either way it says so and
                        lists the changed source files no claim covers: absence from the results is not a pass)
+  --explain            with --changed: print which claims the change selects and why (file, glob, discovery, indeterminate),
+                       a count per reason and the changed source files no claim covers; probes and writes nothing. exit 0,
+                       or 2 when the change cannot be measured. --json: run.scope with explain: true
+  --no-config          ignore testguard.config.json (also admit, sweep, replay, claims, status). Without it the file's keys
+                       (runner, runnerCmd, python, nodeModules, typecheck, workers, faultWorkers, confirm, budget) are the
+                       defaults: a flag typed, then TESTGUARD_PYTHON / _NODE_MODULES / _FAULT_WORKERS, win over the file.
+                       An unknown key or wrong type exits 3; an uncommitted file is refused like a dirty defender
   --include-dirty      probe the working tree (a snapshot commit) instead of HEAD; uncommitted tests count
                        (without it, a dirty defender/target with the implicit HEAD is refused: the silent-mismatch trap)
   --verbose            also print each killed fault (default: only unproven ones, plus a count)
@@ -317,6 +325,7 @@ async function dispatch(argv, io, seen) {
         'in-place': { type: 'boolean', default: false },
         'no-escalate': { type: 'boolean', default: false },
         'no-reuse': { type: 'boolean', default: false },
+        'no-config': { type: 'boolean', default: false },
         'allow-empty': { type: 'boolean', default: false },
         quiet: { type: 'boolean', default: false },
         json: { type: 'boolean', default: false },
@@ -383,6 +392,10 @@ async function dispatch(argv, io, seen) {
     io.err('--typecheck is only valid on probe and on claims --check-anchors');
     return 3;
   }
+  if (values['no-config'] && !CONFIG_COMMANDS.includes(command)) {
+    io.err(`--no-config is only valid on ${CONFIG_COMMANDS.join(', ')}: the commands that read testguard.config.json`);
+    return 3;
+  }
   if ((values.annotate || values.apply) && command !== 'claims') {
     io.err('--annotate and --apply are only valid on claims');
     return 3;
@@ -406,7 +419,20 @@ async function dispatch(argv, io, seen) {
     const projectDir = command === 'scaffold' || command === 'admit' ? resolve('.') : resolve(dirArg ?? '.');
     // Checked before the handler writes anything: a scratch directory that cannot be used refuses the run.
     const scratchBase = SCRATCH_COMMANDS.has(command) ? resolveScratchDir(values['scratch-dir']) : undefined;
-    return await withScratchBase(scratchBase, () => handler({ projectDir, file: dirArg, files: positionals.slice(1), values, suppliedOptions, version: VERSION }, io));
+    // testguard.config.json (#301): the project's defaults, under every flag
+    // typed and every environment variable set. Read before the handler, so
+    // each command sees one set of options however they were given.
+    let commandValues = values;
+    let projectConfig;
+    const readsConfig = CONFIG_COMMANDS.includes(command) && !values['no-config'] && !(command === 'claims' && !values['check-anchors']);
+    const loaded = readsConfig ? readProjectConfig(projectDir) : undefined;
+    if (loaded && command === 'status') projectConfig = { ...loaded, keys: configKeys(loaded.config) };
+    else if (loaded) {
+      const applied = applyProjectConfig({ command, values, suppliedOptions, env: process.env, loaded });
+      commandValues = applied.values;
+      projectConfig = { ...loaded, ...applied };
+    }
+    return await withScratchBase(scratchBase, () => handler({ projectDir, file: dirArg, files: positionals.slice(1), values: commandValues, suppliedOptions, version: VERSION, projectConfig }, io));
   } catch (e) {
     seen.error = e;
     if (e instanceof UsageError) {

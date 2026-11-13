@@ -7,6 +7,7 @@ import { discoverDefendersDetailed } from './discover.mjs';
 import { defenderSelection } from './attribution.mjs';
 import { createDependencyHasher } from './dependencies.mjs';
 import { globToRegExp } from '../util/glob.mjs';
+import { CONFIG_FILE } from '../config/config-file.mjs';
 
 /**
  * `probe --changed <ref>`: which claims a change can have affected.
@@ -132,7 +133,11 @@ function recordedDiscovery(projectDir) {
 
 /** Everything one claim's verdicts depend on, as project-relative paths and literals. */
 function dependenciesOf(projectDir, claim, hasher, recorded = new Set()) {
-  const named = new Set();
+  // testguard.config.json (#301) decides how every defender runs, like a
+  // lockfile decides what they run against: a change to it reaches every
+  // claim. Named whether or not it exists, so a deleted one selects too.
+  // Which of those verdicts really moved is reuse's question, not this one.
+  const named = new Set([CONFIG_FILE]);
   const globs = [];
   // A discovered defender set depends on every candidate test file and what
   // they import (#297): an edit there can give the claim a defender. Kept

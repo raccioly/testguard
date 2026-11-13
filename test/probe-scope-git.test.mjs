@@ -118,6 +118,6 @@ describe('the ledger of git call sites on the --changed path', () => {
 
   it('imports exactly the reviewed set of modules, so a new dependency that shells out is a visible edit', () => {
     const imports = [...source.matchAll(/^import .* from '([^']+)';$/gm)].map((m) => m[1]).sort();
-    expect(imports).toEqual(['../gate/changed.mjs', '../git.mjs', '../util/glob.mjs', './attribution.mjs', './dependencies.mjs', './discover.mjs', './runners/shared.mjs', 'node:fs', 'node:path']);
+    expect(imports).toEqual(['../config/config-file.mjs', '../gate/changed.mjs', '../git.mjs', '../util/glob.mjs', './attribution.mjs', './dependencies.mjs', './discover.mjs', './runners/shared.mjs', 'node:fs', 'node:path']);
   });
 });

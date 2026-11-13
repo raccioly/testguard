@@ -41,7 +41,8 @@ function findProjectDir(testAbs, claimsFlag) {
  * Sugar over `probe --claim <ID> --include-dirty`; no second engine, so the
  * decision here can never disagree with the gate.
  */
-export async function admitCommand({ file, values, version }, io) {
+export async function admitCommand({ file, values, version, projectConfig }, io) {
+  const confirmFromConfig = projectConfig?.keys?.includes('confirm') ? projectConfig.file : undefined;
   if (!file || !values.claim?.length) {
     io.err('usage: testguard admit <test-file> --claim <ID> [--fault <FID>] [--confirm <n>] [--json]');
     return 3;
@@ -106,7 +107,7 @@ export async function admitCommand({ file, values, version }, io) {
   }
 
   const provisional = confirmRuns < 3;
-  if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
+  if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns, confirmFromConfig));
   const command = `testguard probe --claim ${claimId} --include-dirty --confirm ${confirmRuns} --no-escalate${claimsSource ? ' --claims <claims-file>' : ''}`;
   const evidence = await probe({
     projectDir,
@@ -166,6 +167,6 @@ export async function admitCommand({ file, values, version }, io) {
     }
     io.out(`evidence: ${outPath} (partial; not the canonical evidence file)`);
   }
-  if (provisional && !values.quiet && !values.json) io.err(PROVISIONAL_WARNING(confirmRuns));
+  if (provisional && !values.quiet && !values.json) io.err(PROVISIONAL_WARNING(confirmRuns, confirmFromConfig));
   return admitted ? 0 : 1;
 }

@@ -3,11 +3,12 @@ import { replay, calibrationFrom, renderReplay } from '../replay/replay.mjs';
 import { writeSpecDoc } from '../evidence/writer.mjs';
 import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
 import { runnerOptions } from './runner-options.mjs';
+import { configUncommitted } from '../config/project-config.mjs';
 
 export const replayPath = (projectDir) => join(projectDir, '.testguard', 'replay.json');
 export const calibrationPath = (projectDir) => join(projectDir, '.testguard', 'calibration.json');
 
-export async function replayCommand({ projectDir, values, version }, io) {
+export async function replayCommand({ projectDir, values, version, projectConfig }, io) {
   const range = values.since ?? values.changed;
   if (!range) {
     io.err('usage: testguard replay [dir] --since <range>   (e.g. --since HEAD~50..HEAD, or a tag)');
@@ -36,6 +37,9 @@ export async function replayCommand({ projectDir, values, version }, io) {
     return 3;
   }
   const commandBudget = createCommandBudget(commandBudgetMs);
+  // Replay has no dirty rule: it runs history, not one tree. An uncommitted
+  // config is still applied (it is how this command runs), and said so.
+  if (projectConfig?.keys.length && configUncommitted(projectDir)) io.err(`warning: ${projectConfig.file} has uncommitted changes; its working-tree version is applied (${projectConfig.keys.join(', ')}). Commit it, or pass --no-config, if that is not what you mean.`);
 
   const doc = await replay({
     projectDir,

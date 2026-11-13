@@ -252,6 +252,7 @@ fingerprint derivation, N-run agreement and interval arithmetic.
 | [`claims`](../../spec/schemas/claims.schema.json) | The claims file, and every scaffold draft. |
 | [`common`](../../spec/schemas/common.schema.json) | Shared definitions: verdict, fault class, severity, provenance, source kind, identifier, paths and dates. |
 | [`concerns`](../../spec/schemas/concerns.schema.json) | The concerns file: scopes a sweep can be aimed by. |
+| [`config`](../../spec/schemas/config.schema.json) | `testguard.config.json`, committed in the project directory: how this project's tests run (runner, custom command, interpreter, `node_modules`, type check, workers, confirm, budget), so a plain `testguard probe` needs no flags. See [Configuration](configuration.md#testguardconfigjson-how-this-projects-tests-run). |
 | [`evidence`](../../spec/schemas/evidence.schema.json) | One run's records: verdict, every run, defenders, signals, input hashes, rank. |
 | [`gate`](../../spec/schemas/gate.schema.json) | Claim coverage of one change. |
 | [`ignore`](../../spec/schemas/ignore.schema.json) | The ignore file: reviewable scoping, every entry with a reason. |

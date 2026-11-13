@@ -190,7 +190,7 @@ export function fanOutPolicy({ faultWorkersSource, cpus } = {}) {
 }
 
 /** Did this run ask for one fault at a time? Then no fan-out may stand in for it. */
-export const serialRequested = (faultWorkers, source) => faultWorkers === 1 && ['serial', 'flag', 'env'].includes(source);
+export const serialRequested = (faultWorkers, source) => faultWorkers === 1 && ['serial', 'flag', 'env', 'config'].includes(source);
 
 /**
  * Probe every fault of every claim. Returns a spec-conformant evidence
@@ -295,6 +295,7 @@ async function measureProbe({
   carry,
   onProgress = () => {},
   typecheck,
+  configFile,
 }, ctx) {
   if (!Number.isSafeInteger(workers) || workers < 1) throw new UsageError('workers must be a positive safe integer');
   if (parseFaultWorkers(faultWorkers) !== faultWorkers) throw new UsageError('fault workers must be a positive safe integer');
@@ -412,14 +413,24 @@ async function measureProbe({
         ...['js', 'mjs', 'cjs', 'ts', 'mts', 'cts'].flatMap((ext) => [`vitest.config.${ext}`, `vite.config.${ext}`, `vitest.workspace.${ext}`, `jest.config.${ext}`, `playwright.config.${ext}`]),
         'vitest.workspace.json',
       ]) watched.add(relative(root, join(projectDir, config)));
+      // testguard.config.json (#301) sets how every defender runs. It is read
+      // from the working tree, so an uncommitted one with the implicit HEAD is
+      // the same silent mismatch as a dirty defender: refused alike.
+      const configPath = configFile === undefined ? undefined : relative(root, join(projectDir, configFile));
+      if (configPath !== undefined) watched.add(configPath);
       const dirty = dirtyPaths.filter((path) => watched.has(path));
       if (dirty.length && !refExplicit && !ignoreDirty) {
         throw new PreconditionError(`${dirty.length} defender/target file${dirty.length === 1 ? ' has' : 's have'} uncommitted changes (${dirty.join(', ')}); worktree mode probes HEAD (${head.slice(0, 7)}), so those changes would be silently ignored. Commit them, run with --include-dirty to probe the working tree, use --in-place, or --ignore-dirty if you mean HEAD as committed.`, 'dirty-tree');
       }
-      if (dirty.length) {
-        ignoredDirty = dirty.sort();
+      // Under --ref or --ignore-dirty the config is the opposite of an ignored
+      // file: its working-tree version IS applied. It gets its own line and
+      // stays out of repo.ignoredDirty, which names what was not probed.
+      if (configPath !== undefined && dirty.includes(configPath)) onWarn(`${configFile} has uncommitted changes; its working-tree version sets how the tests run (it is read like the flags typed with this command), while ${ref === 'HEAD' ? 'HEAD' : ref} (${head.slice(0, 7)}) is probed as committed. Commit it, or pass --no-config, if that is not what you mean.`);
+      const ignored = dirty.filter((path) => path !== configPath);
+      if (ignored.length) {
+        ignoredDirty = ignored.sort();
         ctx.ignoredDirty = ignoredDirty;
-        onWarn(`${dirty.length} defender/target file${dirty.length === 1 ? ' has' : 's have'} uncommitted changes (${dirty.join(', ')}); probing ${ref === 'HEAD' ? `HEAD (${head.slice(0, 7)})` : `${ref} (${head.slice(0, 7)})`} as committed — the working-tree versions are NOT what is being probed. Recorded in the evidence as repo.ignoredDirty.`);
+        onWarn(`${ignored.length} defender/target file${ignored.length === 1 ? ' has' : 's have'} uncommitted changes (${ignored.join(', ')}); probing ${ref === 'HEAD' ? `HEAD (${head.slice(0, 7)})` : `${ref} (${head.slice(0, 7)})`} as committed — the working-tree versions are NOT what is being probed. Recorded in the evidence as repo.ignoredDirty.`);
       }
     }
   }

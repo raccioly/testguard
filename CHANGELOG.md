@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`testguard.config.json`: the project's runner options in one committed file (#301).** `runner`, `runnerCmd`, `python`, `nodeModules`, `typecheck`, `workers`, `faultWorkers`, `confirm` and `budget` are the defaults for the flags of the same meaning in `probe`, `admit`, `sweep`, `replay` and `claims --check-anchors`, so a hook, a CI line or an agent runs plain `testguard probe`. A typed flag, then `TESTGUARD_PYTHON`/`TESTGUARD_NODE_MODULES`/`TESTGUARD_FAULT_WORKERS`, win; `--no-config` ignores the file. An unknown key, a wrong type or malformed JSON exits 3 naming the key; a path outside the repository exits 2. An uncommitted file refuses a probe of the implicit HEAD like a dirty defender. Reuse compares the resolved options, never the file: moving a flag into it keeps every verdict, changing a value re-measures as the flag would. A change to the file selects every claim under `--changed`. `status --json` reports `config`, `probe --json` reports `run.config`; evidence records `faultWorkersSource: config`. Schema: `spec/schemas/config.schema.json`.
+- **`probe --changed <ref> --explain` (#301).** Prints which claims a change selects and why (one line per claim: `file`, `glob`, `discovery` or `indeterminate` with its issue), a count per reason and the changed source files no claim covers, and probes nothing. `--json` gives `run.scope` as a probe would, with `explain: true`. Exit 0, or 2 when the change cannot be measured.
+
 ### Changed
 
 - **The Playwright gallery's reference runs once, in its own CI job (#305, repository only).** Modes that only compare with the reference run with `--reference-later` and the scorecard job compares them (`corpus/lib/deferred.mjs`): a missing reference, one of another subject or size, a comparison that never arrived, claim halves of `twice` that do not cover every fault exactly once, and a mode that applies with no shard are all failures. Modes that do not apply to a subject are recorded as such from `applies()`.

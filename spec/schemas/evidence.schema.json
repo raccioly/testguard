@@ -102,8 +102,8 @@
           "minimum": 2
         },
         "faultWorkersSource": {
-          "description": "How the fault-worker count was chosen: `auto` from the machine (`cpus`), `flag` (`--fault-workers`), `env` (`TESTGUARD_FAULT_WORKERS`), `serial` (`--serial`: one fault at a time), `in-place` (one tree, so one fault at a time). Absent when the caller (the library API) did not say.",
-          "enum": ["auto", "flag", "env", "serial", "in-place"]
+          "description": "How the fault-worker count was chosen: `auto` from the machine (`cpus`), `flag` (`--fault-workers`), `env` (`TESTGUARD_FAULT_WORKERS`), `config` (`faultWorkers` in testguard.config.json), `serial` (`--serial`: one fault at a time), `in-place` (one tree, so one fault at a time). Absent when the caller (the library API) did not say.",
+          "enum": ["auto", "flag", "env", "config", "serial", "in-place"]
         },
         "cpus": {
           "description": "The CPUs available to the process (`os.availableParallelism()`) an automatic fault-worker count was derived from. Present exactly when `faultWorkersSource` is `auto`.",

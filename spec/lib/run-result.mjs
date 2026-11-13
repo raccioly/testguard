@@ -57,6 +57,12 @@ export function runErrors(run) {
   if (requested && scope.probedClaims.some((id) => !requested.has(id))) errors.push({ path: '/run/scope/probedClaims', message: 'every probed claim must have been requested' });
 
   const changed = scope.changed;
+  // --explain (#301): a selection described, never measured.
+  if (scope.explain) {
+    if (measured) errors.push({ path: '/run/id', message: 'an --explain invocation probes nothing: it has no measurement' });
+    if (!changed) errors.push({ path: '/run/scope/explain', message: '--explain explains a --changed selection; this scope has none' });
+    else if (changed.outcome === 'determined' && run.exitCode !== 0) errors.push({ path: '/run/exitCode', message: 'an explained determined selection exits 0: an explanation judges nothing' });
+  }
   if (!changed) {
     if (scope.selectedCount !== undefined) errors.push({ path: '/run/scope/selectedCount', message: 'selectedCount belongs to a --changed selection' });
     if (!requested) errors.push({ path: '/run/scope', message: 'a scope names a --claim request or a --changed selection; this one names neither' });
@@ -82,7 +88,7 @@ export function runErrors(run) {
     if (scope.selectedCount !== expected) errors.push({ path: '/run/scope/selectedCount', message: `selectedCount (${scope.selectedCount}) must be the matched claims left after --claim (${expected})` });
     if (measured && scope.selectedCount !== scope.probedCount) errors.push({ path: '/run/scope/probedCount', message: 'every selected claim is probed' });
     if (!measured) {
-      if (scope.selectedCount !== 0) errors.push({ path: '/run/id', message: 'a run with claims selected measures them: it has an id and evidence' });
+      if (scope.selectedCount !== 0 && !scope.explain) errors.push({ path: '/run/id', message: 'a run with claims selected measures them: it has an id and evidence' });
       if (run.exitCode === 1) errors.push({ path: '/run/exitCode', message: 'an empty selection exits 0, or 2 under --fail-on-empty-selection; it cannot find anything unproven' });
     }
   }

@@ -29,7 +29,7 @@ export const sweepEvidencePath = (projectDir) => join(projectDir, '.testguard', 
  * and folding one into the other would corrupt what `status` and `baseline`
  * read.
  */
-export async function sweepCommand({ projectDir, values, version }, io) {
+export async function sweepCommand({ projectDir, values, version, projectConfig }, io) {
   const mode = values['save-paths'] ? 'save-paths' : 'changed';
   const confirmRuns = Number(values.confirm);
   const budgetMs = Number(values.budget);
@@ -95,6 +95,7 @@ export async function sweepCommand({ projectDir, values, version }, io) {
       runnerName: values.runner,
       nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
       python: runner.python,
+      ...(projectConfig ? { configFile: projectConfig.file } : {}),
       toolVersion: version,
       claimsPath: values.claims ? resolve(values.claims) : undefined,
       ignorePath: values.ignore ? resolve(values.ignore) : undefined,
