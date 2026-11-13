@@ -3234,10 +3234,10 @@
     },
     {
       "id": "TG-ADVICE-FULL-PROBE-NAMES-A-RUNNING-LINE",
-      "statement": "The advice \"probes every claim on every push\" names only an executable line (continued lines joined) that runs probe with neither --changed nor --claim: never a comment, an echo or a printf that mentions probing, and never a probe whose --changed is on the continuation line.",
+      "statement": "The advice \"probes every claim on every push\" names only a simple command (continued lines joined, split quote-aware at ; & | and newlines, comments dropped) that runs probe with neither --changed nor --claim: never a comment, an echo, a printf or a colon that mentions probing, never `probe --help`, and never a probe whose --changed is on the continuation line.",
       "source": {
         "kind": "spec",
-        "ref": "issue #301 (init and hook rough edges)"
+        "ref": "issues #301 and #320 (init and hook rough edges)"
       },
       "severity": "high",
       "producedBy": {
@@ -3253,8 +3253,8 @@
           "description": "A comment or echo that mentions probing every claim is reported.",
           "faultClass": "guard-removed",
           "file": "src/init/managed.mjs",
-          "find": "!/^\\s*(#|echo\\b|printf\\b)/.test(line) && ",
-          "replace": "",
+          "find": "/^(?:echo|printf|:)(?=\\s|$)/.test(s)",
+          "replace": "false",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -3271,12 +3271,37 @@
             "producer": "agent",
             "by": "claude"
           }
+        },
+        {
+          "id": "F3",
+          "description": "A probe --help check is reported as a run.",
+          "faultClass": "guard-removed",
+          "file": "src/init/managed.mjs",
+          "find": " && !/(?:^|\\s)(?:--help|-h)(?=\\s|$)/.test(s)",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Message text after an else/then keyword is judged as a command (keywords are not stripped).",
+          "faultClass": "guard-removed",
+          "file": "src/init/managed.mjs",
+          "find": "s = s.replace(SHELL_OPENER, '').replace(SHELL_ASSIGNMENT, '');",
+          "replace": "s = s.replace(SHELL_ASSIGNMENT, '');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
         }
       ],
       "tags": [
         "advice",
         "hooks",
-        "issue-301"
+        "issue-301",
+        "issue-320"
       ]
     },
     {

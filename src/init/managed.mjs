@@ -325,6 +325,46 @@ function candidateFiles(root) {
 }
 
 /**
+ * The simple commands of a shell snippet (#320): split at an unquoted `;`, `&`, `|` or newline,
+ * quote-aware (single, double, backslash), an unquoted `#` at the start of a word begins a
+ * comment. Not a shell grammar: enough to tell the words a command runs from the words a
+ * message prints.
+ */
+export function simpleCommands(text) {
+  const out = [];
+  let cur = '';
+  let quote = '';
+  const flush = () => { if (cur.trim()) out.push(cur); cur = ''; };
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      cur += c;
+      if (c === '\\' && quote === '"' && i + 1 < text.length) cur += text[++i];
+      else if (c === quote) quote = '';
+    } else if (c === '\\' && i + 1 < text.length) { cur += c + text[++i]; }
+    else if (c === '"' || c === "'") { quote = c; cur += c; }
+    else if (c === '#' && (cur === '' || /\s$/.test(cur))) { while (i + 1 < text.length && text[i + 1] !== '\n') i++; }
+    else if (c === ';' || c === '|' || c === '\n') flush();
+    else if (c === '&') { if (/[<>]$/.test(cur) || text[i + 1] === '>') cur += c; else flush(); } // `>&2` and `&>` redirect; `&`, `&&` separate
+    else cur += c;
+  }
+  flush();
+  return out;
+}
+
+const SHELL_OPENER = /^\s*(?:(?:if|then|else|elif|do|while|until)(?=\s|$)|![ \t]|[{(])/;
+const SHELL_ASSIGNMENT = /^\s*[A-Za-z_]\w*=(?:"(?:[^"\\]|\\.)*"|'[^']*'|\S*)(?=\s|$)/;
+
+/** One simple command: does it run probe over every claim? Keywords and `VAR=x` prefixes are not the command. */
+export function runsFullProbe(segment) {
+  let s = segment;
+  for (let prev = ''; prev !== s;) { prev = s; s = s.replace(SHELL_OPENER, '').replace(SHELL_ASSIGNMENT, ''); }
+  s = s.trim();
+  if (!s || /^(?:echo|printf|:)(?=\s|$)/.test(s)) return false;
+  return /\bprobe\b/.test(s) && !/(?:^|\s)(?:--help|-h)(?=\s|$)/.test(s) && !/--changed\b/.test(s) && !/--claim\b/.test(s);
+}
+
+/**
  * Hooks and CI files that run TestGuard the slow or stale way: `--serial`,
  * a full probe on every push, a pinned version older than this one, or a
  * managed block from an older template. One finding per line, with whether
@@ -360,9 +400,10 @@ export function scanInstalled({ root, toolVersion }) {
       if (pin && olderThan(pin[1], toolVersion)) findings.push({ ...at, reason: 'pinned-old', detail: `pins testguard-cli@${pin[1]}; ${toolVersion} is installed here` });
       const action = /raccioly\/testguard@(v?\d+\.\d+\.\d+)/.exec(line);
       if (action && olderThan(action[1], toolVersion)) findings.push({ ...at, reason: 'pinned-old', detail: `uses the action at ${action[1]}; ${toolVersion} is installed here` });
-      // Only a line that RUNS probe, with neither --changed nor --claim: not a comment, not an echo.
+      // Only a command that RUNS probe, with neither --changed nor --claim: not a comment, not an echo,
+      // not `probe --help`. Judged per simple command, not per line (#320).
       const run = command(i);
-      if (prePush && !/^\s*(#|echo\b|printf\b)/.test(line) && /\bprobe\b/.test(run) && !/--changed\b/.test(run) && !/--claim\b/.test(run)) findings.push({ ...at, reason: 'full-probe-on-push', detail: 'probes every claim on every push' });
+      if (prePush && simpleCommands(run).some(runsFullProbe)) findings.push({ ...at, reason: 'full-probe-on-push', detail: 'probes every claim on every push' });
     });
     // pre-commit: a `rev:` under the TestGuard repo.
     if (file === '.pre-commit-config.yaml') {

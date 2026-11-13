@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { scanInstalled } from '../src/init/managed.mjs';
+import { scanInstalled, simpleCommands, runsFullProbe } from '../src/init/managed.mjs';
 import { V, cfg, devNull, hermeticRepos, put, repo } from './helpers/owned-repo.mjs';
 
 const made = hermeticRepos();
@@ -25,6 +25,43 @@ describe('"probes every claim on every push" names only a line that runs probe w
   it('a command that runs probe with neither flag is still one, also when continued', () => {
     expect(scan('#!/bin/sh\ntestguard probe\n')).toEqual([expect.objectContaining({ line: 2 })]);
     expect(scan('#!/bin/sh\nnpx testguard probe . \\\n  --confirm 3\n')).toEqual([expect.objectContaining({ line: 2 })]);
+  });
+});
+
+describe('a command is judged, not a line: message text and --help are not runs (#320)', () => {
+  const scan = (hook) => {
+    const dir = repo(made);
+    put(dir, '.husky/pre-push', hook, 0o755);
+    cfg(dir, 'core.hooksPath', '.husky/_');
+    return scanInstalled({ root: dir, toolVersion: V }).filter((f) => f.reason === 'full-probe-on-push');
+  };
+  it('an else-branch echo, a --help check and an echo inside an if-body are not findings', () => {
+    expect(scan('#!/bin/sh\nif command -v testguard >/dev/null; then :\nelse echo "  ! testguard not installed: probe skipped" >&2; exit 0; fi\n')).toEqual([]);
+    expect(scan("#!/bin/sh\nif testguard probe --help | grep -q -- '--no-config'; then x=1; fi\n")).toEqual([]);
+    expect(scan('#!/bin/sh\nif [ $? -ne 0 ]; then\n  echo "testguard probe did not complete; push allowed" >&2\nfi\n')).toEqual([]);
+    expect(scan('#!/bin/sh\ntestguard probe --changed auto --runner-cmd "x"  # not testguard probe every claim\n')).toEqual([]);
+  });
+  it('a probe through a wrapper, a prefix, a shell -c, after an echo, or beside --help is still a finding', () => {
+    for (const hook of [
+      'TESTGUARD_RUN=1 "$@" probe --quiet',
+      'testguard probe',
+      'echo start; testguard probe',
+      'testguard probe --help; testguard probe',
+      'sh -c "testguard probe"',
+      'if ! testguard probe; then exit 1; fi',
+      'npx testguard-cli probe && echo ok',
+    ]) expect(scan(`#!/bin/sh\n${hook}\n`), hook).toEqual([expect.objectContaining({ line: 2 })]);
+  });
+  it('simpleCommands splits at unquoted separators only and drops comments', () => {
+    expect(simpleCommands('a "b;c" \'d|e\'; f && g | h & i\nj # k; l')).toEqual(['a "b;c" \'d|e\'', ' f ', ' g ', ' h ', ' i', 'j ']);
+    expect(simpleCommands('x >&2; y 2>&1')).toEqual(['x >&2', ' y 2>&1']);
+    expect(simpleCommands('echo a\\;b')).toEqual(['echo a\\;b']);
+  });
+  it('runsFullProbe strips keywords and assignments, and refuses echo, printf, colon, help and scoped runs', () => {
+    expect(runsFullProbe('  then testguard probe')).toBe(true);
+    expect(runsFullProbe('FOO="a b" BAR=1 testguard probe')).toBe(true);
+    expect(runsFullProbe('FOO="testguard probe"')).toBe(false);
+    for (const s of ['else echo "probe"', 'printf "probe"', ': probe', 'testguard probe -h', 'testguard probe --claim A']) expect(runsFullProbe(s), s).toBe(false);
   });
 });
 
