@@ -13341,7 +13341,9 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/external-claims.test.mjs"
+        "test/external-claims.test.mjs",
+        "test/external-claims-own.test.mjs",
+        "test/external-claims-serve.test.mjs"
       ],
       "faults": [
         {
@@ -13354,7 +13356,10 @@
           "producedBy": {
             "producer": "agent",
             "by": "claude"
-          }
+          },
+          "defendedBy": [
+            "test/external-claims.test.mjs"
+          ]
         },
         {
           "id": "F2",
@@ -13366,7 +13371,10 @@
           "producedBy": {
             "producer": "agent",
             "by": "claude"
-          }
+          },
+          "defendedBy": [
+            "test/external-claims-own.test.mjs"
+          ]
         },
         {
           "id": "F3",
@@ -13378,7 +13386,10 @@
           "producedBy": {
             "producer": "agent",
             "by": "claude"
-          }
+          },
+          "defendedBy": [
+            "test/external-claims-serve.test.mjs"
+          ]
         },
         {
           "id": "F4",
@@ -13390,7 +13401,10 @@
           "producedBy": {
             "producer": "agent",
             "by": "claude"
-          }
+          },
+          "defendedBy": [
+            "test/external-claims-serve.test.mjs"
+          ]
         }
       ]
     },
