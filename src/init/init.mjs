@@ -4,11 +4,14 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { PreconditionError } from '../probe/worktree.mjs';
 import { PACKAGE, pinDevDependency, dependabotRule, renovateRule, RENOVATE_JSON, RENOVATE_OTHER } from './pin.mjs';
-import { TEMPLATE_VERSION, prePushBlock, prePushBlockName, githubWorkflow, gitlabCi, installStep, markSkill, skillState, parseManagedBlocks, replaceManagedBlock, scanInstalled, renderFinding } from './managed.mjs';
+import { hookActivation, activateHook } from './activation.mjs';
+import { TEMPLATE_VERSION, handWrittenTestguard, agentsSectionHash, prePushBlock, prePushBlockName, githubWorkflow, gitlabCi, installStep, markSkill, skillState, parseManagedBlocks, replaceManagedBlock, scanInstalled, renderFinding } from './managed.mjs';
 
 const TEMPLATES = join(dirname(fileURLToPath(import.meta.url)), 'templates');
 /** The hash of every skill template shipped before template markers: an installed copy matching one is unmodified. */
 const SKILL_HISTORY = JSON.parse(readFileSync(join(TEMPLATES, 'skill-history.json'), 'utf8')).sha256;
+/** The hash of every AGENTS.md section TestGuard shipped: a section matching one is unmodified (#301). */
+export const AGENTS_HISTORY = JSON.parse(readFileSync(join(TEMPLATES, 'agents-history.json'), 'utf8')).sha256;
 const AGENTS_BEGIN = `<!-- testguard:begin template=${TEMPLATE_VERSION} -->`;
 /** Every release's opening marker: before #270 it carried no template number (template 1). */
 const AGENTS_BEGIN_RE = /<!-- testguard:begin(?: template=(\d+))? -->/;
@@ -64,10 +67,12 @@ export function hookCommand(dir) {
   return [...candidates.map((c) => `${c} brief --text${arg} 2>/dev/null`), onPath, 'true'].join(' || ');
 }
 
-function agentsBlock(entries) {
-  const lines = entries.map((dir) => (dir === '.'
-    ? '- This project: claims in `testguard.claims.json`; run `testguard status --json` and follow `next`.'
-    : `- \`${dir}/\`: claims in \`${dir}/testguard.claims.json\`; run \`testguard status --json ${dir}\` and follow \`next\`.`));
+const entryLine = (dir) => (dir === '.'
+  ? '- This project: claims in `testguard.claims.json`; run `testguard status --json` and follow `next`.'
+  : `- \`${dir}/\`: claims in \`${dir}/testguard.claims.json\`; run \`testguard status --json ${dir}\` and follow \`next\`.`);
+
+export function agentsBlock(entries) {
+  const lines = entries.map(entryLine);
   return `${AGENTS_BEGIN}
 ## TestGuard
 
@@ -227,7 +232,7 @@ exit 0
 };
 const CI_PLATFORMS = ['github', 'gitlab'];
 
-export function initProject({ projectDir, force = false, here = false, ciEvidence, mcp = false, upgrade = false, ci, toolVersion = '0.0.0' }) {
+export function initProject({ projectDir, force = false, here = false, ciEvidence, mcp = false, upgrade = false, pin = false, activateHook: activate = false, ci, toolVersion = '0.0.0' }) {
   if (ciEvidence !== undefined && !CI_PLATFORMS.includes(ciEvidence)) throw new InitUsageError(`--ci-evidence must be github or gitlab, not ${JSON.stringify(ciEvidence)}`);
   if (ci !== undefined && !CI_PLATFORMS.includes(ci)) throw new InitUsageError(`--ci must be github or gitlab, not ${JSON.stringify(ci)}`);
   projectDir = realpathSync(resolve(projectDir));
@@ -240,6 +245,8 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
   let mcpConfig;
   const skipped = [];
   const warnings = [];
+  // What init recommends and does not do itself: { title, lines } (#301). `pin` writes them; --upgrade never does.
+  const recommendations = [];
   const writes = [];
   const rel = (p) => relative(agentRoot, p).split(sep).join('/');
   const note = (p) => { if (isGitIgnored(ignoreRoot, p)) warnings.push(`${rel(p)} is ignored by .gitignore — it was written, but git will not track it and agents in a fresh clone will never see it; unignore it or move it`); };
@@ -310,12 +317,17 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
     const entries = [...block.matchAll(/^- (?:This project|`([^`]+)\/`)/gm)].map((m) => m[1] ?? '.');
     const legacyBlock = entries.length === 0; // a pre-0.6 section with no project list
     const template = Number(beginMatch[1] ?? 1);
-    if (entries.includes(dir) && template < TEMPLATE_VERSION && upgrade) {
+    // Only a section that is byte-for-byte a template TestGuard shipped is TestGuard's to rewrite.
+    // One that is not (edited, or from a release that left no proof) is the project's: left alone and reported (#301).
+    const unmodified = AGENTS_HISTORY.includes(agentsSectionHash(block));
+    if (!unmodified) {
+      skipped.push(`AGENTS.md: the TestGuard section was edited by hand, so it is left as it is${entries.includes(dir) ? '' : ` (it does not list ${dir === '.' ? 'this project' : dir}; add the bullet yourself: ${entryLine(dir)})`}; --upgrade rewrites only an unmodified one`);
+    } else if (entries.includes(dir) && template < TEMPLATE_VERSION && upgrade) {
       write(agentsPath, agents.slice(0, begin) + agentsBlock(entries) + agents.slice(end + AGENTS_END.length));
       done.push(`AGENTS.md: TestGuard section upgraded to template ${TEMPLATE_VERSION}`);
     } else if (entries.includes(dir)) {
       skipped.push(`AGENTS.md already has the TestGuard section for ${dir === '.' ? 'this project' : dir}`);
-      if (template < TEMPLATE_VERSION) outdated.push(`AGENTS.md: the TestGuard section is template ${template} — testguard init --upgrade rewrites it`);
+      if (template < TEMPLATE_VERSION) outdated.push(`AGENTS.md: the TestGuard section is template ${template}, unmodified — testguard init --upgrade rewrites it`);
     } else {
       write(agentsPath, agents.slice(0, begin) + agentsBlock([...entries, dir]) + agents.slice(end + AGENTS_END.length));
       done.push(legacyBlock ? `AGENTS.md: TestGuard section rewritten to list ${dir}` : `AGENTS.md: TestGuard section now lists ${dir}`);
@@ -355,6 +367,8 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
 
   // ---- the fast path: a pre-push hook, and CI on request (#270) ----
   const handled = new Set(); // files whose TestGuard block this run judged itself
+  const inactiveReported = new Set(); // hook files whose inactivity this run reports itself
+  let pendingActivation; // --activate-hook: done after the files are written, since it reads the hook file
   // A whole file TestGuard owns (CI): written, or rewritten where nobody edited it.
   const refresh = (path, text, label, name) => {
     handled.add(rel(path));
@@ -378,7 +392,17 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
   const ourBlock = parseManagedBlocks(existingHook).find((b) => b.name === blockName);
   handled.add(rel(hookPath));
   const hookLabel = `${rel(hookPath)}: pre-push → probe --changed auto${dir === '.' ? '' : ` in ${dir}`} (the full probe is the nightly job)`;
-  if (!ourBlock) {
+  // A hook that already mentions TestGuard outside a managed block is the project's own: a hand-written
+  // probe, runner flags, a probe somebody paused. No block goes beside it, after an early `exit 0`
+  // included; the block is printed for the owner to adopt. Only --force writes one (#301).
+  const own = handWrittenTestguard(existingHook);
+  if (own && !force) {
+    outdated.push(`${rel(hookPath)}:${own.line}: hand-written TestGuard hook: left alone (it mentions TestGuard outside a managed block; no block is written beside it, and a paused probe is never re-enabled) — adopt the block below by hand, or pass --force to add it`);
+    recommendations.push({ title: `${rel(hookPath)}: the managed pre-push block init would have written`, lines: block.split('\n') });
+  } else if (!ourBlock && upgrade && !force) {
+    // --upgrade refreshes what TestGuard wrote; it never adds a kind of file the project did not have from it.
+    skipped.push(`${rel(hookPath)} has no TestGuard block, so --upgrade adds none (testguard init without --upgrade does)`);
+  } else if (!ourBlock) {
     write(hookPath, (existingHook ? existingHook.replace(/\s*$/, '\n') : '#!/bin/sh\n') + block + '\n', { mode: 0o755 });
     done.push(hookLabel);
   } else if (existingHook.includes(block)) {
@@ -391,9 +415,19 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
   } else {
     outdated.push(`${rel(hookPath)}: the TestGuard block is template ${ourBlock.template}, unmodified — testguard init --upgrade rewrites it`);
   }
-  if (!husky) {
-    const hooksPath = spawnSync('git', ['config', '--get', 'core.hooksPath'], { cwd: agentRoot, encoding: 'utf8' }).stdout?.trim();
-    if (hooksPath !== '.githooks') notes.push('Enable the pre-push hook once per clone: git config core.hooksPath .githooks (or call .githooks/pre-push from your hook manager).');
+  // Is that hook file one git will run? A file nobody's git runs is a finding with the fix, not a footnote (#301).
+  // init changes no git config and writes nothing under .git/ unless --activate-hook says so; the hook
+  // file is written first, so the check below sees it.
+  if (ourBlock || writes.some((w) => w.path === hookPath)) {
+    const activation = hookActivation({ root: gitRoot(agentRoot) ?? agentRoot, hookFile: hookPath });
+    if (!activation.active) {
+      inactiveReported.add(rel(hookPath));
+      outdated.push(`${rel(hookPath)}:1: is not on this clone's active hooks path, so it never runs on push — ${activation.short}`);
+      recommendations.push({ title: `${rel(hookPath)} is not on the active hooks path: ${activation.kind === 'wrapper' ? 'keep the other hooks, call this one' : 'how to turn it on'}`, lines: activation.fix.split('\n') });
+      if (activate) pendingActivation = { hookFile: hookPath, activation };
+    } else if (activate) {
+      skipped.push(`${rel(hookPath)} is already on the active hooks path (${activation.how})`);
+    }
   }
   if (ci !== undefined) {
     const install = installStep(projectDir);
@@ -406,14 +440,25 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
     }
   }
   // ---- the version that runs: pinned, and raised only by a pull request (#293) ----
+  // Reported, not written (#301): four of seven projects reverted these writes (two forbid them in their own
+  // rules, and the pin leaves the lockfile out of date). --pin writes them as 0.25.0 did; --upgrade never
+  // writes a file kind the project did not already have from TestGuard, --pin or not.
+  const writePins = pin && !upgrade;
+  const recommend = (title, lines) => recommendations.push({ title, lines });
   const pkgPath = join(projectDir, 'package.json');
+  if (pin && upgrade) notes.push('--pin was ignored: --upgrade never writes package.json or an update rule; run testguard init --pin without --upgrade for those.');
   if (existsSync(pkgPath)) {
     let pinned;
     try { pinned = pinDevDependency(readFileSync(pkgPath, 'utf8'), toolVersion); }
     catch (e) { warnings.push(`${rel(pkgPath)} could not be read as JSON (${e.message}); add "${PACKAGE}": "${toolVersion}" to devDependencies yourself`); }
+    const lockfileNote = "The lockfile is now out of date, and npm ci / --frozen-lockfile will fail until you run your package manager's install (npm install, pnpm install, …) and commit the updated lockfile with it. Where npm enforces min-release-age, installing a release that new needs that setting overridden for one install, or a wait until the release is old enough";
     if (pinned?.action === 'added') {
-      write(pkgPath, pinned.text, { checkIgnored: false });
-      done.push(`${rel(pkgPath)}: devDependency ${PACKAGE} pinned to exactly ${toolVersion}. The lockfile is now out of date, and npm ci / --frozen-lockfile will fail until you run your package manager's install (npm install, pnpm install, …) and commit the updated lockfile with it. Where npm enforces min-release-age, installing a release that new needs that setting overridden for one install, or a wait until the release is old enough`);
+      if (writePins) {
+        write(pkgPath, pinned.text, { checkIgnored: false });
+        done.push(`${rel(pkgPath)}: devDependency ${PACKAGE} pinned to exactly ${toolVersion}. ${lockfileNote}`);
+      } else {
+        recommend(`${rel(pkgPath)}: pin the TestGuard that hooks and CI run (testguard init --pin writes it)`, [`"devDependencies": { "${PACKAGE}": "${toolVersion}" }`, 'Then run your package manager\'s install and commit the lockfile with it: the pin leaves the lockfile out of date until you do.']);
+      }
     } else if (pinned?.action === 'exact') skipped.push(`${rel(pkgPath)} already pins ${PACKAGE} ${pinned.spec}`);
     else if (pinned?.action === 'floating') outdated.push(`${rel(pkgPath)}: ${PACKAGE} "${pinned.spec}" is a floating version, so a new release runs here unreviewed — pin an exact version ("${toolVersion}") and let Dependabot/Renovate raise it`);
     else if (pinned?.action === 'range') notes.push(`${rel(pkgPath)} asks for ${PACKAGE} "${pinned.spec}", a range: the lockfile pins it, a fresh install does not. An exact version ("${toolVersion}") makes every install run the same TestGuard.`);
@@ -421,24 +466,28 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
     const repoRoot = gitRoot(agentRoot) ?? agentRoot;
     const renovate = RENOVATE_JSON.find((f) => existsSync(join(repoRoot, f)));
     const renovateOther = RENOVATE_OTHER.find((f) => existsSync(join(repoRoot, f)));
+    const renovateRuleText = `{ "matchPackageNames": ["${PACKAGE}"], "groupName": "testguard", "rangeStrategy": "pin" }`;
     if (renovate) {
       const path = join(repoRoot, renovate);
       let rule;
       try { rule = renovateRule(readFileSync(path, 'utf8')); } catch { rule = { action: 'manual' }; }
-      if (rule.action === 'extended') { write(path, rule.text); done.push(`${renovate}: a packageRules entry groups and pins ${PACKAGE}, so its updates arrive as pull requests`); }
+      if (rule.action === 'extended' && writePins) { write(path, rule.text); done.push(`${renovate}: a packageRules entry groups and pins ${PACKAGE}, so its updates arrive as pull requests`); }
+      else if (rule.action === 'extended') recommend(`${renovate}: let ${PACKAGE} updates arrive as pull requests (testguard init --pin writes it)`, [`add to packageRules: ${renovateRuleText}`]);
       else if (rule.action === 'present') skipped.push(`${renovate} already has a rule for ${PACKAGE}`);
-      else notes.push(`${renovate} could not be read as JSON; add to packageRules: { "matchPackageNames": ["${PACKAGE}"], "groupName": "testguard", "rangeStrategy": "pin" }`);
+      else notes.push(`${renovate} could not be read as JSON; add to packageRules: ${renovateRuleText}`);
     } else if (renovateOther) {
       notes.push(`${renovateOther}: add to packageRules { matchPackageNames: ['${PACKAGE}'], groupName: 'testguard', rangeStrategy: 'pin' } so ${PACKAGE} updates arrive as pull requests (init does not edit JSON5)`);
     } else if (ci === 'gitlab') {
-      notes.push(`Pin updates: GitLab has no Dependabot; with Renovate, add a packageRules entry { "matchPackageNames": ["${PACKAGE}"], "groupName": "testguard", "rangeStrategy": "pin" } so ${PACKAGE} updates arrive as merge requests.`);
+      notes.push(`Pin updates: GitLab has no Dependabot; with Renovate, add a packageRules entry ${renovateRuleText} so ${PACKAGE} updates arrive as merge requests.`);
     } else {
       const path = join(repoRoot, '.github', 'dependabot.yml');
       const ymlPath = join(repoRoot, '.github', 'dependabot.yaml');
       const existingPath = existsSync(path) ? path : existsSync(ymlPath) ? ymlPath : undefined;
-      const rule = dependabotRule(existingPath ? readFileSync(existingPath, 'utf8') : undefined, relative(repoRoot, projectDir).split(sep).join('/') || '.');
+      const existingText = existingPath ? readFileSync(existingPath, 'utf8') : undefined;
+      const rule = dependabotRule(existingText, relative(repoRoot, projectDir).split(sep).join('/') || '.');
       const shown = relative(agentRoot, existingPath ?? path).split(sep).join('/');
-      if (rule.action === 'created' || rule.action === 'appended') { write(existingPath ?? path, rule.text); done.push(`${shown}: ${rule.action === 'created' ? 'created with' : 'added'} an npm rule for ${PACKAGE}, so its updates arrive as pull requests your CI gates`); }
+      if ((rule.action === 'created' || rule.action === 'appended') && writePins) { write(existingPath ?? path, rule.text); done.push(`${shown}: ${rule.action === 'created' ? 'created with' : 'added'} an npm rule for ${PACKAGE}, so its updates arrive as pull requests your CI gates`); }
+      else if (rule.action === 'created' || rule.action === 'appended') recommend(`${shown}: ${rule.action === 'created' ? 'create it with' : 'add'} an npm rule so ${PACKAGE} updates arrive as pull requests your CI gates (testguard init --pin writes it)`, (rule.action === 'created' ? rule.text : rule.text.slice((existingText ?? '').replace(/\s*$/, '\n').length)).replace(/\n+$/, '').split('\n'));
       else if (rule.action === 'present') skipped.push(`${shown} already names ${PACKAGE}`);
       else notes.push(`${shown} has an npm rule already; add to it so ${PACKAGE} updates arrive grouped:\n${rule.snippet}`);
     }
@@ -449,6 +498,7 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
   const writing = new Set(writes.map((w) => rel(w.path)));
   for (const f of scanInstalled({ root: gitRoot(agentRoot) ?? agentRoot, toolVersion })) {
     if (f.managed && (writing.has(f.file) || handled.has(f.file))) continue;
+    if (f.reason === 'hook-inactive' && inactiveReported.has(f.file)) continue;
     outdated.push(renderFinding(f));
   }
 
@@ -458,6 +508,11 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
     writeFileSync(w.path, w.content, w.mode === undefined ? undefined : { mode: w.mode });
     if (w.mode !== undefined) chmodSync(w.path, w.mode); // an existing file keeps its old mode otherwise
     if (w.checkIgnored) note(w.path);
+  }
+
+  if (pendingActivation) {
+    const r = activateHook({ root: gitRoot(agentRoot) ?? agentRoot, hookFile: pendingActivation.hookFile }, pendingActivation.activation);
+    (r.done ? done : warnings).push(r.message);
   }
 
   if (mcp) {
@@ -472,5 +527,5 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
     };
     notes.push('MCP: five read-only tools (status, brief, claims, evidence, next_command). Nothing there runs a probe.');
   }
-  return { done, skipped, warnings, outdated, notes, agentRoot, projectDir, dir, ...(mcpConfig ? { mcpConfig } : {}) };
+  return { done, skipped, warnings, outdated, notes, recommendations, agentRoot, projectDir, dir, ...(mcpConfig ? { mcpConfig } : {}) };
 }

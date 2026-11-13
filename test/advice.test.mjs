@@ -61,6 +61,7 @@ describe('hook-outdated', () => {
     const root = mkdtempSync(join(tmpdir(), 'tg-advice-'));
     try {
       spawnSync('git', ['init', '-q'], { cwd: root });
+      spawnSync('git', ['config', 'core.hooksPath', '.husky/_'], { cwd: root }); // husky's: the hook is active
       mkdirSync(join(root, '.husky'));
       writeFileSync(join(root, '.husky/pre-push'), '#!/bin/sh\nnpx testguard probe . --confirm 3 --serial\n');
       mkdirSync(join(root, '.github/workflows'), { recursive: true });

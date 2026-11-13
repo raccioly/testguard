@@ -25,6 +25,7 @@ import { concernsCommand } from './commands/concerns.mjs';
 import { originPolicyRequest } from './probe/origin-policy.mjs';
 import { assertionPolicyRequest } from './probe/assertion-policy.mjs';
 import { draftAppendRequest, intentInputRequest } from './scaffold/request.mjs';
+import { CONFIG_COMMANDS, projectOptions } from './config/project-config.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
 const ISSUES = 'https://github.com/raccioly/testguard/issues';
@@ -82,6 +83,13 @@ probe
                        (kind no-base). A named base that cannot be measured, and any runner failure, still exit 2. skip: not with --json.
   --fail-on-empty-selection  with --changed: a change that selects no claim exits 2 instead of 0 (either way it says so and
                        lists the changed source files no claim covers: absence from the results is not a pass)
+  --explain            with --changed: print which claims the change selects and why (file, glob, discovery, indeterminate),
+                       a count per reason and the changed source files no claim covers; probes and writes nothing. exit 0,
+                       or 2 when the change cannot be measured. --json: run.scope with explain: true
+  --no-config          ignore testguard.config.json (also admit, sweep, replay, claims, status). Without it the file's keys
+                       (runner, runnerCmd, python, nodeModules, typecheck, workers, faultWorkers, confirm, budget) are the
+                       defaults: a flag typed, then TESTGUARD_PYTHON / _NODE_MODULES / _FAULT_WORKERS, win over the file.
+                       An unknown key or wrong type exits 3; an uncommitted file is refused like a dirty defender
   --include-dirty      probe the working tree (a snapshot commit) instead of HEAD; uncommitted tests count
                        (without it, a dirty defender/target with the implicit HEAD is refused: the silent-mismatch trap)
   --verbose            also print each killed fault (default: only unproven ones, plus a count)
@@ -189,6 +197,9 @@ init       --force (replace an existing skill file)  --here (keep the agent laye
            reports hooks and CI files that run probe --serial, a full probe on every push, an old pin or an old template
            --upgrade         rewrite TestGuard's own blocks (skill, AGENTS.md section, hooks, CI) to the current template
                              where nobody edited them; edited ones are reported, and --force replaces them
+           --pin             also write the exact devDependency pin and the Dependabot/Renovate rule (without it they are only recommended; --upgrade never writes them)
+           --activate-hook   make this clone run the pre-push hook: set core.hooksPath, or write a .git/hooks/pre-push that calls it and keeps the other hooks (without it init only reports)
+           a hook file that already mentions TestGuard outside a managed block is the project's own: init leaves it alone and prints the block (--force adds it)
            --ci github|gitlab  write the CI file: pull requests probe --changed auto, nightly runs probe every claim
            --ci-evidence github|gitlab   write .testguard/fetch-ci-evidence.sh, an ON-DEMAND helper that downloads CI's evidence artifact and briefs from it; the session-start hook stays offline
            agent layer (skill, SessionStart hook, AGENTS.md section) → git root; project layer (.gitignore lines) → [dir]
@@ -306,6 +317,8 @@ async function dispatch(argv, io, seen) {
         'ci-evidence': { type: 'string' },
         ci: { type: 'string' },
         upgrade: { type: 'boolean', default: false },
+        pin: { type: 'boolean', default: false },
+        'activate-hook': { type: 'boolean', default: false },
         here: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'runner-cmd': { type: 'string' },
@@ -317,6 +330,7 @@ async function dispatch(argv, io, seen) {
         'in-place': { type: 'boolean', default: false },
         'no-escalate': { type: 'boolean', default: false },
         'no-reuse': { type: 'boolean', default: false },
+        'no-config': { type: 'boolean', default: false },
         'allow-empty': { type: 'boolean', default: false },
         quiet: { type: 'boolean', default: false },
         json: { type: 'boolean', default: false },
@@ -383,6 +397,10 @@ async function dispatch(argv, io, seen) {
     io.err('--typecheck is only valid on probe and on claims --check-anchors');
     return 3;
   }
+  if (values['no-config'] && !CONFIG_COMMANDS.includes(command)) {
+    io.err(`--no-config is only valid on ${CONFIG_COMMANDS.join(', ')}: the commands that read testguard.config.json`);
+    return 3;
+  }
   if ((values.annotate || values.apply) && command !== 'claims') {
     io.err('--annotate and --apply are only valid on claims');
     return 3;
@@ -406,7 +424,11 @@ async function dispatch(argv, io, seen) {
     const projectDir = command === 'scaffold' || command === 'admit' ? resolve('.') : resolve(dirArg ?? '.');
     // Checked before the handler writes anything: a scratch directory that cannot be used refuses the run.
     const scratchBase = SCRATCH_COMMANDS.has(command) ? resolveScratchDir(values['scratch-dir']) : undefined;
-    return await withScratchBase(scratchBase, () => handler({ projectDir, file: dirArg, files: positionals.slice(1), values, suppliedOptions, version: VERSION }, io));
+    // testguard.config.json (#301): the project's defaults, under every flag
+    // typed and every environment variable set. Read before the handler, so
+    // each command sees one set of options however they were given.
+    const { values: commandValues, projectConfig } = projectOptions({ command, projectDir, values, suppliedOptions, env: process.env });
+    return await withScratchBase(scratchBase, () => handler({ projectDir, file: dirArg, files: positionals.slice(1), values: commandValues, suppliedOptions, version: VERSION, projectConfig }, io));
   } catch (e) {
     seen.error = e;
     if (e instanceof UsageError) {

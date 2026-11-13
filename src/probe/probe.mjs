@@ -189,8 +189,32 @@ export function fanOutPolicy({ faultWorkersSource, cpus } = {}) {
   return { faultWorkersSource, ...(faultWorkersSource === 'auto' && cpus !== undefined ? { cpus } : {}) };
 }
 
+/**
+ * testguard.config.json in the dirty rule (#301): it sets how every defender
+ * runs and is read from the working tree, so it is watched like a defender.
+ * Watched whenever the command reads it (not under --no-config), whether or
+ * not it exists: a deleted copy is as uncommitted as an edited one. Adds the
+ * repository path to `watched` and returns it.
+ */
+export function watchConfigFile(watched, { root, projectDir, configFile }) {
+  if (configFile === undefined) return undefined;
+  const path = relative(root, join(projectDir, configFile));
+  watched.add(path);
+  return path;
+}
+
+/**
+ * Of the dirty files a run proceeds past (--ref, --ignore-dirty), the config
+ * file is the opposite of ignored: its working-tree copy IS applied. It is
+ * said on its own and kept out of repo.ignoredDirty, which names what was not
+ * probed.
+ */
+export function ignoredDirtyFiles(dirty, configPath) {
+  return { configApplied: configPath !== undefined && dirty.includes(configPath), ignored: dirty.filter((path) => path !== configPath) };
+}
+
 /** Did this run ask for one fault at a time? Then no fan-out may stand in for it. */
-export const serialRequested = (faultWorkers, source) => faultWorkers === 1 && ['serial', 'flag', 'env'].includes(source);
+export const serialRequested = (faultWorkers, source) => faultWorkers === 1 && ['serial', 'flag', 'env', 'config'].includes(source);
 
 /**
  * Probe every fault of every claim. Returns a spec-conformant evidence
@@ -295,6 +319,7 @@ async function measureProbe({
   carry,
   onProgress = () => {},
   typecheck,
+  configFile,
 }, ctx) {
   if (!Number.isSafeInteger(workers) || workers < 1) throw new UsageError('workers must be a positive safe integer');
   if (parseFaultWorkers(faultWorkers) !== faultWorkers) throw new UsageError('fault workers must be a positive safe integer');
@@ -416,14 +441,19 @@ async function measureProbe({
         ...['js', 'mjs', 'cjs', 'ts', 'mts', 'cts'].flatMap((ext) => [`vitest.config.${ext}`, `vite.config.${ext}`, `vitest.workspace.${ext}`, `jest.config.${ext}`, `playwright.config.${ext}`]),
         'vitest.workspace.json',
       ]) watched.add(relative(root, join(projectDir, config)));
+      // testguard.config.json (#301): an uncommitted copy with the implicit
+      // HEAD is the same silent mismatch as a dirty defender, refused alike.
+      const configPath = watchConfigFile(watched, { root, projectDir, configFile });
       const dirty = dirtyPaths.filter((path) => watched.has(path));
       if (dirty.length && !refExplicit && !ignoreDirty) {
         throw new PreconditionError(`${dirty.length} defender/target file${dirty.length === 1 ? ' has' : 's have'} uncommitted changes (${dirty.join(', ')}); worktree mode probes HEAD (${head.slice(0, 7)}), so those changes would be silently ignored. Commit them, run with --include-dirty to probe the working tree, use --in-place, or --ignore-dirty if you mean HEAD as committed.`, 'dirty-tree');
       }
-      if (dirty.length) {
-        ignoredDirty = dirty.sort();
+      const { configApplied, ignored } = ignoredDirtyFiles(dirty, configPath);
+      if (configApplied) onWarn(`${configFile} has uncommitted changes; its working-tree version sets how the tests run (it is read like the flags typed with this command), while ${ref === 'HEAD' ? 'HEAD' : ref} (${head.slice(0, 7)}) is probed as committed. Commit it, or pass --no-config, if that is not what you mean.`);
+      if (ignored.length) {
+        ignoredDirty = ignored.sort();
         ctx.ignoredDirty = ignoredDirty;
-        onWarn(`${dirty.length} defender/target file${dirty.length === 1 ? ' has' : 's have'} uncommitted changes (${dirty.join(', ')}); probing ${ref === 'HEAD' ? `HEAD (${head.slice(0, 7)})` : `${ref} (${head.slice(0, 7)})`} as committed — the working-tree versions are NOT what is being probed. Recorded in the evidence as repo.ignoredDirty.`);
+        onWarn(`${ignored.length} defender/target file${ignored.length === 1 ? ' has' : 's have'} uncommitted changes (${ignored.join(', ')}); probing ${ref === 'HEAD' ? `HEAD (${head.slice(0, 7)})` : `${ref} (${head.slice(0, 7)})`} as committed — the working-tree versions are NOT what is being probed. Recorded in the evidence as repo.ignoredDirty.`);
       }
     }
   }

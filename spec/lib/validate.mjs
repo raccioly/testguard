@@ -11,7 +11,7 @@ import { runErrors } from './run-result.mjs';
 
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 
-export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate', 'replay', 'sweep', 'concerns', 'annotations', 'authoring-input', 'error']);
+export const KINDS = Object.freeze(['claims', 'evidence', 'baseline', 'ignore', 'calibration', 'brief', 'status', 'gate', 'replay', 'sweep', 'concerns', 'annotations', 'authoring-input', 'error', 'config']);
 /**
  * How a document says it tried to falsify its claims. Absent means
  * `fault-injection`, so every document written before the field existed is
@@ -756,7 +756,8 @@ const semantic = {
 /**
  * Speed advice (#270) is informational, but each line must be the one its
  * rule produces: the change-scoped probe is advised only where the next step
- * is a probe, an outdated hook is fixed by `init --upgrade`, and every rule
+ * is a probe, an outdated hook is fixed by `init --upgrade` (and one no git
+ * hook path runs by `init --activate-hook`), and every rule
  * but hook-outdated (one line per file and line) says its piece once.
  */
 const runsHere0 = (r) => r.detail.probeRuns ?? [];
@@ -771,7 +772,7 @@ function adviceErrors(advice, nextAction) {
     if (a.id === 'full-probe-where-changed-would-do' && nextAction !== 'probe') errors.push({ path: `/advice/${i}/id`, message: 'full-probe-where-changed-would-do is advice about a probe the next step makes: it requires next.action = probe' });
     if (a.id === 'full-probe-where-changed-would-do' && !/^testguard probe --changed /.test(a.command)) errors.push({ path: `/advice/${i}/command`, message: 'full-probe-where-changed-would-do names a probe --changed command' });
     if (a.id === 'slow-defenders-dominate' && a.command !== 'testguard claims --cost') errors.push({ path: `/advice/${i}/command`, message: 'slow-defenders-dominate points at the per-claim cost report: testguard claims --cost' });
-    if (a.id === 'hook-outdated' && a.command !== 'testguard init --upgrade') errors.push({ path: `/advice/${i}/command`, message: 'hook-outdated is fixed by testguard init --upgrade' });
+    if (a.id === 'hook-outdated' && a.command !== 'testguard init --upgrade' && a.command !== 'testguard init --activate-hook') errors.push({ path: `/advice/${i}/command`, message: 'hook-outdated is fixed by testguard init --upgrade, or by testguard init --activate-hook where the hook is not on the clone\'s active hooks path' });
   });
   return errors;
 }

@@ -1,0 +1,8 @@
+{
+  "description": "sha256 of every TestGuard AGENTS.md section TestGuard shipped, with its project bullets removed (#301). A section whose hash is listed is unmodified, so init --upgrade may rewrite it; any other is the project's own and is left alone. Append the new hash when the section text changes.",
+  "sha256": [
+    "f33484eff1a4b4211f510db662d4b303eafc80192218b1fed97177e2a04e7cd5",
+    "24d9e398cc633bd9b3bdc5e14732ffd557a01196f33de96bededa57025a801ce",
+    "e706d50174b27cd70a30799061cddcfc33ded010fff0edf9641d334b06c3d611"
+  ]
+}

@@ -56,7 +56,7 @@ TestGuard itself never makes a network call. Pick one way to get new releases:
 
 | Way | Prefer it when | What to do |
 |---|---|---|
-| A pinned devDependency, bumped by a bot | the project has a `package.json` | What `testguard init` sets up: it adds `testguard-cli` at exactly its own version to `devDependencies` and writes a Dependabot rule (or a Renovate rule when the repository uses Renovate), so each release arrives as a pull request your CI gates. Run your install once so the lockfile records the pin. |
+| A pinned devDependency, bumped by a bot | the project has a `package.json` | What `testguard init --pin` sets up (plain `init` only recommends it): it adds `testguard-cli` at exactly its own version to `devDependencies` and writes a Dependabot rule (or a Renovate rule when the repository uses Renovate), so each release arrives as a pull request your CI gates. Run your install once so the lockfile records the pin. |
 | The exact version through npx | there is no `package.json` (a Python project) | What the pre-push hook and CI fall back to when nothing is installed: `npx -y testguard-cli@<the version that ran init>`. `testguard init --upgrade` raises it. A floating tag is never written, and `init` reports one it finds (`floating-version`), because it would run a release nobody reviewed. |
 | Homebrew | one machine runs many repositories | `brew tap raccioly/tap && brew install testguard`, then `brew upgrade testguard`. |
 
@@ -133,7 +133,7 @@ changes none of them:
 | File | What stays old | How to bring it forward |
 |---|---|---|
 | `.claude/skills/testguard/SKILL.md` | the whole skill, as copied by the `init` you ran | `init --upgrade` when unmodified; merge by hand, or `init --force` |
-| The `AGENTS.md` section between `<!-- testguard:begin … -->` and `<!-- testguard:end -->` | the instructions, once the section lists the project | `init --upgrade` |
+| The `AGENTS.md` section between `<!-- testguard:begin … -->` and `<!-- testguard:end -->` | the instructions, once the section lists the project | `init --upgrade` when it is an unmodified template; an edited section is left alone and reported |
 | The pre-push block (`.husky/pre-push` or `.githooks/pre-push`) and the CI file from `init --ci` | the commands | `init --upgrade` when unmodified; `--force` otherwise |
 | The `SessionStart` hook in `.claude/settings.json` | the command, once it is present | usually nothing to do; see below |
 
@@ -150,9 +150,12 @@ Re-running `testguard init` after an upgrade is safe and does a little:
   `init --upgrade` would rewrite and the hook and CI lines that run TestGuard
   the slow or stale way.
 - `init --upgrade` rewrites every block TestGuard wrote that nobody edited.
-  Each block carries `template=<n>` and the hash of its own body; a skill
-  written before markers is recognized by the hash of every template TestGuard
-  shipped. Anything edited is reported, never overwritten without `--force`.
+  Each block carries `template=<n>` and the hash of its own body; a skill or an
+  `AGENTS.md` section written before markers is recognized by the hash of every
+  template TestGuard shipped. Anything edited, or that cannot be proved
+  unmodified, is reported, never overwritten without `--force`. A hook file that
+  already mentions TestGuard outside a managed block is the project's own and
+  gets no block.
 - If the new version's hook command differs from the one you have, `init`
   replaces your TestGuard hook in place (for each project, the root and every
   subdirectory alike), keeping its position and any other keys on it, and

@@ -13,8 +13,9 @@ rather than being guessed at.
 | [`testguard.claims.json`](#claims-file) | every command | yes |
 | [`testguard.ignore.json`](#ignore-file) | `gate`, `sweep`, `status`/`brief` with a reference, `claims --since` (never `probe`) | yes |
 | [`testguard.concerns.json`](#concerns-file) | `concerns`, `sweep --concern` | yes, when you have one |
+| [`testguard.config.json`](#testguardconfigjson-how-this-projects-tests-run) | `probe`, `admit`, `sweep`, `replay`, `claims --check-anchors`, `status` | yes, when your tests need runner flags |
 
-All three live in the project directory, beside each other. Each command has
+All four live in the project directory, beside each other. Each command has
 a flag to point at another path (`--claims`, `--ignore`, `--concerns`).
 
 ## Claims file
@@ -272,6 +273,74 @@ deliberately no built-in authorization concern: which files check permissions
 cannot be guessed reliably, and a project that knows its own auth layer says
 so with a `glob` concern.
 
+## testguard.config.json: how this project's tests run
+
+A project whose tests need runner flags (`--runner unittest --python
+.venv/bin/python`, a `--runner-cmd`, a `--node-modules` from the workspace
+root) once had to repeat them in every hook, every CI line and every agent's
+memory. Put them in `testguard.config.json` instead, and a plain
+`testguard probe` runs the tests correctly everywhere. Schema:
+[`config.schema.json`](../../spec/schemas/config.schema.json).
+
+```json
+{
+  "$schema": "./node_modules/testguard-cli/spec/schemas/config.schema.json",
+  "schemaVersion": 1,
+  "runner": "unittest",
+  "python": ".venv/bin/python",
+  "confirm": 3
+}
+```
+
+| Key | Flag it stands for | Value |
+|---|---|---|
+| `runner` | `--runner` | `vitest`, `jest`, `playwright`, `python`, `pytest`, `unittest`, `node-test` or `auto` |
+| `runnerCmd` | `--runner-cmd` | a command containing `{files}` and `{out}`, run as an argv, never through a shell |
+| `python` | `--python` | a bare command looked up on `PATH` (`python3`), or a path relative to the project directory |
+| `nodeModules` | `--node-modules` | a directory relative to the project directory (`../node_modules` in a workspace package) |
+| `typecheck` | `--typecheck` | `true` runs the project's own `tsc`; a string is the command. Applies to `probe` and `claims --check-anchors` |
+| `workers` | `--workers` | a positive integer |
+| `faultWorkers` | `--fault-workers` (`probe`) | a positive integer, or `"auto"` |
+| `confirm` | `--confirm` | a positive integer; below 3 the run is provisional, exactly as with the flag, and the warning names this file |
+| `budget` | `--budget` | milliseconds per run, at least 1000 |
+
+Only options that describe **how** the tests run belong here. Nothing in the
+file selects **what** is probed (`--claim`, `--changed`, `--ref`), nothing
+shapes output, and no value can do what its flag could not.
+
+- **Precedence:** a flag you type, then the environment variable where one
+  exists (`TESTGUARD_PYTHON`, `TESTGUARD_NODE_MODULES`,
+  `TESTGUARD_FAULT_WORKERS`; empty is unset), then the file, then the
+  built-in default. `--no-config` ignores the file; it is also the way to turn
+  off a `typecheck` or `runnerCmd` the file sets, which have no "off" flag.
+- **Refused, never ignored:** malformed JSON, an unknown key (a misspelled
+  `confirmRuns` would otherwise fall back to the default silently), a wrong
+  type or an unusable `runnerCmd` is a usage error (exit `3`) that names the
+  key. A path that leaves the repository, or an absolute one, is refused too
+  (`path-outside-project`, exit `2`): a committed setting must work on every
+  checkout, so a machine-specific path belongs in the flag or the variable.
+  Paths are judged by their text, so a virtualenv's `python` that links out
+  of the tree is fine.
+- **Which copy is read:** the one in the working tree, like the flags typed
+  with the command. An uncommitted or untracked `testguard.config.json` is
+  then treated like a dirty defender: `probe` of the implicit `HEAD` refuses
+  (exit `2`) rather than measure a commit with options nobody committed;
+  `--include-dirty` and `--in-place` probe the working tree it belongs to;
+  `--ref` and `--ignore-dirty` proceed and say that the working-tree copy is
+  applied. `replay`, which has no dirty rule, says so too.
+- **Reuse:** what decides whether a verdict may be carried forward is the
+  options the file resolves to, never the file's bytes. Moving a flag into
+  the file with the same value keeps every verdict; changing a value
+  (`runner`, `runnerCmd`, `python`, `typecheck`, `workers`, `confirm`) re-measures
+  exactly as changing the flag would.
+- **`--changed`:** the file is an input of every claim, like a lockfile, so a
+  change to it selects every claim (`probe --changed <ref> --explain` names it
+  as the reason). Reuse then carries whatever the change did not touch.
+- **Reported:** `status` prints the keys the file sets, and `status --json`
+  carries `config: {file, sha256, keys}`; `probe --json` carries
+  `run.config` with the keys this run took from the file and the ones a flag or
+  variable overrode.
+
 ## Cost budget file
 
 `testguard.cost-budget.json` in this repository is **not** a TestGuard
@@ -371,10 +440,10 @@ or VM for untrusted code, and give it a writable scratch directory.
 |---|---|---|
 | `TESTGUARD_CHANGED_REF` | `gate`, `sweep`, `status`, `brief`, the MCP tools | The reference to measure a change against when `--changed` is absent. Checked before the CI variables below. |
 | `TESTGUARD_WORKER` | set by `probe` | Set by TestGuard, not read: every test runner process a probe starts gets the 0-based index of the scratch tree it runs in. Trees running side by side have different indices; a run with nothing else in flight is `0`. Derive a port, a database name or a directory from it (`8787 + TESTGUARD_WORKER`) and a suite that needs one of its own stays parallel. |
-| `TESTGUARD_FAULT_WORKERS` | `probe` | How many faults to probe at once: a positive integer or `auto` (the default: `min(4, floor(CPUs / 2))`). `--fault-workers` and `--serial` win; empty is unset. `1` restores one fault at a time. |
-| `TESTGUARD_NODE_MODULES` | `probe`, `admit`, `sweep`, `replay` | A `node_modules` directory to link into the scratch worktree. `--node-modules` wins. |
+| `TESTGUARD_FAULT_WORKERS` | `probe` | How many faults to probe at once: a positive integer or `auto` (the default: `min(4, floor(CPUs / 2))`). `--fault-workers` and `--serial` win; it wins over `faultWorkers` in `testguard.config.json`; empty is unset. `1` restores one fault at a time. |
+| `TESTGUARD_NODE_MODULES` | `probe`, `admit`, `sweep`, `replay` | A `node_modules` directory to link into the scratch worktree. `--node-modules` wins; it wins over `nodeModules` in `testguard.config.json`. |
 | `TESTGUARD_SCRATCH_DIR` | `probe`, `admit`, `sweep`, `replay` | An existing, writable directory for everything TestGuard creates while it runs tests: scratch worktrees, the temporary git index, runner reports and runner temp directories. `--scratch-dir` wins. Missing or unwritable is an error (exit 2) before anything is written. Default: the OS temp directory. |
-| `TESTGUARD_PYTHON` | `probe`, `claims --check-anchors`, `admit`, `sweep`, `replay` | The Python interpreter for `.py` defenders. `--python` wins when both are given; the two mean the same thing: a bare name such as `python3` is looked up on `PATH`, anything containing `/` is a path. |
+| `TESTGUARD_PYTHON` | `probe`, `claims --check-anchors`, `admit`, `sweep`, `replay` | The Python interpreter for `.py` defenders. `--python` wins when both are given, and it wins over `python` in `testguard.config.json`; the two mean the same thing: a bare name such as `python3` is looked up on `PATH`, anything containing `/` is a path. |
 | `TESTGUARD_GITLAB_TOKEN` | the GitLab CI template only | A project or group access token with `api` scope, used when `post_note: true` to post the brief as a merge-request note. `CI_JOB_TOKEN` cannot write notes. The CLI never reads it. See the [GitLab guide](../guides/ci/gitlab.md). |
 
 ### CI variables TestGuard reads

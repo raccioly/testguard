@@ -107,13 +107,13 @@ describe('the devDependency and the update rule', () => {
     const dir = repo();
     try {
       writeFileSync(join(dir, 'package.json'), '{\n  "name": "app"\n}\n');
-      const r = initProject({ projectDir: dir, ci: 'github', toolVersion: '1.2.3' });
+      const r = initProject({ projectDir: dir, ci: 'github', pin: true, toolVersion: '1.2.3' });
       expect(JSON.parse(read(dir, 'package.json')).devDependencies).toEqual({ 'testguard-cli': '1.2.3' });
       expect(r.done.join('\n')).toMatch(/devDependency testguard-cli pinned to exactly 1\.2\.3\. The lockfile is now out of date, and npm ci \/ --frozen-lockfile will fail until you run your package manager's install .* min-release-age/);
       expect(read(dir, '.github/dependabot.yml')).toContain('dependency-name: testguard-cli');
       expect(read(dir, '.github/workflows/testguard.yml')).not.toMatch(FLOATING);
       // Run again: nothing more to do.
-      const again = initProject({ projectDir: dir, ci: 'github', toolVersion: '1.2.3' });
+      const again = initProject({ projectDir: dir, ci: 'github', pin: true, toolVersion: '1.2.3' });
       expect(again.done).toEqual([]);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
@@ -123,7 +123,7 @@ describe('the devDependency and the update rule', () => {
     try {
       writeFileSync(join(dir, 'package.json'), JSON.stringify({ devDependencies: { 'testguard-cli': 'latest' } }));
       writeFileSync(join(dir, 'renovate.json'), '{}');
-      const r = initProject({ projectDir: dir, mcp: true, toolVersion: '1.2.3' });
+      const r = initProject({ projectDir: dir, mcp: true, pin: true, toolVersion: '1.2.3' });
       expect(r.outdated.join('\n')).toMatch(/testguard-cli "latest" is a floating version/);
       expect(JSON.parse(read(dir, 'package.json')).devDependencies['testguard-cli']).toBe('latest');
       expect(JSON.parse(read(dir, 'renovate.json')).packageRules[0].matchPackageNames).toEqual(['testguard-cli']);

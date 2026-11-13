@@ -16,13 +16,14 @@ import { assertionPolicyRequest, scopedAssertionPolicy, renderAssertionPolicy, i
 import { readNativeTestUniverse } from '../probe/universe.mjs';
 import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
 import { runnerOptions } from './runner-options.mjs';
+import { configReport, confirmFromConfig as confirmSource, CONFIG_FILE } from '../config/project-config.mjs';
 import { PreconditionError } from '../probe/precondition-error.mjs';
 import { resolveFaultWorkers } from '../probe/fan-out.mjs';
 import { availableParallelism } from 'node:os';
 import { computeAdvice, renderAdvice } from '../status/advice.mjs';
 import { resolveProbeScope } from '../probe/scope.mjs';
 import { repoRoot, headSha } from '../git.mjs';
-import { selectByChange, measuredScope, renderNoSelection, renderUnmatched, scopedView, renderScopedView } from './probe-scope.mjs';
+import { selectByChange, measuredScope, renderNoSelection, renderUnmatched, scopedView, renderScopedView, explainScope, renderExplain } from './probe-scope.mjs';
 import { claimResults } from '../probe/claim-results.mjs';
 import { partialExit, partialEvidencePath, isNotReached } from '../probe/partial-budget.mjs';
 import { convergeRequest, mergeEvidence, staleCarried, STALE_WHY } from '../evidence/carry.mjs';
@@ -134,7 +135,7 @@ export function partialScope(only, records) {
  * command budget (an injected clock makes expiry deterministic) and `onStage`
  * sees every stage the probe starts.
  */
-export async function probeCommand({ projectDir, values, version }, io, deps = {}) {
+export async function probeCommand({ projectDir, values, version, projectConfig }, io, deps = {}) {
   let eligibleKinds;
   try { eligibleKinds = originPolicyRequest(values); }
   catch (e) { io.err(e.message); return 3; }
@@ -151,7 +152,7 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   // Fast by default (#270): auto from the machine unless the flag, the
   // environment or the explicit --serial says otherwise. Only the flag the
   // user typed counts as --serial, never the derived "one runner worker".
-  const fanOut = resolveFaultWorkers({ flag: values['fault-workers'], env: process.env, serial: values.serial === true, inPlace: values['in-place'] === true, cpus: deps.cpus ?? availableParallelism() });
+  const fanOut = resolveFaultWorkers({ flag: values['fault-workers'], env: process.env, config: projectConfig?.faultWorkers, serial: values.serial === true, inPlace: values['in-place'] === true, cpus: deps.cpus ?? availableParallelism() });
   if (fanOut.error) {
     io.err(fanOut.error);
     return 3;
@@ -185,6 +186,10 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   }
   if (whenNoBase === 'skip' && values.json) {
     io.err('--when-no-base skip cannot be combined with --json: a skipped run has no document to print; use --when-no-base fail for a JSON refusal');
+    return 3;
+  }
+  if (values.explain && values.changed === undefined) {
+    io.err('--explain needs --changed <ref>: it explains which claims a change selects, and why');
     return 3;
   }
   if (values['fail-on-empty-selection'] && values.changed === undefined) {
@@ -263,6 +268,21 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   }
   if (values.changed !== undefined) {
     const selection = selectByChange({ projectDir, claims, ref: values.changed, includeDirty: values['include-dirty'], only: requested, failOnEmpty: values['fail-on-empty-selection'] });
+    // --explain: the selection and its reasons, and nothing probed (#301 item 8).
+    if (values.explain) {
+      const explained = explainScope(selection, { requested });
+      if (values.json) {
+        const status = withChangedRef(selection.outcome === 'undetermined' ? null : resolveChangedRef({ explicit: values.changed, projectDir }), (changedRef) => computeStatus({
+          projectDir, toolVersion: version, changedRef, includeDirty: values['include-dirty'],
+          paths: { claims: claimsPath, evidence: evidencePath(projectDir), provisional: provisionalEvidencePath(projectDir), baseline: values.baseline ? resolve(values.baseline) : baselinePath(projectDir) },
+        }), io.err);
+        const doc = { ...status, run: { exitCode: explained.exitCode, ...(projectConfig ? { config: configReport(projectConfig) } : {}), scope: explained.scope } };
+        const result = validate('status', doc);
+        if (!result.ok) throw new Error(`probe --explain JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
+        io.out(JSON.stringify(doc, null, 2));
+      } else for (const line of renderExplain(explained, { total: claims.claims.length })) (explained.exitCode === 2 ? io.err : io.out)(line);
+      return explained.exitCode;
+    }
     if (selection.outcome !== 'selected') {
       for (const line of renderNoSelection(selection, { failOnEmpty: values['fail-on-empty-selection'] })) (selection.outcome === 'undetermined' || values.json ? io.err : io.out)(line);
       if (values.json) {
@@ -298,7 +318,8 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   let carryResult;
   const partialPath = join(projectDir, '.testguard', 'evidence-partial.json');
   let outPath = values.out && !(only && resolve(values.out) === canonicalPath) ? resolve(values.out) : only ? partialPath : provisional ? provisionalEvidencePath(projectDir) : canonicalPath;
-  if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
+  const confirmFromConfig = confirmSource(projectConfig);
+  if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns, confirmFromConfig));
   const discoveryNoted = new Set();
   // A partial run (--claim, --changed) also reuses the last full probe's
   // verdicts: the canonical evidence, under the same reuse rule (#270). That is
@@ -331,6 +352,8 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
     nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
     python: runner.python,
     typecheck: values.typecheck,
+    // Watched whenever it is read, present or not: a deleted copy is uncommitted too.
+    ...(!values['no-config'] ? { configFile: CONFIG_FILE } : {}),
     only,
     ...(carryFrom ? { carry: { document: carryFrom, done: (result) => { carryResult = result; } } } : {}),
     escalate: !values['no-escalate'],
@@ -440,7 +463,7 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
         baseline: values.baseline ? resolve(values.baseline) : baselinePath(projectDir),
       },
     }), io.err);
-    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: measured.length, newSinceBaseline: g.new.length, exitCode, ...(probed.run.reuse ? { reuse: probed.run.reuse } : {}), ...(only ? { converged: converged ? { into: outPath, carriedFrom: converged.from, carried: converged.carried, stale: converged.stale } : { into: null, reason: convergeReason ?? 'not requested' } } : {}), ...(policy ? { originPolicy: policy } : {}), ...(weak ? { assertionPolicy: weak } : {}), ...(scope ? { scope: { ...scope, state: view.state, next: view.next } } : {}), ...(evidence.run.budget ? { budget: evidence.run.budget } : {}), ...(incomplete ? { failureKind: incomplete.failureKind, ...(incomplete.unprovenAtLeast !== undefined ? { unprovenAtLeast: incomplete.unprovenAtLeast } : {}) } : {}), claims: claimResults(measured) }, ...(values.cost ? { cost: costReport(measured, { run: probed.run }) } : {}) };
+    const doc = { ...status, ...(policy ? { originPolicy: policy } : {}), run: { id: evidence.run.id, evidence: outPath, provisional, records: measured.length, newSinceBaseline: g.new.length, exitCode, ...(projectConfig ? { config: configReport(projectConfig) } : {}), ...(probed.run.reuse ? { reuse: probed.run.reuse } : {}), ...(only ? { converged: converged ? { into: outPath, carriedFrom: converged.from, carried: converged.carried, stale: converged.stale } : { into: null, reason: convergeReason ?? 'not requested' } } : {}), ...(policy ? { originPolicy: policy } : {}), ...(weak ? { assertionPolicy: weak } : {}), ...(scope ? { scope: { ...scope, state: view.state, next: view.next } } : {}), ...(evidence.run.budget ? { budget: evidence.run.budget } : {}), ...(incomplete ? { failureKind: incomplete.failureKind, ...(incomplete.unprovenAtLeast !== undefined ? { unprovenAtLeast: incomplete.unprovenAtLeast } : {}) } : {}), claims: claimResults(measured) }, ...(values.cost ? { cost: costReport(measured, { run: probed.run }) } : {}) };
     const result = validate('status', doc);
     if (!result.ok) throw new Error(`probe JSON document does not conform: ${result.errors.map((e) => `${e.path}: ${e.message}`).join('; ')}`);
     io.out(JSON.stringify(doc, null, 2));
@@ -488,6 +511,6 @@ export async function probeCommand({ projectDir, values, version }, io, deps = {
   const selectionText = scope ? [scope.requestedClaims ? `${scope.requestedCount} claim${scope.requestedCount === 1 ? '' : 's'} requested` : null, scope.changed ? `${scope.selectedCount} selected by --changed ${scope.changed.ref}` : null, `${scope.probedCount} probed`].filter(Boolean).join(', ') + (scope.requestedClaims ? `: --claim ${scope.requestedClaims.join(',')}` : '') : '';
   if (converged) io.out(renderConverged({ outPath, measured: measured.length, selection: selectionText, converged }));
   else io.out(`evidence: ${outPath}${scope ? ` (partial: ${selectionText}; not the canonical evidence file${convergeReason ? `, which was not updated because ${convergeReason}` : ''})` : exhausted ? ' (incomplete: command budget exhausted; not the canonical evidence file)' : provisional ? ' (provisional; not the canonical evidence file)' : ''}`);
-  if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns));
+  if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns, confirmFromConfig));
   return exitCode;
 }

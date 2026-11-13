@@ -1,0 +1,12 @@
+{
+  "$schema": "../../schemas/config.schema.json",
+  "schemaVersion": 1,
+  "runner": "unittest",
+  "python": ".venv/bin/python",
+  "nodeModules": "../node_modules",
+  "typecheck": true,
+  "workers": 2,
+  "faultWorkers": "auto",
+  "confirm": 3,
+  "budget": 180000
+}
