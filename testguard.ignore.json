@@ -327,6 +327,27 @@
       "by": "claude",
       "at": "2026-11-12T00:00:00Z",
       "expires": "2027-02-28T00:00:00Z"
+    },
+    {
+      "kind": "fault",
+      "pattern": "TG-RUN-ENDS-WITHIN-BUDGET-PLUS-GRACE/F5",
+      "reason": "Moved unchanged to TG-UNCONFIRMED-TEARDOWN-IS-REPORTED-NEVER-AS-SUCCESS/F1. The claim carried two statements (the run ends within the grace; an unconfirmed teardown is reported, never as success) and eleven faults, and measured 99 to 105 s in CI against the 100 s per-claim ceiling, so the cost gate passed or failed with the runner. Its second sentence is now its own claim with the three faults that falsify it: same file, same anchor, same replacement, same defender.",
+      "by": "claude",
+      "at": "2026-11-13T17:00:00Z"
+    },
+    {
+      "kind": "fault",
+      "pattern": "TG-RUN-ENDS-WITHIN-BUDGET-PLUS-GRACE/F6",
+      "reason": "Moved unchanged to TG-UNCONFIRMED-TEARDOWN-IS-REPORTED-NEVER-AS-SUCCESS/F2. The claim carried two statements (the run ends within the grace; an unconfirmed teardown is reported, never as success) and eleven faults, and measured 99 to 105 s in CI against the 100 s per-claim ceiling, so the cost gate passed or failed with the runner. Its second sentence is now its own claim with the three faults that falsify it: same file, same anchor, same replacement, same defender.",
+      "by": "claude",
+      "at": "2026-11-13T17:00:00Z"
+    },
+    {
+      "kind": "fault",
+      "pattern": "TG-RUN-ENDS-WITHIN-BUDGET-PLUS-GRACE/F7",
+      "reason": "Moved unchanged to TG-UNCONFIRMED-TEARDOWN-IS-REPORTED-NEVER-AS-SUCCESS/F3. The claim carried two statements (the run ends within the grace; an unconfirmed teardown is reported, never as success) and eleven faults, and measured 99 to 105 s in CI against the 100 s per-claim ceiling, so the cost gate passed or failed with the runner. Its second sentence is now its own claim with the three faults that falsify it: same file, same anchor, same replacement, same defender.",
+      "by": "claude",
+      "at": "2026-11-13T17:00:00Z"
     }
   ]
 }
