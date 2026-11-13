@@ -4,9 +4,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { performance } from 'node:perf_hooks';
-import { BATCH_CHARS, checkAnchors, checkInBatches, cutBatches, runBatchCheck } from '../src/claims/anchors.mjs';
+import { BATCH_CHARS, checkAnchors, checkInBatches, cutBatches, defaultPoolSize, runBatchCheck } from '../src/claims/anchors.mjs';
 import { ClaimsError } from '../src/claims/load.mjs';
 import { main } from '../src/cli.mjs';
 
@@ -109,34 +107,58 @@ describe('checkAnchors over a source that needs several batches (#320)', () => {
     expect(pids.length).toBeGreaterThan(0);
     for (const pid of pids) expect(alive(pid)).toBe(false);
   });
+});
 
-  it('a spent budget stops between batches and says how many faults were checked', async () => {
-    const { dir, doc } = project(60, -1);
-    const batches = [];
-    const failure = await checkAnchors(dir, doc, { budgetMs: 1, onBatch: (b) => batches.push(b) }).then(() => undefined, (e) => e);
-    expect(failure).toBeInstanceOf(ClaimsError);
-    expect(failure.message).toMatch(/ran out of its 1ms budget after \d+ of 60 faults/);
-    expect(batches.length).toBeLessThan(3);
-  }, 60_000);
+// A parser stand-in: reads the batch, then answers, hangs or fails as each item says.
+const PARSER = `
+let input = ''; process.stdin.setEncoding('utf8');
+process.stdin.on('data', (c) => { input += c; });
+process.stdin.on('end', () => {
+  const items = JSON.parse(input);
+  if (items.some((i) => i.mode === 'hang')) { setInterval(() => {}, 1000); return; }
+  if (items.some((i) => i.mode === 'fail')) { console.error('SyntaxError: stand-in failure'); process.exit(3); }
+  setTimeout(() => process.stdout.write(JSON.stringify(items.map((i) => ({ status: 'ok', n: i.n })))), Math.max(...items.map((i) => i.delay ?? 0)));
+});`;
+const pooled = (candidates, extra = {}) => checkInBatches({ language: 'javascript', command: process.execPath, args: ['-e', PARSER], candidates, sizeOf: () => 10, batchChars: 10, build: (c) => c, ...extra });
 
-  it('a batch never outlives the budget: a parser that hangs is stopped when the budget is spent, not after its own 10 s', async () => {
+describe('a language\'s batches run through a pool (#320)', () => {
+  it('the default pool is at most 4 and at least 1', () => {
+    expect(defaultPoolSize()).toBeGreaterThanOrEqual(1);
+    expect(defaultPoolSize()).toBeLessThanOrEqual(4);
+  });
+
+  it('results keep input order when batches finish in another order, and the pool really overlaps them', async () => {
+    const delays = [400, 20, 300, 20, 200, 20];
     const started = Date.now();
-    let pid;
-    const failure = await checkInBatches({ language: 'javascript', command: process.execPath, args: HANGS, candidates: [{ size: 10 }, { size: 10 }], sizeOf: (c) => c.size, build: (c) => c, deadline: performance.now() + 300, budgetMs: 300, onSpawn: (c) => { pid = c.pid; } }).then(() => undefined, (e) => e);
-    expect(failure.message).toBe('javascript syntax check ran out of its 300ms budget after 0 of 2 faults; raise --budget');
-    expect(Date.now() - started).toBeLessThan(5_000);
-    expect(alive(pid)).toBe(false);
+    const batches = [];
+    const results = await pooled(delays.map((delay, n) => ({ n, delay })), { poolSize: 3, onBatch: (b) => batches.push(b) });
+    expect(results.map((r) => r.n)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(batches.map((b) => b.from)).toEqual([0, 1, 2, 3, 4, 5]);
+    // serial would take the sum of the delays plus six spawns; three at once is about the longest chain
+    expect(Date.now() - started).toBeLessThan(delays.reduce((a, b) => a + b, 0) + 600 - 150);
+    const one = await pooled(delays.slice(0, 3).map((delay, n) => ({ n, delay })), { poolSize: 1 });
+    expect(one.map((r) => r.n)).toEqual([0, 1, 2]);
   }, 30_000);
 
-  it('through the CLI a failure is one error line and a nonzero exit, never a hang', () => {
-    const { dir, doc } = project(60, -1);
-    writeFileSync(join(dir, 'testguard.claims.json'), JSON.stringify(doc, null, 2));
-    const r = spawnSync(process.execPath, [join(import.meta.dirname, '..', 'cli', 'testguard.mjs'), 'claims', dir, '--check-anchors', '--budget', '1'], { encoding: 'utf8', timeout: 90_000 });
-    expect(r.error).toBeUndefined();
-    expect(r.status).toBe(2);
-    expect(r.stderr).toMatch(/^error: the syntax check of the fault replacements could not finish: .*ran out of its 1ms budget/m);
-    expect(r.stderr).not.toMatch(/bug in testguard/);
-  }, 120_000);
+  it('one failing batch kills its siblings, every child is gone when it rejects, and it rejects once with the count', async () => {
+    const pids = [];
+    const started = Date.now();
+    const failure = await pooled([{ n: 0, mode: 'hang' }, { n: 1, mode: 'hang' }, { n: 2, mode: 'fail' }, { n: 3, delay: 0 }], { poolSize: 3, onSpawn: (c) => pids.push(c.pid) }).then(() => undefined, (e) => e);
+    expect(failure.message).toMatch(/syntax check failed: SyntaxError: stand-in failure \(0 of 4 javascript faults checked\)$/);
+    expect(Date.now() - started).toBeLessThan(5_000); // not after the hung siblings' own 10 s
+    expect(pids).toHaveLength(3);
+    for (const pid of pids) expect(alive(pid)).toBe(false);
+  }, 30_000);
+
+  it('an outer abort stops the whole pool', async () => {
+    const abort = new AbortController();
+    const pids = [];
+    const pending = pooled([{ n: 0, mode: 'hang' }, { n: 1, mode: 'hang' }], { poolSize: 2, signal: abort.signal, onSpawn: (c) => pids.push(c.pid) });
+    await new Promise((r) => setTimeout(r, 300));
+    abort.abort();
+    await expect(pending).rejects.toThrow(/another check failed/);
+    for (const pid of pids) expect(alive(pid)).toBe(false);
+  }, 30_000);
 });
 
 describe('a normal claims file still passes through main()', () => {

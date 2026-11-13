@@ -3389,7 +3389,7 @@
     },
     {
       "id": "TG-ANCHOR-CHECK-BATCHES-AND-NEVER-HANGS",
-      "statement": "claims --check-anchors sends each language's replaced sources to a fresh parser process in batches that close before their summed length passes 4,000,000 characters (a larger single item goes alone), returns every fault's result in input order, stops with a typed error that says how many faults were checked when the --budget runs out, between batches or inside one (a batch never outlives what is left of it), and on any failure (send, per-batch timeout, abort) kills the parser and rejects once it is gone: never one message holding every source, never a pending promise or a parser left waiting for input.",
+      "statement": "claims --check-anchors sends each language's replaced sources to fresh parser processes in batches that close before their summed length passes 4,000,000 characters (a larger single item goes alone), up to a small pool of them at once, builds a batch's mutated source only when the batch is dispatched, returns every fault's result in input order however the batches finish, and on any failure (send, per-batch timeout, a sibling's failure, abort) kills every parser and rejects once, with a typed error that says how many faults were checked, after no parser is left: never one message holding every source, never a pending promise or a parser left waiting for input. The phase has no cap but each batch's timeout, so a large healthy claims file is slow, never refused.",
       "source": {
         "kind": "spec",
         "ref": "issue #320 (claims --check-anchors on a large claims file)"
@@ -3429,11 +3429,11 @@
         },
         {
           "id": "F3",
-          "description": "A batch is allowed its whole timeout past the budget.",
+          "description": "The batches come back in the order they finished, not the input order.",
           "faultClass": "literal-changed",
           "file": "src/claims/anchors.mjs",
-          "find": "const limit = Math.min(timeoutMs, Math.ceil(left));",
-          "replace": "const limit = timeoutMs;",
+          "find": "return batchResults.flat();",
+          "replace": "return batchResults.flat().reverse();",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -3458,6 +3458,30 @@
           "file": "src/claims/anchors.mjs",
           "find": "if (failure) settle(reject, failure);",
           "replace": "if (false) settle(reject, failure);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "The pool is one parser at a time.",
+          "faultClass": "literal-changed",
+          "file": "src/claims/anchors.mjs",
+          "find": "Math.max(1, Math.min(poolSize, cuts.length))",
+          "replace": "1",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "A failing batch does not stop its siblings.",
+          "faultClass": "guard-removed",
+          "file": "src/claims/anchors.mjs",
+          "find": "        firstError ??= error;\n        stop();\n",
+          "replace": "        firstError ??= error;\n",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

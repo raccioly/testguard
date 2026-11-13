@@ -2,6 +2,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { dirname, extname, join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
+import { availableParallelism } from 'node:os';
 import { locate, mutate } from '../probe/inject.mjs';
 import { resolveInterpreter } from '../probe/runners/python.mjs';
 import { repoRoot, isDirty, snapshotWorkingTree } from '../git.mjs';
@@ -191,29 +192,45 @@ export function runBatchCheck(command, args, items, { timeoutMs = BATCH_TIMEOUT_
   });
 }
 
+/** Parser processes at once, per language. */
+export const defaultPoolSize = () => Math.max(1, Math.min(4, availableParallelism()));
+
 /**
- * One language: its faults in batches of at most `batchChars`, one fresh parser process after another, results
- * in input order. A fault's mutated source is built only when its batch is, and is garbage once the batch is
- * sent. The phase is bounded by `deadline`: checked before every batch, and a batch's own timeout is capped
- * by what is left. Running out says how far it got.
+ * One language: its faults in batches of at most `batchChars`, each through a fresh parser process, up to
+ * `poolSize` at once. Results come back in input order whatever order the batches finish in. A fault's mutated
+ * source is built only when its batch is dispatched and is garbage once it is sent, so at most `poolSize`
+ * batches are in memory. There is no cap on the phase: every batch makes progress and each has its own
+ * timeout, so a large healthy claims file is slow, never refused. On the first failure the other parsers are
+ * stopped, every child is gone before this rejects, and it rejects once, saying how many faults were checked.
  */
-export async function checkInBatches({ language, command, args, candidates, build, sizeOf, batchChars = BATCH_CHARS, timeoutMs = BATCH_TIMEOUT_MS, deadline, budgetMs, signal, onBatch, onSpawn, serialize }) {
-  const results = [];
-  for (const [from, to] of cutBatches(candidates.map(sizeOf), batchChars)) {
-    const left = deadline - performance.now();
-    const spent = () => new Error(`${language} syntax check ran out of its ${budgetMs}ms budget after ${results.length} of ${candidates.length} faults; raise --budget`);
-    if (left <= 0) throw spent();
-    onBatch?.({ language, from, to });
-    // A batch never outlives the budget: its timeout is the smaller of its own and what is left.
-    const limit = Math.min(timeoutMs, Math.ceil(left));
-    try {
-      for (const r of await runBatchCheck(command, args, candidates.slice(from, to).map(build), { timeoutMs: limit, signal, onSpawn, serialize })) results.push(r);
-    } catch (error) {
-      if (error.timedOut && limit < timeoutMs) throw spent();
-      throw new Error(`${error.message} (${results.length} of ${candidates.length} ${language} faults checked)`, { cause: error });
+export async function checkInBatches({ language, command, args, candidates, build, sizeOf, batchChars = BATCH_CHARS, timeoutMs = BATCH_TIMEOUT_MS, poolSize = defaultPoolSize(), signal, onBatch, onSpawn, serialize }) {
+  const cuts = cutBatches(candidates.map(sizeOf), batchChars);
+  const batchResults = new Array(cuts.length);
+  const inner = new AbortController();
+  const stop = () => inner.abort();
+  if (signal?.aborted) stop(); else signal?.addEventListener('abort', stop, { once: true });
+  let next = 0;
+  let checked = 0;
+  let firstError;
+  const worker = async () => {
+    while (!inner.signal.aborted && next < cuts.length) {
+      const at = next++;
+      const [from, to] = cuts[at];
+      onBatch?.({ language, from, to });
+      try {
+        batchResults[at] = await runBatchCheck(command, args, candidates.slice(from, to).map(build), { timeoutMs, signal: inner.signal, onSpawn, serialize });
+        checked += to - from;
+      } catch (error) {
+        firstError ??= error;
+        stop();
+        return;
+      }
     }
-  }
-  return results;
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(poolSize, cuts.length)) }, worker));
+  signal?.removeEventListener('abort', stop);
+  if (firstError) throw new Error(`${firstError.message} (${checked} of ${candidates.length} ${language} faults checked)`, { cause: firstError });
+  return batchResults.flat();
 }
 
 function packageType(projectDir, file, cache) {
@@ -246,7 +263,7 @@ function packageType(projectDir, file, cache) {
  * baseline check of the unmodified tree. A replacement the checker refuses is
  * `fault-invalid`; a file it does not judge is reported `not-applicable`.
  */
-export async function checkAnchors(projectDir, claims, { python, typecheck, budgetMs = 120_000, nodeModules, scratchBase, batchChars, batchTimeoutMs, onBatch, onSpawn, serialize } = {}) {
+export async function checkAnchors(projectDir, claims, { python, typecheck, budgetMs = 120_000, nodeModules, scratchBase, batchChars, batchTimeoutMs, poolSize, onBatch, onSpawn, serialize } = {}) {
   const started = performance.now();
   const work = inspectLocations(projectDir, claims);
   const candidates = work.filter((x) => x.result.status === 'ok' && x.source !== undefined && isInjection(x.fault));
@@ -266,15 +283,14 @@ export async function checkAnchors(projectDir, claims, { python, typecheck, budg
   const buildJs = (candidate) => ({ file: candidate.fault.file, source: mutate(candidate.source, candidate.fault), type: packageType(projectDir, candidate.fault.file, packageTypes) });
   const buildPy = (candidate) => ({ file: candidate.fault.file, source: mutate(candidate.source, candidate.fault) });
 
-  // One parser process at a time per language, a batch of faults each, keeps this a cheap preflight even when a
+  // A few parser processes at a time per language, a batch of faults each, keeps this a cheap preflight even when a
   // claims file has thousands of faults. The Node VM constructors use the same V8 grammar as `node --check`
   // and compile without linking or executing code. The two languages run beside each other; when one fails the
   // other is stopped, and the call settles only after no parser process is left.
-  const deadline = performance.now() + budgetMs;
   const abort = new AbortController();
   let firstError;
   const guard = (promise) => promise.catch((error) => { firstError ??= error; abort.abort(); throw error; });
-  const common = { sizeOf, deadline, budgetMs, signal: abort.signal, batchChars, timeoutMs: batchTimeoutMs, onBatch, onSpawn, serialize };
+  const common = { sizeOf, signal: abort.signal, batchChars, timeoutMs: batchTimeoutMs, poolSize, onBatch, onSpawn, serialize };
   const settled = await Promise.allSettled([
     guard(checkInBatches({ ...common, language: 'javascript', command: process.execPath, args: ['--no-warnings', '--experimental-vm-modules', '-e', NODE_SYNTAX_CHECK], candidates: javascript, build: buildJs })),
     interpreter && !interpreter.error
