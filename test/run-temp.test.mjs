@@ -1,10 +1,10 @@
 // The suite's own temp directory (#311): one `tg-run-<pid>-<random>` per run,
 // every tmpdir() and every child process inside it, all of it gone when the
-// run ends, and a crashed run's removed by the next. A small vitest project
-// runs through the same setup and the leftovers are counted.
+// run ends, and a crashed run's removed by the next. The end-to-end run of a
+// small vitest project through the same setup is test/run-temp.run.test.mjs.
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,46 +40,31 @@ describe('this repository\'s own test run', () => {
   });
 });
 
-describe('a run through the same setup leaves nothing behind', () => {
-  it('removes its directory, every tg-* entry the tests made in it, and the child\'s, and sweeps only provably dead runs', () => {
-    const outer = dir();
-    const project = dir('tg-run-temp-project-');
-    symlinkSync(join(ROOT, 'node_modules'), join(project, 'node_modules'), 'dir');
-    writeFileSync(join(project, 'package.json'), '{"type":"module"}');
-    writeFileSync(join(project, 'vitest.config.mjs'), `export default { test: { include: ['*.test.mjs'], globalSetup: [${JSON.stringify(join(ROOT, 'test', 'helpers', 'run-temp.mjs'))}] } };\n`);
-    writeFileSync(join(project, 'a.test.mjs'), `import { it, expect } from 'vitest';
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
-it('creates temp directories and never removes them', () => {
-  for (const name of ['tg-leak-', 'tg-leak-other-']) writeFileSync(join(mkdtempSync(join(tmpdir(), name)), 'big'), 'x'.repeat(1000));
-  const child = spawnSync(process.execPath, ['-e', 'require("fs").mkdtempSync(require("path").join(require("os").tmpdir(), "tg-child-"))']);
-  expect(child.status).toBe(0);
-  writeFileSync(process.env.SEEN_FILE, tmpdir());
-  expect(1).toBe(1);
-});
-`);
-    // What is already in the real temp directory: a crashed run (dead pid here), a live run, another host's run, an ordinary directory, a run with no owner file.
-    const crashed = owned(outer, 'tg-run-1-AAAAAA', { pid: DEAD, host: hostname() });
-    owned(outer, 'tg-run-2-BBBBBB', { pid: process.pid, host: hostname() });
-    owned(outer, 'tg-run-3-CCCCCC', { pid: DEAD, host: 'another-host' });
-    owned(outer, 'tg-run-4-DDDDDD');
-    owned(outer, 'tg-ordinary');
-    const seen = join(project, 'seen.txt');
-    const r = spawnSync(process.execPath, [join(ROOT, 'node_modules', 'vitest', 'vitest.mjs'), 'run', '--root', project], {
-      encoding: 'utf8', timeout: 120_000, cwd: project,
-      env: { ...process.env, TMPDIR: outer, TMP: outer, TEMP: outer, SEEN_FILE: seen, TESTGUARD_TEST_RUN_DIR: '', TESTGUARD_REAL_TMPDIR: '' },
-    });
-    expect(r.status, r.stdout + r.stderr).toBe(0);
-    // It ran inside a per-run directory under `outer`…
-    const during = readFileSync(seen, 'utf8');
-    expect(dirname(during)).toBe(realpathSync(outer));
-    expect(during.slice(dirname(during).length + 1)).toMatch(/^tg-run-\d+-[A-Za-z0-9]{6}$/);
-    // …which is gone, with every tg-* the test and its child made in it.
-    expect(readdirSync(outer).sort()).toEqual(['tg-ordinary', 'tg-run-2-BBBBBB', 'tg-run-3-CCCCCC', 'tg-run-4-DDDDDD']);
-    expect(existsSync(crashed)).toBe(false);
-  }, 150_000);
+describe('the setup and its teardown', () => {
+  it('makes the run directory, points the environment at it, sweeps a crashed run, and its teardown removes everything', () => {
+    const keys = ['TMPDIR', 'TMP', 'TEMP', 'TESTGUARD_TEST_RUN_DIR', 'TESTGUARD_REAL_TMPDIR'];
+    const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+    const base = dir();
+    const crashed = owned(base, 'tg-run-1-AAAAAA', { pid: DEAD, host: hostname() });
+    try {
+      delete process.env.TESTGUARD_TEST_RUN_DIR;
+      process.env.TMPDIR = base;
+      const teardown = setup();
+      const run = process.env.TESTGUARD_TEST_RUN_DIR;
+      expect(dirname(run)).toBe(realpathSync(base));
+      expect(run.slice(dirname(run).length + 1)).toMatch(/^tg-run-\d+-[A-Za-z0-9]{6}$/);
+      expect([process.env.TMPDIR, process.env.TMP, process.env.TEMP, tmpdir()]).toEqual([run, run, run, run]);
+      expect(process.env.TESTGUARD_REAL_TMPDIR).toBe(base);
+      expect(existsSync(join(run, OWNER_FILE))).toBe(true);
+      expect(existsSync(crashed)).toBe(false);
+      writeFileSync(join(mkdtempSync(join(tmpdir(), 'tg-leak-')), 'big'), 'x');
+      teardown();
+      expect(existsSync(run)).toBe(false);
+      expect(readdirSync(base)).toEqual([]);
+    } finally {
+      for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+    }
+  });
 });
 
 describe('sweeping the runs of dead processes', () => {

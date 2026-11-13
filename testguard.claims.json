@@ -17698,7 +17698,7 @@
     },
     {
       "id": "TG-CLEAN-REMOVES-ONLY-PROVABLE-ORPHANS",
-      "statement": "A scratch tree is removed only when its owner is provably gone (same host, pid not running) or, with no owner record, when it is older than 24 hours; a live owner's tree, another host's, a young ownerless one and a name this tool does not create are never touched, and --dry-run removes nothing.",
+      "statement": "A scratch tree is an orphan only when its owner is provably gone (same host, pid not running) or, with no owner record, when it is older than 24 hours; a live owner's tree, another host's, a young ownerless one, a lock whose owner is alive and a name this tool does not create are never touched.",
       "source": {
         "kind": "spec",
         "ref": "issue #311"
@@ -17783,9 +17783,27 @@
             "producer": "agent",
             "by": "claude"
           }
-        },
+        }
+      ]
+    },
+    {
+      "id": "TG-CLEAN-REMOVAL-IS-SAFE-BOUNDED-AND-REPORTED",
+      "statement": "Removing orphans never removes under --dry-run, stops at its time budget, reports an entry it cannot remove instead of failing the command (one warning line), drops the owner record with the tree, and covers every scratch name this tool creates.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #311"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/clean-orphans.test.mjs"
+      ],
+      "faults": [
         {
-          "id": "F7",
+          "id": "F1",
           "description": "A dry run removes the trees it lists.",
           "faultClass": "condition-forced",
           "file": "src/clean/orphans.mjs",
@@ -17797,19 +17815,7 @@
           }
         },
         {
-          "id": "F8",
-          "description": "The registry is never pruned after the trees are removed.",
-          "faultClass": "call-removed",
-          "file": "src/clean/orphans.mjs",
-          "find": "  if (repo && now() <= deadline) {",
-          "replace": "  if (false) {",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
-          "id": "F9",
+          "id": "F2",
           "description": "The time budget is ignored while removing.",
           "faultClass": "guard-removed",
           "file": "src/clean/orphans.mjs",
@@ -17821,7 +17827,7 @@
           }
         },
         {
-          "id": "F10",
+          "id": "F3",
           "description": "A failure in the cleanup a command does first propagates and fails the command.",
           "faultClass": "statement-deleted",
           "file": "src/clean/orphans.mjs",
@@ -17833,7 +17839,7 @@
           }
         },
         {
-          "id": "F11",
+          "id": "F4",
           "description": "An entry that cannot be removed throws instead of being reported.",
           "faultClass": "condition-forced",
           "file": "src/clean/orphans.mjs",
@@ -17845,19 +17851,7 @@
           }
         },
         {
-          "id": "F12",
-          "description": "The registry prune does not wait for the repository's lock.",
-          "faultClass": "call-removed",
-          "file": "src/clean/orphans.mjs",
-          "find": "withWorktreeLock(worktreeLockDir(repo, base), () => pruneWorktrees(repo), { timeoutMs: lockWaitMs, ...(alive ? { alive } : {}) })",
-          "replace": "pruneWorktrees(repo)",
-          "producedBy": {
-            "producer": "agent",
-            "by": "claude"
-          }
-        },
-        {
-          "id": "F13",
+          "id": "F5",
           "description": "The owner record stays after its tree is removed.",
           "faultClass": "statement-deleted",
           "file": "src/clean/orphans.mjs",
@@ -17869,24 +17863,66 @@
           }
         },
         {
-          "id": "F14",
-          "description": "A dry run prunes the registrations it should only report.",
-          "faultClass": "condition-forced",
-          "file": "src/git.mjs",
-          "find": "...(dryRun ? ['--dry-run'] : [])",
-          "replace": "...[]",
+          "id": "F6",
+          "description": "The runner and temporary-file names this tool creates are not recognised as scratch.",
+          "faultClass": "guard-removed",
+          "file": "src/clean/orphans.mjs",
+          "find": "|(?:run|discovery|vitest-list|vitest-kinds|playwright-kinds)-[0-9a-f]{12,16}\\.json",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CLEAN-PRUNES-ITS-REPOSITORYS-WORKTREE-REGISTRATIONS",
+      "statement": "After removing orphans, stale git worktree registrations are pruned for the repository the command works on and no other, without waiting for a live probe's lock; a dry run prunes nothing.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #311"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/clean-worktrees.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The registry is never pruned after the trees are removed.",
+          "faultClass": "call-removed",
+          "file": "src/clean/orphans.mjs",
+          "find": "  if (repo && now() <= deadline) {",
+          "replace": "  if (false) {",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
           }
         },
         {
-          "id": "F15",
-          "description": "The runner and temporary-file names this tool creates are not recognised as scratch.",
-          "faultClass": "guard-removed",
+          "id": "F2",
+          "description": "The registry prune does not wait for the repository's lock.",
+          "faultClass": "call-removed",
           "file": "src/clean/orphans.mjs",
-          "find": "|(?:run|discovery|vitest-list|vitest-kinds|playwright-kinds)-[0-9a-f]{12,16}\\.json",
-          "replace": "",
+          "find": "withWorktreeLock(worktreeLockDir(repo, base), () => pruneWorktrees(repo), { timeoutMs: lockWaitMs, ...(alive ? { alive } : {}) })",
+          "replace": "pruneWorktrees(repo)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A dry run prunes the registrations it should only report.",
+          "faultClass": "condition-forced",
+          "file": "src/git.mjs",
+          "find": "...(dryRun ? ['--dry-run'] : [])",
+          "replace": "...[]",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -17998,8 +18034,9 @@
       },
       "defendedBy": [
         "test/clean.cli.test.mjs",
-        "test/clean-sigkill.test.mjs",
-        "test/clean-orphans.test.mjs"
+        "test/clean-worktrees.test.mjs",
+        "test/clean-orphans.test.mjs",
+        "test/clean-sigkill.test.mjs"
       ],
       "faults": [
         {
@@ -18041,7 +18078,7 @@
           "find": "const dropOwner = recordOwner(scratchBase, dest);",
           "replace": "const dropOwner = () => {};",
           "defendedBy": [
-            "test/clean-orphans.test.mjs"
+            "test/clean-worktrees.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",
@@ -18056,7 +18093,7 @@
           "find": "cleanup: () => { remove(); dropOwner(); unregister(); },",
           "replace": "cleanup: () => { remove(); unregister(); },",
           "defendedBy": [
-            "test/clean-orphans.test.mjs"
+            "test/clean-worktrees.test.mjs"
           ],
           "producedBy": {
             "producer": "agent",
@@ -18232,7 +18269,8 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/run-temp.test.mjs"
+        "test/run-temp.test.mjs",
+        "test/run-temp.run.test.mjs"
       ],
       "faults": [
         {
@@ -18242,6 +18280,10 @@
           "file": "test/helpers/run-temp.mjs",
           "find": "return () => { rmSync(dir, { recursive: true, force: true }); };",
           "replace": "return () => {};",
+          "defendedBy": [
+            "test/run-temp.test.mjs",
+            "test/run-temp.run.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18254,6 +18296,9 @@
           "file": "test/helpers/run-temp.mjs",
           "find": "  for (const name of ['TMPDIR', 'TMP', 'TEMP']) process.env[name] = dir;\n",
           "replace": "",
+          "defendedBy": [
+            "test/run-temp.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18266,6 +18311,9 @@
           "file": "test/helpers/run-temp.mjs",
           "find": "if (!lockIsStale(owner, { alive, host })) continue;",
           "replace": "if (!owner) continue;",
+          "defendedBy": [
+            "test/run-temp.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18278,6 +18326,9 @@
           "file": "test/helpers/run-temp.mjs",
           "find": "    if (!RUN_NAME.test(name)) continue;\n",
           "replace": "",
+          "defendedBy": [
+            "test/run-temp.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18290,6 +18341,9 @@
           "file": "test/helpers/run-temp.mjs",
           "find": "  sweepStaleRuns(real);\n",
           "replace": "",
+          "defendedBy": [
+            "test/run-temp.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18302,6 +18356,9 @@
           "file": "test/helpers/run-temp.mjs",
           "find": "  writeFileSync(join(dir, OWNER_FILE), JSON.stringify({ pid: process.pid, host: hostname(), at: new Date().toISOString() }));\n",
           "replace": "",
+          "defendedBy": [
+            "test/run-temp.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18314,6 +18371,9 @@
           "file": "test/helpers/run-temp.mjs",
           "find": "  if (outer && existsSync(outer)) return () => {};\n",
           "replace": "",
+          "defendedBy": [
+            "test/run-temp.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18326,6 +18386,9 @@
           "file": "vitest.config.mjs",
           "find": "globalSetup: ['./test/helpers/run-temp.mjs'],",
           "replace": "globalSetup: [],",
+          "defendedBy": [
+            "test/run-temp.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
