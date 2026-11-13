@@ -34,7 +34,7 @@ gate that sees a commit before it exists.
 default_install_hook_types: [pre-commit, pre-push]
 repos:
   - repo: https://github.com/raccioly/testguard
-    rev: v0.26.0
+    rev: v0.26.1
     hooks:
       - id: testguard-claims
         stages: [pre-commit]
