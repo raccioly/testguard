@@ -181,6 +181,10 @@
           "properties": { "reused": { "type": "integer", "minimum": 0 }, "measured": { "type": "integer", "minimum": 0 } },
           "additionalProperties": false
         },
+        "config": {
+          "description": "The options this invocation took from testguard.config.json (#301): the file by hash, the keys it supplied, and the ones a flag or an environment variable overrode. Absent when no file was read. Reuse never compares this: it compares the resolved options, so a value moved from a flag into the file carries its verdicts forward.",
+          "$ref": "#/$defs/projectConfig"
+        },
         "converged": {
           "description": "Scoped runs only (`--claim`, `--changed`): whether this invocation updated the canonical evidence (GATE-SEMANTICS \"Convergence\"). `into` is the canonical file, with how many records were carried from `carriedFrom` and the faults kept stale; or null with the `reason` it did not.",
           "oneOf": [
@@ -252,6 +256,10 @@
               "description": "Claims left after the change selection and any --claim intersection. 0 means nothing was probed; it is not a pass.",
               "type": "integer",
               "minimum": 0
+            },
+            "explain": {
+              "description": "`probe --changed <ref> --explain` (#301): the selection was computed and explained, and nothing was probed, so `selectedCount` may exceed `probedCount` (always 0). A determined change exits 0 under --explain whatever it selected; an undetermined one still exits 2.",
+              "const": true
             },
             "changed": { "$ref": "#/$defs/changedScope" },
             "state": {
@@ -518,6 +526,10 @@
         "additionalProperties": false
       }
     },
+    "config": {
+      "description": "`status --json`: the project configuration file (#301) as it is in the working tree, with every key it sets. Absent when there is none or under --no-config.",
+      "$ref": "#/$defs/projectConfig"
+    },
     "claimsSource": {
       "description": "Present when the claims file lives outside the project: its hash, never its path (paths.claims is then omitted).",
       "$ref": "urn:claimspec:v1:common#/$defs/claimsSource"
@@ -625,6 +637,28 @@
   },
   "additionalProperties": false,
   "$defs": {
+    "projectConfig": {
+      "type": "object",
+      "required": ["file", "sha256", "keys"],
+      "properties": {
+        "file": { "const": "testguard.config.json" },
+        "sha256": { "$ref": "urn:claimspec:v1:common#/$defs/sha256" },
+        "keys": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/projectConfigKey" } },
+        "overridden": {
+          "description": "Keys the file sets that a command-line flag (`flag`) or an environment variable (`env`) overrode for this invocation.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["key", "by"],
+            "properties": { "key": { "$ref": "#/$defs/projectConfigKey" }, "by": { "enum": ["flag", "env"] } },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "projectConfigKey": { "enum": ["runner", "runnerCmd", "python", "nodeModules", "typecheck", "workers", "faultWorkers", "confirm", "budget"] },
     "claimResult": {
       "type": "object",
       "required": ["id", "result", "faults", "reasons"],
@@ -682,7 +716,7 @@
           "items": { "$ref": "urn:claimspec:v1:common#/$defs/identifier" }
         },
         "matchReasons": {
-          "description": "Why each matched claim was selected, one entry per matchedClaims id in the same order: `file` (a changed file is a fault target, a resolved defender or in the import closure; `file` names the first), `glob` (a changed path only a defendedBy glob matches, such as a deleted defender), `discovery` (#297: the claim's defenders are discovered and a changed file is one of its discovery inputs, a candidate test file or something a candidate imports, as found now or as its evidence recorded them; `file` names the first), or `indeterminate` (the closure or the defender discovery cannot be followed and something in the repository changed; `issue` is the closure's first recorded reason). Absent in documents written before it existed.",
+          "description": "Why each matched claim was selected, one entry per matchedClaims id in the same order: `file` (a changed file is a fault target, a resolved defender, in the import closure, or the project configuration testguard.config.json, which every claim depends on; `file` names the first), `glob` (a changed path only a defendedBy glob matches, such as a deleted defender), `discovery` (#297: the claim's defenders are discovered and a changed file is one of its discovery inputs, a candidate test file or something a candidate imports, as found now or as its evidence recorded them; `file` names the first), or `indeterminate` (the closure or the defender discovery cannot be followed and something in the repository changed; `issue` is the closure's first recorded reason). Absent in documents written before it existed.",
           "type": "array",
           "items": {
             "type": "object",

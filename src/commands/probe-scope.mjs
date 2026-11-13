@@ -50,6 +50,49 @@ export function renderNoSelection(selection, { failOnEmpty }) {
   return lines;
 }
 
+/**
+ * `probe --changed <ref> --explain`: the selection, measured and not probed.
+ * The `run.scope` a probe would carry, with nothing probed and `explain`
+ * set, and its exit: 0 for a determined change whatever it selected (an
+ * explanation judges nothing), 2 when git could not say what changed (never
+ * 0: "could not tell" is not an answer).
+ */
+export function explainScope(selection, { requested } = {}) {
+  if (selection.outcome !== 'selected') return { exitCode: selection.outcome === 'undetermined' ? 2 : 0, scope: { ...selection.scope, explain: true } };
+  return {
+    exitCode: 0,
+    scope: { ...(requested ? { requestedClaims: requested, requestedCount: requested.length } : {}), probedClaims: [], probedCount: 0, selectedCount: selection.only.length, explain: true, changed: selection.changed },
+  };
+}
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** One reason, as the line names it: the input that changed, and how the claim reaches it. */
+export function renderReason(reason) {
+  if (reason.kind === 'file') return `file ${reason.file}${reason.file === 'testguard.config.json' ? ' (the project configuration: every claim depends on it)' : ''}`;
+  if (reason.kind === 'glob') return `glob ${reason.file} (matches defendedBy ${reason.glob})`;
+  if (reason.kind === 'discovery') return `discovery ${reason.file} (a candidate test, or something one imports, for a claim whose defenders are discovered)`;
+  const issue = reason.issue;
+  return `indeterminate${issue ? ` ${issue.code} in ${issue.file}${issue.specifier ? ` (${issue.specifier})` : ''}` : ''} (the closure cannot be followed, and something in the repository changed)`;
+}
+
+/** The human lines of `--explain`: one per selected claim and why, a count per reason kind, what no claim covers. */
+export function renderExplain({ scope, exitCode }, { total }) {
+  const changed = scope.changed;
+  if (changed.outcome === 'undetermined') return renderNoSelection({ outcome: 'undetermined', scope }, { failOnEmpty: false });
+  const selected = scope.requestedClaims ? new Set(scope.requestedClaims) : null;
+  const reasons = (changed.matchReasons ?? []).filter((reason) => !selected || selected.has(reason.claimId));
+  const lines = [`--changed ${changed.ref}: ${scope.selectedCount} of ${plural(total, 'claim')} selected; ${plural(changed.files.length, 'file')} ${changed.files.length === 1 ? 'differs' : 'differ'} since merge-base ${changed.base.slice(0, 7)}${changed.includeDirty ? ' (working tree included)' : ''}. Nothing was probed (--explain).`];
+  const width = Math.max(0, ...reasons.map((reason) => reason.claimId.length));
+  for (const reason of reasons) lines.push(`  ${reason.claimId.padEnd(width)}  ${renderReason(reason)}`);
+  const counts = Object.fromEntries(['file', 'glob', 'discovery', 'indeterminate'].map((kind) => [kind, reasons.filter((reason) => reason.kind === kind).length]));
+  lines.push(`by reason: ${Object.entries(counts).map(([kind, n]) => `${kind} ${n}`).join(', ')}`);
+  if (selected && changed.matchedClaims.length > reasons.length) lines.push(`${changed.matchedClaims.length - reasons.length} more matched by the change but not named by --claim.`);
+  lines.push(...renderUnmatched(changed));
+  if (exitCode === 0 && scope.selectedCount === 0) lines.push('No claim depends on anything that changed. That is not a pass for the change: it says no claim was in its way.');
+  return lines;
+}
+
 /** The changed source files no claim covers; absence from the results says nothing about them. */
 export const renderUnmatched = (changed) => changed.unmatchedFiles.length === 0 ? [] : [`${changed.unmatchedFiles.length} changed source file${changed.unmatchedFiles.length === 1 ? ' is' : 's are'} ${changed.note}: ${changed.unmatchedFiles.slice(0, 10).join(', ')}${changed.unmatchedFiles.length > 10 ? ', …' : ''}`];
 

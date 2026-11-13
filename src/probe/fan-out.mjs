@@ -38,11 +38,12 @@ export function autoFaultWorkers(cpus) {
  * How many faults the CLI probes at once, and why. Precedence: `--serial`
  * (the explicit flag only — the derived "one runner worker" of the default is
  * not a request), then `--fault-workers`, then `TESTGUARD_FAULT_WORKERS`, then
- * auto. `--in-place` has one tree, so auto resolves to one there and an
- * explicit fan-out is refused. Returns `{ faultWorkers, source, cpus? }` or
+ * `faultWorkers` in testguard.config.json (#301, source `config`), then auto.
+ * `--in-place` has one tree, so auto resolves to one there and an explicit
+ * fan-out is refused. Returns `{ faultWorkers, source, cpus? }` or
  * `{ error }` (a usage error).
  */
-export function resolveFaultWorkers({ flag, env = {}, serial = false, inPlace = false, cpus }) {
+export function resolveFaultWorkers({ flag, env = {}, config, serial = false, inPlace = false, cpus }) {
   const read = (value, name) => {
     if (value === 'auto') return { auto: true };
     const n = parseFaultWorkers(value);
@@ -51,7 +52,8 @@ export function resolveFaultWorkers({ flag, env = {}, serial = false, inPlace = 
   const envValue = env.TESTGUARD_FAULT_WORKERS === '' ? undefined : env.TESTGUARD_FAULT_WORKERS;
   const asked = flag !== undefined ? { ...read(flag, '--fault-workers'), source: 'flag' }
     : envValue !== undefined ? { ...read(envValue, 'TESTGUARD_FAULT_WORKERS'), source: 'env' }
-      : { auto: true };
+      : config !== undefined ? { ...read(config, '"faultWorkers" in testguard.config.json'), source: 'config' }
+        : { auto: true };
   if (asked.error) return { error: asked.error };
   if (serial) {
     if (asked.source === 'flag' && !asked.auto && asked.n > 1) return { error: `--serial probes one fault at a time; it cannot be combined with --fault-workers ${asked.n}` };
