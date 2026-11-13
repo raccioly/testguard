@@ -111,7 +111,7 @@ prints each as a `speed` line.
 ## init
 
 ```bash
-npx testguard-cli init [dir] [--here] [--force] [--upgrade] [--ci github|gitlab] [--ci-evidence github|gitlab] [--mcp] [--json]
+npx testguard-cli init [dir] [--here] [--force] [--upgrade] [--pin] [--activate-hook] [--ci github|gitlab] [--ci-evidence github|gitlab] [--mcp] [--json]
 ```
 
 Installs two layers. The **agent layer** goes to the git root, where agent
@@ -125,9 +125,18 @@ it never reaches the network.
 
 It also writes a **pre-push block** that runs `probe --changed auto`: in
 `.husky/pre-push` when the repository has `.husky/`, otherwise in
-`.githooks/pre-push` (enable it once per clone with
-`git config core.hooksPath .githooks`). Anything else in that file stays. It
-never writes `.git/hooks`. Then it reports, with `~` lines, every hook and CI
+`.githooks/pre-push`. Anything else in that file stays; but a hook file that
+already mentions TestGuard outside a managed block is the project's own
+(runner flags, a probe somebody paused): `init` and `init --upgrade` write no
+block there, report it, and print the block they would have written (`--force`
+adds it). `init` then checks that the file is on this clone's **active hooks
+path** (`core.hooksPath`, husky, or a hook in the active directory that calls
+it) and reports it when git would never run it. When `.git/hooks` already
+holds other hooks it prints a small `.git/hooks/pre-push` that calls the
+tracked file, because repointing `core.hooksPath` would silently disable them;
+when it holds none, it prints `git config core.hooksPath .githooks`. `init`
+never changes git config and never writes `.git/` by itself; `--activate-hook`
+does the recommended one. Then it reports, with `~` lines, every hook and CI
 line that runs `probe --serial`, a full probe on every push, a pinned older
 `testguard-cli`, a floating version (the `latest` tag, or `npx
 testguard-cli` with no version) or an older TestGuard template.
@@ -137,17 +146,20 @@ repository root's, then one on `PATH`); with none it prints how to install the
 exact version that ran `init` and lets the push through, fetching nothing. The
 CI files run the project's installed TestGuard first, else exactly that version
 through `npx`. Nothing runs a floating tag.
-With a `package.json`, `init` also adds `testguard-cli` at that exact version to
-`devDependencies` (run your install so the lockfile records it) and writes a
-Dependabot rule for it in `.github/dependabot.yml`, or a Renovate rule when the
-repository has a Renovate config, so a new release arrives as a pull request
-your CI gates.
+With a `package.json`, `init` **recommends**, under "Recommended", pinning
+`testguard-cli` at that exact version in `devDependencies` and a Dependabot
+rule (or a Renovate rule when the repository has a Renovate config), so a new
+release arrives as a pull request your CI gates. It writes none of it unless you
+pass `--pin`: the pin leaves the lockfile out of date, and some projects forbid
+those files in their own rules.
 
 | Flag | Default | Meaning |
 |---|---|---|
 | `--here` | off | Keep the agent layer in `[dir]` instead of the git root, for a subdirectory that is its own agent root. |
 | `--force` | off | Replace an existing skill file (and an existing `.testguard/fetch-ci-evidence.sh`), and TestGuard blocks edited by hand. It does not refresh an `AGENTS.md` section that already lists the project. |
-| `--upgrade` | off | Rewrite what TestGuard wrote and nobody edited — the skill, the `AGENTS.md` section, the pre-push block, the `--ci` file — to the current template. Each managed block carries `template=<n>` and the hash of its body; an edited one is reported and left alone. See [upgrading](../upgrade.md#024-fast-by-default). |
+| `--upgrade` | off | Rewrite what TestGuard wrote and nobody edited — the skill, the `AGENTS.md` section, the pre-push block, the `--ci` file — to the current template. Each managed block carries `template=<n>` and the hash of its body; an edited one is reported and left alone. An `AGENTS.md` section is rewritten only when it is byte-for-byte a template TestGuard shipped; any other is left and reported. `--upgrade` never adds a pre-push block to a hook that had none from TestGuard, and never writes `package.json` or an update rule. See [upgrading](../upgrade.md#024-fast-by-default). |
+| `--pin` | off | Also write the exact `devDependencies` pin and the Dependabot or Renovate rule, as 0.25.0 did (run your install afterwards so the lockfile records the pin). Ignored with `--upgrade`. |
+| `--activate-hook` | off | Make this clone run the pre-push hook `init` wrote: set `core.hooksPath`, or write a `.git/hooks/pre-push` that calls it and keeps the other hooks. A `pre-push` already in `.git/hooks`, another hooks directory and husky are never edited. |
 | `--ci github\|gitlab` | none | Write `.github/workflows/testguard.yml` (GitHub) or `testguard.gitlab-ci.yml` to `include:` (GitLab): pull or merge requests run `probe --changed auto`, scheduled and manual runs run `probe`, and `.testguard/evidence.json` is cached. It runs the project's installed TestGuard, else `npx -y testguard-cli@<the version that ran init>`, and pins every action by commit SHA. Any other value is a usage error (exit `3`). |
 | `--ci-evidence github\|gitlab` | none | Also write `.testguard/fetch-ci-evidence.sh`, an on-demand helper that downloads CI's evidence artifact and briefs from it. See [artifacts](artifacts.md#fetch-ci-evidencesh). Any other value is a usage error (exit `3`) and nothing is written. |
 | `--mcp` | off | Print the MCP server configuration for Claude Code, Cursor and Codex. Printed, never written. See [MCP](mcp.md#register-the-server). |

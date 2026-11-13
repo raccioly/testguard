@@ -3,7 +3,7 @@ import { initProject, InitUsageError } from '../init/init.mjs';
 export async function initCommand({ projectDir, values, version }, io) {
   let r;
   try {
-    r = initProject({ projectDir, force: values.force, here: values.here, ciEvidence: values['ci-evidence'], mcp: values.mcp, upgrade: values.upgrade, ci: values.ci, toolVersion: version });
+    r = initProject({ projectDir, force: values.force, here: values.here, ciEvidence: values['ci-evidence'], mcp: values.mcp, upgrade: values.upgrade, pin: values.pin, activateHook: values['activate-hook'], ci: values.ci, toolVersion: version });
   } catch (e) {
     // A bad option is the caller's to fix, and init has written nothing yet:
     // every option is checked before the first write.
@@ -12,9 +12,9 @@ export async function initCommand({ projectDir, values, version }, io) {
     io.err("Run 'testguard init --help' for its options. Nothing was written.");
     return 3;
   }
-  const { done, skipped, warnings, outdated, notes, agentRoot, dir, mcpConfig } = r;
+  const { done, skipped, warnings, outdated, notes, recommendations, agentRoot, dir, mcpConfig } = r;
   if (values.json) {
-    io.out(JSON.stringify({ done, skipped, warnings, outdated, notes, agentRoot, dir, ...(mcpConfig ? { mcpConfig } : {}) }, null, 2));
+    io.out(JSON.stringify({ done, skipped, warnings, outdated, notes, recommendations, agentRoot, dir, ...(mcpConfig ? { mcpConfig } : {}) }, null, 2));
     return warnings.length ? 1 : 0;
   }
   for (const d of done) io.out(`+ ${d}`);
@@ -24,6 +24,15 @@ export async function initCommand({ projectDir, values, version }, io) {
   // with an old pin; and TestGuard's own blocks from an older template.
   for (const o of outdated) io.out(`~ ${o}`);
   for (const n of notes) io.out(`  ${n}`);
+  // What init recommends and did not do itself (#301): each with its exact text, to adopt by hand or with the flag it names.
+  if (recommendations.length) {
+    io.out('');
+    io.out('Recommended (init did not do these):');
+    for (const rec of recommendations) {
+      io.out(`  ${rec.title}`);
+      for (const line of rec.lines) io.out(`    ${line}`);
+    }
+  }
   io.out('');
   if (dir !== '.') io.out(`Agent layer (skill, session-start hook, AGENTS.md section) installed at the git root ${agentRoot}, where agent sessions run; the project layer stays in ${dir}/. Use --here to keep everything in ${dir}/.`);
   io.out(`Agents now start with the blind-spot brief and can run \`testguard status --json${dir === '.' ? '' : ` ${dir}`}\` to learn what to do next. The hook prefers a local install and never fetches from the network.`);

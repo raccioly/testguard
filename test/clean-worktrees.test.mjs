@@ -72,6 +72,21 @@ describe('worktree registrations', () => {
     expect(registered(other)).toBe(2);
   });
 
+  it('a dead probe\'s registration that git left locked (killed mid `worktree add`) is removed too', () => {
+    const dir = repo();
+    const base = root();
+    const name = 'testguard-kkkkkk';
+    git(dir, 'worktree', 'add', '--detach', join(base, name), 'HEAD');
+    git(dir, 'worktree', 'lock', '--reason', 'initializing', join(base, name));
+    mkdirSync(ownersDir(base), { recursive: true });
+    writeFileSync(join(ownersDir(base), `${name}.json`), JSON.stringify({ pid: DEAD, host: HOST }));
+    expect(registered(dir)).toBe(2);
+    const report = cleanOrphans({ base, repoRoot: dir, ...options });
+    expect(report.worktrees).toHaveLength(1);
+    expect(existsSync(join(base, name))).toBe(false);
+    expect(registered(dir)).toBe(1);
+  });
+
   it('a dry run reports the registration it would prune and prunes nothing', () => {
     const dir = repo();
     const base = root();

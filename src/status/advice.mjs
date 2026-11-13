@@ -92,7 +92,7 @@ export function hookAdvice({ root, toolVersion }) {
   return findings.slice(0, 5).map((f) => ({
     id: 'hook-outdated',
     message: renderFinding(f).slice(0, 512),
-    command: 'testguard init --upgrade',
+    command: f.reason === 'hook-inactive' ? 'testguard init --activate-hook' : 'testguard init --upgrade',
   }));
 }
 

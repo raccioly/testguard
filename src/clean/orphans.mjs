@@ -2,7 +2,7 @@ import { lstatSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { ownersDir } from './owner.mjs';
 import { hostname } from 'node:os';
 import { basename, join } from 'node:path';
-import { gitCommonDir, pruneWorktrees } from '../git.mjs';
+import { gitCommonDir, pruneWorktrees, unlockWorktree } from '../git.mjs';
 import { defaultAlive } from '../probe/contention.mjs';
 import { lockIsStale, parseLock, LOCK_NAME, withWorktreeLock, worktreeLockDir } from '../probe/worktree-lock.mjs';
 import { workerSlotDir } from '../probe/worker-env.mjs';
@@ -142,7 +142,11 @@ export function cleanOrphans({ base, repoRoot, dryRun = false, measure = false, 
   try { repo = repoRoot ? gitCommonDir(repoRoot) : undefined; } catch { repo = undefined; /* not a repository: nothing to prune */ }
   if (repo && now() <= deadline) {
     try {
-      const lines = dryRun ? pruneWorktrees(repo, { dryRun: true }) : withWorktreeLock(worktreeLockDir(repo, base), () => pruneWorktrees(repo), { timeoutMs: lockWaitMs, ...(alive ? { alive } : {}) });
+      const lines = dryRun ? pruneWorktrees(repo, { dryRun: true }) : withWorktreeLock(worktreeLockDir(repo, base), () => {
+        // The trees just removed belonged to dead probes; one killed mid-`worktree add` left its registration locked, which prune would skip.
+        for (const r of removed) if (r.kind === 'scratch-tree') unlockWorktree(repo, r.path);
+        return pruneWorktrees(repo);
+      }, { timeoutMs: lockWaitMs, ...(alive ? { alive } : {}) });
       for (const line of lines) worktrees.push({ registration: line.replace(/^Removing /, '') });
     } catch { /* a lock held by a live probe: leave it for the next run */ }
   }
