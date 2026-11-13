@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ClaimsError } from './claims/load.mjs';
+import { assertOutputFlags } from './util/out-path.mjs';
 import { PreconditionError } from './probe/worktree.mjs';
 import { UsageError, errorDocument } from './probe/precondition-error.mjs';
 import { resolveScratchDir, withScratchBase } from './scratch-dir.mjs';
@@ -438,6 +439,8 @@ async function dispatch(argv, io, seen) {
     return 3;
   }
   try {
+    // Before anything is measured or written: --out names a file, never a directory (#320).
+    assertOutputFlags(command, values);
     const projectDir = command === 'scaffold' || command === 'admit' ? resolve('.') : resolve(dirArg ?? '.');
     // Checked before the handler writes anything: a scratch directory that cannot be used refuses the run.
     const scratchBase = SCRATCH_COMMANDS.has(command) ? resolveScratchDir(values['scratch-dir']) : undefined;

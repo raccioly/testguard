@@ -3471,6 +3471,89 @@
       ]
     },
     {
+      "id": "TG-OUT-NAMES-A-FILE-NOT-A-DIRECTORY",
+      "statement": "Every command that writes an --out document (and replay's --calibration-out) refuses a path that is an existing directory, or ends in a separator, with exit 2, the message `--out names a file, and <path> is a directory` and the named kind out-is-directory, before anything is probed or written and never as an internal error; a file path in a directory that does not exist yet is accepted.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #320 (--out and a directory)"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/out-is-directory.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An existing directory is accepted as the output file.",
+          "faultClass": "guard-removed",
+          "file": "src/util/out-path.mjs",
+          "find": "if (directory) throw new PreconditionError(",
+          "replace": "if (false) throw new PreconditionError(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A path ending in a separator is accepted as a file.",
+          "faultClass": "guard-removed",
+          "file": "src/util/out-path.mjs",
+          "find": "if (/[\\\\/]$/.test(value)) throw new PreconditionError(",
+          "replace": "if (false) throw new PreconditionError(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The check is never run before a command starts.",
+          "faultClass": "statement-deleted",
+          "file": "src/cli.mjs",
+          "find": "    assertOutputFlags(command, values);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "sweep is dropped from the commands whose --out is checked.",
+          "faultClass": "literal-changed",
+          "file": "src/util/out-path.mjs",
+          "find": "'probe', 'sweep', 'replay'",
+          "replace": "'probe', 'replay'",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "replay's --calibration-out is not checked.",
+          "faultClass": "literal-changed",
+          "file": "src/util/out-path.mjs",
+          "find": "{ replay: ['calibration-out'] }",
+          "replace": "{}",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ],
+      "tags": [
+        "cli",
+        "out",
+        "issue-320"
+      ]
+    },
+    {
       "id": "TG-ANNOTATION-RESULT-IS-NON-OPTIMISTIC",
       "statement": "Annotation authoring validation rejects applied results without complete verified targets, recovery and owned-lock release.",
       "source": {
