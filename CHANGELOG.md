@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`testguard.config.json` holds how a project's tests run (#301).** The keys `runner`, `runnerCmd`, `python`, `nodeModules`, `typecheck`, `workers`, `faultWorkers`, `confirm` and `budget` become the defaults of every command, so a hook or a CI line is `testguard probe --changed` instead of a row of flags. A flag on the command line still wins; `--no-config` ignores the file. An unknown key or a wrong type is a usage error, never a silent default.
+- **`probe --changed --explain` prints which claims a change selects and why, and probes nothing (#301).** One line per selected claim with its reason.
+- **`testguard clean [--dry-run]` removes what interrupted runs left behind (#311).** Scratch trees and locks record their owner; `clean` removes those whose owner is no longer running on this host and never touches a live run. `probe`, `sweep`, `replay` and `admit` do the same before they start, and `status` reports leftovers as `orphaned-scratch`.
+- **`init --pin` and `init --activate-hook` (#301).** `--pin` writes the exact `devDependencies` pin and the Dependabot or Renovate rule. `--activate-hook` makes the clone run the pre-push hook `init` wrote: it sets `core.hooksPath`, or writes a `.git/hooks/pre-push` that calls the tracked file when other hooks already live there.
+
+### Fixed
+
+- **A run ends when its budget does (#310).** A timed-out run is over at its budget and its teardown gets a fixed 5 seconds, sent as `SIGKILL` only, so a runner that ignores `SIGTERM` or leaves a child holding the output pipe no longer keeps the probe waiting far past the budget. `durationMs` is the time to the budget. A teardown that could not be confirmed is one warning line and stays a `timeout`; a timeout while other test runners were busy says so in its message. No verdict changes.
+- **`--changed` no longer over-selects through a CommonJS export surface (#301).**
+- **The unit suite and interrupted probes no longer fill the temp directory (#311).** Each test run works in one directory that is removed when it ends.
+
 ### Changed
+
+- **`init` no longer edits `package.json` or the dependency-update config by default (#301).** It recommends the pin and writes it only with `--pin`: the pin leaves the lockfile out of date, and some projects forbid those files in their own rules. 0.25.0 wrote it unasked.
+- **`init` leaves hand-written TestGuard hooks and edited `AGENTS.md` sections alone (#301).** A pre-push file that already runs TestGuard its own way gets no managed block (`--force` adds it); the block that would have been written is printed.
+- **`init` reports a pre-push hook git would never run (#301).** It checks that the file is on the clone's active hooks path and prints the one command that fixes it.
 
 - **The sharded cost gate is per fault, and the shard count has one home (#284, repository only).** The total ceiling is `perFaultSeconds` (3.0) times the faults in the merged evidence, so adding claims passes and a dearer fault fails; the slowest-shard ceiling is the wall-time guard (720 normalized seconds) and its failure says to add a shard. `sharded.shards` in `testguard.cost-budget.json` is read by `shard-probe.mjs plan` and, through its `indexes` output, by the CI matrix.
 
