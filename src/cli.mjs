@@ -22,6 +22,10 @@ import { mcpCommand } from './commands/mcp.mjs';
 import { admitCommand } from './commands/admit.mjs';
 import { sweepCommand } from './commands/sweep.mjs';
 import { concernsCommand } from './commands/concerns.mjs';
+import { cleanCommand } from './commands/clean.mjs';
+import { cleanOnStart } from './clean/orphans.mjs';
+import { repoRoot } from './git.mjs';
+import { scratchRoot } from './scratch-dir.mjs';
 import { originPolicyRequest } from './probe/origin-policy.mjs';
 import { assertionPolicyRequest } from './probe/assertion-policy.mjs';
 import { draftAppendRequest, intentInputRequest } from './scaffold/request.mjs';
@@ -44,6 +48,7 @@ export const USAGE = `testguard ${VERSION} — proves a test suite defends the c
   testguard mcp              serve the read-only status/brief/claims/evidence tools over MCP on stdio, so the loop works in any agent harness
   testguard replay [dir]     would this suite have caught the bugs that already escaped? Replays real fix commits and calibrates fault classes against them
   testguard admit <test> --claim <ID>   the two-gate rule as one verb: is this test green on HEAD and does it fail on every fault of the claim?
+  testguard clean [dir]      remove the scratch trees and locks interrupted runs left behind; --dry-run lists them first
 
 probe
   --claims <path>      claims file             (default: <dir>/testguard.claims.json). May live outside the project
@@ -194,6 +199,11 @@ init       --force (replace an existing skill file)  --here (keep the agent laye
            agent layer (skill, SessionStart hook, AGENTS.md section) → git root; project layer (.gitignore lines) → [dir]
            the hook prefers a local install, then a testguard already on PATH, then nothing; it never reaches the network. exit 1 if a written file is gitignored
            --mcp             print the MCP server config for Claude Code, Cursor and Codex (printed, never written: a harness config is yours)
+clean      --dry-run  list what would be removed and remove nothing  --scratch-dir <dir>  --json
+           removes what interrupted runs left under the scratch root: scratch trees whose owner process is gone (same host, pid not
+           running), stale worker-slot and worktree locks, and this repository's stale git worktree registrations; reports how much.
+           A live owner's tree, another host's and a young tree with no owner record are never touched. probe, sweep, replay and admit
+           do the same, bounded to a few seconds, before they start. exit 0 (2 when an entry could not be removed)
 every command except mcp accepts --json (mcp speaks JSON-RPC on stdio and refuses it); probe/baseline emit the status document plus their own result
 claims     --json
            --cost            what the last probe spent, per claim and per defender file, read back from the recorded run durations. Names the files more than one claim pays for, which is where a slow gate comes from
@@ -207,9 +217,11 @@ exit codes: 0 nothing new to prove · 1 unproven claims (or claim drift, or uncl
 `;
 
 /** The commands that run a project's tests, and so create scratch worktrees and runner files. */
-const SCRATCH_COMMANDS = new Set(['probe', 'sweep', 'replay', 'admit']);
+const SCRATCH_COMMANDS = new Set(['probe', 'sweep', 'replay', 'admit', 'clean']);
+/** The ones that also remove what interrupted runs left behind before they start (#311); `clean` does it as its job. */
+const CLEANS_ON_START = new Set(['probe', 'sweep', 'replay', 'admit']);
 
-const COMMANDS = { mcp: mcpCommand, replay: replayCommand, probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand, admit: admitCommand, sweep: sweepCommand, concerns: concernsCommand };
+const COMMANDS = { mcp: mcpCommand, replay: replayCommand, probe: probeCommand, claims: claimsCommand, baseline: baselineCommand, brief: briefCommand, scaffold: scaffoldCommand, status: statusCommand, init: initCommand, gate: gateCommand, admit: admitCommand, sweep: sweepCommand, concerns: concernsCommand, clean: cleanCommand };
 
 /** Derive command help from the same option descriptions as the overview. */
 export function commandUsage(command) {
@@ -314,6 +326,7 @@ async function dispatch(argv, io, seen) {
         runner: { type: 'string', default: 'auto' },
         'node-modules': { type: 'string' },
         'scratch-dir': { type: 'string' },
+        'dry-run': { type: 'boolean', default: false },
         'in-place': { type: 'boolean', default: false },
         'no-escalate': { type: 'boolean', default: false },
         'no-reuse': { type: 'boolean', default: false },
@@ -379,6 +392,10 @@ async function dispatch(argv, io, seen) {
     io.err('--scratch-dir is only valid on probe, sweep, replay and admit: the commands that run tests');
     return 3;
   }
+  if (values['dry-run'] && command !== 'clean') {
+    io.err('--dry-run is only valid on clean');
+    return 3;
+  }
   if (values.typecheck !== undefined && !(command === 'probe' || (command === 'claims' && values['check-anchors']))) {
     io.err('--typecheck is only valid on probe and on claims --check-anchors');
     return 3;
@@ -406,7 +423,15 @@ async function dispatch(argv, io, seen) {
     const projectDir = command === 'scaffold' || command === 'admit' ? resolve('.') : resolve(dirArg ?? '.');
     // Checked before the handler writes anything: a scratch directory that cannot be used refuses the run.
     const scratchBase = SCRATCH_COMMANDS.has(command) ? resolveScratchDir(values['scratch-dir']) : undefined;
-    return await withScratchBase(scratchBase, () => handler({ projectDir, file: dirArg, files: positionals.slice(1), values, suppliedOptions, version: VERSION }, io));
+    return await withScratchBase(scratchBase, () => {
+      if (CLEANS_ON_START.has(command)) {
+        let root;
+        try { root = repoRoot(projectDir); } catch { root = undefined; }
+        const report = cleanOnStart({ base: scratchRoot(), repoRoot: root, warn: io.err });
+        if (report?.removed.length && !values.quiet) io.err(`cleaned ${report.removed.length} leftover scratch ${report.removed.length === 1 ? 'entry' : 'entries'} from interrupted runs${report.capped ? ' (more remain; testguard clean removes the rest)' : ''}`);
+      }
+      return handler({ projectDir, file: dirArg, files: positionals.slice(1), values, suppliedOptions, version: VERSION }, io);
+    });
   } catch (e) {
     seen.error = e;
     if (e instanceof UsageError) {

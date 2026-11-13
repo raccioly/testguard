@@ -40,6 +40,7 @@ code were wrong, would anything fail?*
 | Verdict function | The pure decision: runs in, verdict out | `src/probe/classify.mjs` |
 | Injector | Apply and restore a fault; anchor location | `src/probe/inject.mjs` |
 | Isolation | Scratch git worktree, or in-place with restore guarantees | `src/probe/worktree.mjs` |
+| Orphan cleanup | Owner record per scratch tree; remove trees, locks and worktree registrations whose owner is gone (`clean`, and before every probe) | `src/clean/orphans.mjs`, `src/clean/owner.mjs` |
 | Runners | One module per test runner behind a single interface | `src/probe/runners/` |
 | Discovery | Which tests defend a target, and which merely mock it | `src/probe/discover.mjs`, `src/probe/mocks.mjs` |
 | Ranking | Severity, claim provenance and blast radius; alias resolution | `src/probe/rank.mjs` |

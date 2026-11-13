@@ -70,6 +70,7 @@ of these codes it can return; the normative rules are in
 | [`mcp`](#mcp) | Serve the read-only loop over the Model Context Protocol on stdio. |
 | [`replay`](#replay) | Would this suite have caught the bugs that already escaped? |
 | [`admit`](#admit) | Is this test green on HEAD and does it fail on every fault of the claim? |
+| [`clean`](#clean) | Remove the scratch trees and locks interrupted runs left behind. |
 
 ## status
 
@@ -101,7 +102,7 @@ is the exact shell line to run.
 
 `advice` lists where the project is leaving speed on the table, one line each
 with the command to run: `serial-on-multicore`, `full-probe-where-changed-would-do`, `slow-defenders-dominate`,
-`nothing-reused`, `hook-outdated`. It is informational (it never changes
+`nothing-reused`, `hook-outdated`, `orphaned-scratch` (leftovers of interrupted runs: `testguard clean`). It is informational (it never changes
 `state`, `next` or the exit code) and reads only files on disk. The text form
 prints each as a `speed` line.
 
@@ -599,6 +600,43 @@ it). Verdict meanings are in [verdicts](verdicts.md#admit).
 
 **`--json` schema:** none published for the result; the evidence file conforms
 to [`evidence.schema.json`](../../spec/schemas/evidence.schema.json).
+
+## clean
+
+```bash
+npx testguard-cli clean [dir] [--dry-run] [--scratch-dir <dir>] [--json]
+```
+
+Removes what interrupted runs left under the scratch directory (the operating
+system's temp directory unless `--scratch-dir` or `TESTGUARD_SCRATCH_DIR` names
+one), and says how much it freed:
+
+- **scratch trees** (`testguard-*` worktrees and runner directories) whose owner
+  is gone: every tree carries an owner record (the creating process and host,
+  and the repository it is registered with), and a tree is an orphan when that
+  process is no longer running on this host. A tree with no owner record (one a
+  version before 0.26 left) is removed only when it is older than 24 hours;
+- **stale locks**: worker-slot and worktree-allocation lock files whose owner is
+  gone;
+- **stale `git worktree` registrations** of this repository, and of the
+  repository an orphaned tree was registered with.
+
+A tree whose owner is alive, one another host owns, a young tree with no owner
+record and any directory this tool does not name that way are never touched.
+`probe`, `sweep`, `replay` and `admit` do the same before they start, bounded to
+a few seconds, and print one line when they removed something; a cleanup that
+fails is one warning and never fails the command. `status` and `brief` carry an
+`orphaned-scratch` advice line with this command when there is something to
+remove.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--dry-run` | off | List what would be removed and remove nothing. |
+| `--scratch-dir <dir>` | the OS temp directory | The scratch root to clean, as for [probe](#probe). |
+| `--json` | off | One document: `{base, dryRun, capped, removed[{kind, path, reason, bytes}], failed, worktrees, bytes}`. |
+
+**Exit:** `0`, also when there was nothing to remove; `2` an entry could not be
+removed.
 
 ## Next
 

@@ -409,13 +409,13 @@
       }
     },
     "advice": {
-      "description": "Where the run is leaving speed on the table (#270), one line each with the exact command to run: `serial-on-multicore` (the last probe ran one fault at a time by request on a machine where the automatic width is above one), `full-probe-where-changed-would-do` (the next step is a probe and the change since a known base can affect fewer claims than there are), `nothing-reused` (the last probe, a minute or longer, carried no verdict forward), `slow-defenders-dominate` (a few claims hold a large share of the recorded defender time: the message names each claim, its summed seconds, its slowest defender file with the median seconds per run and the run count; computed from recorded durations, no extra runs), `hook-outdated` (a hook or CI file runs TestGuard with `--serial`, a full probe on every push, a pinned older version, a floating version such as testguard-cli@latest, or an older managed template). Informational: advice never changes `state`, `next`, a verdict or an exit code, and computing it makes no network call. Absent when nothing applies, and for a selection's view.",
+      "description": "Where the run is leaving speed on the table (#270), one line each with the exact command to run: `serial-on-multicore` (the last probe ran one fault at a time by request on a machine where the automatic width is above one), `full-probe-where-changed-would-do` (the next step is a probe and the change since a known base can affect fewer claims than there are), `nothing-reused` (the last probe, a minute or longer, carried no verdict forward), `slow-defenders-dominate` (a few claims hold a large share of the recorded defender time: the message names each claim, its summed seconds, its slowest defender file with the median seconds per run and the run count; computed from recorded durations, no extra runs), `hook-outdated` (a hook or CI file runs TestGuard with `--serial`, a full probe on every push, a pinned older version, a floating version such as testguard-cli@latest, or an older managed template), `orphaned-scratch` (#311: scratch trees or locks an interrupted run left under the scratch directory, whose owner process is gone; the command is `testguard clean`). Informational: advice never changes `state`, `next`, a verdict or an exit code, and computing it makes no network call. Absent when nothing applies, and for a selection's view.",
       "type": "array",
       "items": {
         "type": "object",
         "required": ["id", "message", "command"],
         "properties": {
-          "id": { "enum": ["serial-on-multicore", "full-probe-where-changed-would-do", "nothing-reused", "slow-defenders-dominate", "hook-outdated"] },
+          "id": { "enum": ["serial-on-multicore", "full-probe-where-changed-would-do", "nothing-reused", "slow-defenders-dominate", "hook-outdated", "orphaned-scratch"] },
           "message": { "type": "string", "minLength": 1, "maxLength": 512 },
           "command": { "type": "string", "pattern": "^testguard ", "maxLength": 256 }
         },

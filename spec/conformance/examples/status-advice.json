@@ -116,6 +116,11 @@
       "id": "hook-outdated",
       "message": ".husky/pre-push:4: runs probe --serial: one fault at a time — drop --serial (faults now run in parallel safely)",
       "command": "testguard init --upgrade"
+    },
+    {
+      "id": "orphaned-scratch",
+      "message": "3 scratch entries left by interrupted runs are taking disk space; the next probe removes some, and clean removes all of them (add --dry-run to list first).",
+      "command": "testguard clean"
     }
   ]
 }

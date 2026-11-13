@@ -1572,13 +1572,14 @@ and local git, and makes no network call. The set is closed:
 | `full-probe-where-changed-would-do` | asked about a change — `status --changed <ref>`, or the end of a full probe with the base `--changed auto` would use — `next.action` is `probe` (status), and the change selects fewer claims than the file holds (the selection rule of [Probing a change](#probing-a-change)). Selecting walks every claim's import closure, so a `brief`, the MCP tools and a `status` without `--changed` do not compute it. | `testguard probe --changed auto` |
 | `nothing-reused` | the last evidence reused no verdict, measured at least one fault, and took a minute or longer | `testguard probe` |
 | `slow-defenders-dominate` | the last evidence holds at least 20 claims and 600 s of recorded defender time, and one to three claims each hold at least 10% of it with at least 5 runs at a median of at least 15 s per run, together at least 25%. The message names each claim, its summed seconds, its slowest defender file with the median seconds per run of every run that included it and that run count (runs execute a claim's defenders together, so a file's time is a ceiling, as in `--cost`), and says to give the claim a faster defender or split the file. Read from recorded `durationMs`; nothing is run. The thresholds are measured: this repository's own evidence peaks at 6.2% and a median 9.9 s, so the rule is silent there; the field run that prompted it had claims at 34% (73 s) and 18% (32 s) | `testguard claims --cost` |
+| `orphaned-scratch` | scratch trees or locks an interrupted run left under the scratch directory: a tree whose owner record names a process that is gone on this host, a lock whose owner is gone, or a tree with no owner record older than 24 hours (a bounded look of a quarter second; a live owner's tree, another host's and a young ownerless tree are never counted). One line | `testguard clean` |
 | `hook-outdated` | a hook or CI file in the repository runs TestGuard with `probe --serial`, probes every claim from a pre-push hook, pins `testguard-cli@<x.y.z>` or the action or pre-commit `rev` below this version, runs a floating version (`testguard-cli@latest`, `@next` or `@*`, or `npx testguard-cli` with no version; managed blocks included), or holds a TestGuard managed block from an older template; one line per file and line, at most five | `testguard init --upgrade` |
 
 A selection's view (`--claim`, `--changed`) carries no advice. Validators
 reject an unknown id, a command that is not a `testguard` command, an id other
 than `hook-outdated` said twice, `slow-defenders-dominate` with any command but `testguard claims --cost`, `full-probe-where-changed-would-do` where
 `next.action` is not `probe` or whose command is not a `probe --changed`, and
-`hook-outdated` with any command but `testguard init --upgrade`, in a status
+`hook-outdated` with any command but `testguard init --upgrade`, `orphaned-scratch` with any command but `testguard clean`, in a status
 document and in a brief alike.
 
 **Managed blocks.** What `init` writes for the fast path — the pre-push block

@@ -17695,6 +17695,579 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-CLEAN-REMOVES-ONLY-PROVABLE-ORPHANS",
+      "statement": "A scratch tree is removed only when its owner is provably gone (same host, pid not running) or, with no owner record, when it is older than 24 hours; a live owner's tree, another host's, a young ownerless one and a name this tool does not create are never touched, and --dry-run removes nothing.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #311"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/clean-orphans.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A tree whose owner is alive is removed.",
+          "faultClass": "guard-removed",
+          "file": "src/clean/orphans.mjs",
+          "find": "if (lockIsStale(owner, { alive, host })) orphans.push({ kind: 'scratch-tree', path,",
+          "replace": "if (owner) orphans.push({ kind: 'scratch-tree', path,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The owner's host is ignored: another host's tree is judged by this host's process table.",
+          "faultClass": "condition-forced",
+          "file": "src/clean/orphans.mjs",
+          "find": "if (lockIsStale(owner, { alive, host })) orphans.push({ kind: 'scratch-tree', path,",
+          "replace": "if (!alive(owner.pid)) orphans.push({ kind: 'scratch-tree', path,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A young tree with no owner record is removed.",
+          "faultClass": "guard-removed",
+          "file": "src/clean/orphans.mjs",
+          "find": "} else if (old(path)) {",
+          "replace": "} else {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Any entry under the scratch root is a candidate, whatever its name.",
+          "faultClass": "guard-removed",
+          "file": "src/clean/orphans.mjs",
+          "find": "    if (!isTree && !isFile) continue;\n",
+          "replace": "    if (false) continue;\n",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A lock whose owner is alive is removed.",
+          "faultClass": "condition-forced",
+          "file": "src/clean/orphans.mjs",
+          "find": "    if (lockIsStale(owner, { alive, host })) orphans.push({ kind: 'stale-lock',",
+          "replace": "    if (owner) orphans.push({ kind: 'stale-lock',",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "The owner record does not name the host that wrote it.",
+          "faultClass": "field-dropped",
+          "file": "src/clean/owner.mjs",
+          "find": "JSON.stringify({ pid: process.pid, host, at:",
+          "replace": "JSON.stringify({ pid: process.pid, at:",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "A dry run removes the trees it lists.",
+          "faultClass": "condition-forced",
+          "file": "src/clean/orphans.mjs",
+          "find": "    if (!dryRun) {",
+          "replace": "    if (true) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F8",
+          "description": "The registry is never pruned after the trees are removed.",
+          "faultClass": "call-removed",
+          "file": "src/clean/orphans.mjs",
+          "find": "    if (!usableGitDir(repo) || now() > deadline) continue;",
+          "replace": "    continue;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F9",
+          "description": "The time budget is ignored while removing.",
+          "faultClass": "guard-removed",
+          "file": "src/clean/orphans.mjs",
+          "find": "    if (now() > deadline) { capped = true; break; }\n    const bytes = measure",
+          "replace": "    const bytes = measure",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F10",
+          "description": "A failure in the cleanup a command does first propagates and fails the command.",
+          "faultClass": "statement-deleted",
+          "file": "src/clean/orphans.mjs",
+          "find": "    warn(`warning: orphaned scratch cleanup skipped: ${error.message}`);\n    return null;",
+          "replace": "    throw error;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F11",
+          "description": "An entry that cannot be removed throws instead of being reported.",
+          "faultClass": "condition-forced",
+          "file": "src/clean/orphans.mjs",
+          "find": "} catch (error) { failed.push({",
+          "replace": "} catch (error) { throw error; failed.push({",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F12",
+          "description": "The registry prune does not wait for the repository's lock.",
+          "faultClass": "call-removed",
+          "file": "src/clean/orphans.mjs",
+          "find": "withWorktreeLock(worktreeLockDir(repo, base), () => pruneWorktrees(repo), { timeoutMs: lockWaitMs, ...(alive ? { alive } : {}) })",
+          "replace": "pruneWorktrees(repo)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F13",
+          "description": "The owner record stays after its tree is removed.",
+          "faultClass": "statement-deleted",
+          "file": "src/clean/orphans.mjs",
+          "find": "        if (orphan.kind === 'scratch-tree') rmSync(join(ownersDir(base), `${basename(orphan.path)}.json`), { force: true });\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F14",
+          "description": "A dry run prunes the registrations it should only report.",
+          "faultClass": "condition-forced",
+          "file": "src/git.mjs",
+          "find": "...(dryRun ? ['--dry-run'] : [])",
+          "replace": "...[]",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CLEAN-COMMAND-REPORTS-AND-DRY-RUN-REMOVES-NOTHING",
+      "statement": "`testguard clean` reports what it removed and how much, exits 0, prints one JSON document under --json, and with --dry-run lists everything and removes nothing; --dry-run is refused on any other command.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #311"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/clean.cli.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "--dry-run is ignored and the orphans are removed.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/clean.mjs",
+          "find": "dryRun: values['dry-run'],",
+          "replace": "dryRun: false,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Nothing to clean exits 1.",
+          "faultClass": "return-altered",
+          "file": "src/commands/clean.mjs",
+          "find": "return report.failed.length ? 2 : 0;",
+          "replace": "return report.removed.length ? 0 : 1;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "--json prints the text report.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/clean.mjs",
+          "find": "io.out(values.json ? JSON.stringify(report, null, 2) : renderClean(report));",
+          "replace": "io.out(renderClean(report));",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "How much was removed is not measured.",
+          "faultClass": "literal-changed",
+          "file": "src/commands/clean.mjs",
+          "find": "measure: true",
+          "replace": "measure: false",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "--dry-run is accepted on every command.",
+          "faultClass": "guard-removed",
+          "file": "src/cli.mjs",
+          "find": "  if (values['dry-run'] && command !== 'clean') {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "Sizes lose their rounding rule.",
+          "faultClass": "literal-changed",
+          "file": "src/commands/clean.mjs",
+          "find": "value >= 100 ? 0 : 1",
+          "replace": "1",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-PROBE-REMOVES-ORPHANS-AT-START",
+      "statement": "Every scratch tree and child scope carries an owner record from creation, and probe, sweep, replay and admit remove the trees of dead owners and their worktree registrations before they start; a probe killed with SIGKILL leaves a tree the next probe removes.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #311"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/clean.cli.test.mjs",
+        "test/clean-sigkill.test.mjs",
+        "test/clean-orphans.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "No command cleans before it starts.",
+          "faultClass": "guard-removed",
+          "file": "src/cli.mjs",
+          "find": "      if (CLEANS_ON_START.has(command)) {",
+          "replace": "      if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The note about what was cleaned ignores --quiet.",
+          "faultClass": "guard-removed",
+          "file": "src/cli.mjs",
+          "find": "if (report?.removed.length && !values.quiet)",
+          "replace": "if (report?.removed.length)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A scratch tree is created with no owner record.",
+          "faultClass": "call-removed",
+          "file": "src/probe/worktree.mjs",
+          "find": "const dropOwner = recordOwner(scratchBase, dest, { repo: gitCommonDir(repoRoot) });",
+          "replace": "const dropOwner = () => {};",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A tree's owner record outlives the tree.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/worktree.mjs",
+          "find": "cleanup: () => { remove(); dropOwner(); unregister(); },",
+          "replace": "cleanup: () => { remove(); unregister(); },",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A child scope is created with no owner record.",
+          "faultClass": "call-removed",
+          "file": "src/scratch-dir.mjs",
+          "find": "const dropOwner = recordOwner(base, dir);",
+          "replace": "const dropOwner = () => {};",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "A child scope's owner record outlives it.",
+          "faultClass": "statement-deleted",
+          "file": "src/scratch-dir.mjs",
+          "find": "{ rmSync(dir, { recursive: true, force: true }); dropOwner(); };",
+          "replace": "{ rmSync(dir, { recursive: true, force: true }); };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "clean does not accept --scratch-dir.",
+          "faultClass": "literal-changed",
+          "file": "src/cli.mjs",
+          "find": "new Set(['probe', 'sweep', 'replay', 'admit', 'clean'])",
+          "replace": "new Set(['probe', 'sweep', 'replay', 'admit'])",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-STATUS-ADVISES-ORPHANED-SCRATCH",
+      "statement": "status and brief carry one `orphaned-scratch` advice line with `testguard clean` when interrupted runs left scratch trees or locks whose owner is gone, and none otherwise; no other command is accepted for it.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #311"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/clean-advice.test.mjs",
+        "spec/conformance/advice.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The advice is given for a count of zero.",
+          "faultClass": "condition-forced",
+          "file": "src/status/advice.mjs",
+          "find": "if (!(count > 0)) return undefined;",
+          "replace": "if (false) return undefined;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The scan result never reaches the advice.",
+          "faultClass": "literal-changed",
+          "file": "src/status/status.mjs",
+          "find": "toolVersion: toolVersion ?? '0.0.0', orphans });",
+          "replace": "toolVersion: toolVersion ?? '0.0.0', orphans: 0 });",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A leftover owner record of a gone tree counts as an orphan.",
+          "faultClass": "guard-removed",
+          "file": "src/status/status.mjs",
+          "find": ".filter((o) => o.kind !== 'owner-record')",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The validator accepts any command for the advice.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (a.id === 'orphaned-scratch' && a.command !== 'testguard clean')",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The status schema does not list the advice.",
+          "faultClass": "statement-deleted",
+          "file": "spec/schemas/status.schema.json",
+          "find": "\"hook-outdated\", \"orphaned-scratch\"]",
+          "replace": "\"hook-outdated\"]",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TEST-RUN-TEMP-IS-ONE-DIRECTORY-REMOVED-AT-END",
+      "statement": "The test suite runs inside one per-run directory under the OS temp directory (tg-run-<pid>-<random>, with an owner file), exported as TMPDIR/TMP/TEMP before any worker starts and removed at the end; the next run removes only the directories of runs whose owner is a dead pid on this host.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #311"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/run-temp.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The directory is not removed at the end of the run.",
+          "faultClass": "statement-deleted",
+          "file": "test/helpers/run-temp.mjs",
+          "find": "return () => { rmSync(dir, { recursive: true, force: true }); };",
+          "replace": "return () => {};",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "TMPDIR is not pointed at the run directory.",
+          "faultClass": "statement-deleted",
+          "file": "test/helpers/run-temp.mjs",
+          "find": "  for (const name of ['TMPDIR', 'TMP', 'TEMP']) process.env[name] = dir;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The sweep removes a run whose owner is alive.",
+          "faultClass": "condition-forced",
+          "file": "test/helpers/run-temp.mjs",
+          "find": "if (!lockIsStale(owner, { alive, host })) continue;",
+          "replace": "if (!owner) continue;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The sweep removes any directory with a dead owner file, whatever its name.",
+          "faultClass": "guard-removed",
+          "file": "test/helpers/run-temp.mjs",
+          "find": "    if (!RUN_NAME.test(name)) continue;\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A crashed run's directory is never swept.",
+          "faultClass": "statement-deleted",
+          "file": "test/helpers/run-temp.mjs",
+          "find": "  sweepStaleRuns(real);\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "The run directory has no owner file.",
+          "faultClass": "statement-deleted",
+          "file": "test/helpers/run-temp.mjs",
+          "find": "  writeFileSync(join(dir, OWNER_FILE), JSON.stringify({ pid: process.pid, host: hostname(), at: new Date().toISOString() }));\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "A nested run makes and removes a directory of its own.",
+          "faultClass": "guard-removed",
+          "file": "test/helpers/run-temp.mjs",
+          "find": "  if (outer && existsSync(outer)) return () => {};\n",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F8",
+          "description": "The configuration does not use the setup.",
+          "faultClass": "statement-deleted",
+          "file": "vitest.config.mjs",
+          "find": "globalSetup: ['./test/helpers/run-temp.mjs'],",
+          "replace": "globalSetup: [],",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
     }
   ]
 }
