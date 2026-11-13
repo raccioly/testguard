@@ -23,6 +23,7 @@ export const PRECONDITION_KINDS = Object.freeze([
   'no-base',               // --changed auto --when-no-base fail found no base to compare against
   'no-commits',            // the repository has no commit to tie a verdict to
   'no-fix-commits',        // replay found no fix commit in the range
+  'out-is-directory',      // --out (or --calibration-out) names a directory, not a file (#320)
   'path-outside-project',  // a named path escapes the project, repository or scratch tree
   'ref-unresolved',        // a git ref or range does not resolve
   'runner-unresolvable',   // the test runner cannot be found in the tree

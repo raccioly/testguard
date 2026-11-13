@@ -17,7 +17,7 @@ import { UsageError } from './precondition-error.mjs';
 import { BudgetExhaustedError } from '../command-budget.mjs';
 import { completeRecords, budgetSummary, notReachedRecord, isNotReached } from './partial-budget.mjs';
 import { applyContent, applyFault, locate } from './inject.mjs';
-import { resolveDefenders, parseCommandTemplate, BUDGET_GRACE_MS } from './runners/shared.mjs';
+import { resolveDefenders, parseCommandTemplate, bareReporterHint, BUDGET_GRACE_MS } from './runners/shared.mjs';
 import { selectRunner, discoverRunnerManifest, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns, runnerLabel, runnerFor } from './runners/index.mjs';
 import { classify, shouldStopEarly } from './classify.mjs';
 import { blastRadius, rank } from './rank.mjs';
@@ -679,7 +679,11 @@ async function measureProbe({
         const res = await tree.runDefenders(defenders);
         if (reuse) measurements.reuseBaselineRuns++;
         entry.runs.push(res.run);
-        if (res.run.outcome !== 'pass') entry.loadMessage = res.loadMessage;
+        if (res.run.outcome !== 'pass') {
+          entry.loadMessage = res.loadMessage;
+          // A defender set that did not load, under a runner command with a bare relative --test-reporter path (#320).
+          entry.loadHint = res.run.outcome === 'error' ? bareReporterHint(runnerCommand, projectDir) : undefined;
+        }
       }
       if (want === confirmRuns && !entry.flakeFinished && entry.runs.length < confirmRuns && entry.runs[entry.runs.length - 1].outcome === 'fail') {
         for (let i = entry.runs.length; i < confirmRuns; i++) {
@@ -1397,9 +1401,11 @@ async function planFault(args, pre) {
       if (baseline.runs.some((r) => r.outcome === 'error')) {
         // The defenders did not load. That is not flakiness and not a verdict
         // about the fault; the claim cannot be probed until they do.
-        anchor = { status: 'defenders-failed-to-load', hits: anchor.hits, expected: anchor.expected, message: baseline.loadMessage };
+        anchor = { status: 'defenders-failed-to-load', hits: anchor.hits, expected: anchor.expected, message: baseline.loadHint ? `${baseline.loadMessage ?? 'the defenders did not load'}\n${baseline.loadHint}` : baseline.loadMessage };
         // The runner's own words belong in the record, not only in `anchor` (#291).
         if (baseline.loadMessage) detail.message = String(baseline.loadMessage).split('\n')[0].slice(0, 1024);
+        // The one sentence that fixes it goes after the runner's first line, where a reader of the record sees it (#320).
+        if (baseline.loadHint) detail.message = `${detail.message ? `${detail.message} ` : ''}${baseline.loadHint}`.slice(0, 1024);
       }
     }
   }

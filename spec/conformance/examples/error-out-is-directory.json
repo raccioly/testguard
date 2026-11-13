@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.26.0"
+  },
+  "error": {
+    "kind": "out-is-directory",
+    "message": "--out names a file, and reports/ is a directory",
+    "exitCode": 2
+  }
+}

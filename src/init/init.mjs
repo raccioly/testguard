@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { PreconditionError } from '../probe/worktree.mjs';
 import { PACKAGE, pinDevDependency, dependabotRule, renovateRule, RENOVATE_JSON, RENOVATE_OTHER } from './pin.mjs';
 import { hookActivation, activateHook } from './activation.mjs';
-import { TEMPLATE_VERSION, handWrittenTestguard, agentsSectionHash, prePushBlock, prePushBlockName, githubWorkflow, gitlabCi, installStep, markSkill, skillState, parseManagedBlocks, replaceManagedBlock, scanInstalled, renderFinding } from './managed.mjs';
+import { TEMPLATE_VERSION, handWrittenTestguard, handWrittenTestguardHeading, agentsSectionHash, prePushBlock, prePushBlockName, githubWorkflow, gitlabCi, installStep, markSkill, skillState, parseManagedBlocks, replaceManagedBlock, scanInstalled, renderFinding } from './managed.mjs';
 
 const TEMPLATES = join(dirname(fileURLToPath(import.meta.url)), 'templates');
 /** The hash of every skill template shipped before template markers: an installed copy matching one is unmodified. */
@@ -332,6 +332,13 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
       write(agentsPath, agents.slice(0, begin) + agentsBlock([...entries, dir]) + agents.slice(end + AGENTS_END.length));
       done.push(legacyBlock ? `AGENTS.md: TestGuard section rewritten to list ${dir}` : `AGENTS.md: TestGuard section now lists ${dir}`);
     }
+  } else if (!force && handWrittenTestguardHeading(agents)) {
+    // A section the project wrote about TestGuard is the project's: a second one beside it would contradict
+    // the first. Treated as a hand-written hook is: left alone, reported, the block printed to merge by hand;
+    // only --force appends it (#320).
+    const own = handWrittenTestguardHeading(agents);
+    skipped.push(`AGENTS.md:${own.line}: a hand-written TestGuard section (${own.text}) is left as it is; no managed block is appended beside it — merge the block below by hand, or pass --force to append it`);
+    recommendations.push({ title: 'AGENTS.md: the TestGuard section init would have appended', lines: agentsBlock([dir]).split('\n') });
   } else {
     write(agentsPath, (agents ? agents.replace(/\s*$/, '\n\n') : '# Agent instructions\n\n') + agentsBlock([dir]) + '\n');
     done.push(agents ? 'AGENTS.md: TestGuard section appended' : 'AGENTS.md created with the TestGuard section');

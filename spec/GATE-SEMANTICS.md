@@ -1209,6 +1209,10 @@ a `TMPDIR` inside it. Unset, it is the operating system's temp directory, as
 before. A directory that does not exist or cannot be written is a precondition
 error (exit 2) reported before anything is written; it is never created.
 
+`--out` (and replay's `--calibration-out`) names a file. A path that is an existing
+directory, or ends in a separator, is the precondition `out-is-directory` (exit 2),
+reported before anything is probed or written (#320).
+
 The scratch worktree gets its own `node_modules`, and **no level a package
 manager may write is a link into the user's install** (#279). A runner
 command can run a package manager in the scratch tree (`pnpm vitest …`

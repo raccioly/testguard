@@ -18,7 +18,7 @@
           "enum": [
             "budget-exhausted", "claim-unknown", "claims-file-invalid", "defender-ambiguous", "defender-excluded", "defender-misrouted",
             "defender-outside-universe", "dirty-tree", "discovery-failed", "fault-unknown", "file-missing", "init-settings", "install-changed",
-            "module-shadowed", "no-base", "no-commits", "no-fix-commits", "path-outside-project", "ref-unresolved", "runner-unresolvable",
+            "module-shadowed", "no-base", "no-commits", "no-fix-commits", "out-is-directory", "path-outside-project", "ref-unresolved", "runner-unresolvable",
             "scratch-dir", "typecheck-red-baseline", "typecheck-timeout", "typecheck-unavailable", "workspace-link-outside-tree",
             "claims-file", "git", "spec-document", "refused", "usage", "internal"
           ]

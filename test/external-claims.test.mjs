@@ -1,6 +1,9 @@
 // Issue #234: a claims file outside the repository under probe is a supported
 // contract for probe, claims, admit and status. Fault `file` and `defendedBy`
 // stay project-relative; the evidence names the file by hash only.
+// One behavior per file (as test/run-budget-*.test.mjs): each fault of
+// TG-EXTERNAL-CLAIMS-ARE-NAMED-BY-HASH-NEVER-BY-PATH names the one file that kills it, so no fault
+// pays for the other two probes.
 import { afterEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -45,35 +48,6 @@ describe('an external claims file', () => {
     expect(evidence.run.claimsSource).toEqual({ external: true, sha256: createHash('sha256').update(text).digest('hex') });
     expect(JSON.stringify(evidence)).not.toContain(outside);
     expect(JSON.stringify(doc)).not.toContain(outside);
-    expect(readdirSync(outside)).toEqual(['claims.json']);
-  });
-
-  it('records no claimsSource for the project\'s own claims file', async () => {
-    const { dir } = setup();
-    const r = await run(['probe', dir, '--runner', 'node-test', '--json']);
-    expect(JSON.parse(readFileSync(JSON.parse(r.out).run.evidence, 'utf8')).run.claimsSource).toBeUndefined();
-  });
-
-  it('serves claims, status and admit from the file outside the project', async () => {
-    const { dir, outside, claims } = setup();
-    // The project's own claims file must not be what answers.
-    rmSync(join(dir, 'testguard.claims.json'));
-    const listed = await run(['claims', dir, '--claims', claims, '--json']);
-    expect(listed.code, listed.err).toBe(0);
-    expect(JSON.parse(listed.out).claims.claims.map((c) => c.id)).toEqual(['PRICE-TOTAL']);
-    const probed = await run(['probe', dir, '--claims', claims, '--runner', 'node-test', '--json']);
-    expect(probed.code, probed.err).toBe(0);
-    const status = await run(['status', dir, '--claims', claims, '--json']);
-    expect(status.err).not.toMatch(/^error:/m);
-    expect(status.code, status.out).toBe(0);
-    const doc = JSON.parse(status.out);
-    expect(doc.state).toBe('clean');
-    expect(JSON.stringify(doc)).not.toContain(outside);
-    // Named by hash, not by a relative path a `..`-rejecting consumer could not read.
-    expect(doc.paths.claims).toBeUndefined();
-    expect(doc.claimsSource).toEqual({ external: true, sha256: expect.stringMatching(/^[a-f0-9]{64}$/) });
-    const admit = await run(['admit', join(dir, 'test/price.test.mjs'), '--claims', claims, '--claim', 'PRICE-TOTAL', '--runner', 'node-test', '--json']);
-    expect(admit.err).not.toMatch(/^error:/m);
     expect(readdirSync(outside)).toEqual(['claims.json']);
   });
 });

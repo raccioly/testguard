@@ -2,9 +2,9 @@ import { spawn, spawnSync } from 'node:child_process';
 import { workerEnv } from '../worker-env.mjs';
 import { registerChild, assertNotCancelled } from './lifecycle.mjs';
 import { readBoundedJsonFile } from './discovery.mjs';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { childScope, scratchRoot } from '../../scratch-dir.mjs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -168,6 +168,31 @@ export function splitCommandWords(template, flag = '--runner-cmd') {
   if (has || cur) words.push(cur);
   if (quote) throw new RangeError(`unterminated quote in ${flag}`);
   return words;
+}
+
+/**
+ * Node reads `--test-reporter=tools/x.mjs` as a package name, not a path, so a reporter given as a bare
+ * relative path makes the defenders fail to load (#320). A hint for that, or `undefined`: only a value that
+ * is not already a path, URL or builtin (`.`/`/`-led, `file:`, `node:`) AND names a file under the project
+ * directory, so a real package (`spec`, `tap`) is never second-guessed. Pure but for two stats.
+ */
+export function bareReporterHint(runnerCommand, projectDir) {
+  if (!runnerCommand) return undefined;
+  let words;
+  try { words = splitCommandWords(runnerCommand); } catch { return undefined; }
+  const values = [];
+  words.forEach((word, i) => {
+    if (word.startsWith('--test-reporter=')) values.push(word.slice('--test-reporter='.length));
+    else if (word === '--test-reporter' && i + 1 < words.length) values.push(words[i + 1]);
+  });
+  const hints = [];
+  for (const value of new Set(values)) {
+    if (!value || /^(?:\.|\/|file:|node:|[A-Za-z]:[\\/])/.test(value)) continue;
+    let isFile = false;
+    try { isFile = statSync(resolve(projectDir, value)).isFile(); } catch { /* not a file here: a package name */ }
+    if (isFile) hints.push(`Node reads \`${value}\` as a package name; write \`./${value}\`.`);
+  }
+  return hints.length ? hints.join(' ') : undefined;
 }
 
 export function parseCommandTemplate(template) {
