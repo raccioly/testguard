@@ -534,7 +534,7 @@
           "description": "The note about what was cleaned ignores --quiet.",
           "faultClass": "guard-removed",
           "file": "src/cli.mjs",
-          "find": "if (report?.removed.length && !values.quiet)",
+          "find": "if (report?.removed.length && !commandValues.quiet)",
           "replace": "if (report?.removed.length)",
           "defendedBy": [
             "test/clean.cli.test.mjs"
@@ -624,7 +624,7 @@
           "description": "The note about what was cleaned goes through the command's own error stream under --json, and becomes the message of a refusal.",
           "faultClass": "argument-swapped",
           "file": "src/cli.mjs",
-          "find": "const say = values.json ? (line) => process.stderr.write(`${line}\\n`) : io.err;",
+          "find": "const say = commandValues.json ? (line) => process.stderr.write(`${line}\\n`) : io.err;",
           "replace": "const say = io.err;",
           "defendedBy": [
             "test/clean.cli.test.mjs"
