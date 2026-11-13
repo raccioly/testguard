@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A run ends in bounded time after its budget (#310).** A detached process that kept the runner's output pipe open could hold a run for as long as it lived (the field report: 2034 s under a 120 s budget), and a process table that `ps` could not read under load was treated as an empty tree. Now the run is recorded `timeout` with `durationMs` of the budget (the run, not its teardown), the tree gets SIGKILL and a re-read sweep, and after a fixed 5 s grace the output pipes are destroyed and the run is over: a run takes at most its budget plus 5 s, a run cut by `--command-budget` included. A teardown that could not be confirmed (processes alive, process table unreadable, pipe held by a process TestGuard could not find) says so in the record's `detail.message` and in one warning line, counts only. A `timeout` recorded while other test runners were busy says so too; the verdict stays `timeout`. The type check, the Python interpreter check and the PATH runner check wait the same bounded time.
+
 ### Changed
 
 - **The Playwright gallery's reference runs once, in its own CI job (#305, repository only).** Modes that only compare with the reference run with `--reference-later` and the scorecard job compares them (`corpus/lib/deferred.mjs`): a missing reference, one of another subject or size, a comparison that never arrived, claim halves of `twice` that do not cover every fault exactly once, and a mode that applies with no shard are all failures. Modes that do not apply to a subject are recorded as such from `applies()`.

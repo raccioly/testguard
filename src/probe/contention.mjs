@@ -129,3 +129,32 @@ export function fanOutWarning({ faultWorkers = 1, workers = 1, serial = workers 
   if (!(cpus >= 1) || load <= cpus) return undefined;
   return `--fault-workers ${faultWorkers} × ${serial ? 1 : workers} runner worker${serial || workers === 1 ? '' : 's'} = ${load} concurrent test processes on ${cpus} available CPU${cpus === 1 ? '' : 's'}; the probe will contend with itself. Timeouts and inconsistent probes are re-measured serially before they are reported, which can cost more than the fan-out saves — lower --fault-workers to ${Math.max(1, Math.floor(cpus / (serial ? 1 : workers)))} or fewer.`;
 }
+
+/**
+ * A `timeout` that happened while other test runners were busy reads as an
+ * environment condition, never as a statement about the tests. The verdict
+ * stays `timeout`; only its message says so. Count, not names.
+ */
+export const timeoutContentionNote = (c) => (c?.detected
+  ? `${c.runners.length} other test runner${c.runners.length === 1 ? ' was' : 's were'} busy on this machine when the run timed out, so this timeout is an environment condition (machine load), not evidence about the tests`
+  : '');
+
+/** The one warning line for a run whose teardown could not be confirmed (counts only, never names). */
+export const teardownWarning = (t, graceMs) =>
+  `a timed-out run's teardown was not confirmed within ${graceMs}ms of its budget: ${[
+    t.alive > 0 ? `${t.alive} process${t.alive === 1 ? '' : 'es'} still alive` : '',
+    t.unlisted ? 'the process table could not be read' : '',
+    t.pipeHeld ? 'its output pipe is held by a process TestGuard could not find' : '',
+  ].filter(Boolean).join('; ')}; the run is recorded as ended and as a timeout.`;
+
+/**
+ * What a timed-out run says beyond its verdict (#310): one warning line when
+ * its teardown is unconfirmed, and the contention note on its message. Never
+ * touches the outcome.
+ */
+export function annotateTimeout(result, { contention, onWarn, graceMs }) {
+  if (result.teardown?.unconfirmed) onWarn(teardownWarning(result.teardown, graceMs));
+  const note = timeoutContentionNote(contention);
+  if (note) result.loadMessage = `${result.loadMessage ?? 'timed out'}; ${note}`;
+  return result;
+}
