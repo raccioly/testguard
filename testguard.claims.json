@@ -18324,8 +18324,8 @@
           "description": "The sweep removes any directory with a dead owner file, whatever its name.",
           "faultClass": "guard-removed",
           "file": "test/helpers/run-temp.mjs",
-          "find": "    if (!match) continue;\n",
-          "replace": "",
+          "find": "const RUN_NAME = /^tg-run-(\\d+)-[A-Za-z0-9]{6}$/;",
+          "replace": "const RUN_NAME = /^tg-run-(.*)$/;",
           "defendedBy": [
             "test/run-temp.test.mjs"
           ],
