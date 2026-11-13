@@ -18071,7 +18071,7 @@
     },
     {
       "id": "TG-CONFIG-UNCOMMITTED-IS-NEVER-SILENT",
-      "statement": "testguard.config.json is read from the working tree and watched by the dirty rule: an uncommitted or untracked copy refuses a probe of the implicit HEAD like a dirty defender; under --ignore-dirty or --ref the run proceeds and says the working-tree copy is applied, without listing it in repo.ignoredDirty; replay, which has no dirty rule, says so whenever git does not hold the copy or cannot be asked.",
+      "statement": "testguard.config.json is read from the working tree and watched by the dirty rule whenever it is read, present or not: an uncommitted, untracked or deleted copy refuses a probe of the implicit HEAD like a dirty defender; under --ignore-dirty or --ref the run proceeds and says the working-tree copy is applied, without listing it in repo.ignoredDirty; replay, which has no dirty rule, says so whenever git does not hold the copy or cannot be asked.",
       "source": {
         "kind": "spec",
         "ref": "issue #301"
@@ -18082,7 +18082,7 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/project-config-probe.test.mjs"
+        "test/project-config.test.mjs"
       ],
       "faults": [
         {
@@ -18090,8 +18090,8 @@
           "description": "An uncommitted config file is not watched, so an implicit-HEAD probe runs with options nobody committed.",
           "faultClass": "statement-deleted",
           "file": "src/probe/probe.mjs",
-          "find": "      if (configPath !== undefined) watched.add(configPath);",
-          "replace": "      // the config file is not watched",
+          "find": "  watched.add(path);\n  return path;",
+          "replace": "  return path;",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18102,8 +18102,8 @@
           "description": "The applied config file is reported as ignored.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "      const ignored = dirty.filter((path) => path !== configPath);",
-          "replace": "      const ignored = dirty;",
+          "find": "ignored: dirty.filter((path) => path !== configPath) };",
+          "replace": "ignored: dirty };",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18119,16 +18119,40 @@
           "producedBy": {
             "producer": "agent",
             "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A run that proceeds past an uncommitted config file does not say it is applied.",
+          "faultClass": "return-altered",
+          "file": "src/probe/probe.mjs",
+          "find": "configApplied: configPath !== undefined && dirty.includes(configPath),",
+          "replace": "configApplied: false,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "probe watches the file only when it exists, so a deleted copy is read as no file.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/probe.mjs",
+          "find": "    ...(!values['no-config'] ? { configFile: CONFIG_FILE } : {}),",
+          "replace": "    ...(projectConfig ? { configFile: CONFIG_FILE } : {}),",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
           },
           "defendedBy": [
-            "test/project-config.test.mjs"
+            "test/project-config-probe.test.mjs"
           ]
         }
       ]
     },
     {
       "id": "TG-CLI-APPLIES-PROJECT-CONFIG",
-      "statement": "The CLI hands every command that takes runner options the values testguard.config.json supplies, so a plain probe runs with them, reports them in run.config and warns that a provisional confirm came from the file.",
+      "statement": "Every command that takes runner options runs with the values testguard.config.json supplies (claims only under --check-anchors, status only reporting them, nothing under --no-config), so a plain probe runs with them, reports them in run.config and warns that a provisional confirm came from the file.",
       "source": {
         "kind": "spec",
         "ref": "issue #301"
@@ -18139,16 +18163,16 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/project-config-probe.test.mjs"
+        "test/project-config.test.mjs"
       ],
       "faults": [
         {
           "id": "F1",
           "description": "The file is read but its values never reach the command.",
           "faultClass": "statement-deleted",
-          "file": "src/cli.mjs",
-          "find": "      commandValues = applied.values;",
-          "replace": "      // values from the file are dropped",
+          "file": "src/config/project-config.mjs",
+          "find": "  return { values: applied.values, projectConfig: { ...loaded, ...applied } };",
+          "replace": "  return { values, projectConfig: { ...loaded, ...applied } };",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18156,15 +18180,42 @@
         },
         {
           "id": "F2",
-          "description": "probe forgets that its confirm came from the file.",
-          "faultClass": "literal-changed",
-          "file": "src/commands/probe.mjs",
-          "find": "const confirmFromConfig = projectConfig?.keys?.includes('confirm') ? projectConfig.file : undefined;",
-          "replace": "const confirmFromConfig = undefined;",
+          "description": "A confirm from the file is not traced back to it.",
+          "faultClass": "return-altered",
+          "file": "src/config/project-config.mjs",
+          "find": "(projectConfig?.keys?.includes('confirm') ? projectConfig.file : undefined)",
+          "replace": "(undefined)",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
           }
+        },
+        {
+          "id": "F3",
+          "description": "A plain claims listing reads, and can fail on, the config file.",
+          "faultClass": "condition-forced",
+          "file": "src/config/project-config.mjs",
+          "find": " && !(command === 'claims' && !values['check-anchors']);",
+          "replace": ";",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "probe forgets that its confirm came from the file.",
+          "faultClass": "literal-changed",
+          "file": "src/commands/probe.mjs",
+          "find": "const confirmFromConfig = confirmSource(projectConfig);",
+          "replace": "const confirmFromConfig = undefined;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/project-config-probe.test.mjs"
+          ]
         }
       ]
     },
@@ -18350,9 +18401,9 @@
           "id": "F5",
           "description": "status is not given the file it read.",
           "faultClass": "variable-swap",
-          "file": "src/cli.mjs",
-          "find": "    if (loaded && command === 'status') projectConfig = { ...loaded, keys: configKeys(loaded.config) };",
-          "replace": "    if (loaded && command === 'status') projectConfig = undefined;",
+          "file": "src/config/project-config.mjs",
+          "find": "  if (command === 'status') return { values, projectConfig: { ...loaded, keys: configKeys(loaded.config) } };",
+          "replace": "  if (command === 'status') return { values, projectConfig: undefined };",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

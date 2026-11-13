@@ -36,7 +36,9 @@ describe('testguard.config.json through the CLI', () => {
     expect(bad.code).toBe(3);
     expect(bad.err).toContain('unknown key "confirmRuns"');
     expect((await run(['status', p.dir, '--no-config'])).code).not.toBe(3);
-    expect((await run(['gate', p.dir, '--no-config'])).code).toBe(3);
+    const brief = await run(['brief', p.dir, '--no-config']);
+    expect(brief.code).toBe(3);
+    expect(brief.err).toContain('--no-config is only valid on');
   });
 });
 

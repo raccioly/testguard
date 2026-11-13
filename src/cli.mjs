@@ -25,7 +25,7 @@ import { concernsCommand } from './commands/concerns.mjs';
 import { originPolicyRequest } from './probe/origin-policy.mjs';
 import { assertionPolicyRequest } from './probe/assertion-policy.mjs';
 import { draftAppendRequest, intentInputRequest } from './scaffold/request.mjs';
-import { CONFIG_COMMANDS, readProjectConfig, applyProjectConfig, configKeys } from './config/project-config.mjs';
+import { CONFIG_COMMANDS, projectOptions } from './config/project-config.mjs';
 
 const VERSION = JSON.parse(readFileSync(join(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version;
 const ISSUES = 'https://github.com/raccioly/testguard/issues';
@@ -422,16 +422,7 @@ async function dispatch(argv, io, seen) {
     // testguard.config.json (#301): the project's defaults, under every flag
     // typed and every environment variable set. Read before the handler, so
     // each command sees one set of options however they were given.
-    let commandValues = values;
-    let projectConfig;
-    const readsConfig = CONFIG_COMMANDS.includes(command) && !values['no-config'] && !(command === 'claims' && !values['check-anchors']);
-    const loaded = readsConfig ? readProjectConfig(projectDir) : undefined;
-    if (loaded && command === 'status') projectConfig = { ...loaded, keys: configKeys(loaded.config) };
-    else if (loaded) {
-      const applied = applyProjectConfig({ command, values, suppliedOptions, env: process.env, loaded });
-      commandValues = applied.values;
-      projectConfig = { ...loaded, ...applied };
-    }
+    const { values: commandValues, projectConfig } = projectOptions({ command, projectDir, values, suppliedOptions, env: process.env });
     return await withScratchBase(scratchBase, () => handler({ projectDir, file: dirArg, files: positionals.slice(1), values: commandValues, suppliedOptions, version: VERSION, projectConfig }, io));
   } catch (e) {
     seen.error = e;

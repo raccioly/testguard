@@ -6,11 +6,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readProjectConfig, applyProjectConfig, keyApplies, configReport, configUncommitted, CONFIG_FILE, CONFIG_FLAGS } from '../src/config/project-config.mjs';
+import { readProjectConfig, applyProjectConfig, keyApplies, configReport, configUncommitted, projectOptions, confirmFromConfig, CONFIG_FILE, CONFIG_FLAGS } from '../src/config/project-config.mjs';
 import { commit, project } from './helpers/scope-project.mjs';
 import { RUNNER_NAMES } from '../src/probe/runners/index.mjs';
 import { resolveFaultWorkers } from '../src/probe/fan-out.mjs';
-import { serialRequested } from '../src/probe/probe.mjs';
+import { serialRequested, watchConfigFile, ignoredDirtyFiles } from '../src/probe/probe.mjs';
 import { PROVISIONAL_WARNING } from '../src/render.mjs';
 import { serialAdvice } from '../src/status/advice.mjs';
 import { UsageError, PreconditionError } from '../src/probe/precondition-error.mjs';
@@ -136,6 +136,45 @@ describe('faultWorkers from the file', () => {
   it('one fault at a time from the file is a request, as it is from the flag: no fan-out stands in for it', () => {
     expect(serialRequested(1, 'config')).toBe(serialRequested(1, 'flag'));
     expect(serialRequested(1, 'config')).toBe(true);
+  });
+});
+
+describe('the options a command runs with', () => {
+  it('are the file under the command line, and the file it read', () => {
+    const dir = projectWith({ schemaVersion: 1, runner: 'node-test', confirm: 2 });
+    const r = projectOptions({ command: 'probe', projectDir: dir, values: defaults, suppliedOptions: [] });
+    expect(r.values).toMatchObject({ runner: 'node-test', confirm: '2' });
+    expect(r.projectConfig).toMatchObject({ file: CONFIG_FILE, keys: ['runner', 'confirm'] });
+    expect(confirmFromConfig(r.projectConfig)).toBe(CONFIG_FILE);
+    expect(confirmFromConfig(projectOptions({ command: 'probe', projectDir: dir, values: defaults, suppliedOptions: ['confirm'] }).projectConfig)).toBeUndefined();
+  });
+
+  it('status reports every key and changes nothing; --no-config and a plain claims listing never read the file', () => {
+    const dir = projectWith({ schemaVersion: 1, runner: 'node-test' });
+    const status = projectOptions({ command: 'status', projectDir: dir, values: {} });
+    expect(status).toMatchObject({ values: {}, projectConfig: { keys: ['runner'] } });
+    const broken = projectWith('{ not json');
+    expect(projectOptions({ command: 'probe', projectDir: broken, values: { ...defaults, 'no-config': true } }).projectConfig).toBeUndefined();
+    expect(projectOptions({ command: 'claims', projectDir: broken, values: {} }).projectConfig).toBeUndefined();
+    expect(() => projectOptions({ command: 'claims', projectDir: broken, values: { 'check-anchors': true } })).toThrow(UsageError);
+    expect(projectOptions({ command: 'gate', projectDir: broken, values: {} }).projectConfig).toBeUndefined();
+  });
+});
+
+describe('the config file in the dirty rule', () => {
+  it('is watched whenever it is read, present or not, by its repository path', () => {
+    const watched = new Set();
+    expect(watchConfigFile(watched, { root: '/repo', projectDir: '/repo/packages/api', configFile: CONFIG_FILE })).toBe(`packages/api/${CONFIG_FILE}`);
+    expect([...watched]).toEqual([`packages/api/${CONFIG_FILE}`]);
+    const none = new Set();
+    expect(watchConfigFile(none, { root: '/repo', projectDir: '/repo', configFile: undefined })).toBeUndefined();
+    expect(none.size).toBe(0);
+  });
+
+  it('when a run proceeds past it, is applied and said, never listed as ignored', () => {
+    expect(ignoredDirtyFiles([CONFIG_FILE, 'test/a.test.mjs'], CONFIG_FILE)).toEqual({ configApplied: true, ignored: ['test/a.test.mjs'] });
+    expect(ignoredDirtyFiles(['test/a.test.mjs'], CONFIG_FILE)).toEqual({ configApplied: false, ignored: ['test/a.test.mjs'] });
+    expect(ignoredDirtyFiles([CONFIG_FILE], undefined)).toEqual({ configApplied: false, ignored: [CONFIG_FILE] });
   });
 });
 

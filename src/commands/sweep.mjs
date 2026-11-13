@@ -4,6 +4,7 @@ import { resolveChangedRef } from '../gate/changed.mjs';
 import { writeSpecDoc } from '../evidence/writer.mjs';
 import { createCommandBudget, parseCommandBudget } from '../command-budget.mjs';
 import { runnerOptions } from './runner-options.mjs';
+import { CONFIG_FILE } from '../config/project-config.mjs';
 
 export const sweepPath = (projectDir) => join(projectDir, '.testguard', 'sweep.json');
 /**
@@ -95,7 +96,7 @@ export async function sweepCommand({ projectDir, values, version, projectConfig 
       runnerName: values.runner,
       nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
       python: runner.python,
-      ...(projectConfig ? { configFile: projectConfig.file } : {}),
+      ...(!values['no-config'] ? { configFile: CONFIG_FILE } : {}),
       toolVersion: version,
       claimsPath: values.claims ? resolve(values.claims) : undefined,
       ignorePath: values.ignore ? resolve(values.ignore) : undefined,

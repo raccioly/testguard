@@ -16,7 +16,7 @@ import { assertionPolicyRequest, scopedAssertionPolicy, renderAssertionPolicy, i
 import { readNativeTestUniverse } from '../probe/universe.mjs';
 import { originPolicyInputsFresh } from '../probe/policy-freshness.mjs';
 import { runnerOptions } from './runner-options.mjs';
-import { configReport } from '../config/project-config.mjs';
+import { configReport, confirmFromConfig as confirmSource, CONFIG_FILE } from '../config/project-config.mjs';
 import { PreconditionError } from '../probe/precondition-error.mjs';
 import { resolveFaultWorkers } from '../probe/fan-out.mjs';
 import { availableParallelism } from 'node:os';
@@ -318,7 +318,7 @@ export async function probeCommand({ projectDir, values, version, projectConfig 
   let carryResult;
   const partialPath = join(projectDir, '.testguard', 'evidence-partial.json');
   let outPath = values.out && !(only && resolve(values.out) === canonicalPath) ? resolve(values.out) : only ? partialPath : provisional ? provisionalEvidencePath(projectDir) : canonicalPath;
-  const confirmFromConfig = projectConfig?.keys?.includes('confirm') ? projectConfig.file : undefined;
+  const confirmFromConfig = confirmSource(projectConfig);
   if (provisional && !values.quiet) io.err(PROVISIONAL_WARNING(confirmRuns, confirmFromConfig));
   const discoveryNoted = new Set();
   // A partial run (--claim, --changed) also reuses the last full probe's
@@ -352,7 +352,8 @@ export async function probeCommand({ projectDir, values, version, projectConfig 
     nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
     python: runner.python,
     typecheck: values.typecheck,
-    ...(projectConfig ? { configFile: projectConfig.file } : {}),
+    // Watched whenever it is read, present or not: a deleted copy is uncommitted too.
+    ...(!values['no-config'] ? { configFile: CONFIG_FILE } : {}),
     only,
     ...(carryFrom ? { carry: { document: carryFrom, done: (result) => { carryResult = result; } } } : {}),
     escalate: !values['no-escalate'],

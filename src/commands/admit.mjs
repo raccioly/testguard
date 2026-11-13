@@ -13,6 +13,7 @@ import { hintFor } from '../brief/brief.mjs';
 import { formatVerdict, PROVISIONAL_WARNING } from '../render.mjs';
 import { decideAdmission } from '../admit/admit.mjs';
 import { runnerOptions } from './runner-options.mjs';
+import { confirmFromConfig as confirmSource } from '../config/project-config.mjs';
 import { assertionPolicyRequest, evaluateAssertionPolicy, renderAssertionPolicy } from '../probe/assertion-policy.mjs';
 
 /** The project is wherever the claims file is, walking up from the test file; else cwd. */
@@ -42,7 +43,7 @@ function findProjectDir(testAbs, claimsFlag) {
  * decision here can never disagree with the gate.
  */
 export async function admitCommand({ file, values, version, projectConfig }, io) {
-  const confirmFromConfig = projectConfig?.keys?.includes('confirm') ? projectConfig.file : undefined;
+  const confirmFromConfig = confirmSource(projectConfig);
   if (!file || !values.claim?.length) {
     io.err('usage: testguard admit <test-file> --claim <ID> [--fault <FID>] [--confirm <n>] [--json]');
     return 3;

@@ -48,6 +48,12 @@ describe('testguard.config.json through measured probes', () => {
     expect(doc.run.config).toMatchObject({ file: CONFIG_FILE, keys: ['runner', 'confirm'] });
     expect(second.err).toContain(`from "confirm" in ${CONFIG_FILE}`);
 
+    // A deleted copy is as uncommitted as an edited one: refused, never read as "no file".
+    rmSync(join(p.dir, CONFIG_FILE));
+    const deleted = await run(['probe', p.dir]);
+    expect(deleted.code).toBe(2);
+    expect(deleted.err).toContain(CONFIG_FILE);
+
     // The same option changed in the file refuses reuse, as the flag would.
     writeConfig(p.dir, { runner: 'node-test', confirm: 1, workers: 2 });
     commit(p.dir);

@@ -43,7 +43,9 @@ describe('the document rules for an explanation', () => {
     expect(runErrors({ exitCode: 0, id: 'run-1', evidence: 'e.json', provisional: false, records: 0, newSinceBaseline: 0, scope }).map((e) => e.path)).toContain('/run/id');
   });
   it('exits 0 for a determined change: an explanation judges nothing', () => {
-    expect(runErrors({ exitCode: 1, scope }).map((e) => e.path)).toContain('/run/exitCode');
+    // 2 is what --fail-on-empty-selection would have said; only the explain rule refuses it here.
+    expect(runErrors({ exitCode: 2, scope }).map((e) => e.path)).toContain('/run/exitCode');
+    expect(runErrors({ exitCode: 2, scope: { ...scope, explain: undefined, selectedCount: 0, changed: { ...scope.changed, matchedClaims: [], matchReasons: [] } } })).toEqual([]);
   });
   it('without explain, selected claims and no measurement are still refused', () => {
     expect(runErrors({ exitCode: 0, scope: { ...scope, explain: undefined } }).map((e) => e.path)).toContain('/run/id');

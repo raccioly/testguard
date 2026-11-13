@@ -150,6 +150,24 @@ export function applyProjectConfig({ command, values, suppliedOptions = [], env 
   return { values: out, keys, overridden, ...(faultWorkers !== undefined ? { faultWorkers } : {}) };
 }
 
+/**
+ * The options one command runs with (#301): the file read from the project
+ * directory unless --no-config, merged under the command line. `claims` reads
+ * it only for --check-anchors; `status` only reports it. Returns the values
+ * the command gets and `projectConfig` (undefined when no file was read).
+ */
+export function projectOptions({ command, projectDir, values, suppliedOptions = [], env = {} }) {
+  const reads = CONFIG_COMMANDS.includes(command) && !values['no-config'] && !(command === 'claims' && !values['check-anchors']);
+  const loaded = reads ? readProjectConfig(projectDir) : undefined;
+  if (!loaded) return { values, projectConfig: undefined };
+  if (command === 'status') return { values, projectConfig: { ...loaded, keys: configKeys(loaded.config) } };
+  const applied = applyProjectConfig({ command, values, suppliedOptions, env, loaded });
+  return { values: applied.values, projectConfig: { ...loaded, ...applied } };
+}
+
+/** The file a provisional confirm came from, for the warning; undefined when it was typed or defaulted. */
+export const confirmFromConfig = (projectConfig) => (projectConfig?.keys?.includes('confirm') ? projectConfig.file : undefined);
+
 /** What a document says about the file: which one, by hash, and the keys it supplied. */
 export const configReport = (projectConfig) => projectConfig && {
   file: projectConfig.file,
