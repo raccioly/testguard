@@ -41,6 +41,15 @@ describe('advice is the line its rule produces', () => {
     expect(paths(doc)).toEqual(['/advice/2/command']);
   });
 
+  it('an inactive hook is fixed by init --activate-hook; any other command is still refused (#301)', () => {
+    const doc = load('examples', 'status-advice.json');
+    doc.advice[2].message = '.githooks/pre-push:1: is not on this clone\'s active hooks path, so it never runs on push — git config core.hooksPath .githooks; testguard init --activate-hook runs it';
+    doc.advice[2].command = 'testguard init --activate-hook';
+    expect(paths(doc)).toEqual([]);
+    doc.advice[2].command = 'testguard init --force';
+    expect(paths(doc)).toEqual(['/advice/2/command']);
+  });
+
   it('a brief carries the same advice under the same rules', () => {
     const brief = load('examples', 'brief-advice.json');
     expect(validate('brief', brief).errors).toEqual([]);

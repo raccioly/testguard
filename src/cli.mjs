@@ -189,6 +189,9 @@ init       --force (replace an existing skill file)  --here (keep the agent laye
            reports hooks and CI files that run probe --serial, a full probe on every push, an old pin or an old template
            --upgrade         rewrite TestGuard's own blocks (skill, AGENTS.md section, hooks, CI) to the current template
                              where nobody edited them; edited ones are reported, and --force replaces them
+           --pin             also write the exact devDependency pin and the Dependabot/Renovate rule (without it they are only recommended; --upgrade never writes them)
+           --activate-hook   make this clone run the pre-push hook: set core.hooksPath, or write a .git/hooks/pre-push that calls it and keeps the other hooks (without it init only reports)
+           a hook file that already mentions TestGuard outside a managed block is the project's own: init leaves it alone and prints the block (--force adds it)
            --ci github|gitlab  write the CI file: pull requests probe --changed auto, nightly runs probe every claim
            --ci-evidence github|gitlab   write .testguard/fetch-ci-evidence.sh, an ON-DEMAND helper that downloads CI's evidence artifact and briefs from it; the session-start hook stays offline
            agent layer (skill, SessionStart hook, AGENTS.md section) → git root; project layer (.gitignore lines) → [dir]
@@ -306,6 +309,8 @@ async function dispatch(argv, io, seen) {
         'ci-evidence': { type: 'string' },
         ci: { type: 'string' },
         upgrade: { type: 'boolean', default: false },
+        pin: { type: 'boolean', default: false },
+        'activate-hook': { type: 'boolean', default: false },
         here: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'runner-cmd': { type: 'string' },

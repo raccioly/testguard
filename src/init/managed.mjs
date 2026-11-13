@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sha256 } from '../util/hash.mjs';
+import { inactiveHooks } from './activation.mjs';
 
 /**
  * The hooks, CI files and agent instructions `testguard init` writes, and the
@@ -82,6 +83,33 @@ export function replaceManagedBlock(text, name, block) {
   if (!found) return null;
   const lines = text.split('\n');
   return [...lines.slice(0, found.start), block, ...lines.slice(found.end + 1)].join('\n');
+}
+
+/**
+ * The first line of `text` that mentions TestGuard outside every managed block
+ * (#301): the project's own TestGuard hook. `{ line, text }`, line 1-based, or
+ * null. A comment that says the probe is paused still mentions it: whoever
+ * wrote the line owns the hook, and init never writes a second block beside it.
+ */
+export function handWrittenTestguard(text) {
+  const blocks = parseManagedBlocks(text);
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (!/testguard/i.test(lines[i])) continue;
+    if (blocks.some((b) => i >= b.start && i <= b.end)) continue;
+    return { line: i + 1, text: lines[i].trim() };
+  }
+  return null;
+}
+
+/**
+ * The sha256 of an AGENTS.md TestGuard section with its per-project bullets
+ * removed, so listing another project does not change it. A section whose hash
+ * is in agents-history.json is a template TestGuard shipped, unmodified; any
+ * other cannot be proved unmodified and is the project's to keep (#301).
+ */
+export function agentsSectionHash(block) {
+  return sha256(block.split('\n').filter((l) => !/^- (?:This project|`[^`]+\/`)/.test(l)).join('\n'));
 }
 
 // ── Templates ───────────────────────────────────────────────────────────────
@@ -317,6 +345,9 @@ export function scanInstalled({ root, toolVersion }) {
     const inBlock = (i) => blocks.some((b) => i >= b.start && i <= b.end);
     const lines = text.split('\n');
     const prePush = /(^|\/)pre-push$/.test(file);
+    // A command continued over several lines is one command: the flags that
+    // decide whether it probes everything may sit on the next line (#301).
+    const command = (i) => { let out = lines[i]; for (let j = i; /\\\s*$/.test(lines[j]) && j + 1 < lines.length; j++) out = `${out.replace(/\\\s*$/, ' ')}${lines[j + 1]}`; return out; };
     lines.forEach((line, i) => {
       if (!/testguard/i.test(line)) return;
       // A floating version is a finding wherever it is, a managed block included (#293).
@@ -329,7 +360,9 @@ export function scanInstalled({ root, toolVersion }) {
       if (pin && olderThan(pin[1], toolVersion)) findings.push({ ...at, reason: 'pinned-old', detail: `pins testguard-cli@${pin[1]}; ${toolVersion} is installed here` });
       const action = /raccioly\/testguard@(v?\d+\.\d+\.\d+)/.exec(line);
       if (action && olderThan(action[1], toolVersion)) findings.push({ ...at, reason: 'pinned-old', detail: `uses the action at ${action[1]}; ${toolVersion} is installed here` });
-      if (prePush && /\bprobe\b/.test(line) && !/--changed\b/.test(line) && !/--claim\b/.test(line)) findings.push({ ...at, reason: 'full-probe-on-push', detail: 'probes every claim on every push' });
+      // Only a line that RUNS probe, with neither --changed nor --claim: not a comment, not an echo.
+      const run = command(i);
+      if (prePush && !/^\s*(#|echo\b|printf\b)/.test(line) && /\bprobe\b/.test(run) && !/--changed\b/.test(run) && !/--claim\b/.test(run)) findings.push({ ...at, reason: 'full-probe-on-push', detail: 'probes every claim on every push' });
     });
     // pre-commit: a `rev:` under the TestGuard repo.
     if (file === '.pre-commit-config.yaml') {
@@ -342,12 +375,15 @@ export function scanInstalled({ root, toolVersion }) {
       });
     }
   }
+  // A hook file nobody's git runs (#301): the gate it promises never happens.
+  for (const h of inactiveHooks(root)) findings.push({ file: h.file, line: 1, reason: 'hook-inactive', managed: false, upgradable: false, detail: 'is not on this clone\'s active hooks path, so it never runs on push', fix: h.activation.short });
   return findings;
 }
 
 /** One line for a finding, with what fixes it. */
 export function renderFinding(f) {
-  const fix = f.upgradable ? 'testguard init --upgrade rewrites it'
+  const fix = f.reason === 'hook-inactive' ? f.fix
+    : f.upgradable ? 'testguard init --upgrade rewrites it'
     : f.managed ? 'edited by hand, so init --upgrade leaves it: merge the current template, or pass --force'
       : f.reason === 'serial' ? 'drop --serial (faults now run in parallel safely)'
         : f.reason === 'pinned-old' ? 'raise the pin, or let Dependabot/Renovate do it'

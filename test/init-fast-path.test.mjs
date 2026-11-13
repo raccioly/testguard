@@ -2,19 +2,25 @@
 // (issue #270): a pre-push hook that probes the change with automatic fault
 // workers, CI that probes the change and runs the full probe nightly, and
 // managed blocks that a later init recognizes by template and by hash.
-import { describe, it, expect } from 'vitest';
+import { afterAll, beforeAll, describe, it, expect } from 'vitest';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { devNull, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { initProject } from '../src/init/init.mjs';
 import { HOOK_MIN_VERSION, TEMPLATE_VERSION, managedBlock, parseManagedBlocks, prePushBlock, prePushScript, markSkill, skillState, scanInstalled, olderThan } from '../src/init/managed.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
+// Whether the hook is on the active hooks path reads the clone's git config; a machine's global core.hooksPath must not decide it.
+const savedEnv = {};
+beforeAll(() => { for (const k of ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM']) savedEnv[k] = process.env[k]; process.env.GIT_CONFIG_GLOBAL = devNull; process.env.GIT_CONFIG_NOSYSTEM = '1'; });
+afterAll(() => { for (const [k, v] of Object.entries(savedEnv)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } });
 const TEMPLATE = readFileSync(join(ROOT, 'src/init/templates/SKILL.md'), 'utf8');
-const repo = () => {
+// `hooksPath` is where this clone runs hooks from (the default is an active hooks path, so these tests are not about activation).
+const repo = ({ hooksPath = '.githooks' } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'tg-init-fast-'));
   spawnSync('git', ['init', '-q'], { cwd: dir });
+  if (hooksPath) spawnSync('git', ['config', 'core.hooksPath', hooksPath], { cwd: dir });
   return dir;
 };
 const read = (dir, f) => readFileSync(join(dir, f), 'utf8');
@@ -53,7 +59,7 @@ describe('the templates are fast and pinned', () => {
 
 describe('init writes the fast path', () => {
   it('a pre-push block in the husky hook when husky is there, and CI on request', () => {
-    const dir = repo();
+    const dir = repo({ hooksPath: '.husky/_' });
     try {
       mkdirSync(join(dir, '.husky'));
       writeFileSync(join(dir, '.husky/pre-push'), 'npm run lint\n');
@@ -94,17 +100,21 @@ describe('init writes the fast path', () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
-  it('without husky, writes .githooks/pre-push, says how to enable it, and never writes .git/hooks', () => {
-    const dir = repo();
+  it('without husky, writes .githooks/pre-push, reports it as inactive until the clone runs it, and never writes .git/hooks or git config itself', () => {
+    const dir = repo({ hooksPath: null });
     try {
       const r = initProject({ projectDir: dir, toolVersion: '0.23.0' });
       expect(read(dir, '.githooks/pre-push')).toBe(prePushScript('.', { version: '0.23.0' }));
       expect(statSync(join(dir, '.githooks/pre-push')).mode & 0o111).not.toBe(0);
-      expect(r.notes.join('\n')).toMatch(/git config core\.hooksPath \.githooks/);
+      expect(r.outdated).toEqual([expect.stringMatching(/^\.githooks\/pre-push:1: is not on this clone's active hooks path, so it never runs on push — git config core\.hooksPath \.githooks/)]);
+      expect(r.recommendations).toEqual([expect.objectContaining({ lines: [expect.stringMatching(/^git config core\.hooksPath \.githooks/)] })]);
       expect(existsSync(join(dir, '.git/hooks/pre-push'))).toBe(false);
-      // Already enabled: nothing to say.
+      expect(spawnSync('git', ['config', '--get', 'core.hooksPath'], { cwd: dir, encoding: 'utf8' }).stdout).toBe('');
+      // Already active: nothing to say.
       spawnSync('git', ['config', 'core.hooksPath', '.githooks'], { cwd: dir });
-      expect(initProject({ projectDir: dir, toolVersion: '0.23.0' }).notes.join('\n')).not.toMatch(/core\.hooksPath/);
+      const active = initProject({ projectDir: dir, toolVersion: '0.23.0' });
+      expect(active.outdated).toEqual([]);
+      expect(active.recommendations).toEqual([]);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
@@ -119,12 +129,13 @@ describe('init writes the fast path', () => {
 
 describe('init finds the slow and stale ways, and --upgrade fixes only its own', () => {
   it('reports --serial, a full probe on every push and an old pin, and leaves those lines alone', () => {
-    const dir = repo();
+    const dir = repo({ hooksPath: '.husky/_' });
     try {
       mkdirSync(join(dir, '.husky'));
       writeFileSync(join(dir, '.husky/pre-push'), '#!/bin/sh\nnpx testguard probe . --confirm 3 --serial\n');
       const r = initProject({ projectDir: dir, upgrade: true, toolVersion: '0.23.0' });
       expect(r.outdated).toEqual([
+        expect.stringMatching(/^\.husky\/pre-push:2: hand-written TestGuard hook: left alone/),
         expect.stringMatching(/^\.husky\/pre-push:2: runs probe --serial/),
         expect.stringMatching(/^\.husky\/pre-push:2: probes every claim on every push/),
       ]);
@@ -171,18 +182,43 @@ describe('init finds the slow and stale ways, and --upgrade fixes only its own',
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
-  it('an AGENTS.md section from before template markers is upgraded with its project list kept', () => {
+  it('an unmodified AGENTS.md section from an older release is upgraded with its project list kept', () => {
     const dir = repo();
     try {
-      writeFileSync(join(dir, 'AGENTS.md'), '# Agents\n\nOur rules.\n\n<!-- testguard:begin -->\n## TestGuard\nold text\n- This project: claims in `testguard.claims.json`; run `testguard status --json` and follow `next`.\n<!-- testguard:end -->\n\nMore of ours.\n');
-      expect(initProject({ projectDir: dir, toolVersion: '0.23.0' }).outdated).toEqual(expect.arrayContaining([expect.stringMatching(/AGENTS\.md: the TestGuard section is template 1/)]));
-      initProject({ projectDir: dir, upgrade: true, toolVersion: '0.23.0' });
-      const agents = read(dir, 'AGENTS.md');
-      expect(agents).toMatch(/^# Agents\n\nOur rules\.\n\n<!-- testguard:begin template=\d+ -->/);
-      expect(agents).toContain('testguard probe --changed auto');
-      expect(agents).toContain('Run the full probe (`testguard probe`) only when asked, or in the nightly job.');
-      expect(agents).not.toContain('old text');
-      expect(agents).toMatch(/<!-- testguard:end -->\n\nMore of ours\.\n$/);
+      for (const name of ['template-1-short', 'template-1-long']) {
+        const old = readFileSync(join(ROOT, 'test/fixtures/agents-sections', `${name}.md`), 'utf8').replace(/\n$/, '');
+        writeFileSync(join(dir, 'AGENTS.md'), `# Agents\n\nOur rules.\n\n${old}\n\nMore of ours.\n`);
+        expect(initProject({ projectDir: dir, toolVersion: '0.23.0' }).outdated).toEqual(expect.arrayContaining([expect.stringMatching(/AGENTS\.md: the TestGuard section is template 1, unmodified/)]));
+        initProject({ projectDir: dir, upgrade: true, toolVersion: '0.23.0' });
+        const agents = read(dir, 'AGENTS.md');
+        expect(agents).toMatch(/^# Agents\n\nOur rules\.\n\n<!-- testguard:begin template=\d+ -->/);
+        expect(agents).toContain('testguard probe --changed auto');
+        expect(agents).not.toContain('Before writing or changing tests, run `testguard status --json [dir]` and follow `next`.\nThe full operating loop and the verdict table are in `.claude/skills/testguard/SKILL.md`.\nNever make a fault die by editing `testguard.claims.json`; write the test. Claim edits are recorded in the evidence.\n- ');
+        expect(agents).toMatch(/<!-- testguard:end -->\n\nMore of ours\.\n$/);
+      }
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('an edited AGENTS.md section is left alone, byte for byte, by init and by --upgrade, and reported (#301)', () => {
+    const dir = repo();
+    try {
+      const old = readFileSync(join(ROOT, 'test/fixtures/agents-sections/template-1-long.md'), 'utf8').replace(/\n$/, '');
+      // What a project does to it: drops a line it budgets for, keeps its own, adds one.
+      const edited = old.replace(/^Never install automatically.*\n/m, '').replace('<!-- testguard:end -->', 'Project rule: run the probe in CI only.\n<!-- testguard:end -->');
+      expect(edited).not.toBe(old);
+      const text = `# Agents\n\n${edited}\n`;
+      writeFileSync(join(dir, 'AGENTS.md'), text);
+      for (const opts of [{}, { upgrade: true }, { upgrade: true, force: true }]) {
+        const r = initProject({ projectDir: dir, toolVersion: '0.23.0', ...opts });
+        expect(read(dir, 'AGENTS.md')).toBe(text);
+        expect(r.skipped).toEqual(expect.arrayContaining([expect.stringMatching(/^AGENTS\.md: the TestGuard section was edited by hand, so it is left as it is/)]));
+        expect(r.done.join('\n')).not.toMatch(/AGENTS\.md/);
+      }
+      // A project the section does not list yet: the bullet is printed, nothing is rewritten.
+      mkdirSync(join(dir, 'api'));
+      const sub = initProject({ projectDir: join(dir, 'api'), toolVersion: '0.23.0' });
+      expect(read(dir, 'AGENTS.md')).toBe(text);
+      expect(sub.skipped.join('\n')).toMatch(/is left as it is \(it does not list api; add the bullet yourself: - `api\/`/);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
