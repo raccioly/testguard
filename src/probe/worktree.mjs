@@ -10,6 +10,7 @@ import { withWorktreeLock, worktreeLockDir } from './worktree-lock.mjs';
 import { PreconditionError } from './precondition-error.mjs';
 import { installChanges, installFingerprint, linkNodeModules, writable } from './node-modules-link.mjs';
 import { scratchConfigured, scratchRoot } from '../scratch-dir.mjs';
+import { recordOwner } from '../clean/owner.mjs';
 
 export { PreconditionError };
 
@@ -66,6 +67,9 @@ export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase 
   // The lock is keyed by the repository and kept out of it.
   const lockDir = worktreeLockDir(gitCommonDir(repoRoot));
   const dest = mkdtempSync(join(scratchBase, 'testguard-'));
+  // Who owns this tree, written before anything else so an interrupted probe's
+  // tree is provably an orphan for the next run (#311).
+  const dropOwner = recordOwner(scratchBase, dest);
   const remove = () => withWorktreeLock(lockDir, () => removeWorktree(repoRoot, dest));
   const unregister = registerCleanup(remove);
   withWorktreeLock(lockDir, () => addWorktree(repoRoot, dest, sha));
@@ -73,6 +77,7 @@ export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase 
     layOutNodeModules({ repoRoot, projectDir, dest, nodeModules });
   } catch (error) {
     remove();
+    dropOwner();
     unregister();
     throw error;
   }
@@ -81,7 +86,7 @@ export function createScratch({ repoRoot, projectDir, ref = 'HEAD', scratchBase 
     sha,
     root: dest,
     projectDir: join(dest, relative(repoRoot, projectDir)),
-    cleanup: () => { remove(); unregister(); },
+    cleanup: () => { remove(); dropOwner(); unregister(); },
   };
 }
 

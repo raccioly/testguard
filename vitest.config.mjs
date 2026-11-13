@@ -24,5 +24,9 @@ export default defineConfig({
     // the oversubscribed machine instead of the code. Tests that are about
     // the fan-out or the default pass their own width, or delete this (#270).
     env: { TESTGUARD_FAULT_WORKERS: '1' },
+    // Every temp directory the suite creates lives under one per-run directory
+    // that is removed when the run ends, and a crashed run's is removed by the
+    // next (#311). See test/helpers/run-temp.mjs.
+    globalSetup: ['./test/helpers/run-temp.mjs'],
   },
 });

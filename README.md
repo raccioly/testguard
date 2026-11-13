@@ -267,8 +267,8 @@ verdict.
 
 ## Status
 
-Thirteen commands (`status`, `init`, `claims`, `probe`, `admit`, `baseline`,
-`brief`, `gate`, `scaffold`, `sweep`, `concerns`, `replay`, `mcp`). Runners
+Fourteen commands (`status`, `init`, `claims`, `probe`, `admit`, `baseline`,
+`brief`, `gate`, `scaffold`, `sweep`, `concerns`, `replay`, `clean`, `mcp`). Runners
 for vitest, jest, Playwright, Node's built-in test runner, pytest and stdlib
 `unittest`, plus `--runner-cmd` for anything that writes a jest-compatible
 report. Hand-authored faults and a mechanical scaffold for JavaScript,

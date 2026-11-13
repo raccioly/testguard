@@ -55,7 +55,8 @@ describe('createScratch keeps its lock under the scratch base, outside the repos
     expect(existsSync(join(base, 'testguard-locks'))).toBe(false);
     const s = withScratchBase(base, () => createScratch({ repoRoot: dir, projectDir: dir, scratchBase: base }));
     try {
-      const locks = readdirSync(join(base, 'testguard-locks'));
+      // `owners` holds the tree's owner record (#311); the other entry is the repository's lock directory.
+      const locks = readdirSync(join(base, 'testguard-locks')).filter((name) => name !== 'owners');
       expect(locks).toHaveLength(1);
       expect(join(base, 'testguard-locks', locks[0])).toBe(withScratchBase(base, () => worktreeLockDir(gitCommonDir(dir))));
       expect(existsSync(join(dir, 'testguard-locks'))).toBe(false);

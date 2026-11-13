@@ -16,6 +16,8 @@ import { computeChangedGate, defaultIgnorePath } from '../gate/changed.mjs';
 import { headSha, isAncestor, repoRoot } from '../git.mjs';
 import { availableParallelism } from 'node:os';
 import { computeAdvice, renderAdvice } from './advice.mjs';
+import { scanOrphans, STATUS_BUDGET_MS } from '../clean/orphans.mjs';
+import { scratchRoot } from '../scratch-dir.mjs';
 import { resolveProbeScope } from '../probe/scope.mjs';
 import { checkAnchorLocations } from '../claims/anchors.mjs';
 import { computeClaimedSurface, needsClaimExpansion } from './surface.mjs';
@@ -86,7 +88,10 @@ function statusAdvice(doc, { projectDir, toolVersion, paths = P(projectDir), cha
   }
   let root;
   try { root = repoRoot(projectDir); } catch { root = undefined; }
-  return computeAdvice({ evidence, cpus, changed, root, toolVersion: toolVersion ?? '0.0.0' });
+  // A bounded look under the scratch root (#311); never a reason for status to fail or to wait.
+  let orphans = 0;
+  try { orphans = scanOrphans(scratchRoot(), { deadline: Date.now() + STATUS_BUDGET_MS }).orphans.filter((o) => o.kind !== 'owner-record').length; } catch { orphans = 0; }
+  return computeAdvice({ evidence, cpus, changed, root, toolVersion: toolVersion ?? '0.0.0', orphans });
 }
 
 function computeStatusCore({ projectDir, toolVersion, generatedAt = new Date().toISOString(), paths = P(projectDir), max = 20, changedRef, includeDirty = false, evidence: evidenceOverride, only }) {

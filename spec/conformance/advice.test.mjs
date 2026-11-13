@@ -13,7 +13,7 @@ const paths = (doc) => validate('status', doc).errors.map((e) => e.path);
 describe('status advice', () => {
   it('a status with advice lines conforms', () => {
     const doc = load('examples', 'status-advice.json');
-    expect(doc.advice.map((a) => a.id)).toEqual(['serial-on-multicore', 'slow-defenders-dominate', 'hook-outdated']);
+    expect(doc.advice.map((a) => a.id)).toEqual(['serial-on-multicore', 'slow-defenders-dominate', 'hook-outdated', 'orphaned-scratch']);
     expect(validate('status', doc).errors).toEqual([]);
   });
 
@@ -29,6 +29,10 @@ describe('status advice', () => {
 describe('advice is the line its rule produces', () => {
   it('the slow-defender advice points at the per-claim cost report, nothing else (#291)', () => {
     expect(paths(load('invalid', 'status.advice-slow-defenders-wrong-command.json'))).toEqual(['/advice/0/command']);
+  });
+
+  it('the leftover-scratch advice points at testguard clean, nothing else (#311)', () => {
+    expect(paths(load('invalid', 'status.advice-orphaned-scratch-wrong-command.json'))).toEqual(['/advice/0/command']);
   });
 
   it('the change-scoped probe is advised only where the next step is a probe', () => {
