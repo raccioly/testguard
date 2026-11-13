@@ -112,7 +112,9 @@ describe('what lives under the scratch directory', () => {
     expect(reported.report.out.startsWith(base)).toBe(true);
     expect(dirname(reported.report.tmp)).toBe(base);
     expect(reported.report.data.startsWith(reported.report.tmp)).toBe(true);
-    expect(readdirSync(base)).toEqual([]);
+    // The owner record the child's directory carried (#311) is gone with it; the lock directory that held it stays, as for every other command.
+    expect(readdirSync(base).filter((name) => name !== 'testguard-locks')).toEqual([]);
+    expect(readdirSync(join(base, 'testguard-locks', 'owners'))).toEqual([]);
   });
 
   it('without a scratch directory a child keeps the operating system\'s own temp directory', () => {

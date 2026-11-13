@@ -117,3 +117,26 @@ export function removeWorktree(repo, dest) {
   rmSync(dest, { recursive: true, force: true });
   scratchGit(['worktree', 'prune'], repo);
 }
+
+/**
+ * Unlock the registration of the worktree at `path` in the repository whose git
+ * directory is `commonDir`. A probe killed in the middle of `git worktree add`
+ * leaves its registration locked ("initializing"), and `prune` never removes a
+ * locked one. Only ever called for a tree whose owner is provably gone (#311).
+ */
+export function unlockWorktree(commonDir, path, { timeoutMs = 10_000 } = {}) {
+  spawnSync('git', [...NO_HOOKS, '--git-dir', commonDir, 'worktree', 'unlock', path], { encoding: 'utf8', timeout: timeoutMs, env: scratchGitEnv() });
+}
+
+/**
+ * The registrations `git worktree prune` would remove (or removes) for the
+ * repository whose git directory is `commonDir`: worktrees whose directory is
+ * gone. Returns git's own "Removing worktrees/<id>: …" lines. `--git-dir`
+ * rather than a cwd, so a repository whose checkout is gone is still reachable;
+ * a path that is not a git directory yields no lines instead of an error (#311).
+ */
+export function pruneWorktrees(commonDir, { dryRun = false, timeoutMs = 10_000 } = {}) {
+  const r = spawnSync('git', [...NO_HOOKS, '--git-dir', commonDir, 'worktree', 'prune', '--verbose', ...(dryRun ? ['--dry-run'] : [])], { encoding: 'utf8', timeout: timeoutMs, env: scratchGitEnv() });
+  if (r.status !== 0) return [];
+  return `${r.stdout ?? ''}\n${r.stderr ?? ''}`.split('\n').map((line) => line.trim()).filter((line) => line.startsWith('Removing '));
+}

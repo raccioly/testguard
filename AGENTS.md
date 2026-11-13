@@ -47,6 +47,8 @@ tree). Records come out in claim/fault order.
 - `src/probe/dependencies.mjs` — what a verdict depends on; reuse, origin policy and `status` all compare through it.
 - `src/probe/fan-out.mjs` — pure fan-out rules: width, order, what is re-measured alone.
 - `src/probe/worktree.mjs`, `src/probe/node-modules-link.mjs`, `src/probe/worker-env.mjs`, `src/probe/typecheck.mjs` — scratch trees; borrowing `node_modules` without writing through it; `TESTGUARD_WORKER`; the project's own compiler refusing a non-type-checking fault.
+- `src/clean/orphans.mjs`, `src/clean/owner.mjs` — every scratch tree carries an owner record; `testguard clean` and the start of every probe remove the trees, locks and worktree registrations whose owner is provably gone (same host, pid not running; no record: older than 24 h). Never a live or foreign owner's.
+- `test/helpers/run-temp.mjs` — vitest `globalSetup`: one `tg-run-<pid>-<random>` temp directory per run, exported as `TMPDIR`, removed at the end; a dead run's is removed by the next. Do not create temp directories outside `os.tmpdir()` in tests.
 - `src/probe/cost.mjs` — cost report and gate (normalized elapsed seconds, valid for one width); `testguard.cost-budget.json`.
 - `src/probe/runners/` — one module per runner; a new one needs its own fixture with hand-verified expected verdicts.
 - `src/gate/changed.mjs` — `gate --changed`; `src/status/status.mjs` — the state machine (a new state is a spec change plus a template change).

@@ -11,7 +11,7 @@ import { scanInstalled, renderFinding } from '../init/managed.mjs';
  * machine's CPU count, the change since a base the caller resolved, and the
  * hook and CI files in the repository.
  */
-export const ADVICE_IDS = ['serial-on-multicore', 'full-probe-where-changed-would-do', 'nothing-reused', 'slow-defenders-dominate', 'hook-outdated'];
+export const ADVICE_IDS = ['serial-on-multicore', 'full-probe-where-changed-would-do', 'nothing-reused', 'slow-defenders-dominate', 'hook-outdated', 'orphaned-scratch'];
 
 /** The last run measured one fault at a time because somebody asked, on a machine where auto would not. */
 export function serialAdvice(run, cpus) {
@@ -98,7 +98,7 @@ export function hookAdvice({ root, toolVersion }) {
 }
 
 /** Every advice line that applies, in a fixed order. */
-export function computeAdvice({ evidence, cpus, changed, root, toolVersion }) {
+export function computeAdvice({ evidence, cpus, changed, root, toolVersion, orphans = 0 }) {
   const run = evidence?.run;
   return [
     serialAdvice(run, cpus),
@@ -106,7 +106,14 @@ export function computeAdvice({ evidence, cpus, changed, root, toolVersion }) {
     reuseAdvice(run, evidence?.records?.length),
     costAdvice(evidence),
     ...hookAdvice({ root, toolVersion }),
+    orphanAdvice(orphans),
   ].filter(Boolean);
+}
+
+/** Scratch trees and locks interrupted runs left behind (#311): one line, with the command that removes them. */
+export function orphanAdvice(count) {
+  if (!(count > 0)) return undefined;
+  return { id: 'orphaned-scratch', message: `${count} scratch ${count === 1 ? 'entry' : 'entries'} left by interrupted runs ${count === 1 ? 'is' : 'are'} taking disk space; the next probe removes some, and clean removes all of them (add --dry-run to list first).`, command: 'testguard clean' };
 }
 
 /** Human lines for a terminal. */

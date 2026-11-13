@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { PreconditionError } from './probe/precondition-error.mjs';
 import { registerCleanup } from './probe/runners/lifecycle.mjs';
+import { recordOwner } from './clean/owner.mjs';
 
 /**
  * The one place TestGuard's temporary files live. A confined caller names a
@@ -38,7 +39,8 @@ export function childScope() {
   const base = context.getStore();
   if (base === undefined) return { env: {}, dispose: () => {} };
   const dir = mkdtempSync(join(base, 'testguard-child-'));
-  const remove = () => rmSync(dir, { recursive: true, force: true });
+  const dropOwner = recordOwner(base, dir);
+  const remove = () => { rmSync(dir, { recursive: true, force: true }); dropOwner(); };
   const unregister = registerCleanup(remove);
   return {
     env: { TMPDIR: dir, TMP: dir, TEMP: dir, XDG_DATA_HOME: join(dir, 'data') },
