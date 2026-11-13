@@ -3388,6 +3388,89 @@
       ]
     },
     {
+      "id": "TG-ANCHOR-CHECK-BATCHES-AND-NEVER-HANGS",
+      "statement": "claims --check-anchors sends each language's replaced sources to a fresh parser process in batches that close before their summed length passes 4,000,000 characters (a larger single item goes alone), returns every fault's result in input order, stops with a typed error that says how many faults were checked when the --budget runs out between batches, and on any failure (send, per-batch timeout, abort) kills the parser and rejects once it is gone: never one message holding every source, never a pending promise or a parser left waiting for input.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #320 (claims --check-anchors on a large claims file)"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/claims-anchors-batches.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "No batch is ever closed: every source goes to the parser in one message again.",
+          "faultClass": "guard-removed",
+          "file": "src/claims/anchors.mjs",
+          "find": "if (i > start && sum + size > cap) {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The batch cap is ten times larger.",
+          "faultClass": "literal-changed",
+          "file": "src/claims/anchors.mjs",
+          "find": "export const BATCH_CHARS = 4_000_000;",
+          "replace": "export const BATCH_CHARS = 40_000_000;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A spent budget is not noticed between batches.",
+          "faultClass": "guard-removed",
+          "file": "src/claims/anchors.mjs",
+          "find": "if (left <= 0) throw new Error(",
+          "replace": "if (false) throw new Error(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A failed syntax check escapes as an untyped error, which the CLI labels a bug in testguard.",
+          "faultClass": "literal-changed",
+          "file": "src/claims/anchors.mjs",
+          "find": "if (firstError) throw new ClaimsError(",
+          "replace": "if (firstError) throw new Error(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A killed parser's own failure is not the one reported: the timeout or send error is replaced by its exit status.",
+          "faultClass": "guard-removed",
+          "file": "src/claims/anchors.mjs",
+          "find": "if (failure) settle(reject, failure);",
+          "replace": "if (false) settle(reject, failure);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ],
+      "tags": [
+        "claims",
+        "anchors",
+        "issue-320"
+      ]
+    },
+    {
       "id": "TG-ANNOTATION-RESULT-IS-NON-OPTIMISTIC",
       "statement": "Annotation authoring validation rejects applied results without complete verified targets, recovery and owned-lock release.",
       "source": {

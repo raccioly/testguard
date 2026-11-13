@@ -8,6 +8,7 @@ import { repoRoot, isDirty, snapshotWorkingTree } from '../git.mjs';
 import { createScratch } from '../probe/worktree.mjs';
 import { applyFault } from '../probe/inject.mjs';
 import { createTypechecker } from '../probe/typecheck.mjs';
+import { ClaimsError } from './load.mjs';
 
 const JS_EXTENSIONS = new Set(['.js', '.mjs', '.cjs']);
 
@@ -98,9 +99,39 @@ function firstError(stderr) {
     ?? 'replacement does not compile';
 }
 
-function runBatchCheck(command, args, items, timeoutMs = 5_000) {
+/** A batch closes when its summed source length would pass this many characters (#320). */
+export const BATCH_CHARS = 4_000_000;
+/** One parser process gets this long for one batch. */
+export const BATCH_TIMEOUT_MS = 10_000;
+
+/**
+ * Cut consecutive items, given by size, into batches: a batch closes when its summed size would pass `cap`,
+ * and an item larger than `cap` goes alone. Returns [start, end) pairs covering every item in order.
+ * The whole claims file is never one message: 6,600 faults times a whole source file each overran the
+ * string a parser process can be sent, and the throw left that process waiting for input forever (#320).
+ */
+export function cutBatches(sizes, cap = BATCH_CHARS) {
+  const cuts = [];
+  let start = 0;
+  let sum = 0;
+  sizes.forEach((size, i) => {
+    if (i > start && sum + size > cap) { cuts.push([start, i]); start = i; sum = 0; }
+    sum += size;
+  });
+  if (sizes.length > start) cuts.push([start, sizes.length]);
+  return cuts;
+}
+
+/**
+ * One parser process, one batch. Every way this can fail (the send, the timeout, the parser's exit, an abort
+ * because a sibling failed) kills the child and rejects once the child is gone: no failure leaves a
+ * process or a timer behind, and none leaves the promise pending. `serialize` and `onSpawn` are
+ * injectable so a test can force the send to fail and see the child die.
+ */
+export function runBatchCheck(command, args, items, { timeoutMs = BATCH_TIMEOUT_MS, serialize = JSON.stringify, onSpawn, signal } = {}) {
   if (!items.length) return Promise.resolve([]);
   return new Promise((resolveRun, reject) => {
+    if (signal?.aborted) { reject(new Error(`${command} syntax check not started: another check failed`)); return; }
     let child;
     try {
       child = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, CI: '1' } });
@@ -108,37 +139,77 @@ function runBatchCheck(command, args, items, timeoutMs = 5_000) {
       reject(error);
       return;
     }
+    onSpawn?.(child);
     let stdout = '';
     let stderr = '';
-    let timedOut = false;
+    let failure;
+    let settled = false;
+    let timer;
+    const onAbort = () => fail(new Error(`${command} syntax check stopped: another check failed`));
+    const settle = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      fn(value);
+    };
+    // Kill now, reject on 'close': by then the process is gone, not merely signalled.
+    function fail(error) {
+      failure ??= error;
+      clearTimeout(timer);
+      child.kill('SIGKILL');
+    }
+    signal?.addEventListener('abort', onAbort, { once: true });
     child.stdout.on('data', (chunk) => {
       if (stdout.length < 16_777_216) stdout += chunk;
     });
     child.stderr.on('data', (chunk) => {
       if (stderr.length < 16_384) stderr += chunk;
     });
-    child.on('error', reject);
+    child.on('error', (error) => { fail(error); settle(reject, error); });
     child.stdin.on('error', () => {});
-    child.stdin.end(JSON.stringify(items));
-    const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill('SIGKILL');
-    }, timeoutMs);
+    // The timer starts before the send, so nothing after this line can wait unbounded.
+    timer = setTimeout(() => fail(new Error(`${command} syntax check timed out after ${timeoutMs}ms`)), timeoutMs);
+    let payload;
+    try { payload = serialize(items); } catch (error) { fail(new Error(`${command} syntax check: could not serialize ${items.length} items: ${error.message}`)); }
+    if (payload !== undefined) {
+      try { child.stdin.end(payload); } catch (error) { fail(new Error(`${command} syntax check: could not send ${items.length} items: ${error.message}`)); }
+    }
     child.on('close', (code) => {
-      clearTimeout(timer);
-      if (timedOut) reject(new Error(`${command} syntax check timed out after ${timeoutMs}ms`));
-      else if (code !== 0) reject(new Error(`${command} syntax check failed: ${firstError(stderr)}`));
+      if (failure) settle(reject, failure);
+      else if (code !== 0) settle(reject, new Error(`${command} syntax check failed: ${firstError(stderr)}`));
       else {
         try {
           const results = JSON.parse(stdout);
           if (!Array.isArray(results) || results.length !== items.length) throw new Error('unexpected result count');
-          resolveRun(results);
+          settle(resolveRun, results);
         } catch (error) {
-          reject(new Error(`${command} syntax check returned invalid output: ${error.message}`));
+          settle(reject, new Error(`${command} syntax check returned invalid output: ${error.message}`));
         }
       }
     });
   });
+}
+
+/**
+ * One language: its faults in batches of at most `batchChars`, one fresh parser process after another, results
+ * in input order. A fault's mutated source is built only when its batch is, and is garbage once the batch is
+ * sent. The phase is bounded by `deadline`, checked before every batch (so it overruns by at most one
+ * batch's own timeout); running out says how far it got.
+ */
+export async function checkInBatches({ language, command, args, candidates, build, sizeOf, batchChars = BATCH_CHARS, timeoutMs = BATCH_TIMEOUT_MS, deadline, budgetMs, signal, onBatch, onSpawn, serialize }) {
+  const results = [];
+  for (const [from, to] of cutBatches(candidates.map(sizeOf), batchChars)) {
+    const left = deadline - performance.now();
+    if (left <= 0) throw new Error(`${language} syntax check ran out of its ${budgetMs}ms budget after ${results.length} of ${candidates.length} faults; raise --budget`);
+    onBatch?.({ language, from, to });
+    try {
+      for (const r of await runBatchCheck(command, args, candidates.slice(from, to).map(build), { timeoutMs, signal, onSpawn, serialize })) results.push(r);
+    } catch (error) {
+      throw new Error(`${error.message} (${results.length} of ${candidates.length} ${language} faults checked)`, { cause: error });
+    }
+  }
+  return results;
 }
 
 function packageType(projectDir, file, cache) {
@@ -171,39 +242,48 @@ function packageType(projectDir, file, cache) {
  * baseline check of the unmodified tree. A replacement the checker refuses is
  * `fault-invalid`; a file it does not judge is reported `not-applicable`.
  */
-export async function checkAnchors(projectDir, claims, { python, typecheck, budgetMs = 120_000, nodeModules, scratchBase } = {}) {
+export async function checkAnchors(projectDir, claims, { python, typecheck, budgetMs = 120_000, nodeModules, scratchBase, batchChars, batchTimeoutMs, onBatch, onSpawn, serialize } = {}) {
   const started = performance.now();
   const work = inspectLocations(projectDir, claims);
   const candidates = work.filter((x) => x.result.status === 'ok' && x.source !== undefined && isInjection(x.fault));
   const hasPython = candidates.some((x) => extname(x.fault.file) === '.py');
   const interpreter = hasPython ? await resolveInterpreter({ projectDir, python, budgetMs: 5_000 }) : undefined;
   const packageTypes = new Map();
+  // Candidates only: which fault goes to which parser. The mutated source is built when its batch is (#320).
   const javascript = [];
   const pythonSources = [];
   for (const candidate of candidates) {
-    const { fault, source } = candidate;
-    const extension = extname(fault.file);
-    const changed = mutate(source, fault);
-    if (JS_EXTENSIONS.has(extension)) {
-      javascript.push({ candidate, file: fault.file, source: changed, type: packageType(projectDir, fault.file, packageTypes) });
-    } else if (extension === '.py' && interpreter && !interpreter.error) {
-      pythonSources.push({ candidate, file: fault.file, source: changed });
-    }
+    const extension = extname(candidate.fault.file);
+    if (JS_EXTENSIONS.has(extension)) javascript.push(candidate);
+    else if (extension === '.py' && interpreter && !interpreter.error) pythonSources.push(candidate);
   }
+  // Exact, without building the string: the replaced text is the source minus the anchor plus the replacement.
+  const sizeOf = ({ source, fault }) => source.length - fault.find.length + fault.replace.length;
+  const buildJs = (candidate) => ({ file: candidate.fault.file, source: mutate(candidate.source, candidate.fault), type: packageType(projectDir, candidate.fault.file, packageTypes) });
+  const buildPy = (candidate) => ({ file: candidate.fault.file, source: mutate(candidate.source, candidate.fault) });
 
-  // One parser process per language keeps this a cheap preflight even when a
-  // claims file has hundreds of faults. The Node VM constructors use the same
-  // V8 grammar as `node --check` and compile without linking or executing code.
-  const [javascriptResults, pythonResults] = await Promise.all([
-    runBatchCheck(process.execPath, ['--no-warnings', '--experimental-vm-modules', '-e', NODE_SYNTAX_CHECK], javascript),
+  // One parser process at a time per language, a batch of faults each, keeps this a cheap preflight even when a
+  // claims file has thousands of faults. The Node VM constructors use the same V8 grammar as `node --check`
+  // and compile without linking or executing code. The two languages run beside each other; when one fails the
+  // other is stopped, and the call settles only after no parser process is left.
+  const deadline = performance.now() + budgetMs;
+  const abort = new AbortController();
+  let firstError;
+  const guard = (promise) => promise.catch((error) => { firstError ??= error; abort.abort(); throw error; });
+  const common = { sizeOf, deadline, budgetMs, signal: abort.signal, batchChars, timeoutMs: batchTimeoutMs, onBatch, onSpawn, serialize };
+  const settled = await Promise.allSettled([
+    guard(checkInBatches({ ...common, language: 'javascript', command: process.execPath, args: ['--no-warnings', '--experimental-vm-modules', '-e', NODE_SYNTAX_CHECK], candidates: javascript, build: buildJs })),
     interpreter && !interpreter.error
-      ? runBatchCheck(interpreter.path, ['-c', PYTHON_SYNTAX_CHECK], pythonSources)
-      : [],
+      ? guard(checkInBatches({ ...common, language: 'python', command: interpreter.path, args: ['-c', PYTHON_SYNTAX_CHECK], candidates: pythonSources, build: buildPy }))
+      : Promise.resolve([]),
   ]);
+  // A typed refusal, so the CLI prints one `error:` line and exits 2, not a trace labeled a bug in testguard.
+  if (firstError) throw new ClaimsError(`the syntax check of the fault replacements could not finish: ${firstError.message}`, { cause: firstError });
+  const [javascriptResults, pythonResults] = settled.map((r) => r.value);
 
   const parsedByFault = new Map();
-  javascript.forEach(({ candidate }, index) => parsedByFault.set(keyOf(candidate.claim.id, candidate.fault.id), { language: 'javascript', ...javascriptResults[index] }));
-  pythonSources.forEach(({ candidate }, index) => parsedByFault.set(keyOf(candidate.claim.id, candidate.fault.id), { language: 'python', ...pythonResults[index] }));
+  javascript.forEach((candidate, index) => parsedByFault.set(keyOf(candidate.claim.id, candidate.fault.id), { language: 'javascript', ...javascriptResults[index] }));
+  pythonSources.forEach((candidate, index) => parsedByFault.set(keyOf(candidate.claim.id, candidate.fault.id), { language: 'python', ...pythonResults[index] }));
 
   let results = work.map(({ claim, fault, result }) => {
     const parsed = parsedByFault.get(keyOf(claim.id, fault.id));
