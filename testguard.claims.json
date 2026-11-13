@@ -3389,7 +3389,7 @@
     },
     {
       "id": "TG-ANCHOR-CHECK-BATCHES-AND-NEVER-HANGS",
-      "statement": "claims --check-anchors sends each language's replaced sources to a fresh parser process in batches that close before their summed length passes 4,000,000 characters (a larger single item goes alone), returns every fault's result in input order, stops with a typed error that says how many faults were checked when the --budget runs out between batches, and on any failure (send, per-batch timeout, abort) kills the parser and rejects once it is gone: never one message holding every source, never a pending promise or a parser left waiting for input.",
+      "statement": "claims --check-anchors sends each language's replaced sources to a fresh parser process in batches that close before their summed length passes 4,000,000 characters (a larger single item goes alone), returns every fault's result in input order, stops with a typed error that says how many faults were checked when the --budget runs out, between batches or inside one (a batch never outlives what is left of it), and on any failure (send, per-batch timeout, abort) kills the parser and rejects once it is gone: never one message holding every source, never a pending promise or a parser left waiting for input.",
       "source": {
         "kind": "spec",
         "ref": "issue #320 (claims --check-anchors on a large claims file)"
@@ -3429,11 +3429,11 @@
         },
         {
           "id": "F3",
-          "description": "A spent budget is not noticed between batches.",
-          "faultClass": "guard-removed",
+          "description": "A batch is allowed its whole timeout past the budget.",
+          "faultClass": "literal-changed",
           "file": "src/claims/anchors.mjs",
-          "find": "if (left <= 0) throw new Error(",
-          "replace": "if (false) throw new Error(",
+          "find": "const limit = Math.min(timeoutMs, Math.ceil(left));",
+          "replace": "const limit = timeoutMs;",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

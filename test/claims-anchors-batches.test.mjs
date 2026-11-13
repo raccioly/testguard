@@ -5,7 +5,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { BATCH_CHARS, checkAnchors, cutBatches, runBatchCheck } from '../src/claims/anchors.mjs';
+import { performance } from 'node:perf_hooks';
+import { BATCH_CHARS, checkAnchors, checkInBatches, cutBatches, runBatchCheck } from '../src/claims/anchors.mjs';
 import { ClaimsError } from '../src/claims/load.mjs';
 import { main } from '../src/cli.mjs';
 
@@ -117,6 +118,15 @@ describe('checkAnchors over a source that needs several batches (#320)', () => {
     expect(failure.message).toMatch(/ran out of its 1ms budget after \d+ of 60 faults/);
     expect(batches.length).toBeLessThan(3);
   }, 60_000);
+
+  it('a batch never outlives the budget: a parser that hangs is stopped when the budget is spent, not after its own 10 s', async () => {
+    const started = Date.now();
+    let pid;
+    const failure = await checkInBatches({ language: 'javascript', command: process.execPath, args: HANGS, candidates: [{ size: 10 }, { size: 10 }], sizeOf: (c) => c.size, build: (c) => c, deadline: performance.now() + 300, budgetMs: 300, onSpawn: (c) => { pid = c.pid; } }).then(() => undefined, (e) => e);
+    expect(failure.message).toBe('javascript syntax check ran out of its 300ms budget after 0 of 2 faults; raise --budget');
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(alive(pid)).toBe(false);
+  }, 30_000);
 
   it('through the CLI a failure is one error line and a nonzero exit, never a hang', () => {
     const { dir, doc } = project(60, -1);

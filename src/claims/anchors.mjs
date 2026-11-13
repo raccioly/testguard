@@ -169,7 +169,7 @@ export function runBatchCheck(command, args, items, { timeoutMs = BATCH_TIMEOUT_
     child.on('error', (error) => { fail(error); settle(reject, error); });
     child.stdin.on('error', () => {});
     // The timer starts before the send, so nothing after this line can wait unbounded.
-    timer = setTimeout(() => fail(new Error(`${command} syntax check timed out after ${timeoutMs}ms`)), timeoutMs);
+    timer = setTimeout(() => fail(Object.assign(new Error(`${command} syntax check timed out after ${timeoutMs}ms`), { timedOut: true })), timeoutMs);
     let payload;
     try { payload = serialize(items); } catch (error) { fail(new Error(`${command} syntax check: could not serialize ${items.length} items: ${error.message}`)); }
     if (payload !== undefined) {
@@ -194,18 +194,22 @@ export function runBatchCheck(command, args, items, { timeoutMs = BATCH_TIMEOUT_
 /**
  * One language: its faults in batches of at most `batchChars`, one fresh parser process after another, results
  * in input order. A fault's mutated source is built only when its batch is, and is garbage once the batch is
- * sent. The phase is bounded by `deadline`, checked before every batch (so it overruns by at most one
- * batch's own timeout); running out says how far it got.
+ * sent. The phase is bounded by `deadline`: checked before every batch, and a batch's own timeout is capped
+ * by what is left. Running out says how far it got.
  */
 export async function checkInBatches({ language, command, args, candidates, build, sizeOf, batchChars = BATCH_CHARS, timeoutMs = BATCH_TIMEOUT_MS, deadline, budgetMs, signal, onBatch, onSpawn, serialize }) {
   const results = [];
   for (const [from, to] of cutBatches(candidates.map(sizeOf), batchChars)) {
     const left = deadline - performance.now();
-    if (left <= 0) throw new Error(`${language} syntax check ran out of its ${budgetMs}ms budget after ${results.length} of ${candidates.length} faults; raise --budget`);
+    const spent = () => new Error(`${language} syntax check ran out of its ${budgetMs}ms budget after ${results.length} of ${candidates.length} faults; raise --budget`);
+    if (left <= 0) throw spent();
     onBatch?.({ language, from, to });
+    // A batch never outlives the budget: its timeout is the smaller of its own and what is left.
+    const limit = Math.min(timeoutMs, Math.ceil(left));
     try {
-      for (const r of await runBatchCheck(command, args, candidates.slice(from, to).map(build), { timeoutMs, signal, onSpawn, serialize })) results.push(r);
+      for (const r of await runBatchCheck(command, args, candidates.slice(from, to).map(build), { timeoutMs: limit, signal, onSpawn, serialize })) results.push(r);
     } catch (error) {
+      if (error.timedOut && limit < timeoutMs) throw spent();
       throw new Error(`${error.message} (${results.length} of ${candidates.length} ${language} faults checked)`, { cause: error });
     }
   }
