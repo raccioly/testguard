@@ -7,15 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- **`testguard.config.json`: the project's runner options in one committed file (#301).** `runner`, `runnerCmd`, `python`, `nodeModules`, `typecheck`, `workers`, `faultWorkers`, `confirm` and `budget` are the defaults for the flags of the same meaning in `probe`, `admit`, `sweep`, `replay` and `claims --check-anchors`, so a hook, a CI line or an agent runs plain `testguard probe`. A typed flag, then `TESTGUARD_PYTHON`/`TESTGUARD_NODE_MODULES`/`TESTGUARD_FAULT_WORKERS`, win; `--no-config` ignores the file. An unknown key, a wrong type or malformed JSON exits 3 naming the key; a path outside the repository exits 2. An uncommitted file refuses a probe of the implicit HEAD like a dirty defender. Reuse compares the resolved options, never the file: moving a flag into it keeps every verdict, changing a value re-measures as the flag would. A change to the file selects every claim under `--changed`. `status --json` reports `config`, `probe --json` reports `run.config`; evidence records `faultWorkersSource: config`. Schema: `spec/schemas/config.schema.json`.
-- **`probe --changed <ref> --explain` (#301).** Prints which claims a change selects and why (one line per claim: `file`, `glob`, `discovery` or `indeterminate` with its issue), a count per reason and the changed source files no claim covers, and probes nothing. `--json` gives `run.scope` as a probe would, with `explain: true`. Exit 0, or 2 when the change cannot be measured.
-
-### Fixed
-
-- **A CommonJS export form no longer makes a file closure indeterminate (#301 item 8).** `module.exports = Reporter` (and the other CommonJS export forms the reader does not model) hides which binding an importer receives, never which file loads: the closure scans every literal `require()` itself. Such a module made every claim reaching it selected by any change in the repository; here, a documentation-only `AGENTS.md` change selected `TG-KILL-KIND-IS-RECORDED-FROM-ERROR-IDENTITY` (11 faults) through `kinds-reporter.cjs`. It is still uncertain for binding resolution; an ES module form the reader cannot read still makes the closure indeterminate.
-
 ### Changed
 
 - **The sharded cost gate is per fault, and the shard count has one home (#284, repository only).** The total ceiling is `perFaultSeconds` (3.0) times the faults in the merged evidence, so adding claims passes and a dearer fault fails; the slowest-shard ceiling is the wall-time guard (720 normalized seconds) and its failure says to add a shard. `sharded.shards` in `testguard.cost-budget.json` is read by `shard-probe.mjs plan` and, through its `indexes` output, by the CI matrix.
