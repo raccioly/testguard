@@ -1,21 +1,12 @@
 // The teardown sends SIGKILL to the whole tree and finds a detached server through the process table (#310).
 import { afterEach, describe, it, expect } from 'vitest';
 import { spawn } from 'node:child_process';
-import { terminateProcessTree, processRows } from '../src/probe/runners/shared.mjs';
+import { terminateProcessTree } from '../src/probe/runners/shared.mjs';
 import { FIXTURES, cleanup, timed, bounded, allDead, pidsOf, sleep, fresh } from './helpers/process-tree.mjs';
 
 afterEach(cleanup);
 
 describe('the teardown kills the tree', () => {
-  it('a child that ignores SIGTERM is killed (SIGKILL, not SIGTERM) and the teardown is confirmed', async () => {
-    const run = await timed(FIXTURES.ignoresSigterm);
-    bounded(run);
-    expect(run.pids.length).toBeGreaterThan(0);
-    expect(await allDead(run.pids)).toBe(true);
-    expect(run.result.teardown).toBeUndefined();
-    expect(run.result.loadMessage).toMatch(/every process of its tree was confirmed dead/);
-  });
-
   it('a webServer-style server of its own process group is found by its parent and killed', async () => {
     const run = await timed(FIXTURES.webServer);
     bounded(run);
@@ -24,13 +15,6 @@ describe('the teardown kills the tree', () => {
     expect(run.result.teardown).toBeUndefined();
   });
 
-  it('a process table that fails to read twice is retried while the tree is frozen, and the server is still found', async () => {
-    let calls = 0;
-    const run = await timed(FIXTURES.webServer, { processList: () => (options) => (++calls <= 2 ? null : processRows(options)) });
-    bounded(run);
-    expect(calls).toBeGreaterThan(2);
-    expect(await allDead(run.pids)).toBe(true);
-  });
 });
 
 describe('terminateProcessTree', () => {

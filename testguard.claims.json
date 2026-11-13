@@ -6336,7 +6336,7 @@
         "by": "claude"
       },
       "defendedBy": [
-        "test/run-budget-kill.test.mjs"
+        "test/run-budget-pipes.test.mjs"
       ],
       "faults": [
         {
@@ -6351,7 +6351,7 @@
             "by": "claude"
           },
           "defendedBy": [
-            "test/run-budget-kill.test.mjs"
+            "test/run-budget-sigterm.test.mjs"
           ]
         },
         {
@@ -6366,7 +6366,7 @@
             "by": "claude"
           },
           "defendedBy": [
-            "test/run-budget-pipes.test.mjs"
+            "test/run-budget-orphan.test.mjs"
           ]
         },
         {
@@ -6381,7 +6381,7 @@
             "by": "claude"
           },
           "defendedBy": [
-            "test/run-budget-teardown.test.mjs"
+            "test/run-budget-alive.test.mjs"
           ]
         },
         {
@@ -6396,7 +6396,7 @@
             "by": "claude"
           },
           "defendedBy": [
-            "test/run-budget-pipes.test.mjs"
+            "test/run-budget-orphan.test.mjs"
           ]
         },
         {
@@ -6411,7 +6411,7 @@
             "by": "claude"
           },
           "defendedBy": [
-            "test/run-budget-teardown.test.mjs"
+            "test/run-budget-alive.test.mjs"
           ]
         },
         {
@@ -6426,7 +6426,7 @@
             "by": "claude"
           },
           "defendedBy": [
-            "test/run-budget-pipes.test.mjs"
+            "test/run-budget-orphan.test.mjs"
           ]
         },
         {
@@ -6441,7 +6441,7 @@
             "by": "claude"
           },
           "defendedBy": [
-            "test/run-budget-teardown.test.mjs"
+            "test/run-budget-unlisted.test.mjs"
           ]
         },
         {
@@ -6456,7 +6456,7 @@
             "by": "claude"
           },
           "defendedBy": [
-            "test/run-budget-kill.test.mjs"
+            "test/run-budget-retry.test.mjs"
           ]
         },
         {
@@ -6471,7 +6471,7 @@
             "by": "claude"
           },
           "defendedBy": [
-            "test/run-budget-pipes.test.mjs"
+            "test/run-budget-at-budget.test.mjs"
           ]
         }
       ]
