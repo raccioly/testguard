@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`init --upgrade` no longer reads message text as a full probe on push (#320).** The advice "probes every claim on every push" now judges each simple command, not each line: an `echo` in an `else` or `then` branch, `testguard probe --help | grep …` and a comment are not runs. A command after `;`, `&&`, `||`, `|` or `&` is judged on its own, so `echo start; testguard probe` is still one.
+- **`claims --check-anchors` no longer crashes or hangs on a large claims file (#320).** The mutated source of every fault was sent to the parser in one message; at about 6,600 faults that overran the string limit, and the throw left the parser process waiting for input forever. Faults now go in batches of at most 4,000,000 characters through fresh parser processes, each batch has 10 seconds, `--budget` bounds the whole syntax check, and any failure kills the parser and ends as one `error:` line with exit 2 that says how many faults were checked.
+- **`--out` naming a directory is refused before anything is probed (#320).** It used to run the whole probe, fail on the final rename and report "a bug in testguard". Every command that writes an `--out` document (and replay's `--calibration-out`) now exits 2 up front with `--out names a file, and <path> is a directory`; a path ending in a separator is refused too. New error kind `out-is-directory`.
+- **A bare relative `--test-reporter` path in `runnerCmd` is named when the defenders fail to load (#320).** Node reads `--test-reporter=tools/x.mjs` as a package name, so nothing loads. When the path is an existing file under the project, the record's message ends with "Node reads `tools/x.mjs` as a package name; write `./tools/x.mjs`", and the configuration reference says a reporter file path must start with `./` or be absolute.
+
+### Changed
+
+- **`init` leaves a hand-written TestGuard section in `AGENTS.md` alone (#320).** A heading (levels 1 to 6, outside a fenced code block) that names TestGuard counts as the project's own section: `init` and `init --upgrade` append no second, managed one, report it as left as it is, and print the block it would have added to merge by hand. `--force` appends it. A mention in body text only is not a section.
+
 ## [0.26.0] - 2026-11-13
 
 Automated weekly release — everything merged since `v0.25.0`.

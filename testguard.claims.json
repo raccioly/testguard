@@ -3554,6 +3554,89 @@
       ]
     },
     {
+      "id": "TG-BARE-REPORTER-PATH-IS-NAMED-WHEN-DEFENDERS-FAIL-TO-LOAD",
+      "statement": "When the defenders fail to load and the runner command has a --test-reporter (either spelling) whose value is a bare relative path that exists as a file under the project, the record's message ends with the sentence that says Node reads it as a package name and to write ./ before it; a path starting with ./, ../, / or file:, a node: builtin, a real package name and a value that is not a file here get no hint.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #320 (bare relative --test-reporter path)"
+      },
+      "severity": "low",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-reporter-hint.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An existing file is never named, whatever the command says.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "if (isFile) hints.push(",
+          "replace": "if (false) hints.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A ./ path is treated as bare and hinted.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "/^(?:\\.|\\/|file:|node:|",
+          "replace": "/^(?:\\/|file:|node:|",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The hint is never attached to a failed-to-load baseline.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/probe.mjs",
+          "find": "bareReporterHint(runnerCommand, projectDir) : undefined;",
+          "replace": "undefined : undefined;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The two-word spelling (--test-reporter <value>) is not read.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "values.push(words[i + 1])",
+          "replace": "values.push(undefined)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A value that is not a file under the project is hinted anyway.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "isFile = statSync(resolve(projectDir, value)).isFile();",
+          "replace": "isFile = true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ],
+      "tags": [
+        "runner",
+        "node-test",
+        "issue-320"
+      ]
+    },
+    {
       "id": "TG-ANNOTATION-RESULT-IS-NON-OPTIMISTIC",
       "statement": "Annotation authoring validation rejects applied results without complete verified targets, recovery and owned-lock release.",
       "source": {
