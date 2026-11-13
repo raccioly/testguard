@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-13
+
+Automated weekly release — everything merged since `v0.25.0`.
+
+### Changed
+
+- docs: changelog entries for the 0.26.0 cut (#317)
+- fix: a run ends within its budget plus a fixed 5 s grace (#310) (#313)
+- fix: orphaned scratch trees and test temp directories no longer accumulate; testguard clean (#311) (#314)
+- feat: testguard.config.json and probe --changed --explain (#315)
+- fix: init leaves what the project owns alone; a hook git never runs is a finding (#312)
+- ci: the sharded cost ceiling is per fault; the shard count has one home (#316)
+- ci: the gallery reference runs once; compare-only modes are judged by the scorecard (#305) (#309)
+- ci: corpus one Playwright mode per shard, shard list in one file (#305) (#306)
+- chore(homebrew): sha256 for v0.25.0 (#308)
+
+
 ### Added
 
 - **`testguard.config.json` holds how a project's tests run (#301).** The keys `runner`, `runnerCmd`, `python`, `nodeModules`, `typecheck`, `workers`, `faultWorkers`, `confirm` and `budget` become the defaults of every command, so a hook or a CI line is `testguard probe --changed` instead of a row of flags. A flag on the command line still wins; `--no-config` ignores the file. An unknown key or a wrong type is a usage error, never a silent default.
