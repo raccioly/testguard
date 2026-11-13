@@ -150,8 +150,8 @@ describe('a language\'s batches run through a pool (#320)', { timeout: T }, () =
 
   it('one failing batch kills its siblings, every child is gone when it rejects, and it rejects once with the count', async () => {
     const pids = [];
-    // the siblings hang for 2 s unless the failure stops them, so 900 ms is the bound
-    const failure = await bounded(pooled([{ n: 0, mode: 'hang' }, { n: 1, mode: 'hang' }, { n: 2, mode: 'fail' }, { n: 3, delay: 0 }], { poolSize: 3, timeoutMs: 2_000, onSpawn: (c) => pids.push(c.pid) }), 900).then(() => undefined, (e) => e);
+    // the siblings hang for 4 s unless the failure stops them; 2.5 s leaves a loaded runner room to start three processes
+    const failure = await bounded(pooled([{ n: 0, mode: 'hang' }, { n: 1, mode: 'hang' }, { n: 2, mode: 'fail' }, { n: 3, delay: 0 }], { poolSize: 3, timeoutMs: 4_000, onSpawn: (c) => pids.push(c.pid) }), 2_500).then(() => undefined, (e) => e);
     expect(failure.message).toMatch(/syntax check failed: SyntaxError: stand-in failure \(0 of 4 javascript faults checked\)$/); // not a sibling's timeout
     expect(pids).toHaveLength(3);
     for (const pid of pids) expect(alive(pid)).toBe(false);
