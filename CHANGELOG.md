@@ -7,15 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- **`testguard clean [dir] [--dry-run] [--json]` removes what interrupted runs left behind (#311).** One developer machine reached 130 GB in more than 180,000 temp entries: this repository's own tests and 2,018 `testguard-*` scratch worktrees from interrupted probes. Every scratch tree and child scope now carries an owner record (`testguard-locks/owners/<name>.json`: pid, host, repository). `clean` removes the trees whose owner is provably gone (same host, pid not running; a tree with no record only after 24 hours), stale worker-slot and worktree locks, and the stale `git worktree` registrations, and reports how much it freed; `--dry-run` lists and removes nothing. A live owner's tree, another host's, a young ownerless one and any directory this tool does not name that way are never touched. `probe`, `sweep`, `replay` and `admit` do the same before they start, bounded to three seconds, one warning line if it fails; `status` and `brief` carry an `orphaned-scratch` advice line with the command (a spec change: the advice enum, `GATE-SEMANTICS.md`).
-
-### Fixed
-
-- **The test suite leaves no `tg-*` directory behind (#311, repository only).** A vitest `globalSetup` creates one `tg-run-<pid>-<random>` directory per run, exports it as `TMPDIR`/`TMP`/`TEMP` so every `mkdtemp` and every spawned tool lands inside it, and removes it at the end; a run that crashed or was killed is removed by the next, judged by an owner file's pid and host.
-
 ### Changed
+
+- **The sharded cost gate is per fault, and the shard count has one home (#284, repository only).** The total ceiling is `perFaultSeconds` (3.0) times the faults in the merged evidence, so adding claims passes and a dearer fault fails; the slowest-shard ceiling is the wall-time guard (720 normalized seconds) and its failure says to add a shard. `sharded.shards` in `testguard.cost-budget.json` is read by `shard-probe.mjs plan` and, through its `indexes` output, by the CI matrix.
 
 - **The Playwright gallery's reference runs once, in its own CI job (#305, repository only).** Modes that only compare with the reference run with `--reference-later` and the scorecard job compares them (`corpus/lib/deferred.mjs`): a missing reference, one of another subject or size, a comparison that never arrived, claim halves of `twice` that do not cover every fault exactly once, and a mode that applies with no shard are all failures. Modes that do not apply to a subject are recorded as such from `applies()`.
 
