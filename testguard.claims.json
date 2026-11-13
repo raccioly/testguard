@@ -18371,6 +18371,72 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-CJS-EXPORT-SURFACE-HIDES-NO-FILE",
+      "statement": "A CommonJS export form the import reader does not model (module.exports = X, a computed exports write, defineProperty, an export-star helper) stays uncertain for binding resolution but does not make a file closure indeterminate, because the closure scans every literal require()/import() call itself; an unreadable import form and a computed require still make it indeterminate.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301 item 8"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/closure-cjs-export-surface.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Any unread CommonJS export form makes the file closure indeterminate again.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/imports.mjs",
+          "find": "        if ((parsed.fileUncertain ?? parsed.uncertain).length) addIssue(ctx, 'unsupported-syntax', file);",
+          "replace": "        if (parsed.uncertain.length) addIssue(ctx, 'unsupported-syntax', file);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An unread CommonJS export form is forgotten for binding resolution too.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/imports.mjs",
+          "find": "  module.uncertain = [...new Set([...module.uncertain, ...exportSurfaceOnly])];",
+          "replace": "  module.uncertain = [...new Set(module.uncertain)];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Export-surface uncertainty is counted as file uncertainty.",
+          "faultClass": "other",
+          "file": "src/probe/imports.mjs",
+          "find": "  const exportSurfaceOnly = module.uncertain.splice(beforeCommonJsExports);",
+          "replace": "  const exportSurfaceOnly = [];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "An unreadable import form stops making the closure indeterminate.",
+          "faultClass": "return-altered",
+          "file": "src/probe/imports.mjs",
+          "find": "  module.fileUncertain = [...new Set(module.uncertain)];",
+          "replace": "  module.fileUncertain = [];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
     }
   ]
 }

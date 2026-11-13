@@ -373,6 +373,16 @@ check order is this rule.
    accessor, a member of a named import, and a module load inside an
    expression (`wrap(require('x'))`) stay `unsupported-syntax`: when in doubt
    the closure is indeterminate, never smaller.
+   **A CommonJS export form hides a binding, never a file (#301).** The
+   closure is a set of files, and it scans every `require()` and `import()`
+   call whose argument is one string literal itself; a call whose argument is
+   not is its own reason (`computed-specifier`). So a CommonJS export the
+   reader does not model (`module.exports = Reporter`, a computed
+   `exports[k] = …`, `Object.defineProperty(exports, …)`, an export-star
+   helper) stays `unsupported-syntax` for resolving which binding an importer
+   receives, and does not make the file closure indeterminate. An ES module
+   export or import it cannot read still does: `export … from` and `import …
+   from` name their module outside any call.
    When any import cannot be followed — a dynamic import, `require`,
    `import_module` or `__import__` whose argument is not one string literal; a
    project-relative or aliased specifier that resolves to no file; a module
