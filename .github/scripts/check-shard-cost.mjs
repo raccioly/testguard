@@ -13,9 +13,10 @@
  *
  * A sharded run is a different CONFIGURATION from an unsharded one, exactly as
  * another fault-worker count is: its ceilings live in `budget.sharded`
- * ({ shards, seconds, slowestShardSeconds }) and the gate fails closed when the
+ * ({ shards, perFaultSeconds, slowestShardSeconds }) and the gate fails closed when the
  * run had another number of shards. Two numbers are bounded: the sum (total
- * compute) and the slowest shard's normalized time, which is what a person waits for.
+ * compute) per fault, so the suite may grow while a fault getting dearer fails,
+ * and the slowest shard's normalized time, which is what a person waits for.
  *
  *   usage: check-shard-cost.mjs <dir>     (<dir>/<shard>/{evidence,reference-before,reference-after}.json)
  */
@@ -30,8 +31,8 @@ const tryRead = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } cat
 /** Pure: shard measurements in, a decision out. */
 export function decideShardCost(shards, budget) {
   const cfg = budget.sharded;
-  if (!cfg || !Number.isInteger(cfg.shards) || typeof cfg.seconds !== 'number' || typeof cfg.slowestShardSeconds !== 'number') {
-    return { ok: false, failures: ['the cost budget has no `sharded` configuration (shards, seconds, slowestShardSeconds)'], rows: [], sumMs: 0, slowestMs: 0, budgetMs: 0, slowestBudgetMs: 0 };
+  if (!cfg || !Number.isInteger(cfg.shards) || !(cfg.perFaultSeconds > 0) || typeof cfg.slowestShardSeconds !== 'number') {
+    return { ok: false, failures: ['the cost budget has no `sharded` configuration (shards, perFaultSeconds, slowestShardSeconds)'], rows: [], sumMs: 0, slowestMs: 0, budgetMs: 0, slowestBudgetMs: 0 };
   }
   const rows = shards.map((s) => {
     const report = costReport(s.evidence.records);
@@ -50,18 +51,20 @@ export function decideShardCost(shards, budget) {
   const slowestMs = rows.reduce((a, r) => Math.max(a, r.normalizedMs), 0);
   const failures = rows.flatMap((r) => r.failures.map((f) => `${r.name}: ${f}`));
   if (rows.length === 0) failures.push('no shard evidence');
+  const faults = rows.reduce((a, r) => a + r.faults, 0);
+  const budgetMs = cfg.perFaultSeconds * faults * 1000;
   if (rows.length !== cfg.shards) failures.push(`shards-mismatch: ${rows.length} shards ran, the ceilings are for ${cfg.shards}`);
   else {
-    if (sumMs > cfg.seconds * 1000) failures.push(`over-budget: the shards' normalized compute ${(sumMs / 1000).toFixed(0)}s is over the ${cfg.seconds}s ceiling`);
-    if (slowestMs > cfg.slowestShardSeconds * 1000) failures.push(`over-wall-budget: the slowest shard's normalized ${(slowestMs / 1000).toFixed(0)}s is over its ${cfg.slowestShardSeconds}s ceiling`);
+    if (sumMs > budgetMs) failures.push(`over-budget: the shards' normalized compute ${(sumMs / 1000).toFixed(0)}s over ${faults} faults is ${(sumMs / 1000 / faults).toFixed(2)}s per fault, over the ${cfg.perFaultSeconds}s per-fault ceiling (${(budgetMs / 1000).toFixed(0)}s for this many faults): a fault got dearer`);
+    if (slowestMs > cfg.slowestShardSeconds * 1000) failures.push(`over-wall-budget: the slowest shard's normalized ${(slowestMs / 1000).toFixed(0)}s is over its ${cfg.slowestShardSeconds}s ceiling. If the suite only grew (the per-fault cost is within its ceiling), add a shard: change \`sharded.shards\` in testguard.cost-budget.json, the one place the count lives; if a claim got slower, fix that claim`);
   }
-  return { ok: failures.length === 0, failures, rows, sumMs, slowestMs, budgetMs: cfg.seconds * 1000, slowestBudgetMs: cfg.slowestShardSeconds * 1000 };
+  return { ok: failures.length === 0, failures, rows, faults, sumMs, slowestMs, budgetMs, perFaultSeconds: cfg.perFaultSeconds, slowestBudgetMs: cfg.slowestShardSeconds * 1000 };
 }
 
 export function render(d) {
   const s = (ms) => `${(ms / 1000).toFixed(0)}s`;
   return [
-    `${d.ok ? 'COST WITHIN BUDGET' : 'COST BUDGET EXCEEDED'} (sharded): total normalized compute ${s(d.sumMs)} of ${s(d.budgetMs)} across ${d.rows.length} shards; slowest shard ${s(d.slowestMs)} of ${s(d.slowestBudgetMs)} (the wall time, before the merge).`,
+    `${d.ok ? 'COST WITHIN BUDGET' : 'COST BUDGET EXCEEDED'} (sharded): total normalized compute ${s(d.sumMs)} of ${s(d.budgetMs)} (${d.perFaultSeconds}s x ${d.faults} faults) across ${d.rows.length} shards; slowest shard ${s(d.slowestMs)} of ${s(d.slowestBudgetMs)} (the wall time, before the merge).`,
     ...d.rows.map((r) => `  ${r.name}: ${r.faults} faults, raw ${s(r.rawMs)}, normalized ${s(r.normalizedMs)} (${r.basis})${r.failures.length ? ` — ${r.failures.join(', ')}` : ''}`),
     ...d.failures.map((f) => `  FAIL ${f}`),
   ].join('\n');

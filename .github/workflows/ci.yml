@@ -313,6 +313,7 @@ jobs:
       claim_ids: ${{ steps.scope.outputs.claim_ids }}
       reuse: ${{ steps.reuse.outputs.reuse }}
       shards: ${{ steps.plan.outputs.shards }}
+      indexes: ${{ steps.plan.outputs.indexes }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -364,7 +365,7 @@ jobs:
           if [ -n "$ID" ]; then
             gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ID/zip" > .testguard/weights/a.zip 2>/dev/null && unzip -o -q .testguard/weights/a.zip -d .testguard/weights || echo "::notice::main's evidence could not be fetched; balancing by fault count"
           fi
-          node .github/scripts/shard-probe.mjs plan --shards 4 --weights-from .testguard/weights/ci-self-evidence.json
+          node .github/scripts/shard-probe.mjs plan --weights-from .testguard/weights/ci-self-evidence.json
 
   selfprobe:
     name: selfprobe (shard ${{ matrix.shard }})
@@ -374,7 +375,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3] # the partition has four slices; shard-probe.mjs merge fails if one is missing
+        shard: ${{ fromJSON(needs.scope.outputs.indexes) }} # one per slice of the plan (sharded.shards in testguard.cost-budget.json); shard-probe.mjs merge fails if one is missing
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
