@@ -728,7 +728,16 @@ export function parseModuleSource(source) {
     if (braces === 0 && identifier(tokens[i], 'export')) { i = parseExport(tokens, i, module); continue; }
     i++;
   }
+  // A CommonJS export form this reader does not model (`module.exports = X`,
+  // a computed write, defineProperty, an export-star helper) can hide which
+  // binding an importer receives, never which file loads: the closure scans
+  // every literal require()/import() call itself, and a computed one is its
+  // own issue. So it stays uncertain for binding resolution and does not make
+  // the file closure indeterminate (#301 item 8: it selected a claim for a
+  // documentation-only change).
+  const beforeCommonJsExports = module.uncertain.length;
   parseCommonJsExports(tokens, module);
+  const exportSurfaceOnly = module.uncertain.splice(beforeCommonJsExports);
   parseRuntimeImports(tokens, module);
   namespaceRequests(tokens, module);
   for (const [name, origins] of module.explicit) {
@@ -750,7 +759,8 @@ export function parseModuleSource(source) {
   module.runtime = [...new Set(module.runtime)];
   module.stars = [...new Set(module.stars)];
   module.cjsStars = [...new Set(module.cjsStars)];
-  module.uncertain = [...new Set(module.uncertain)];
+  module.fileUncertain = [...new Set(module.uncertain)];
+  module.uncertain = [...new Set([...module.uncertain, ...exportSurfaceOnly])];
   return module;
 }
 
@@ -1167,7 +1177,7 @@ export function createImportResolver(projectDir, { aliases = [], configFiles = [
         }
         const parsed = readModule(file, ctx);
         if (!parsed) continue;
-        if (parsed.uncertain.length) addIssue(ctx, 'unsupported-syntax', file);
+        if ((parsed.fileUncertain ?? parsed.uncertain).length) addIssue(ctx, 'unsupported-syntax', file);
         const { specifiers, optional, computed } = closureSpecifiers(parsed);
         if (computed) addIssue(ctx, 'computed-specifier', file);
         for (const specifier of specifiers) {

@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.26.0"
+  },
+  "generatedAt": "2026-11-12T00:00:00.000Z",
+  "state": "unprobed",
+  "next": {
+    "action": "probe",
+    "command": "testguard probe",
+    "why": "2 claims / 4 faults have never been probed."
+  },
+  "provisional": false,
+  "counts": {
+    "claims": 2,
+    "faults": 4
+  },
+  "stale": [],
+  "invalidFaults": [],
+  "changedFaults": [],
+  "findings": [],
+  "notes": [
+    "ANNOTATION ADVISORY: 2 declared claim IDs lack a scanned source link. Discoverability and annotation reconciliation are reduced; exact fault anchors remain checked.",
+    "Missing source annotation: PRICE-TOTAL",
+    "Missing source annotation: TAX-DOUBLES",
+    "Optional read-only preview in the selected project: testguard claims --annotate. Placement is not verification or authenticated intent; review before explicitly applying."
+  ],
+  "paths": {
+    "claims": "testguard.claims.json"
+  },
+  "changes": {
+    "ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "includeDirty": false,
+    "changed": 1,
+    "evaluated": 0,
+    "excluded": 1,
+    "uncovered": [],
+    "reliedOn": [],
+    "expired": []
+  },
+  "origins": {
+    "basis": "declared",
+    "claims": {
+      "total": 2,
+      "byKind": {
+        "spec": 2,
+        "adr": 0,
+        "annotation": 0,
+        "comment": 0,
+        "manual": 0,
+        "doc": 0,
+        "bug": 0,
+        "incident": 0,
+        "review": 0,
+        "inferred": 0
+      },
+      "mixed": 0
+    }
+  },
+  "surface": {
+    "sourceModules": 4,
+    "claimedModules": 2,
+    "unclaimedModules": 2,
+    "history": {
+      "available": true,
+      "maxCommits": 200,
+      "commitsRead": 2
+    },
+    "highChurn": {
+      "modules": 4,
+      "claimed": 2
+    },
+    "rankedUnclaimed": [
+      {
+        "file": "src/helper.mjs",
+        "changes": 1,
+        "riskSignals": []
+      },
+      {
+        "file": "src/orphan.mjs",
+        "changes": 1,
+        "riskSignals": []
+      }
+    ]
+  },
+  "run": {
+    "exitCode": 0,
+    "config": {
+      "file": "testguard.config.json",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "keys": [
+        "confirm"
+      ],
+      "overridden": [
+        {
+          "key": "runner",
+          "by": "flag"
+        }
+      ]
+    },
+    "scope": {
+      "probedClaims": [],
+      "probedCount": 0,
+      "selectedCount": 2,
+      "explain": true,
+      "changed": {
+        "ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "outcome": "determined",
+        "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "includeDirty": false,
+        "files": [
+          "testguard.config.json"
+        ],
+        "matchedClaims": [
+          "PRICE-TOTAL",
+          "TAX-DOUBLES"
+        ],
+        "matchReasons": [
+          {
+            "claimId": "PRICE-TOTAL",
+            "kind": "file",
+            "file": "testguard.config.json"
+          },
+          {
+            "claimId": "TAX-DOUBLES",
+            "kind": "file",
+            "file": "testguard.config.json"
+          }
+        ],
+        "unmatchedFiles": [],
+        "note": "not covered by any claim; absence from the results is not a pass"
+      }
+    }
+  }
+}

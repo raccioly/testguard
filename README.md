@@ -192,6 +192,19 @@ One claim can be defended by a vitest test and a pytest test at once. Runner
 resolution, discovery, mocks and limits are in the
 [languages and runners reference](https://github.com/raccioly/testguard/blob/main/docs/reference/languages-and-runners.md).
 
+When your tests need runner flags (`--runner unittest --python .venv/bin/python`,
+a `--runner-cmd`, a `--node-modules`), commit them once in
+`testguard.config.json` and every hook, CI line and agent can run plain
+`testguard probe`:
+
+```json
+{ "schemaVersion": 1, "runner": "unittest", "python": ".venv/bin/python" }
+```
+
+A flag you type, then `TESTGUARD_PYTHON`-style variables, still win;
+`--no-config` ignores the file. Keys and rules are in the
+[configuration reference](https://github.com/raccioly/testguard/blob/main/docs/reference/configuration.md#testguardconfigjson-how-this-projects-tests-run).
+
 ## Use it with your AI agent
 
 TestGuard is meant to be driven by an agent. `testguard init` installs a skill

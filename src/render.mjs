@@ -13,7 +13,7 @@ export function renderOrigins(origins) {
 /** Non-passing verdicts shout; the one pass does not. */
 export const formatVerdict = (v, provisional = false) => (v === 'killed' ? 'killed' : v.toUpperCase()) + (provisional ? '?' : '');
 
-export const PROVISIONAL_WARNING = (n) => `PROVISIONAL — confirmRuns ${n} (< 3): nothing below is confirmed. Verdicts carry a "?"; this evidence cannot be frozen into a baseline. Re-run with --confirm 3 before trusting it.`;
+export const PROVISIONAL_WARNING = (n, fromFile) => `PROVISIONAL — confirmRuns ${n} (< 3${fromFile ? `, from "confirm" in ${fromFile}` : ''}): nothing below is confirmed. Verdicts carry a "?"; this evidence cannot be frozen into a baseline. Re-run with --confirm 3 before trusting it${fromFile ? ` (or set "confirm": 3 in ${fromFile})` : ''}.`;
 
 export const coAuthorshipWarning = (coAuthored, kills) => `${coAuthored} of ${kills} kills are co-authored with the code they defend — the test and the code were written in the same change, so those kills are not independent evidence.`;
 

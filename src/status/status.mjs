@@ -389,6 +389,7 @@ export function renderStatus(doc) {
   }
   lines.push(`state: ${doc.state}${doc.provisional ? ' (provisional)' : ''} — ${doc.counts.claims} claims / ${doc.counts.faults} faults` + (doc.counts.byVerdict ? `; ${Object.entries(doc.counts.byVerdict).map(([k, v]) => `${v} ${k}`).join(', ')}; ${doc.counts.new ?? 0} new, ${doc.counts.baselined ?? 0} baselined` : '')
   );
+  if (doc.config) lines.push(`config: ${doc.config.file} sets ${doc.config.keys.length ? doc.config.keys.join(', ') : 'nothing'} for the commands that run tests (--no-config ignores it)`);
   if (doc.origins) lines.push(renderOrigins(doc.origins));
   lines.push(...renderThin(doc.thinClaims ?? []));
   if (doc.originPolicy) lines.push(renderOriginPolicy(doc.originPolicy, { basis: 'offline' }));

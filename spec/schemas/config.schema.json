@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:claimspec:v1:config",
+  "title": "claimspec v1 — project configuration (testguard.config.json)",
+  "description": "How this project's tests run, so a plain `testguard probe` (a hook, a CI line, an agent) runs them correctly without flags (#301). Every key is a default for the command-line option of the same meaning; a flag, then the environment variable where one exists, wins over the file. Only options that describe HOW the tests run belong here: nothing selects WHAT is probed and nothing shapes output. A value from the file is held to exactly the rules of the flag it stands for (a `confirm` below 3 is provisional). An unknown key or a wrong type is refused, never ignored.",
+  "type": "object",
+  "required": ["schemaVersion"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "runner": {
+      "description": "--runner.",
+      "enum": ["vitest", "jest", "playwright", "python", "pytest", "unittest", "node-test", "auto"]
+    },
+    "runnerCmd": {
+      "description": "--runner-cmd: a custom command; must contain {files} and {out}. Run as an argv, never through a shell.",
+      "type": "string", "minLength": 1, "maxLength": 4096
+    },
+    "python": {
+      "description": "--python: a bare command looked up on PATH (python3), or a path relative to the project directory that stays inside the repository (.venv/bin/python). TESTGUARD_PYTHON wins over it.",
+      "$ref": "#/$defs/relativeOrCommand"
+    },
+    "nodeModules": {
+      "description": "--node-modules: a directory relative to the project directory that stays inside the repository (../node_modules in a workspace package). TESTGUARD_NODE_MODULES wins over it.",
+      "$ref": "#/$defs/relativeOrCommand"
+    },
+    "typecheck": {
+      "description": "--typecheck: true runs the project's own tsc; a string is the command (an argv, never a shell). Applies to probe and claims --check-anchors. There is no flag that turns it off: --no-config does.",
+      "oneOf": [
+        { "const": true },
+        { "type": "string", "minLength": 1, "maxLength": 4096 }
+      ]
+    },
+    "workers": { "description": "--workers.", "type": "integer", "minimum": 1, "maximum": 1024 },
+    "faultWorkers": {
+      "description": "--fault-workers (probe). TESTGUARD_FAULT_WORKERS wins over it.",
+      "oneOf": [
+        { "type": "integer", "minimum": 1, "maximum": 1024 },
+        { "const": "auto" }
+      ]
+    },
+    "confirm": { "description": "--confirm. Below 3 the run is provisional, exactly as with the flag, and the warning names this file.", "type": "integer", "minimum": 1, "maximum": 100 },
+    "budget": { "description": "--budget: wall clock per run, in milliseconds.", "type": "integer", "minimum": 1000 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "relativeOrCommand": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "not": { "pattern": "^(/|\\\\|[A-Za-z]:)" }
+    }
+  }
+}

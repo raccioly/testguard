@@ -373,6 +373,16 @@ check order is this rule.
    accessor, a member of a named import, and a module load inside an
    expression (`wrap(require('x'))`) stay `unsupported-syntax`: when in doubt
    the closure is indeterminate, never smaller.
+   **A CommonJS export form hides a binding, never a file (#301).** The
+   closure is a set of files, and it scans every `require()` and `import()`
+   call whose argument is one string literal itself; a call whose argument is
+   not is its own reason (`computed-specifier`). So a CommonJS export the
+   reader does not model (`module.exports = Reporter`, a computed
+   `exports[k] = …`, `Object.defineProperty(exports, …)`, an export-star
+   helper) stays `unsupported-syntax` for resolving which binding an importer
+   receives, and does not make the file closure indeterminate. An ES module
+   export or import it cannot read still does: `export … from` and `import …
+   from` name their module outside any call.
    When any import cannot be followed — a dynamic import, `require`,
    `import_module` or `__import__` whose argument is not one string literal; a
    project-relative or aliased specifier that resolves to no file; a module
@@ -1312,7 +1322,11 @@ defender, whether the claim names it (`defendedBy`, literally or by glob) or
 discovery resolves it; or a file in the import closure of the target and the
 defenders (the same closure `inputs.dependencyHashes` records, manifests and
 runner configuration included; a workspace package reached through its link
-is part of it, rule 8). A closure that cannot be followed selects the
+is part of it, rule 8); or the project configuration `testguard.config.json`
+(#301), which is an input of every claim whether or not it exists, so a
+change, an addition or a deletion selects every claim. It is not a dependency
+hash: which of those verdicts really moved is decided by reuse, which compares
+the options the file resolves to. A closure that cannot be followed selects the
 claim whenever anything changed **anywhere in the repository**, not only in
 the project directory: what the closure could not follow may be a sibling
 package outside it, and not being able to tell is never read as
@@ -1320,7 +1334,7 @@ package outside it, and not being able to tell is never read as
 8: tracked files, plus untracked non-ignored ones under `--include-dirty`).
 `run.scope.changed.matchReasons` says why each matched claim was selected, in
 `matchedClaims` order: `file` (the first changed file that is a target, a
-resolved defender or in the closure), `glob` (a changed path only a
+resolved defender, in the closure, or `testguard.config.json`), `glob` (a changed path only a
 `defendedBy` glob matches, such as a deleted defender) or `indeterminate`
 (with the closure's first recorded issue). It names each matched claim once
 and nothing else. `--claim` intersects: the selection is the requested ids that the
@@ -1366,6 +1380,60 @@ the selection would describe another tree than the one measured.
 A `--changed` run's selection is partial evidence. When the run may converge
 (see [Convergence](#convergence)) it updates the canonical file; otherwise it
 writes `evidence-partial.json`, which is never a baseline.
+
+**`--explain` (#301).** `probe --changed <ref> --explain` computes the
+selection exactly as above and probes nothing, writes nothing and runs no test
+discovery: one line per selected claim with its `matchReasons` entry, a count
+per reason kind, and the changed source files no claim covers. Under `--json`
+the document is the status document plus `run: {exitCode, scope}`, where
+`scope` is what a probe would carry with `explain: true`, `probedClaims` empty
+and `probedCount` 0; `selectedCount` is the selection, which an explanation
+alone may leave unprobed. It never has a `run.id`. A determined change exits
+0 whatever it selects (an explanation judges nothing, so
+`--fail-on-empty-selection` does not apply); an undetermined change exits 2,
+as it does without `--explain`. `--explain` without `--changed` is a usage
+error (exit 3).
+
+## Project configuration
+
+`testguard.config.json` in the project directory (#301) holds the defaults of
+the options that describe **how** the project's tests run: `runner`,
+`runnerCmd`, `python`, `nodeModules`, `typecheck` (`true` is the project's own
+compiler, a string the command), `workers`, `faultWorkers`, `confirm` and
+`budget`, each standing for the flag of the same meaning. Nothing in it
+selects what is probed or shapes output. Schema: `config.schema.json`.
+
+1. **Precedence.** A flag typed on the command line (judged by what was typed,
+   never by the parser's defaults), then the environment variable where one
+   exists (`TESTGUARD_PYTHON`, `TESTGUARD_NODE_MODULES`,
+   `TESTGUARD_FAULT_WORKERS`; empty is unset), then the file, then the
+   built-in default. `--no-config` ignores the file. A key applies only to
+   the commands whose flag exists: `typecheck` to `probe` and `claims
+   --check-anchors`, `faultWorkers` to `probe`.
+2. **Refused, never ignored.** Malformed JSON, an unknown key, a wrong type
+   or a `runnerCmd` without `{files}` and `{out}` is a usage error (exit 3)
+   that names the key. `python` (when it contains a separator) and
+   `nodeModules` are relative to the project directory and must stay inside
+   the repository, judged by path text and never through symbolic links;
+   anything else is the precondition `path-outside-project` (exit 2).
+3. **No weaker than the flag.** A value from the file is held to the rules of
+   its flag: a `confirm` below 3 is provisional, and the warning names the
+   file.
+4. **Which copy.** The working-tree copy is read, like the flags typed with
+   the command. In worktree mode it is one of the files the dirty rule
+   watches: an uncommitted or untracked copy refuses a probe of the implicit
+   HEAD (`dirty-tree`), `--include-dirty` and `--in-place` measure the tree it
+   belongs to, and `--ref` or `--ignore-dirty` proceed with a warning that the
+   working-tree copy is applied. Because it is applied, it is not listed in
+   `repo.ignoredDirty`, which names what was not probed. `replay`, which has no
+   dirty rule, warns when it applies an uncommitted copy.
+5. **Reuse compares resolved options, never the file.** The file is neither a
+   dependency input nor part of `run.instrument`. A value moved from a flag
+   into the file resolves to the same options and carries every verdict;
+   a changed value refuses reuse exactly as the changed flag does.
+6. **Reported.** `status --json` carries `config: {file, sha256, keys}`, every
+   key the file sets; `probe --json` carries `run.config` with the keys this
+   invocation took from the file and the ones a flag or variable overrode.
 
 ## Convergence
 
@@ -1568,7 +1636,7 @@ and local git, and makes no network call. The set is closed:
 
 | id | when | command |
 |---|---|---|
-| `serial-on-multicore` | the last evidence ran one fault at a time (no `run.faultWorkers`) because it was asked for (`faultWorkersSource` `serial`, `flag` or `env`, or absent: evidence from before 0.24), and the automatic width on this machine is above one | `testguard probe` |
+| `serial-on-multicore` | the last evidence ran one fault at a time (no `run.faultWorkers`) because it was asked for (`faultWorkersSource` `serial`, `flag`, `env` or `config`, or absent: evidence from before 0.24), and the automatic width on this machine is above one | `testguard probe` (`testguard probe --fault-workers auto` when the width came from `testguard.config.json`, which would otherwise ask for one again) |
 | `full-probe-where-changed-would-do` | asked about a change — `status --changed <ref>`, or the end of a full probe with the base `--changed auto` would use — `next.action` is `probe` (status), and the change selects fewer claims than the file holds (the selection rule of [Probing a change](#probing-a-change)). Selecting walks every claim's import closure, so a `brief`, the MCP tools and a `status` without `--changed` do not compute it. | `testguard probe --changed auto` |
 | `nothing-reused` | the last evidence reused no verdict, measured at least one fault, and took a minute or longer | `testguard probe` |
 | `slow-defenders-dominate` | the last evidence holds at least 20 claims and 600 s of recorded defender time, and one to three claims each hold at least 10% of it with at least 5 runs at a median of at least 15 s per run, together at least 25%. The message names each claim, its summed seconds, its slowest defender file with the median seconds per run of every run that included it and that run count (runs execute a claim's defenders together, so a file's time is a ceiling, as in `--cost`), and says to give the claim a faster defender or split the file. Read from recorded `durationMs`; nothing is run. The thresholds are measured: this repository's own evidence peaks at 6.2% and a median 9.9 s, so the rule is silent there; the field run that prompted it had claims at 34% (73 s) and 18% (32 s) | `testguard claims --cost` |
@@ -1837,12 +1905,13 @@ order, and evidence without `run.faultWorkers`.
 as typed, never the derived one-runner-worker default) means one fault at a
 time and is refused beside `--fault-workers` above one; then
 `--fault-workers <n|auto>`; then `TESTGUARD_FAULT_WORKERS` (empty is unset);
-then `auto`. `auto` is `min(4, floor(cpus / 2))`, at least one, where cpus is
+then `faultWorkers` in `testguard.config.json` (see [Project
+configuration](#project-configuration)); then `auto`. `auto` is `min(4, floor(cpus / 2))`, at least one, where cpus is
 `os.availableParallelism()`; `--in-place` resolves it to one. When other test
 runners are already running as the probe starts (the contention check), an
 automatic n is halved (at least one) and the probe says so; a chosen n is
 kept. The evidence records `run.faultWorkersSource` (`auto`, `flag`, `env`,
-`serial`, `in-place`) and, for `auto` only, `run.cpus`. The library API
+`config`, `serial`, `in-place`) and, for `auto` only, `run.cpus`. The library API
 defaults to one and records no source unless its caller passes one.
 
 1. **Plan, then measure.** Every fault is first planned in claim/fault order
@@ -1905,8 +1974,8 @@ defaults to one and records no source unless its caller passes one.
    what was measured: a measurement under a fan-out stands in for a fan-out of
    any width, and for a run whose one fault at a time was not asked for (an
    automatic width of one). It never stands in for a run that asked for one
-   fault at a time (`--serial`, or one by `--fault-workers` or
-   `TESTGUARD_FAULT_WORKERS`). A serial measurement (no `run.faultWorkers`)
+   fault at a time (`--serial`, or one by `--fault-workers`,
+   `TESTGUARD_FAULT_WORKERS` or `faultWorkers` in `testguard.config.json`). A serial measurement (no `run.faultWorkers`)
    may stand in for any. A reused record keeps the marks of the run that
    measured it (`alone`, `remeasuredSerially`, `notParallelSafe`), whatever
    the current run's width; validators judge those marks only on records this

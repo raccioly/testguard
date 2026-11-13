@@ -22,8 +22,9 @@ export function serialAdvice(run, cpus) {
   if (source === 'auto' || source === 'in-place') return undefined;
   const auto = autoFaultWorkers(cpus);
   if (auto <= 1) return undefined;
-  const why = source === 'serial' ? 'with --serial' : source === 'flag' ? 'with --fault-workers 1' : source === 'env' ? 'with TESTGUARD_FAULT_WORKERS=1' : 'one fault at a time (TestGuard before 0.24)';
-  return { id: 'serial-on-multicore', message: `The last probe ran ${why} on a machine with ${cpus} CPUs; without it, ${auto} faults run at once and every kill is still confirmed alone.`, command: 'testguard probe' };
+  const why = source === 'serial' ? 'with --serial' : source === 'flag' ? 'with --fault-workers 1' : source === 'env' ? 'with TESTGUARD_FAULT_WORKERS=1' : source === 'config' ? 'with "faultWorkers": 1 in testguard.config.json' : 'one fault at a time (TestGuard before 0.24)';
+  // The file's setting outlives one command line: the command overrides it, and the message says where it lives.
+  return { id: 'serial-on-multicore', message: `The last probe ran ${why} on a machine with ${cpus} CPUs; without it, ${auto} faults run at once and every kill is still confirmed alone.${source === 'config' ? ' Remove "faultWorkers" from testguard.config.json to make it the default.' : ''}`, command: source === 'config' ? 'testguard probe --fault-workers auto' : 'testguard probe' };
 }
 
 /** A full probe where the change since a base would have selected fewer claims. */

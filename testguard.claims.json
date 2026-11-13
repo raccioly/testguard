@@ -4746,7 +4746,7 @@
           "description": "The ignored files are warned about but never recorded; the evidence looks like a clean probe.",
           "faultClass": "statement-deleted",
           "file": "src/probe/probe.mjs",
-          "find": "        ignoredDirty = dirty.sort();",
+          "find": "        ignoredDirty = ignored.sort();",
           "replace": "",
           "producedBy": {
             "producer": "human",
@@ -4852,6 +4852,799 @@
             "producer": "human",
             "by": "maintainer",
             "at": "2026-09-17T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONFIG-REFUSED-NEVER-IGNORED",
+      "statement": "testguard.config.json is validated when it is read: malformed JSON, an unknown key, a wrong type or a runnerCmd without {files} and {out} is a usage error (exit 3) that names the key, never ignored and never replaced by a default.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/project-config.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An unknown key is left to the schema, whose message does not name it.",
+          "faultClass": "guard-removed",
+          "file": "src/config/project-config.mjs",
+          "find": "  if (unknown !== undefined) throw new UsageError(",
+          "replace": "  if (false) throw new UsageError(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A value of the wrong type is accepted.",
+          "faultClass": "guard-removed",
+          "file": "src/config/project-config.mjs",
+          "find": "  if (!result.ok) {\n    const first",
+          "replace": "  if (false) {\n    const first",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An unusable runnerCmd is accepted from the file.",
+          "faultClass": "call-removed",
+          "file": "src/config/project-config.mjs",
+          "find": "    try { parseCommandTemplate(config.runnerCmd); }",
+          "replace": "    try { /* not checked */ }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Malformed JSON reads as no file at all.",
+          "faultClass": "exception-swallowed",
+          "file": "src/config/project-config.mjs",
+          "find": "  catch (error) { throw new UsageError(`${CONFIG_FILE}: not valid JSON (${error.message}); fix it, or pass --no-config to ignore it`); }",
+          "replace": "  catch { return undefined; }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONFIG-PATHS-STAY-IN-THE-REPOSITORY",
+      "statement": "A path in testguard.config.json (python with a separator, nodeModules) is relative to the project directory, made absolute against it, and must stay inside the repository judged by its text and never through symbolic links (a virtualenv python that links out is allowed); an absolute path is a usage error and an escaping one is path-outside-project (exit 2).",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/project-config.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A path that leaves the repository is accepted.",
+          "faultClass": "guard-removed",
+          "file": "src/config/project-config.mjs",
+          "find": "    if (inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {",
+          "replace": "    if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Containment follows symbolic links, refusing a virtualenv python that links out of the tree.",
+          "faultClass": "other",
+          "file": "src/config/project-config.mjs",
+          "find": "    const abs = resolve(project, value);",
+          "replace": "    const abs = existsSync(resolve(project, value)) ? realpathSync(resolve(project, value)) : resolve(project, value);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A relative path is passed on as typed, to be resolved against the shell's directory instead of the project's.",
+          "faultClass": "variable-swap",
+          "file": "src/config/project-config.mjs",
+          "find": "    resolved[key] = abs;",
+          "replace": "    resolved[key] = value;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The schema stops refusing an absolute path.",
+          "faultClass": "literal-changed",
+          "file": "spec/schemas/config.schema.json",
+          "find": "\"not\": { \"pattern\": \"^(/|\\\\\\\\|[A-Za-z]:)\" }",
+          "replace": "\"not\": { \"pattern\": \"^$\" }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONFIG-YIELDS-TO-FLAGS-AND-ENVIRONMENT",
+      "statement": "A key in testguard.config.json applies only where the flag of the same meaning was not typed (judged by the options typed, never the parser's defaults) and its environment variable (TESTGUARD_PYTHON, TESTGUARD_NODE_MODULES, TESTGUARD_FAULT_WORKERS) is unset or empty, and only on the commands that take that flag; faultWorkers from the file comes after the flag and the variable, is recorded as source config, and one fault at a time from it is a request no fan-out stands in for.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/project-config.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A typed flag no longer wins over the file.",
+          "faultClass": "guard-removed",
+          "file": "src/config/project-config.mjs",
+          "find": "    if (suppliedOptions.includes(flag)) { overridden.push({ key, by: 'flag' }); continue; }",
+          "replace": "    // the typed flag is not consulted",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An empty environment variable overrides the file as if it were set.",
+          "faultClass": "condition-forced",
+          "file": "src/config/project-config.mjs",
+          "find": "env[variable] !== undefined && env[variable] !== ''",
+          "replace": "env[variable] !== undefined",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Every key applies to every command, typecheck on admit included.",
+          "faultClass": "guard-removed",
+          "file": "src/config/project-config.mjs",
+          "find": "    if (!keyApplies(key, command, values)) continue;",
+          "replace": "    // every key applies",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "claims --check-anchors takes runner keys it has no flag for.",
+          "faultClass": "condition-forced",
+          "file": "src/config/project-config.mjs",
+          "find": "  if (command === 'claims') return Boolean(values['check-anchors']) && ['python', 'nodeModules', 'typecheck', 'budget'].includes(key);",
+          "replace": "  if (command === 'claims') return Boolean(values['check-anchors']);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "faultWorkers from the file wins over TESTGUARD_FAULT_WORKERS.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/fan-out.mjs",
+          "find": "    : envValue !== undefined ? { ...read(envValue, 'TESTGUARD_FAULT_WORKERS'), source: 'env' }",
+          "replace": "    : config === undefined && envValue !== undefined ? { ...read(envValue, 'TESTGUARD_FAULT_WORKERS'), source: 'env' }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "One fault at a time from the file stops counting as a request, so a fan-out could stand in for it.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/probe.mjs",
+          "find": "['serial', 'flag', 'env', 'config'].includes(source)",
+          "replace": "['serial', 'flag', 'env'].includes(source)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONFIG-IS-NO-WEAKER-THAN-ITS-FLAG",
+      "statement": "A value from testguard.config.json is held to the rules of its flag and says where it came from: a confirm below 3 is provisional and the warning names the file, and the speed advice for a one-fault-at-a-time width the file set names the file and a command that overrides it.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/project-config.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The provisional warning stops naming the config file.",
+          "faultClass": "literal-changed",
+          "file": "src/render.mjs",
+          "find": "(< 3${fromFile ? `, from \"confirm\" in ${fromFile}` : ''})",
+          "replace": "(< 3)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The advice offers plain probe, which reads the file's width again.",
+          "faultClass": "literal-changed",
+          "file": "src/status/advice.mjs",
+          "find": "command: source === 'config' ? 'testguard probe --fault-workers auto' : 'testguard probe' }",
+          "replace": "command: 'testguard probe' }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The advice no longer says the width came from the file.",
+          "faultClass": "statement-deleted",
+          "file": "src/status/advice.mjs",
+          "find": ": source === 'config' ? 'with \"faultWorkers\": 1 in testguard.config.json' :",
+          "replace": ":",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONFIG-REUSE-COMPARES-RESOLVED-OPTIONS",
+      "statement": "Reuse compares the options testguard.config.json resolves to, never the file: the file is neither a dependency input nor part of run.instrument, a value moved from a flag into the file resolves to exactly the options the typed flag gave (paths absolute against the project directory, typecheck true as the project's own tsc), and a changed runnerCmd or runner refuses reuse as the changed flag does.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/project-config-reuse.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The config file becomes a dependency input of every fault, so moving a flag into it invalidates every verdict.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/dependencies.mjs",
+          "find": "  'poetry.lock', 'uv.lock', 'Pipfile', 'Pipfile.lock', 'pdm.lock',\n]);",
+          "replace": "  'poetry.lock', 'uv.lock', 'Pipfile', 'Pipfile.lock', 'pdm.lock', 'testguard.config.json',\n]);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "typecheck: true becomes the command 'true' instead of the project's own tsc.",
+          "faultClass": "other",
+          "file": "src/config/project-config.mjs",
+          "find": "    else if (key === 'typecheck') out.typecheck = value === true ? '' : value;",
+          "replace": "    else if (key === 'typecheck') out.typecheck = String(value);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A path from the file is handed on unresolved.",
+          "faultClass": "variable-swap",
+          "file": "src/config/project-config.mjs",
+          "find": "    const value = loaded.resolved[key] ?? loaded.config[key];",
+          "replace": "    const value = loaded.config[key];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONFIG-CHANGE-SELECTS-EVERY-CLAIM",
+      "statement": "Under probe --changed, testguard.config.json is an input of every claim whether or not it exists, so a change, an addition or a deletion of it selects every claim with reason file testguard.config.json, while a change elsewhere still selects only what it reaches.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/project-config-reuse.test.mjs",
+        "test/project-config.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A change to the config file selects nothing.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/scope.mjs",
+          "find": "  const named = new Set([CONFIG_FILE]);",
+          "replace": "  const named = new Set();",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The file name the selection watches is not the one the CLI reads.",
+          "faultClass": "literal-changed",
+          "file": "src/config/config-file.mjs",
+          "find": "export const CONFIG_FILE = 'testguard.config.json';",
+          "replace": "export const CONFIG_FILE = 'testguard-config.json';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CONFIG-UNCOMMITTED-IS-NEVER-SILENT",
+      "statement": "testguard.config.json is read from the working tree and watched by the dirty rule whenever it is read, present or not: an uncommitted, untracked or deleted copy refuses a probe of the implicit HEAD like a dirty defender; under --ignore-dirty or --ref the run proceeds and says the working-tree copy is applied, without listing it in repo.ignoredDirty; replay, which has no dirty rule, says so whenever git does not hold the copy or cannot be asked.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/project-config.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An uncommitted config file is not watched, so an implicit-HEAD probe runs with options nobody committed.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "  watched.add(path);\n  return path;",
+          "replace": "  return path;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The applied config file is reported as ignored.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/probe.mjs",
+          "find": "ignored: dirty.filter((path) => path !== configPath) };",
+          "replace": "ignored: dirty };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "No repository to ask reads as committed.",
+          "faultClass": "return-altered",
+          "file": "src/config/project-config.mjs",
+          "find": "  try { return isDirty(projectDir, [CONFIG_FILE]); } catch { return true; }",
+          "replace": "  try { return isDirty(projectDir, [CONFIG_FILE]); } catch { return false; }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A run that proceeds past an uncommitted config file does not say it is applied.",
+          "faultClass": "return-altered",
+          "file": "src/probe/probe.mjs",
+          "find": "configApplied: configPath !== undefined && dirty.includes(configPath),",
+          "replace": "configApplied: false,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "probe watches the file only when it exists, so a deleted copy is read as no file.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/probe.mjs",
+          "find": "    ...(!values['no-config'] ? { configFile: CONFIG_FILE } : {}),",
+          "replace": "    ...(projectConfig ? { configFile: CONFIG_FILE } : {}),",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/project-config-probe.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-CLI-APPLIES-PROJECT-CONFIG",
+      "statement": "Every command that takes runner options runs with the values testguard.config.json supplies (claims only under --check-anchors, status only reporting them, nothing under --no-config), so a plain probe runs with them, reports them in run.config and warns that a provisional confirm came from the file.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/project-config.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The file is read but its values never reach the command.",
+          "faultClass": "statement-deleted",
+          "file": "src/config/project-config.mjs",
+          "find": "  return { values: applied.values, projectConfig: { ...loaded, ...applied } };",
+          "replace": "  return { values, projectConfig: { ...loaded, ...applied } };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A confirm from the file is not traced back to it.",
+          "faultClass": "return-altered",
+          "file": "src/config/project-config.mjs",
+          "find": "(projectConfig?.keys?.includes('confirm') ? projectConfig.file : undefined)",
+          "replace": "(undefined)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A plain claims listing reads, and can fail on, the config file.",
+          "faultClass": "condition-forced",
+          "file": "src/config/project-config.mjs",
+          "find": " && !(command === 'claims' && !values['check-anchors']);",
+          "replace": ";",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "probe forgets that its confirm came from the file.",
+          "faultClass": "literal-changed",
+          "file": "src/commands/probe.mjs",
+          "find": "const confirmFromConfig = confirmSource(projectConfig);",
+          "replace": "const confirmFromConfig = undefined;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          },
+          "defendedBy": [
+            "test/project-config-probe.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TG-PROBE-EXPLAIN-PROBES-NOTHING",
+      "statement": "probe --changed <ref> --explain reports the selection a probe would make and measures nothing: run.scope carries explain: true, no probed claims and the selected count, and never a run id; a determined change exits 0 whatever it selects and an undetermined one exits 2; the lines name each selected claim with its reason, count each reason kind and list the changed source files no claim covers.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/probe-explain.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An empty selection under --fail-on-empty-selection exits 2 under --explain.",
+          "faultClass": "variable-swap",
+          "file": "src/commands/probe-scope.mjs",
+          "find": "return { exitCode: selection.outcome === 'undetermined' ? 2 : 0, scope: { ...selection.scope, explain: true } };",
+          "replace": "return { exitCode: selection.exitCode, scope: { ...selection.scope, explain: true } };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An undetermined change exits 0 under --explain.",
+          "faultClass": "return-altered",
+          "file": "src/commands/probe-scope.mjs",
+          "find": "selection.outcome === 'undetermined' ? 2 : 0",
+          "replace": "0",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The explained scope reports nothing selected.",
+          "faultClass": "literal-changed",
+          "file": "src/commands/probe-scope.mjs",
+          "find": "probedClaims: [], probedCount: 0, selectedCount: selection.only.length, explain: true,",
+          "replace": "probedClaims: [], probedCount: 0, selectedCount: 0, explain: true,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "An explanation may carry a measurement.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/run-result.mjs",
+          "find": "    if (measured) errors.push({ path: '/run/id', message: 'an --explain invocation probes nothing: it has no measurement' });",
+          "replace": "    // a measurement is not checked",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "An explained determined selection may exit non-zero.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/run-result.mjs",
+          "find": "    else if (changed.outcome === 'determined' && run.exitCode !== 0) errors.push(",
+          "replace": "    else if (false) errors.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "An explained selection is refused for being unmeasured.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/run-result.mjs",
+          "find": "if (scope.selectedCount !== 0 && !scope.explain) errors.push",
+          "replace": "if (scope.selectedCount !== 0) errors.push",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "The count per reason kind is always zero.",
+          "faultClass": "return-altered",
+          "file": "src/commands/probe-scope.mjs",
+          "find": "reasons.filter((reason) => reason.kind === kind).length",
+          "replace": "0",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F8",
+          "description": "The changed source files no claim covers are not listed.",
+          "faultClass": "statement-deleted",
+          "file": "src/commands/probe-scope.mjs",
+          "find": "  lines.push(...renderUnmatched(changed));\n  if (exitCode === 0 && scope.selectedCount === 0)",
+          "replace": "  if (exitCode === 0 && scope.selectedCount === 0)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CLI-REPORTS-PROJECT-CONFIG-AND-EXPLAINS",
+      "statement": "Through the CLI: probe --explain needs --changed (exit 3) and probes and writes nothing; status prints and status --json reports the keys testguard.config.json sets, and omits it under --no-config; --no-config is refused on a command that never reads the file.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/project-config-cli.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "--explain is ignored and the change is probed.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/probe.mjs",
+          "find": "    if (values.explain) {\n      const explained",
+          "replace": "    if (false) {\n      const explained",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "--explain without --changed is accepted.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/probe.mjs",
+          "find": "  if (values.explain && values.changed === undefined) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "status --json drops the config report.",
+          "faultClass": "statement-deleted",
+          "file": "src/commands/status.mjs",
+          "find": "  if (projectConfig) doc.config = configReport(projectConfig);",
+          "replace": "  // config not reported",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "--no-config is accepted on a command that never reads the file.",
+          "faultClass": "guard-removed",
+          "file": "src/cli.mjs",
+          "find": "  if (values['no-config'] && !CONFIG_COMMANDS.includes(command)) {",
+          "replace": "  if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "status is not given the file it read.",
+          "faultClass": "variable-swap",
+          "file": "src/config/project-config.mjs",
+          "find": "  if (command === 'status') return { values, projectConfig: { ...loaded, keys: configKeys(loaded.config) } };",
+          "replace": "  if (command === 'status') return { values, projectConfig: undefined };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "The status line naming the file's keys is not printed.",
+          "faultClass": "guard-removed",
+          "file": "src/status/status.mjs",
+          "find": "  if (doc.config) lines.push(",
+          "replace": "  if (false) lines.push(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CJS-EXPORT-SURFACE-HIDES-NO-FILE",
+      "statement": "A CommonJS export form the import reader does not model (module.exports = X, a computed exports write, defineProperty, an export-star helper) stays uncertain for binding resolution but does not make a file closure indeterminate, because the closure scans every literal require()/import() call itself; an unreadable import form and a computed require still make it indeterminate.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #301 item 8"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/closure-cjs-export-surface.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Any unread CommonJS export form makes the file closure indeterminate again.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/imports.mjs",
+          "find": "        if ((parsed.fileUncertain ?? parsed.uncertain).length) addIssue(ctx, 'unsupported-syntax', file);",
+          "replace": "        if (parsed.uncertain.length) addIssue(ctx, 'unsupported-syntax', file);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An unread CommonJS export form is forgotten for binding resolution too.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/imports.mjs",
+          "find": "  module.uncertain = [...new Set([...module.uncertain, ...exportSurfaceOnly])];",
+          "replace": "  module.uncertain = [...new Set(module.uncertain)];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Export-surface uncertainty is counted as file uncertainty.",
+          "faultClass": "other",
+          "file": "src/probe/imports.mjs",
+          "find": "  const exportSurfaceOnly = module.uncertain.splice(beforeCommonJsExports);",
+          "replace": "  const exportSurfaceOnly = [];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "An unreadable import form stops making the closure indeterminate.",
+          "faultClass": "return-altered",
+          "file": "src/probe/imports.mjs",
+          "find": "  module.fileUncertain = [...new Set(module.uncertain)];",
+          "replace": "  module.fileUncertain = [];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
           }
         }
       ]
@@ -16115,7 +16908,7 @@
           "description": "An explicit request for one fault at a time is forgotten, so a fan-out stands in for it.",
           "faultClass": "return-altered",
           "file": "src/probe/probe.mjs",
-          "find": "export const serialRequested = (faultWorkers, source) => faultWorkers === 1 && ['serial', 'flag', 'env'].includes(source);",
+          "find": "export const serialRequested = (faultWorkers, source) => faultWorkers === 1 && ['serial', 'flag', 'env', 'config'].includes(source);",
           "replace": "export const serialRequested = () => false;",
           "producedBy": {
             "producer": "agent",
