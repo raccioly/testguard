@@ -3,11 +3,12 @@
  * Shard the full self-probe across CI jobs, and put the result back together
  * without changing a verdict.
  *
- *   plan    --shards <n> --claims <file> [--weights-from <evidence.json>]
+ *   plan    [--shards <n>] --claims <file> [--weights-from <evidence.json>]
  *             Assigns every claim to exactly one shard, balanced by recorded cost
  *             (the last main evidence) when there is one, else by fault count.
+ *             <n> defaults to `sharded.shards` of testguard.cost-budget.json.
  *             Deterministic. Writes `shards=<json array of comma-joined claim ids>`
- *             to $GITHUB_OUTPUT and prints the balance. Computed ONCE, in one job,
+ *             and `indexes=<[0..n-1]>` (the CI matrix) to $GITHUB_OUTPUT and prints the balance. Computed ONCE, in one job,
  *             so every shard works from the same partition.
  *   merge   --dir <dir> --claims <file> --out <file>
  *             Reads <dir>/<shard>/evidence.json, requires every fault of every claim to
@@ -161,12 +162,18 @@ export function shardEvidencePaths(dir) {
   return readdirSync(dir).sort().map((n) => join(dir, n)).filter((p) => statSync(p).isDirectory() && existsSync(join(p, 'evidence.json'))).map((p) => join(p, 'evidence.json'));
 }
 
+/** The number of shards of the full self-probe: `sharded.shards` of the cost budget, the one place it is written. */
+export function shardCount(budgetPath = join(import.meta.dirname, '..', '..', 'testguard.cost-budget.json')) {
+  return readJson(budgetPath).sharded?.shards;
+}
+
 export async function main(argv, env = process.env) {
   const [command, ...rest] = argv;
   const { values, positionals } = parseArgs({ args: rest, allowPositionals: true, options: { shards: { type: 'string' }, claims: { type: 'string', default: 'testguard.claims.json' }, 'weights-from': { type: 'string' }, dir: { type: 'string' }, out: { type: 'string' } } });
   if (command === 'plan') {
-    const n = Number(values.shards);
-    if (!Number.isInteger(n) || n < 1) { console.error('usage: shard-probe.mjs plan --shards <n> [--claims <file>] [--weights-from <evidence>]'); return 2; }
+    // The shard count lives in testguard.cost-budget.json (`sharded.shards`) and nowhere else; --shards overrides it for a one-off plan.
+    const n = values.shards === undefined ? shardCount() : Number(values.shards);
+    if (!Number.isInteger(n) || n < 1) { console.error('usage: shard-probe.mjs plan [--shards <n>] [--claims <file>] [--weights-from <evidence>] (default: sharded.shards of testguard.cost-budget.json)'); return 2; }
     let costs = new Map();
     let evidence;
     let basis = 'fault count';
@@ -176,7 +183,7 @@ export async function main(argv, env = process.env) {
     const claimsDoc = readJson(resolve(values.claims));
     const slices = planShards(claimsDoc, n, costs, defenderSets(claimsDoc, evidence));
     console.log(`shard plan (${basis}): ${slices.map((s, i) => `#${i} ${s.ids.length} claims/${s.faults} faults/${Math.round(s.weight / 1000)}s`).join('; ')}`);
-    if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `shards=${JSON.stringify(slices.map((s) => s.ids.join(',')))}\n`);
+    if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `shards=${JSON.stringify(slices.map((s) => s.ids.join(',')))}\nindexes=${JSON.stringify(slices.map((_, i) => i))}\n`);
     return 0;
   }
   if (command === 'merge') {
