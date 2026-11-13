@@ -18278,7 +18278,7 @@
           "description": "The directory is not removed at the end of the run.",
           "faultClass": "statement-deleted",
           "file": "test/helpers/run-temp.mjs",
-          "find": "return () => { rmSync(dir, { recursive: true, force: true }); };",
+          "find": "return () => { removeRunDir(dir); };",
           "replace": "return () => {};",
           "defendedBy": [
             "test/run-temp.test.mjs",
@@ -18324,7 +18324,7 @@
           "description": "The sweep removes any directory with a dead owner file, whatever its name.",
           "faultClass": "guard-removed",
           "file": "test/helpers/run-temp.mjs",
-          "find": "    if (!RUN_NAME.test(name)) continue;\n",
+          "find": "    if (!match) continue;\n",
           "replace": "",
           "defendedBy": [
             "test/run-temp.test.mjs"
@@ -18386,6 +18386,51 @@
           "file": "vitest.config.mjs",
           "find": "globalSetup: ['./test/helpers/run-temp.mjs'],",
           "replace": "globalSetup: [],",
+          "defendedBy": [
+            "test/run-temp.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F9",
+          "description": "A young run directory with no owner file is swept.",
+          "faultClass": "guard-removed",
+          "file": "test/helpers/run-temp.mjs",
+          "find": "if (!old || alive(Number(match[1]))) continue;",
+          "replace": "if (alive(Number(match[1]))) continue;",
+          "defendedBy": [
+            "test/run-temp.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F10",
+          "description": "A run directory with no owner file whose pid is alive is swept.",
+          "faultClass": "condition-forced",
+          "file": "test/helpers/run-temp.mjs",
+          "find": "if (!old || alive(Number(match[1]))) continue;",
+          "replace": "if (!old) continue;",
+          "defendedBy": [
+            "test/run-temp.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F11",
+          "description": "The owner file is removed with the other entries, not last.",
+          "faultClass": "condition-forced",
+          "file": "test/helpers/run-temp.mjs",
+          "find": "if (name !== OWNER_FILE) rm(",
+          "replace": "if (name === name) rm(",
           "defendedBy": [
             "test/run-temp.test.mjs"
           ],
