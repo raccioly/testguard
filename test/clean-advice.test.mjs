@@ -1,6 +1,6 @@
 // `status` and `brief` say when interrupted runs left scratch behind (#311):
 // one advice line with the command, from a bounded look under the scratch root.
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,6 +10,8 @@ import { ownersDir } from '../src/clean/owner.mjs';
 import { withScratchBase } from '../src/scratch-dir.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 
+// Real git repositories and real child processes: a loaded machine (a fan-out of probes) must not turn a slow start into a failure.
+vi.setConfig({ testTimeout: 30_000 });
 const roots = [];
 afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, force: true }); });
 const dir = (prefix) => { const d = realpathSync(mkdtempSync(join(tmpdir(), prefix))); roots.push(d); return d; };

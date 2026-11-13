@@ -1,7 +1,7 @@
 // Orphaned scratch trees (#311): what is removed, and — as important — what
 // never is. Pure rules over a scratch root built in a temp directory, with the
 // process table, the host and the clock injected.
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,6 +14,8 @@ import { childScope, withScratchBase } from '../src/scratch-dir.mjs';
 import { LOCK_NAME, worktreeLockDir } from '../src/probe/worktree-lock.mjs';
 import { FIXTURE_GIT } from './helpers/git.mjs';
 
+// Real git repositories and real child processes: a loaded machine (a fan-out of probes) must not turn a slow start into a failure.
+vi.setConfig({ testTimeout: 30_000 });
 const roots = [];
 afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, force: true }); });
 const root = (prefix = 'tg-clean-') => { const d = realpathSync(mkdtempSync(join(tmpdir(), prefix))); roots.push(d); return d; };

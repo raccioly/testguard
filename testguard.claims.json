@@ -18009,6 +18009,10 @@
           "file": "src/cli.mjs",
           "find": "      if (CLEANS_ON_START.has(command)) {",
           "replace": "      if (false) {",
+          "defendedBy": [
+            "test/clean-sigkill.test.mjs",
+            "test/clean.cli.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18021,6 +18025,9 @@
           "file": "src/cli.mjs",
           "find": "if (report?.removed.length && !values.quiet)",
           "replace": "if (report?.removed.length)",
+          "defendedBy": [
+            "test/clean.cli.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18033,6 +18040,9 @@
           "file": "src/probe/worktree.mjs",
           "find": "const dropOwner = recordOwner(scratchBase, dest);",
           "replace": "const dropOwner = () => {};",
+          "defendedBy": [
+            "test/clean-orphans.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18045,6 +18055,9 @@
           "file": "src/probe/worktree.mjs",
           "find": "cleanup: () => { remove(); dropOwner(); unregister(); },",
           "replace": "cleanup: () => { remove(); unregister(); },",
+          "defendedBy": [
+            "test/clean-orphans.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18057,6 +18070,9 @@
           "file": "src/scratch-dir.mjs",
           "find": "const dropOwner = recordOwner(base, dir);",
           "replace": "const dropOwner = () => {};",
+          "defendedBy": [
+            "test/clean-orphans.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18069,6 +18085,9 @@
           "file": "src/scratch-dir.mjs",
           "find": "{ rmSync(dir, { recursive: true, force: true }); dropOwner(); };",
           "replace": "{ rmSync(dir, { recursive: true, force: true }); };",
+          "defendedBy": [
+            "test/clean-orphans.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18081,6 +18100,9 @@
           "file": "src/cli.mjs",
           "find": "new Set(['probe', 'sweep', 'replay', 'admit', 'clean'])",
           "replace": "new Set(['probe', 'sweep', 'replay', 'admit'])",
+          "defendedBy": [
+            "test/clean.cli.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18093,6 +18115,9 @@
           "file": "src/cli.mjs",
           "find": "const say = values.json ? (line) => process.stderr.write(`${line}\\n`) : io.err;",
           "replace": "const say = io.err;",
+          "defendedBy": [
+            "test/clean.cli.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18124,6 +18149,9 @@
           "file": "src/status/advice.mjs",
           "find": "if (!(count > 0)) return undefined;",
           "replace": "if (false) return undefined;",
+          "defendedBy": [
+            "test/clean-advice.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18136,6 +18164,9 @@
           "file": "src/status/status.mjs",
           "find": "toolVersion: toolVersion ?? '0.0.0', orphans });",
           "replace": "toolVersion: toolVersion ?? '0.0.0', orphans: 0 });",
+          "defendedBy": [
+            "test/clean-advice.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18148,6 +18179,9 @@
           "file": "src/status/status.mjs",
           "find": ".filter((o) => o.kind !== 'owner-record')",
           "replace": "",
+          "defendedBy": [
+            "test/clean-advice.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18160,6 +18194,9 @@
           "file": "spec/lib/validate.mjs",
           "find": "if (a.id === 'orphaned-scratch' && a.command !== 'testguard clean')",
           "replace": "if (false)",
+          "defendedBy": [
+            "spec/conformance/advice.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -18172,6 +18209,9 @@
           "file": "spec/schemas/status.schema.json",
           "find": "\"hook-outdated\", \"orphaned-scratch\"]",
           "replace": "\"hook-outdated\"]",
+          "defendedBy": [
+            "spec/conformance/advice.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"

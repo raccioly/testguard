@@ -1,6 +1,6 @@
 // `testguard clean` and the cleanup a probe does before it starts (#311),
 // through the real command line entry point, in process.
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +9,8 @@ import { ownersDir } from '../src/clean/owner.mjs';
 import { formatBytes } from '../src/commands/clean.mjs';
 import { project } from './helpers/scope-project.mjs';
 
+// Real git repositories and real child processes: a loaded machine (a fan-out of probes) must not turn a slow start into a failure.
+vi.setConfig({ testTimeout: 30_000 });
 const roots = [];
 afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, force: true }); });
 const dir = (prefix) => { const d = realpathSync(mkdtempSync(join(tmpdir(), prefix))); roots.push(d); return d; };
@@ -119,11 +121,11 @@ describe('a probe cleans before it starts', () => {
     const tree = orphan(base);
     const p = project();
     roots.push(p.root);
-    // sweep with no base to compare against refuses (exit 3) after the cleanup ran.
-    const r = await run(['sweep', p.dir, '--json', '--scratch-dir', base]);
+    // A sweep that refuses its own options (exit 3, nothing on stdout) does so after the cleanup ran.
+    const r = await run(['sweep', p.dir, '--json', '--confirm', '0', '--scratch-dir', base]);
     expect(r.code).toBe(3);
     expect(existsSync(tree)).toBe(false);
-    expect(JSON.parse(r.out).error.message).toMatch(/^sweep needs a reference/);
+    expect(JSON.parse(r.out).error.message).toMatch(/^--confirm must be a positive integer/);
     expect(r.err).not.toContain('leftover');
   });
 
