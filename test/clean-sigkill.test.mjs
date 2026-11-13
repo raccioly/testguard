@@ -27,7 +27,8 @@ describe('a probe killed with SIGKILL', () => {
     // Its own process group, so the kill takes the runner with it and nothing sleeps on afterwards.
     const child = spawn(process.execPath, [cli, 'probe', p.dir, '--claim', 'PRICE-TOTAL', '--runner', 'node-test', '--confirm', '1', '--scratch-dir', scratch, '--progress', 'none'], { stdio: 'ignore', detached: true });
     const exited = new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
-    const deadline = Date.now() + 30_000;
+    // Generous: a fan-out of probes on a busy machine can take a minute to get this far, and the wait ends the moment the tree exists.
+    const deadline = Date.now() + 120_000;
     while (scratchTrees(scratch).length === 0 || registrations(p.dir) < 2) {
       if (Date.now() > deadline) { process.kill(-child.pid, 'SIGKILL'); throw new Error('no scratch worktree appeared'); }
       await sleep(100);
@@ -46,5 +47,5 @@ describe('a probe killed with SIGKILL', () => {
     expect(stderr).toMatch(/cleaned \d+ leftover scratch entr/);
     expect(scratchTrees(scratch)).toEqual([]);
     expect(registrations(p.dir)).toBe(1);
-  }, 90_000);
+  }, 240_000);
 });
