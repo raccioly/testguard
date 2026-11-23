@@ -54,7 +54,7 @@ inputs:
   version:
     description: 'testguard-cli version to run'
     required: false
-    default: '0.26.2'
+    default: '0.26.3'
   node-version:
     description: 'Node.js version (20+)'
     required: false
