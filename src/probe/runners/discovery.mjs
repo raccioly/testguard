@@ -9,7 +9,7 @@ import { sha256 } from '../../util/hash.mjs';
 import { globToRegExp, walk } from '../../util/glob.mjs';
 import { parseModuleSource, tokenizeModule } from '../imports.mjs';
 import { resolveAliased } from '../rank.mjs';
-import { terminateProcessTree, TIMEOUT_CLEANUP_WARNING } from './shared.mjs';
+import { terminateProcessTree, TIMEOUT_CLEANUP_WARNING } from './process-tree.mjs';
 
 export const DISCOVERY_TIMEOUT_MS = 60_000;
 export const MAX_DISCOVERY_OUTPUT_BYTES = 16 * 1024 * 1024;

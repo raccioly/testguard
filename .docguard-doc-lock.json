@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "sections": {
+    "docs-canonical/ARCHITECTURE.md#component-map": {
+      "dependencies": {
+        "cli/testguard.mjs": {
+          "fingerprint": "sha256:fa328d6f3049567859ef69dba4f6bf7e73a1c436175282fa1a3205c966bcfa98",
+          "tier": "content"
+        },
+        "src/admit/admit.mjs": {
+          "fingerprint": "sha256:436573997d80542e46b8b6fc1e8528a5d85a9b46724e3a3b24bf9f8aa58c420d",
+          "tier": "content"
+        },
+        "src/baseline/baseline.mjs": {
+          "fingerprint": "sha256:91a57f3ecd88357817f2b94ffb2d2b9d7dbc509677932ff71761d30ac12a5a9a",
+          "tier": "content"
+        },
+        "src/brief/brief.mjs": {
+          "fingerprint": "sha256:cc10b983c37995c314f268a969881e7d5210d43b5410e40961c9c4764f759591",
+          "tier": "content"
+        },
+        "src/clean/orphans.mjs": {
+          "fingerprint": "sha256:cde763e4fe6f24472945f92f5a61f5ba79e0a11799c336e3559017a86be8537e",
+          "tier": "content"
+        },
+        "src/clean/owner.mjs": {
+          "fingerprint": "sha256:430a92c7ebb8abd5b3ade8d202003ff1ad554e8d94c496a74ca11cc42e2dcd54",
+          "tier": "content"
+        },
+        "src/cli.mjs": {
+          "fingerprint": "sha256:cccddf7964626bcc9cc457ed206c978708e0b89348d0d7fda0efa319bcd568cb",
+          "tier": "content"
+        },
+        "src/config/project-config.mjs": {
+          "fingerprint": "sha256:39bea170ae15006d26a2f1051c3f254852d329aec81a9bd3d22cda2ca658f018",
+          "tier": "content"
+        },
+        "src/evidence/writer.mjs": {
+          "fingerprint": "sha256:ed1ea0133688650fdd839803df496e4a98d8217023076e8fd30fefa4a4b08ae1",
+          "tier": "content"
+        },
+        "src/gate/changed.mjs": {
+          "fingerprint": "sha256:a05973f3e8207c8e2539ae5cee17da5cadebe99c57a24b58a5dc301c77f02665",
+          "tier": "content"
+        },
+        "src/probe/attribution.mjs": {
+          "fingerprint": "sha256:76bcac10636869d654af29be8538ade6e8e72451a1722ef6941a5024861b98a1",
+          "tier": "content"
+        },
+        "src/probe/classify.mjs": {
+          "fingerprint": "sha256:706cd0d953e632a607a5f000310e449107522a4d7bb2e296b1744b88351e7667",
+          "tier": "content"
+        },
+        "src/probe/contention.mjs": {
+          "fingerprint": "sha256:66010ae79e2457f234a0d6bdcbb89e33613efba420e76789934d05667e428fc4",
+          "tier": "content"
+        },
+        "src/probe/cost.mjs": {
+          "fingerprint": "sha256:2e532fdce5fa70e264f7fb2da540026a89819335fcd02ffde182efdda6f2d47d",
+          "tier": "content"
+        },
+        "src/probe/discover.mjs": {
+          "fingerprint": "sha256:41c78b61d8c5131b032e2961ac65dabe34c8fe301b9b7349477ffffdc0ee554f",
+          "tier": "content"
+        },
+        "src/probe/independence.mjs": {
+          "fingerprint": "sha256:6b5d1f84f4fe3ed5132639e58a1027961297b20f65772ea382d39d51445fdadc",
+          "tier": "content"
+        },
+        "src/probe/inject.mjs": {
+          "fingerprint": "sha256:939dd2c240ef575e65fda8a094e47a6e385871ca0a47b34900477604d6ebafb1",
+          "tier": "content"
+        },
+        "src/probe/mocks.mjs": {
+          "fingerprint": "sha256:e2b01b863dff0ae44b5c6b31d5cb6dc86032033b7556b0e1767d92103f1a9894",
+          "tier": "content"
+        },
+        "src/probe/probe.mjs": {
+          "fingerprint": "sha256:6e0ef4448e3f664fa1c28332342aaa064eead6985588a74412d7efcfe7e30382",
+          "tier": "content"
+        },
+        "src/probe/progress.mjs": {
+          "fingerprint": "sha256:824b418b942ad2d1c60b572b22d443a3b6e4a78e670f079a6ea8c875f8c37908",
+          "tier": "content"
+        },
+        "src/probe/rank.mjs": {
+          "fingerprint": "sha256:303e6b1bc282a3dbb517ce0acafafd935e06c82025bb27f0d7659359187ec4ee",
+          "tier": "content"
+        },
+        "src/probe/worktree.mjs": {
+          "fingerprint": "sha256:550800922b52d9cb3265b8f105ff0453bef2d6be06b6eb2034f76b7521d57f68",
+          "tier": "content"
+        },
+        "src/scaffold/producers.mjs": {
+          "fingerprint": "sha256:c0246fb04fb77f35114eaf0f569d266b22854c42b41e4d4eb10a69efc6cfe83e",
+          "tier": "content"
+        },
+        "src/status/status.mjs": {
+          "fingerprint": "sha256:9909b65c31b6f1ece6157c4bbd458035711bf2d07d3da7c54fc720dd385ac4ab",
+          "tier": "content"
+        },
+        "src/supply/concerns.mjs": {
+          "fingerprint": "sha256:e35fcd3e26026c0adc15cf1d8e572e4b3c6b53f1cc1a9cafcc8955f9d808084d",
+          "tier": "content"
+        },
+        "src/supply/feedback.mjs": {
+          "fingerprint": "sha256:581fda484ddf9ef0635a668cc974168eda95012809793b6b3bf992a42cb752ab",
+          "tier": "content"
+        },
+        "src/supply/persistence.mjs": {
+          "fingerprint": "sha256:5c49d3c557b25c8f0bf792bff9b6d743e0d35c1c8da9d64b68b2f666f1eddfc4",
+          "tier": "content"
+        },
+        "src/supply/savepath.mjs": {
+          "fingerprint": "sha256:5ee1fa71ab828a48199d722f8cd8f432c8532e4281f8bad624f794464980e57a",
+          "tier": "content"
+        },
+        "src/supply/select.mjs": {
+          "fingerprint": "sha256:a3b3ee638624db0bf9676fc98f5a22ad7b042d6fefe28f310617b948892cfafa",
+          "tier": "content"
+        },
+        "src/sweep/sweep.mjs": {
+          "fingerprint": "sha256:898c33e4a1cda685531744a7cb1a3347638548070ea45ef48d30957c00d5682c",
+          "tier": "content"
+        }
+      },
+      "reason": "Checked each covered file exists and the section's rows and descriptions against it",
+      "reviewedAt": "2026-11-27",
+      "reviewedRevision": "06e738bee1e09adf2ba1d0efa045d9e2659273ce"
+    },
+    "docs-canonical/ARCHITECTURE.md#configuration-files": {
+      "dependencies": {
+        ".github/scripts/check-cost-budget.mjs": {
+          "fingerprint": "sha256:e36a5e0d7a7e875d8650a9754e0b3e23c7db96fc094dd7a9a8564d1afd5ef706",
+          "tier": "content"
+        },
+        "packaging/gitlab/testguard.gitlab-ci.yml": {
+          "fingerprint": "sha256:898514ace944157564e51deecde9f4981d464616949bd4f235a8fa30c0db19fa",
+          "tier": "content"
+        },
+        "packaging/homebrew/testguard.rb": {
+          "fingerprint": "sha256:93e893d8e68acfca2fe4c8cbeb9a2e9474fb2d7a95bf9214bcf457c9fd372de3",
+          "tier": "content"
+        }
+      },
+      "reason": "Checked each covered file exists and the section's rows and descriptions against it",
+      "reviewedAt": "2026-11-27",
+      "reviewedRevision": "06e738bee1e09adf2ba1d0efa045d9e2659273ce"
+    }
+  }
+}

@@ -1,0 +1,674 @@
+{
+  "documents": {
+    ".agents/skills/testguard/SKILL.md": {
+      "excluded": {
+        "AGENTS.md": "another document (reviewed on its own)",
+        "testguard.claims.json": "changelog, lockfile or claims/evidence data"
+      },
+      "reason": "Read against the code at HEAD: paths, commands, flags, schemas, CI jobs and counts checked; wrong statements fixed in this change",
+      "references": {
+        "testguard.ignore.json": {
+          "fingerprint": "sha256:3f7f06e795b09a2c4f56f25659150a021b7cf488aa2ed564aeee65b390aa9042",
+          "tier": "content"
+        }
+      },
+      "reviewedAt": "2026-11-27",
+      "reviewedRevision": "06e738bee1e09adf2ba1d0efa045d9e2659273ce"
+    },
+    "AGENTS.md": {
+      "excluded": {
+        ".jules/README.md": "another document (reviewed on its own)",
+        ".jules/RULES.md": "another document (reviewed on its own)",
+        ".jules/routines": "directory",
+        "CHANGELOG.md": "changelog, lockfile or claims/evidence data",
+        "cli/testguard.mjs": "under 20 lines",
+        "corpus": "directory",
+        "corpus/tool-mutants": "directory",
+        "docs-canonical/SECURITY.md": "another document (reviewed on its own)",
+        "fixtures/known-answer/expected.json": "test, fixture or example path",
+        "spec": "directory",
+        "spec/GATE-SEMANTICS.md": "test, fixture or example path",
+        "spec/lib/validate.mjs": "test, fixture or example path",
+        "spec/schemas/common.schema.json": "test, fixture or example path",
+        "src/probe": "directory",
+        "src/probe/runners": "directory",
+        "test/helpers/run-temp.mjs": "test, fixture or example path",
+        "testguard.claims.json": "changelog, lockfile or claims/evidence data"
+      },
+      "reason": "Read against the code at HEAD: paths, commands, flags, schemas, CI jobs and counts checked; wrong statements fixed in this change",
+      "references": {
+        ".github/scripts/jules-policy.mjs": {
+          "fingerprint": "sha256:5dc6a874e85181a19ef9d7589a644471589272b6ca8c1158caeb786118f2af4e",
+          "tier": "content"
+        },
+        ".github/scripts/release-evidence.mjs": {
+          "fingerprint": "sha256:7a0f3f15b639f3fb43d2223eba58e0cc995946dd82b41552772ab098d6911e48",
+          "tier": "content"
+        },
+        ".github/scripts/self-probe-scope.mjs": {
+          "fingerprint": "sha256:2bf1ab61d3817a10c0a3e4185c50e47d9f23e1369eab2c3bde0c5ffb65111dfa",
+          "tier": "content"
+        },
+        ".github/scripts/shard-probe.mjs": {
+          "fingerprint": "sha256:cf71383b0c09519db7e989ad33cb4666210c74d377d2f66aa3f518fadf367cc4",
+          "tier": "content"
+        },
+        ".github/workflows/ci.yml": {
+          "fingerprint": "sha256:5eaadce353f7c9ea41468b4dd8260de7d42220a38c1e156519450ac26d66b5ba",
+          "tier": "content"
+        },
+        ".github/workflows/release.yml": {
+          "fingerprint": "sha256:5907b767147fc0b7c5771e03baac470000c0dca22cd6d85377cc38886f4f5bce",
+          "tier": "content"
+        },
+        ".jules/preflight.mjs": {
+          "fingerprint": "sha256:46552a6bd37b0b316880a873317f56c10f8ecf12ac645d104fc0852071d6fc97",
+          "tier": "content"
+        },
+        "src/clean/orphans.mjs": {
+          "fingerprint": "sha256:cde763e4fe6f24472945f92f5a61f5ba79e0a11799c336e3559017a86be8537e",
+          "tier": "content"
+        },
+        "src/clean/owner.mjs": {
+          "fingerprint": "sha256:430a92c7ebb8abd5b3ade8d202003ff1ad554e8d94c496a74ca11cc42e2dcd54",
+          "tier": "content"
+        },
+        "src/gate/changed.mjs": {
+          "fingerprint": "sha256:a05973f3e8207c8e2539ae5cee17da5cadebe99c57a24b58a5dc301c77f02665",
+          "tier": "content"
+        },
+        "src/init/managed.mjs": {
+          "fingerprint": "sha256:79ba2aba9530e955f2d812ec567973640bd3bdb3aa62dd709595ea7410543eeb",
+          "tier": "content"
+        },
+        "src/probe/classify.mjs": {
+          "fingerprint": "sha256:706cd0d953e632a607a5f000310e449107522a4d7bb2e296b1744b88351e7667",
+          "tier": "content"
+        },
+        "src/probe/cost.mjs": {
+          "fingerprint": "sha256:2e532fdce5fa70e264f7fb2da540026a89819335fcd02ffde182efdda6f2d47d",
+          "tier": "content"
+        },
+        "src/probe/dependencies.mjs": {
+          "fingerprint": "sha256:2184a7911159e401da482f549cdde94d3646bd6336e4acd5fd5004542878f2e8",
+          "tier": "content"
+        },
+        "src/probe/fan-out.mjs": {
+          "fingerprint": "sha256:368c2d5381315171952e6145e155ba1ef20e044d8497644be3fd1051d64f0743",
+          "tier": "content"
+        },
+        "src/probe/node-modules-link.mjs": {
+          "fingerprint": "sha256:862d3a366091e9eceb73691bbfefdc7dceac4c13e1d07a0f382716f3572fa381",
+          "tier": "content"
+        },
+        "src/probe/probe.mjs": {
+          "fingerprint": "sha256:6e0ef4448e3f664fa1c28332342aaa064eead6985588a74412d7efcfe7e30382",
+          "tier": "content"
+        },
+        "src/probe/scope.mjs": {
+          "fingerprint": "sha256:f9422554a8f70ff26a8296da9da8f15dabd4cdaf43db8ddb751c5e3fad1d5222",
+          "tier": "content"
+        },
+        "src/probe/typecheck.mjs": {
+          "fingerprint": "sha256:877c2732ab05fcc33d1b958c4ada33d6b7a340d6ed142237d4cb6ee3011bae67",
+          "tier": "content"
+        },
+        "src/probe/worker-env.mjs": {
+          "fingerprint": "sha256:1facab4c77118cd7321527e475549cb396ef66910c0e1ac41f1722a6d731450e",
+          "tier": "content"
+        },
+        "src/probe/worktree.mjs": {
+          "fingerprint": "sha256:550800922b52d9cb3265b8f105ff0453bef2d6be06b6eb2034f76b7521d57f68",
+          "tier": "content"
+        },
+        "src/scaffold/producers.mjs": {
+          "fingerprint": "sha256:c0246fb04fb77f35114eaf0f569d266b22854c42b41e4d4eb10a69efc6cfe83e",
+          "tier": "content"
+        },
+        "src/status/status.mjs": {
+          "fingerprint": "sha256:9909b65c31b6f1ece6157c4bbd458035711bf2d07d3da7c54fc720dd385ac4ab",
+          "tier": "content"
+        },
+        "testguard.cost-budget.json": {
+          "fingerprint": "sha256:c1de41561f2ce71bdaaf494ac261955f7a5de58fbc2cadedf8d223ffe7b8ded1",
+          "tier": "content"
+        }
+      },
+      "reviewedAt": "2026-11-27",
+      "reviewedRevision": "06e738bee1e09adf2ba1d0efa045d9e2659273ce"
+    },
+    "docs-canonical/ARCHITECTURE.md": {
+      "excluded": {
+        ".docguard.json": "DocGuard state file",
+        ".docguardignore": "DocGuard state file",
+        ".gitattributes": "under 20 lines",
+        ".github/workflows": "directory",
+        ".npmrc": "under 20 lines",
+        "AGENTS.md": "another document (reviewed on its own)",
+        "DRIFT-LOG.md": "another document (reviewed on its own)",
+        "cli/testguard.mjs": "under 20 lines",
+        "corpus": "directory",
+        "fixtures": "directory",
+        "spec": "directory",
+        "spec/lib": "directory",
+        "src": "directory",
+        "src/admit/admit.mjs": "under 20 lines",
+        "src/claims": "directory",
+        "src/commands": "directory",
+        "src/config": "directory",
+        "src/evidence": "directory",
+        "src/init": "directory",
+        "src/mcp": "directory",
+        "src/probe": "directory",
+        "src/probe/runners": "directory",
+        "src/replay": "directory",
+        "src/supply": "directory",
+        "src/util": "directory",
+        "testguard.claims.json": "changelog, lockfile or claims/evidence data"
+      },
+      "reason": "Read against the code at HEAD: paths, commands, flags, schemas, CI jobs and counts checked; wrong statements fixed in this change",
+      "references": {
+        ".github/scripts/check-cost-budget.mjs": {
+          "fingerprint": "sha256:e36a5e0d7a7e875d8650a9754e0b3e23c7db96fc094dd7a9a8564d1afd5ef706",
+          "tier": "content"
+        },
+        ".github/scripts/sync-release-version.mjs": {
+          "fingerprint": "sha256:a0af87e84001a1d0eb96cfdfe3982d64edf479bb68b6a8f7310edac20672f7af",
+          "tier": "content"
+        },
+        ".npmignore": {
+          "fingerprint": "sha256:33653bd99f4d4ed762b1de5edaf7cf728f6aeaaf7a4f1d5839313c556f24f4f8",
+          "tier": "content"
+        },
+        ".pre-commit-config.yaml": {
+          "fingerprint": "sha256:14599f27ad0cdfb927af48a75a6a3ccd0c09e2d50b6f3164352766b62aae0eda",
+          "tier": "content"
+        },
+        ".pre-commit-hooks.yaml": {
+          "fingerprint": "sha256:8bfc112d056411a2305a0cb5c4fd2269866513acb120a16886d92e0e6f164d3e",
+          "tier": "content"
+        },
+        "action.yml": {
+          "fingerprint": "sha256:c23d7ac0a6eee910cd39c61eb0838cd5485043eaed2cefe38f3f26a36b69a9fe",
+          "tier": "content"
+        },
+        "package.json": {
+          "fingerprint": "sha256:2a78a5be776259718332fecbf2e1a3478fd98b7bdab0fc6e5b92dcd4848d0369",
+          "tier": "content"
+        },
+        "packaging/gitlab/testguard.gitlab-ci.yml": {
+          "fingerprint": "sha256:898514ace944157564e51deecde9f4981d464616949bd4f235a8fa30c0db19fa",
+          "tier": "content"
+        },
+        "packaging/homebrew/testguard.rb": {
+          "fingerprint": "sha256:93e893d8e68acfca2fe4c8cbeb9a2e9474fb2d7a95bf9214bcf457c9fd372de3",
+          "tier": "content"
+        },
+        "pyproject.toml": {
+          "fingerprint": "sha256:8076cd6e27f8ea005e80834289967d542f2ce9f74c2002ecdcd3b5578f7b928d",
+          "tier": "content"
+        },
+        "src/baseline/baseline.mjs": {
+          "fingerprint": "sha256:91a57f3ecd88357817f2b94ffb2d2b9d7dbc509677932ff71761d30ac12a5a9a",
+          "tier": "content"
+        },
+        "src/brief/brief.mjs": {
+          "fingerprint": "sha256:cc10b983c37995c314f268a969881e7d5210d43b5410e40961c9c4764f759591",
+          "tier": "content"
+        },
+        "src/clean/orphans.mjs": {
+          "fingerprint": "sha256:cde763e4fe6f24472945f92f5a61f5ba79e0a11799c336e3559017a86be8537e",
+          "tier": "content"
+        },
+        "src/clean/owner.mjs": {
+          "fingerprint": "sha256:430a92c7ebb8abd5b3ade8d202003ff1ad554e8d94c496a74ca11cc42e2dcd54",
+          "tier": "content"
+        },
+        "src/cli.mjs": {
+          "fingerprint": "sha256:cccddf7964626bcc9cc457ed206c978708e0b89348d0d7fda0efa319bcd568cb",
+          "tier": "content"
+        },
+        "src/config/project-config.mjs": {
+          "fingerprint": "sha256:39bea170ae15006d26a2f1051c3f254852d329aec81a9bd3d22cda2ca658f018",
+          "tier": "content"
+        },
+        "src/evidence/writer.mjs": {
+          "fingerprint": "sha256:ed1ea0133688650fdd839803df496e4a98d8217023076e8fd30fefa4a4b08ae1",
+          "tier": "content"
+        },
+        "src/gate/changed.mjs": {
+          "fingerprint": "sha256:a05973f3e8207c8e2539ae5cee17da5cadebe99c57a24b58a5dc301c77f02665",
+          "tier": "content"
+        },
+        "src/git.mjs": {
+          "fingerprint": "sha256:ce660d9fef1016fac98bfa126d2914928267c7cc0aac85c3aaf6510a209799dd",
+          "tier": "content"
+        },
+        "src/probe/attribution.mjs": {
+          "fingerprint": "sha256:76bcac10636869d654af29be8538ade6e8e72451a1722ef6941a5024861b98a1",
+          "tier": "content"
+        },
+        "src/probe/classify.mjs": {
+          "fingerprint": "sha256:706cd0d953e632a607a5f000310e449107522a4d7bb2e296b1744b88351e7667",
+          "tier": "content"
+        },
+        "src/probe/contention.mjs": {
+          "fingerprint": "sha256:66010ae79e2457f234a0d6bdcbb89e33613efba420e76789934d05667e428fc4",
+          "tier": "content"
+        },
+        "src/probe/cost.mjs": {
+          "fingerprint": "sha256:2e532fdce5fa70e264f7fb2da540026a89819335fcd02ffde182efdda6f2d47d",
+          "tier": "content"
+        },
+        "src/probe/discover.mjs": {
+          "fingerprint": "sha256:41c78b61d8c5131b032e2961ac65dabe34c8fe301b9b7349477ffffdc0ee554f",
+          "tier": "content"
+        },
+        "src/probe/independence.mjs": {
+          "fingerprint": "sha256:6b5d1f84f4fe3ed5132639e58a1027961297b20f65772ea382d39d51445fdadc",
+          "tier": "content"
+        },
+        "src/probe/inject.mjs": {
+          "fingerprint": "sha256:939dd2c240ef575e65fda8a094e47a6e385871ca0a47b34900477604d6ebafb1",
+          "tier": "content"
+        },
+        "src/probe/mocks.mjs": {
+          "fingerprint": "sha256:e2b01b863dff0ae44b5c6b31d5cb6dc86032033b7556b0e1767d92103f1a9894",
+          "tier": "content"
+        },
+        "src/probe/probe.mjs": {
+          "fingerprint": "sha256:6e0ef4448e3f664fa1c28332342aaa064eead6985588a74412d7efcfe7e30382",
+          "tier": "content"
+        },
+        "src/probe/progress.mjs": {
+          "fingerprint": "sha256:824b418b942ad2d1c60b572b22d443a3b6e4a78e670f079a6ea8c875f8c37908",
+          "tier": "content"
+        },
+        "src/probe/rank.mjs": {
+          "fingerprint": "sha256:303e6b1bc282a3dbb517ce0acafafd935e06c82025bb27f0d7659359187ec4ee",
+          "tier": "content"
+        },
+        "src/probe/worktree.mjs": {
+          "fingerprint": "sha256:550800922b52d9cb3265b8f105ff0453bef2d6be06b6eb2034f76b7521d57f68",
+          "tier": "content"
+        },
+        "src/scaffold/producers.mjs": {
+          "fingerprint": "sha256:c0246fb04fb77f35114eaf0f569d266b22854c42b41e4d4eb10a69efc6cfe83e",
+          "tier": "content"
+        },
+        "src/scratch-dir.mjs": {
+          "fingerprint": "sha256:138e127a7416b54cb56f747562e97b377639c03b512783caf249bb2bbbb3ff37",
+          "tier": "content"
+        },
+        "src/status/status.mjs": {
+          "fingerprint": "sha256:9909b65c31b6f1ece6157c4bbd458035711bf2d07d3da7c54fc720dd385ac4ab",
+          "tier": "content"
+        },
+        "src/supply/concerns.mjs": {
+          "fingerprint": "sha256:e35fcd3e26026c0adc15cf1d8e572e4b3c6b53f1cc1a9cafcc8955f9d808084d",
+          "tier": "content"
+        },
+        "src/supply/feedback.mjs": {
+          "fingerprint": "sha256:581fda484ddf9ef0635a668cc974168eda95012809793b6b3bf992a42cb752ab",
+          "tier": "content"
+        },
+        "src/supply/persistence.mjs": {
+          "fingerprint": "sha256:5c49d3c557b25c8f0bf792bff9b6d743e0d35c1c8da9d64b68b2f666f1eddfc4",
+          "tier": "content"
+        },
+        "src/supply/savepath.mjs": {
+          "fingerprint": "sha256:5ee1fa71ab828a48199d722f8cd8f432c8532e4281f8bad624f794464980e57a",
+          "tier": "content"
+        },
+        "src/supply/select.mjs": {
+          "fingerprint": "sha256:a3b3ee638624db0bf9676fc98f5a22ad7b042d6fefe28f310617b948892cfafa",
+          "tier": "content"
+        },
+        "src/sweep/sweep.mjs": {
+          "fingerprint": "sha256:898c33e4a1cda685531744a7cb1a3347638548070ea45ef48d30957c00d5682c",
+          "tier": "content"
+        },
+        "testguard.cost-budget.json": {
+          "fingerprint": "sha256:c1de41561f2ce71bdaaf494ac261955f7a5de58fbc2cadedf8d223ffe7b8ded1",
+          "tier": "content"
+        },
+        "testguard.ignore.json": {
+          "fingerprint": "sha256:3f7f06e795b09a2c4f56f25659150a021b7cf488aa2ed564aeee65b390aa9042",
+          "tier": "content"
+        },
+        "vitest.config.mjs": {
+          "fingerprint": "sha256:04acc6f421400af241a49c508b7a81fa68eef3536da4e6c3c8aa01adc2809f8d",
+          "tier": "content"
+        }
+      },
+      "reviewedAt": "2026-11-27",
+      "reviewedRevision": "06e738bee1e09adf2ba1d0efa045d9e2659273ce"
+    },
+    "docs-canonical/DATA-MODEL.md": {
+      "excluded": {
+        "spec/lib/fingerprint.mjs": "test, fixture or example path",
+        "spec/lib/validate.mjs": "test, fixture or example path",
+        "spec/schemas": "directory",
+        "testguard.claims.json": "changelog, lockfile or claims/evidence data"
+      },
+      "reason": "Read against the code at HEAD: paths, commands, flags, schemas, CI jobs and counts checked; wrong statements fixed in this change",
+      "references": {
+        "testguard.ignore.json": {
+          "fingerprint": "sha256:3f7f06e795b09a2c4f56f25659150a021b7cf488aa2ed564aeee65b390aa9042",
+          "tier": "content"
+        }
+      },
+      "reviewedAt": "2026-11-27",
+      "reviewedRevision": "06e738bee1e09adf2ba1d0efa045d9e2659273ce"
+    },
+    "docs-canonical/ENVIRONMENT.md": {
+      "excluded": {
+        ".docguard.json": "DocGuard state file",
+        ".docguardignore": "DocGuard state file",
+        "docs-canonical": "directory",
+        "testguard.claims.json": "changelog, lockfile or claims/evidence data",
+        "testguard_cli": "directory"
+      },
+      "reason": "Read against the code at HEAD: paths, commands, flags, schemas, CI jobs and counts checked; wrong statements fixed in this change",
+      "references": {
+        "testguard.ignore.json": {
+          "fingerprint": "sha256:3f7f06e795b09a2c4f56f25659150a021b7cf488aa2ed564aeee65b390aa9042",
+          "tier": "content"
+        }
+      },
+      "reviewedAt": "2026-11-27",
+      "reviewedRevision": "06e738bee1e09adf2ba1d0efa045d9e2659273ce"
+    },
+    "docs-canonical/PRIOR-ART.md": {
+      "excluded": {
+        "testguard.claims.json": "changelog, lockfile or claims/evidence data"
+      },
+      "reason": "Read against the code at HEAD: paths, commands, flags, schemas, CI jobs and counts checked; wrong statements fixed in this change",
+      "references": {
+        "src/scaffold/producers.python.mjs": {
+          "fingerprint": "sha256:bf7f03ca34bac3e3f8a0938cd52f7964bd00c10f514e6fd96bdac7e38669d67b",
+          "tier": "content"
+        },
+        "src/supply/feedback.mjs": {
+          "fingerprint": "sha256:581fda484ddf9ef0635a668cc974168eda95012809793b6b3bf992a42cb752ab",
+          "tier": "content"
+        },
+        "src/supply/select.mjs": {
+          "fingerprint": "sha256:a3b3ee638624db0bf9676fc98f5a22ad7b042d6fefe28f310617b948892cfafa",
+          "tier": "content"
+        }
+      },
+      "reviewedAt": "2026-11-27",
+      "reviewedRevision": "06e738bee1e09adf2ba1d0efa045d9e2659273ce"
+    },
+    "docs-canonical/REQUIREMENTS.md": {
+      "excluded": {
+        "spec": "directory",
+        "spec/conformance": "directory",
+        "spec/conformance/schemas.test.mjs": "test, fixture or example path",
+        "spec/schemas/claims.schema.json": "test, fixture or example path",
+        "src/admit/admit.mjs": "under 20 lines",
+        "src/brief": "directory",
+        "src/mcp": "directory",
+        "src/probe/runners": "directory",
+        "src/replay": "directory",
+        "src/status": "directory",
+        "test/admit.test.mjs": "test, fixture or example path",
+        "test/attribution.test.mjs": "test, fixture or example path",
+        "test/baseline.test.mjs": "test, fixture or example path",
+        "test/brief.test.mjs": "test, fixture or example path",
+        "test/calibration.test.mjs": "test, fixture or example path",
+        "test/claim-options.test.mjs": "test, fixture or example path",
+        "test/claim-selection.test.mjs": "test, fixture or example path",
+        "test/claims-anchors.test.mjs": "test, fixture or example path",
+        "test/classify.test.mjs": "test, fixture or example path",
+        "test/cost.test.mjs": "test, fixture or example path",
+        "test/fault-defenders.test.mjs": "test, fixture or example path",
+        "test/gate-coverage.test.mjs": "test, fixture or example path",
+        "test/gate.test.mjs": "test, fixture or example path",
+        "test/inject.test.mjs": "test, fixture or example path",
+        "test/mcp.test.mjs": "test, fixture or example path",
+        "test/mocks.test.mjs": "test, fixture or example path",
+        "test/negative-control.test.mjs": "test, fixture or example path",
+        "test/probe.fixture.test.mjs": "test, fixture or example path",
+        "test/replay.test.mjs": "test, fixture or example path",
+        "test/runner-node-direct.test.mjs": "test, fixture or example path",
+        "test/scaffold.python.test.mjs": "test, fixture or example path",
+        "test/scaffold.test.mjs": "test, fixture or example path",
+        "test/status.test.mjs": "test, fixture or example path",
+        "test/worktree.test.mjs": "test, fixture or example path",
+        "test/writer.test.mjs": "test, fixture or example path"
+      },
+      "reason": "Read against the code at HEAD: paths, commands, flags, schemas, CI jobs and counts checked; wrong statements fixed in this change",
+      "references": {
+        "package.json": {
+          "fingerprint": "sha256:2a78a5be776259718332fecbf2e1a3478fd98b7bdab0fc6e5b92dcd4848d0369",
+          "tier": "content"
+        },
+        "src/baseline/baseline.mjs": {
+          "fingerprint": "sha256:91a57f3ecd88357817f2b94ffb2d2b9d7dbc509677932ff71761d30ac12a5a9a",
+          "tier": "content"
+        },
+        "src/claims/anchors.mjs": {
+          "fingerprint": "sha256:9c1cdaf885974ffeb141bd29e889e6a0291f7a4fe879f5d2915400f91145839f",
+          "tier": "content"
+        },
+        "src/claims/load.mjs": {
+          "fingerprint": "sha256:d7ecf0e822714840fd690a5767eb0ab7d53cf8d9e4ee8eef874cacbca18a0f16",
+          "tier": "content"
+        },
+        "src/cli.mjs": {
+          "fingerprint": "sha256:cccddf7964626bcc9cc457ed206c978708e0b89348d0d7fda0efa319bcd568cb",
+          "tier": "content"
+        },
+        "src/commands/admit.mjs": {
+          "fingerprint": "sha256:eb423ed93e21aac4a1c8e55413ab8b82be603973efe79e7eeb8e676d952dbc5e",
+          "tier": "content"
+        },
+        "src/commands/claims.mjs": {
+          "fingerprint": "sha256:b3d52b8f47e1d7cdc38ad072409158f22140ddc9dc6e42f8bac6ae2b9b97780a",
+          "tier": "content"
+        },
+        "src/commands/probe.mjs": {
+          "fingerprint": "sha256:f855c51cda00f820ff15142aa7edcc3fcb40c0521e65667222679bf485d80e3e",
+          "tier": "content"
+        },
+        "src/commands/scaffold.mjs": {
+          "fingerprint": "sha256:ccb9f48edbb4a4beb3454612f757a52570636cc7e98d103b6c9e278fb2d40b43",
+          "tier": "content"
+        },
+        "src/evidence/writer.mjs": {
+          "fingerprint": "sha256:ed1ea0133688650fdd839803df496e4a98d8217023076e8fd30fefa4a4b08ae1",
+          "tier": "content"
+        },
+        "src/gate/changed.mjs": {
+          "fingerprint": "sha256:a05973f3e8207c8e2539ae5cee17da5cadebe99c57a24b58a5dc301c77f02665",
+          "tier": "content"
+        },
+        "src/init/init.mjs": {
+          "fingerprint": "sha256:a836c2d49be89d3a46c4b0e5c23ec549a31c93922cdf5c509c7ab99d95bda80b",
+          "tier": "content"
+        },
+        "src/probe/attribution.mjs": {
+          "fingerprint": "sha256:76bcac10636869d654af29be8538ade6e8e72451a1722ef6941a5024861b98a1",
+          "tier": "content"
+        },
+        "src/probe/classify.mjs": {
+          "fingerprint": "sha256:706cd0d953e632a607a5f000310e449107522a4d7bb2e296b1744b88351e7667",
+          "tier": "content"
+        },
+        "src/probe/contention.mjs": {
+          "fingerprint": "sha256:66010ae79e2457f234a0d6bdcbb89e33613efba420e76789934d05667e428fc4",
+          "tier": "content"
+        },
+        "src/probe/cost.mjs": {
+          "fingerprint": "sha256:2e532fdce5fa70e264f7fb2da540026a89819335fcd02ffde182efdda6f2d47d",
+          "tier": "content"
+        },
+        "src/probe/inject.mjs": {
+          "fingerprint": "sha256:939dd2c240ef575e65fda8a094e47a6e385871ca0a47b34900477604d6ebafb1",
+          "tier": "content"
+        },
+        "src/probe/mocks.mjs": {
+          "fingerprint": "sha256:e2b01b863dff0ae44b5c6b31d5cb6dc86032033b7556b0e1767d92103f1a9894",
+          "tier": "content"
+        },
+        "src/probe/probe.mjs": {
+          "fingerprint": "sha256:6e0ef4448e3f664fa1c28332342aaa064eead6985588a74412d7efcfe7e30382",
+          "tier": "content"
+        },
+        "src/probe/rank.mjs": {
+          "fingerprint": "sha256:303e6b1bc282a3dbb517ce0acafafd935e06c82025bb27f0d7659359187ec4ee",
+          "tier": "content"
+        },
+        "src/probe/worktree.mjs": {
+          "fingerprint": "sha256:550800922b52d9cb3265b8f105ff0453bef2d6be06b6eb2034f76b7521d57f68",
+          "tier": "content"
+        },
+        "src/scaffold/producers.mjs": {
+          "fingerprint": "sha256:c0246fb04fb77f35114eaf0f569d266b22854c42b41e4d4eb10a69efc6cfe83e",
+          "tier": "content"
+        },
+        "src/status/status.mjs": {
+          "fingerprint": "sha256:9909b65c31b6f1ece6157c4bbd458035711bf2d07d3da7c54fc720dd385ac4ab",
+          "tier": "content"
+        }
+      },
+      "reviewedAt": "2026-11-27",
+      "reviewedRevision": "06e738bee1e09adf2ba1d0efa045d9e2659273ce"
+    },
+    "docs-canonical/SECURITY.md": {
+      "excluded": {
+        "SECURITY.md": "another document (reviewed on its own)",
+        "testguard.claims.json": "changelog, lockfile or claims/evidence data"
+      },
+      "reason": "Read against the code at HEAD: paths, commands, flags, schemas, CI jobs and counts checked; wrong statements fixed in this change",
+      "references": {
+        ".gitignore": {
+          "fingerprint": "sha256:9eca7f3e4627d5999d2a1167b0a165461ddda3bb04473162e9b7d927ffa767a9",
+          "tier": "content"
+        }
+      },
+      "reviewedAt": "2026-11-27",
+      "reviewedRevision": "06e738bee1e09adf2ba1d0efa045d9e2659273ce"
+    },
+    "docs-canonical/TEST-SPEC.md": {
+      "excluded": {
+        "spec": "directory",
+        "spec/conformance": "directory",
+        "spec/conformance/schemas.test.mjs": "test, fixture or example path",
+        "spec/lib": "directory",
+        "src/mcp": "directory",
+        "src/probe/runners": "directory",
+        "src/replay": "directory",
+        "test/attribution.test.mjs": "test, fixture or example path",
+        "test/baseline.test.mjs": "test, fixture or example path",
+        "test/brief.test.mjs": "test, fixture or example path",
+        "test/calibration.test.mjs": "test, fixture or example path",
+        "test/claims-anchors.test.mjs": "test, fixture or example path",
+        "test/classify.test.mjs": "test, fixture or example path",
+        "test/contention.test.mjs": "test, fixture or example path",
+        "test/cost.test.mjs": "test, fixture or example path",
+        "test/discover.test.mjs": "test, fixture or example path",
+        "test/fault-defenders.test.mjs": "test, fixture or example path",
+        "test/gate.test.mjs": "test, fixture or example path",
+        "test/init.test.mjs": "test, fixture or example path",
+        "test/inject.test.mjs": "test, fixture or example path",
+        "test/mcp.test.mjs": "test, fixture or example path",
+        "test/mocks.test.mjs": "test, fixture or example path",
+        "test/negative-control.test.mjs": "test, fixture or example path",
+        "test/probe-error.test.mjs": "test, fixture or example path",
+        "test/probe-preconditions.test.mjs": "test, fixture or example path",
+        "test/probe.fixture.test.mjs": "test, fixture or example path",
+        "test/probe.jest.test.mjs": "test, fixture or example path",
+        "test/probe.playwright.test.mjs": "test, fixture or example path",
+        "test/progress.test.mjs": "test, fixture or example path",
+        "test/rank-aliases.test.mjs": "test, fixture or example path",
+        "test/replay.test.mjs": "test, fixture or example path",
+        "test/runner-command.test.mjs": "test, fixture or example path",
+        "test/runner-playwright.test.mjs": "test, fixture or example path",
+        "test/runner-vitest.test.mjs": "test, fixture or example path",
+        "test/status.test.mjs": "test, fixture or example path",
+        "testguard.claims.json": "changelog, lockfile or claims/evidence data"
+      },
+      "reason": "Read against the code at HEAD: paths, commands, flags, schemas, CI jobs and counts checked; wrong statements fixed in this change",
+      "references": {
+        ".github/scripts/install-smoke.mjs": {
+          "fingerprint": "sha256:da100b129a1cfa615adc5fdabd62b8f7ad6a96ca29355ddec3f1025be3d70116",
+          "tier": "content"
+        },
+        "src/baseline/baseline.mjs": {
+          "fingerprint": "sha256:91a57f3ecd88357817f2b94ffb2d2b9d7dbc509677932ff71761d30ac12a5a9a",
+          "tier": "content"
+        },
+        "src/brief/brief.mjs": {
+          "fingerprint": "sha256:cc10b983c37995c314f268a969881e7d5210d43b5410e40961c9c4764f759591",
+          "tier": "content"
+        },
+        "src/claims/anchors.mjs": {
+          "fingerprint": "sha256:9c1cdaf885974ffeb141bd29e889e6a0291f7a4fe879f5d2915400f91145839f",
+          "tier": "content"
+        },
+        "src/gate/changed.mjs": {
+          "fingerprint": "sha256:a05973f3e8207c8e2539ae5cee17da5cadebe99c57a24b58a5dc301c77f02665",
+          "tier": "content"
+        },
+        "src/init/init.mjs": {
+          "fingerprint": "sha256:a836c2d49be89d3a46c4b0e5c23ec549a31c93922cdf5c509c7ab99d95bda80b",
+          "tier": "content"
+        },
+        "src/probe/attribution.mjs": {
+          "fingerprint": "sha256:76bcac10636869d654af29be8538ade6e8e72451a1722ef6941a5024861b98a1",
+          "tier": "content"
+        },
+        "src/probe/classify.mjs": {
+          "fingerprint": "sha256:706cd0d953e632a607a5f000310e449107522a4d7bb2e296b1744b88351e7667",
+          "tier": "content"
+        },
+        "src/probe/contention.mjs": {
+          "fingerprint": "sha256:66010ae79e2457f234a0d6bdcbb89e33613efba420e76789934d05667e428fc4",
+          "tier": "content"
+        },
+        "src/probe/cost.mjs": {
+          "fingerprint": "sha256:2e532fdce5fa70e264f7fb2da540026a89819335fcd02ffde182efdda6f2d47d",
+          "tier": "content"
+        },
+        "src/probe/discover.mjs": {
+          "fingerprint": "sha256:41c78b61d8c5131b032e2961ac65dabe34c8fe301b9b7349477ffffdc0ee554f",
+          "tier": "content"
+        },
+        "src/probe/inject.mjs": {
+          "fingerprint": "sha256:939dd2c240ef575e65fda8a094e47a6e385871ca0a47b34900477604d6ebafb1",
+          "tier": "content"
+        },
+        "src/probe/mocks.mjs": {
+          "fingerprint": "sha256:e2b01b863dff0ae44b5c6b31d5cb6dc86032033b7556b0e1767d92103f1a9894",
+          "tier": "content"
+        },
+        "src/probe/probe.mjs": {
+          "fingerprint": "sha256:6e0ef4448e3f664fa1c28332342aaa064eead6985588a74412d7efcfe7e30382",
+          "tier": "content"
+        },
+        "src/probe/progress.mjs": {
+          "fingerprint": "sha256:824b418b942ad2d1c60b572b22d443a3b6e4a78e670f079a6ea8c875f8c37908",
+          "tier": "content"
+        },
+        "src/probe/rank.mjs": {
+          "fingerprint": "sha256:303e6b1bc282a3dbb517ce0acafafd935e06c82025bb27f0d7659359187ec4ee",
+          "tier": "content"
+        },
+        "src/status/status.mjs": {
+          "fingerprint": "sha256:9909b65c31b6f1ece6157c4bbd458035711bf2d07d3da7c54fc720dd385ac4ab",
+          "tier": "content"
+        },
+        "testguard.cost-budget.json": {
+          "fingerprint": "sha256:c1de41561f2ce71bdaaf494ac261955f7a5de58fbc2cadedf8d223ffe7b8ded1",
+          "tier": "content"
+        }
+      },
+      "reviewedAt": "2026-11-27",
+      "reviewedRevision": "06e738bee1e09adf2ba1d0efa045d9e2659273ce"
+    }
+  },
+  "schemaVersion": 1
+}

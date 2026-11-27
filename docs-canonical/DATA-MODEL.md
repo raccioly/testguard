@@ -25,12 +25,13 @@ in review, and replayable by anyone holding the repository.
 | Claims | `testguard.claims.json` | **yes** | What must be true, and the faults that would make it false |
 | Ignore | `testguard.ignore.json` | **yes** | Reviewable scoping; every entry carries a reason |
 | Baseline | `.testguard/baseline.json` | **yes** | Frozen debt; gate only the delta |
-| Status | `.testguard/status.json` | optional | Snapshot of the state machine |
+| Status | `.testguard/status.json` | optional | Snapshot of the state machine; no command writes it, a project may keep `status --json` output there |
 | Evidence | `.testguard/evidence.json` | no | One run's findings; regenerated |
 | Brief | `.testguard/brief.json` | no | The agent's blind-spot block; regenerated |
 | Gate | `.testguard/gate.json` | no | Claim coverage of one change; regenerated |
-| Replay | written where `--out` says | no | Would the suite have caught bugs that escaped |
-| Calibration | beside the replay document | no | Fault class → share of real bugs missed, with a Wilson interval |
+| Replay | `.testguard/replay.json`, or where `--out` says | no | Would the suite have caught bugs that escaped |
+| Calibration | `.testguard/calibration.json`, beside the replay document | no | Fault class → share of real bugs missed, with a Wilson interval |
+| Sweep | `.testguard/sweep.json`, `.testguard/sweep-evidence.json` | no | The sweep's proposed faults and the evidence of its bounded probe |
 
 ## Schema Definitions
 
