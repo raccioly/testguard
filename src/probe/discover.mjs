@@ -5,6 +5,7 @@ import { fileImportRelation } from './rank.mjs';
 import { pyFileImports } from './pyimports.mjs';
 import { classifyDefenders } from './mocks.mjs';
 import { normalizeDiscoveredFiles } from './runners/discovery.mjs';
+import { unsupportedLanguage } from '../gate/languages.mjs';
 
 /** A target's language decides how its importers are found. Nothing else about it matters here. */
 export const isPython = (rel) => rel.endsWith('.py');
@@ -26,6 +27,21 @@ const explicitFiles = (projectDir, testUniverse) => {
   if (!Object.isFrozen(files)) throw new TypeError('explicit test universe must be immutable');
   return normalizeDiscoveredFiles(projectDir, files);
 };
+
+/**
+ * A target in a language TestGuard recognizes but cannot read imports in (#331:
+ * Java, Apex, ...) has no discoverable defenders, whatever its tests do. An
+ * empty set there says "discovery could not look", not "no test covers this",
+ * so the record carries this reason and message instead of blaming the tests.
+ * The verdict is untouched (still `nocover`, still gating): this only names the
+ * cause. `null` for a language discovery reads, and for one it does not know.
+ * The language table is the gate's (`KNOWN_SOURCE`); there is no second one.
+ */
+export function unsupportedDiscovery(targetRel) {
+  const language = unsupportedLanguage(targetRel);
+  if (!language) return null;
+  return { reason: 'defender-discovery-unsupported', message: `defender-discovery-unsupported (${language.id}): declare defendedBy` };
+}
 
 export function discoverDefendersDetailed(projectDir, targetRel, testUniverse) {
   const explicit = explicitFiles(projectDir, testUniverse);

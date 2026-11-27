@@ -153,7 +153,7 @@ The verdict set is closed. Only one value is a pass.
 |---|---|---|
 | `killed` | Fault applied; every one of N probe runs failed in a test body (by assertion or by an exception the fault provoked; rule 3), on a defender set that was green N/N unmodified. Carries `detail.killKind`. | no |
 | `survived` | Fault applied; every one of N probe runs passed. The claim is **unproven**. | **yes** |
-| `nocover` | No defending test exists: the declared globs resolve to nothing, or no test imports the subject. Worse than `survived` — nothing was even tried. | **yes** |
+| `nocover` | No defending test exists: the declared globs resolve to nothing, or no test imports the subject. When the subject is in a language whose imports the tool cannot read (Java, Apex, ...), discovery could not look, and the record carries `reason: defender-discovery-unsupported` with `message: "defender-discovery-unsupported (java): declare defendedBy"`: the verdict stays `nocover` and gates; only the cause is named. Worse than `survived` — nothing was even tried. | **yes** |
 | `unverifiable` | The claim could not be probed: the fault's anchor is missing or ambiguous, configured or symbol-level defender discovery was indeterminate (`defender-discovery-indeterminate`), its defenders failed to load (`defenders-failed-to-load`), probing it threw (`probe-error`), or the defenders do not execute the subject at all (`subject-not-executed`). Carries a `reason`. `defenders-failed-to-load` and `subject-not-executed` also carry `detail.message`: the runner's own first informative error line, or, for a defender set that stayed green with the subject broken under a Playwright config that declares a `webServer`, a note that the server may have been reused from another tree (and, when one is still listening on the config's literal port after the run, that it was). A run is an `error` whenever a test file failed to load, nothing was collected, or the runner reported an error of its own (a Playwright global setup or teardown, `webServer` or reporter error) even when every test passed; it never carries no message. A loud, gating verdict — a claim that cannot be probed is not "skipped", it is undefended until someone fixes the fault or the defenders. Never confused with `flaky-defender`, which requires tests that *ran*. | **yes** |
 | `timeout` | Probe run exceeded its budget. Not counted as a kill; the pessimistic reading is the safe one because flakiness biases the metric optimistically. | **yes** |
 | `fault-invalid` | The replacement does not load or compile (`replacement-does-not-compile`, `suite-failed-to-load`), or — under `--typecheck` — parses but does not type-check (`replacement-does-not-typecheck`, rule 16). A bad fault, not a detection. | **yes** |
@@ -274,8 +274,10 @@ check order is this rule.
    console line. It is never present together with `escalated`, and it is not
    recorded for `--no-escalate` (a choice) nor for an unexecuted subject
    (already `unverifiable`). Under `--runner-cmd` the universe is the adapter's
-   file globs plus every claim's declared defenders, so a suite the globs do
-   not know can escalate between the tests the claims name.
+   file globs plus every claim's declared defenders plus the files the
+   `--test-glob` patterns (`testGlobs` in the project configuration) match, so
+   a suite the globs do not know can escalate between the tests the claims
+   name and the tests the patterns name.
 6. **A verdict names the commit it is about.** Evidence records `repo.head`;
    when the working tree was probed instead, `repo.snapshot` holds the
    throwaway commit that captured it. A tool must refuse to probe a commit
@@ -574,8 +576,9 @@ check order is this rule.
    that predates this hash, or whose hash
    changed, is readable but never reusable for a current native discovery run.
    A custom `--runner-cmd` has no native listing; its `testUniverseHash` binds
-   the static file set **and the parsed command argv**, so a changed command
-   is a changed universe and never reuses a verdict the old command measured.
+   the static file set, **the parsed command argv** and the sorted
+   `--test-glob` patterns (a run with none hashes as it did before the option
+   existed), so a changed command or glob is a changed universe and never reuses a verdict the old command measured.
    Reformatting whitespace that parses to the same argv is not a change. Only
    the hash is recorded, never the command text.
    When several configured runners list defenders, exact manifest membership

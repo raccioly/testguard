@@ -48,6 +48,15 @@ function unsupportedModules(projectDir) {
   return tallyLanguages(ids);
 }
 
+/**
+ * What `init` needs to know before it installs anything (#331): how many
+ * source modules TestGuard can probe here, and the tally of files in languages
+ * it recognizes but cannot probe. The same two counts `status` prints.
+ */
+export function languageSurvey(projectDir) {
+  return { probeable: claimableModules(projectDir).length, unsupported: unsupportedModules(projectDir) };
+}
+
 function recentChanges(projectDir, sourceModules) {
   const counts = new Map();
   try {

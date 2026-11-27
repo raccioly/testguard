@@ -28,12 +28,14 @@ export function renderRecord(r, { provisional = false, showDiscovered = true } =
     why = `  [killed-by-undeclared-tests: ${files.join(', ')}]`;
   } else if (r.detail.reason === 'anchor-ambiguous' && r.detail.anchor) {
     why = `  [anchor-ambiguous: ${r.detail.anchor.hits} hits, expected ${r.detail.anchor.expected}]`;
+  } else if (r.detail.reason === 'defender-discovery-unsupported' && r.detail.message) {
+    why = `  [${r.detail.message}]`;
   } else if (r.detail.reason) {
     why = `  [${r.detail.reason}]`;
   }
   if (r.detail.escalationSkipped) why += '  [escalation skipped: the test universe has no test outside the defenders]';
   if (r.verdict === 'killed' && r.detail.killKind === 'exception-only') why += '  [killed by exception only: no assertion failed]';
-  if (r.defenders.discovered && showDiscovered) why += '  (defenders discovered by import)';
+  if (r.defenders.discovered && showDiscovered && r.detail.reason !== 'defender-discovery-unsupported') why += '  (defenders discovered by import)';
   return `${head} ${r.claim.severity.padEnd(8)} ${r.subject.file}  ${r.subject.description}${why}`;
 }
 

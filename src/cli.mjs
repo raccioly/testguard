@@ -93,7 +93,7 @@ probe
                        a count per reason and the changed source files no claim covers; probes and writes nothing. exit 0,
                        or 2 when the change cannot be measured. --json: run.scope with explain: true
   --no-config          ignore testguard.config.json (also admit, sweep, replay, claims, status). Without it the file's keys
-                       (runner, runnerCmd, python, nodeModules, typecheck, workers, faultWorkers, confirm, budget) are the
+                       (runner, runnerCmd, testGlobs, python, nodeModules, typecheck, workers, faultWorkers, confirm, budget) are the
                        defaults: a flag typed, then TESTGUARD_PYTHON / _NODE_MODULES / _FAULT_WORKERS, win over the file.
                        An unknown key or wrong type exits 3; an uncommitted file is refused like a dirty defender
   --include-dirty      probe the working tree (a snapshot commit) instead of HEAD; uncommitted tests count
@@ -110,6 +110,9 @@ probe
                        python picks pytest when the interpreter can import it and stdlib unittest otherwise; pytest and
                        unittest pin that choice and fail rather than fall back. The engine that ran is what the evidence records.)
   --runner-cmd "<cmd>" custom runner; must contain {files} and {out}, e.g. "pnpm vitest run {files} --reporter=json --outputFile={out}"
+  --test-glob <glob>   (repeatable; needs --runner-cmd) the tests of a suite the built-in globs do not list (JUnit, Apex, MUnit),
+                       relative to the project, e.g. "src/test/**/*Test.java". The files they match join the test universe that
+                       escalation asks beside every claim's declared defenders, and the globs are part of the universe hash
   --node-modules <dir> node_modules to link into the scratch worktree (or TESTGUARD_NODE_MODULES)
   --scratch-dir <dir>  every scratch worktree, temporary git index, runner report and runner cache goes under this existing,
                        writable directory (or TESTGUARD_SCRATCH_DIR); default: the OS temp directory. Missing or unwritable
@@ -155,7 +158,7 @@ sweep      --changed <ref> (required unless --save-paths; CI bases and a safe lo
                              denominator: "120 writes across 38 files, swept 12". A clean sweep over an unstated
                              denominator is a sample of unknown size, not a guarantee that saving works
            --include-dirty  --exclude <glob>  --confirm <n>  --budget <ms>  --command-budget <ms>  --workers <n>  --serial  --max <n>  --out <path>  --json
-           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>  --scratch-dir <dir>   runner selection and write boundary, as for probe
+           --runner <name>  --runner-cmd "<cmd>"  --test-glob <glob>  --node-modules <dir>  --scratch-dir <dir>   runner selection and write boundary, as for probe
            --python <path>   Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH
            the cold start: no claim and no concern needed. Everything it proposes is a DRAFT — it never writes testguard.claims.json,
            and its evidence never replaces .testguard/evidence.json. exit 1 on a fault that survived, or a file no test imports
@@ -174,12 +177,12 @@ replay     --workers <n> (default 1)  --serial  --budget <ms> (per run)
            --command-budget <ms> cooperative measurement deadline; expiry writes neither replay nor calibration, so an unmeasured suffix cannot look clean
            --out <path>       replay document (default: <dir>/.testguard/replay.json); the calibration goes beside it
            --calibration-out <path>  write the calibration document here instead of beside the replay document
-           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>  --scratch-dir <dir>   runner selection and write boundary, as for probe
+           --runner <name>  --runner-cmd "<cmd>"  --test-glob <glob>  --node-modules <dir>  --scratch-dir <dir>   runner selection and write boundary, as for probe
            --python <path>   Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH
            reports, never gates: a bug that escaped is history, not a regression in this change
 admit      --workers <n> (default 1)  --serial  --budget <ms>  --command-budget <ms>  --require-assertion-kill
            --claim <ID> (required)  --fault <FID> (one fault only)  --confirm <n>  --json
-           --runner <name>  --runner-cmd "<cmd>"  --node-modules <dir>  --scratch-dir <dir>   runner selection and write boundary, as for probe
+           --runner <name>  --runner-cmd "<cmd>"  --test-glob <glob>  --node-modules <dir>  --scratch-dir <dir>   runner selection and write boundary, as for probe
            --python <path>   Python interpreter for .py defenders (or TESTGUARD_PYTHON); a bare name is looked up on PATH
            ADMITTED (exit 0) only when every fault of the claim is killed N/N by defenders that are green N/N; anything else is NOT ADMITTED (exit 1) and names the first blocking fault
            the test must be a declared or discovered defender of the claim (exit 3 otherwise); evidence goes to .testguard/evidence-partial.json
@@ -335,6 +338,7 @@ async function dispatch(argv, io, seen) {
         here: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'runner-cmd': { type: 'string' },
+        'test-glob': { type: 'string', multiple: true },
         typecheck: { type: 'string' },
         python: { type: 'string' },
         runner: { type: 'string', default: 'auto' },

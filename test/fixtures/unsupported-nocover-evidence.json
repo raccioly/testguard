@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.26.3"
+  },
+  "run": {
+    "id": "run-20261127T195118304",
+    "startedAt": "2026-11-27T19:51:18.304Z",
+    "finishedAt": "2026-11-27T19:51:18.834Z",
+    "repo": {
+      "head": "1b0b16f826bfa85633f0cb1ff731efc5f66f9ab5",
+      "dirty": false
+    },
+    "runner": {
+      "name": "vitest",
+      "version": "5.0.2",
+      "source": "project"
+    },
+    "instrument": {
+      "toolVersion": "0.26.3",
+      "digest": "ba80e69a878606332c8a2dda77902d5936f9ea29265db12b10ed5af47fe9e7ec"
+    },
+    "reuse": {
+      "reused": 0,
+      "measured": 1
+    },
+    "confirmRuns": 3,
+    "measurements": {
+      "elapsedMs": 529.5080829999999,
+      "runnerMs": 0,
+      "overheadMs": 529.5080829999999,
+      "runnerInvocations": 0,
+      "reuseBaselineRuns": 0,
+      "aloneConfirmRuns": 0,
+      "aloneConfirmMs": 0,
+      "remeasuredFaults": 0,
+      "remeasureMs": 0
+    },
+    "workers": 1,
+    "serial": true,
+    "faultWorkers": 4,
+    "faultWorkersSource": "auto",
+    "cpus": 18,
+    "mode": "worktree",
+    "writeBoundary": {
+      "scratchDir": "default",
+      "nodeModulesWritable": true,
+      "installUnchanged": true
+    }
+  },
+  "records": [
+    {
+      "fingerprint": "5c183437bdb9fa75964a4cc8e637215cb8cc9d8b959cb74dd42f98ae98e939a3",
+      "claim": {
+        "id": "D-1",
+        "statement": "discount is 0.9",
+        "severity": "high",
+        "source": {
+          "kind": "manual"
+        },
+        "producedBy": {
+          "producer": "human"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F1",
+        "description": "drop discount",
+        "file": "src/D.java",
+        "faultClass": "other",
+        "producedBy": {
+          "producer": "human"
+        },
+        "contentHash": "8106ea01f5dd38362ba525ff0b0eb1001e060939ef4278fe7abbaa0e993a121a"
+      },
+      "verdict": "nocover",
+      "detail": {
+        "baselineRuns": [],
+        "probeRuns": [],
+        "reason": "defender-discovery-unsupported",
+        "message": "defender-discovery-unsupported (java): declare defendedBy"
+      },
+      "defenders": {
+        "requested": [],
+        "selectionSource": "discovery",
+        "resolved": [],
+        "nocover": true,
+        "discovered": true
+      },
+      "inputs": {
+        "targetHash": "5e3cbf02547f4d4767e1e451688b1ecf2b2b6db819bb2c00e5a8d8aea66089f2",
+        "defenderHashes": {},
+        "testUniverseHash": "5a6d84c0dc8eb6c41edf6b65ac0cb677f68e7c5e6080e3ad3f2ed9c25ca954e1",
+        "discoveryHashes": {
+          "package.json": "52a55ef0bc9ed2b49ff72b43ea31b2c111d91691bec567da33298e56651f5883",
+          "test/x.test.mjs": "1230723d3b9008aed574731d83ba4a27b23ed9fb7526c155f4a766c3e4ab7965"
+        },
+        "dependencyHashes": {
+          "package.json": "52a55ef0bc9ed2b49ff72b43ea31b2c111d91691bec567da33298e56651f5883",
+          "src/D.java": "5e3cbf02547f4d4767e1e451688b1ecf2b2b6db819bb2c00e5a8d8aea66089f2"
+        },
+        "dependencyClosure": "complete"
+      },
+      "rank": {
+        "score": 3.6,
+        "blastRadius": 0,
+        "tier": "high"
+      }
+    }
+  ],
+  "origins": {
+    "basis": "recorded",
+    "claims": {
+      "total": 1,
+      "byKind": {
+        "spec": 0,
+        "adr": 0,
+        "annotation": 0,
+        "comment": 0,
+        "manual": 1,
+        "doc": 0,
+        "bug": 0,
+        "incident": 0,
+        "review": 0,
+        "inferred": 0
+      },
+      "mixed": 0
+    },
+    "records": {
+      "total": 1,
+      "byKind": {
+        "spec": 0,
+        "adr": 0,
+        "annotation": 0,
+        "comment": 0,
+        "manual": 1,
+        "doc": 0,
+        "bug": 0,
+        "incident": 0,
+        "review": 0,
+        "inferred": 0
+      }
+    }
+  }
+}

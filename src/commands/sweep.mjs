@@ -93,6 +93,7 @@ export async function sweepCommand({ projectDir, values, version, projectConfig 
       serial: values.serial || workers === 1,
       commandBudget,
       runnerCommand: runner.runnerCommand,
+      testGlobs: runner.testGlobs,
       runnerName: values.runner,
       nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
       python: runner.python,

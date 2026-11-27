@@ -67,6 +67,7 @@ tags each unproven record `[NEW]`, `[baseline]` or `[below floor]`.
 | Verdict | `detail.reason` | Meaning |
 |---|---|---|
 | `survived` | `killed-by-undeclared-tests` | The declared defenders missed the fault, but tests elsewhere in the suite failed in every escalation run. The verdict stays `survived`, because the stated evidence chain is broken. `detail.undeclaredKillers` names the tests (`file::name`) to add to `defendedBy`. |
+| `nocover` | `defender-discovery-unsupported` | The fault's file is in a language TestGuard cannot read imports in, such as Java or Apex. Discovery could not look, so this is not a finding about the tests. The message reads `defender-discovery-unsupported (java): declare defendedBy`. The verdict is still `nocover` and still gates. List the tests in `defendedBy` to name them yourself. |
 | `unverifiable` | `anchor-missing` | `find` occurs zero times. `detail.anchor` has `hits` and `expected`. |
 | `unverifiable` | `anchor-ambiguous` | `find` occurs a number of times other than `expectHits`. |
 | `unverifiable` | `file-missing` | The fault's `file` does not exist. |

@@ -81,7 +81,7 @@ const workspaceConfigFiles = (root, files, maxConfigBytes) => {
       pkg = JSON.parse(decodeUtf8(packageBytes, 'discovery config package.json'));
     } catch (error) {
       if (error instanceof DiscoveryError) throw error;
-      throw new DiscoveryError(`discovery config package.json is not valid JSON: ${error.message}`, { cause: error });
+      throw new DiscoveryError(`discovery config package.json is not valid JSON: ${error.message}`, { cause: error, configUnreadable: true });
     }
     const workspaces = Array.isArray(pkg.workspaces) ? pkg.workspaces : pkg.workspaces?.packages;
     if (Array.isArray(workspaces)) declared.push(...workspaces);
@@ -105,6 +105,9 @@ export class DiscoveryError extends Error {
   constructor(message, options) {
     super(message, options);
     this.name = 'DiscoveryError';
+    // A config file that cannot be parsed is a project defect, not a missing
+    // dependency: callers must not suggest installing or linking anything (#330).
+    if (options?.configUnreadable) this.configUnreadable = true;
   }
 }
 
@@ -470,7 +473,7 @@ const staticConfigReferences = (path, bytes) => {
     try {
       return { paths: jsonConfigReferences(parseJsonc(text)), imports: new Set() };
     } catch (error) {
-      throw new DiscoveryError(`discovery config ${path} is not valid JSON: ${error.message}`, { cause: error });
+      throw new DiscoveryError(`discovery config ${path} is not valid JSON: ${error.message}`, { cause: error, configUnreadable: true });
     }
   }
   if (!SCRIPT_CONFIG_EXTENSIONS.includes(extname(path))) return { paths: new Set(), imports: new Set() };

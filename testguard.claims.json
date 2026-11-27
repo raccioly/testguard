@@ -5360,8 +5360,8 @@
           "description": "The schema stops refusing an absolute path.",
           "faultClass": "literal-changed",
           "file": "spec/schemas/config.schema.json",
-          "find": "\"not\": { \"pattern\": \"^(/|\\\\\\\\|[A-Za-z]:)\" }",
-          "replace": "\"not\": { \"pattern\": \"^$\" }",
+          "find": "\"maxLength\": 4096,\n      \"not\": { \"pattern\": \"^(/|\\\\\\\\|[A-Za-z]:)\" }",
+          "replace": "\"maxLength\": 4096,\n      \"not\": { \"pattern\": \"^$\" }",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -11735,8 +11735,8 @@
           "description": "The custom-command universe hashes only the files, so a fixed command reuses the broken command's verdicts.",
           "faultClass": "field-dropped",
           "file": "src/probe/universe.mjs",
-          "find": "  return sha256(JSON.stringify({ schemaVersion: 3, source: 'custom-command-static', adapter, command: commandTemplate, files }));",
-          "replace": "  return sha256(JSON.stringify({ schemaVersion: 3, source: 'custom-command-static', adapter, files }));",
+          "find": "  return sha256(JSON.stringify({ schemaVersion: 3, source: 'custom-command-static', adapter, command: commandTemplate, files, ...(globs.length ? { testGlobs: globs } : {}) }));",
+          "replace": "  return sha256(JSON.stringify({ schemaVersion: 3, source: 'custom-command-static', adapter, files, ...(globs.length ? { testGlobs: globs } : {}) }));",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -11747,8 +11747,8 @@
           "description": "The probe hashes an empty command into the universe, so any two commands look identical to reuse.",
           "faultClass": "argument-swapped",
           "file": "src/probe/probe.mjs",
-          "find": "      ? hashCustomCommandUniverse(allTests, commandTemplate, runner.name)",
-          "replace": "      ? hashCustomCommandUniverse(allTests, [], runner.name)",
+          "find": "      ? hashCustomCommandUniverse(allTests, commandTemplate, runner.name, testGlobs)",
+          "replace": "      ? hashCustomCommandUniverse(allTests, [], runner.name, testGlobs)",
           "defendedBy": [
             "test/probe-runner-identity.test.mjs"
           ],
@@ -20453,8 +20453,8 @@
           "description": "The custom-command universe drops the declared defenders, so a non-JavaScript suite has nothing to escalate against.",
           "faultClass": "other",
           "file": "src/probe/probe.mjs",
-          "find": "return [...new Set([...nativeTests, ...declaredDefenders])].sort();",
-          "replace": "return [...new Set([...nativeTests])].sort();",
+          "find": "return [...new Set([...nativeTests, ...declaredDefenders, ...matchedTests])].sort();",
+          "replace": "return [...new Set([...nativeTests, ...matchedTests])].sort();",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -20626,6 +20626,496 @@
           "file": "src/probe/rank.mjs",
           "find": "    configFiles.add(path);\n    addJest(",
           "replace": "    addJest(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-UNSUPPORTED-LANGUAGE-DISCOVERY-NAMED",
+      "statement": "A NOCOVER on a file in a language TestGuard cannot read imports in says `defender-discovery-unsupported (<language>): declare defendedBy` and does not blame the tests; init notes, without changing its exit code or files, when a project's source is all in such languages.",
+      "source": {
+        "kind": "spec",
+        "ref": "docs/guides/writing-claims.md#discovery-and-why-mocks-do-not-count"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/discover-unsupported.test.mjs",
+        "test/init-unsupported-language.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A language discovery reads (or one it does not know) is reported as unsupported: a plain NOCOVER on a JavaScript file would blame an import reader that works.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/discover.mjs",
+          "find": "if (!language) return null;",
+          "replace": "if (!language) return { reason: 'defender-discovery-unsupported', message: 'defender-discovery-unsupported (js): declare defendedBy' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The message no longer names the language or says to declare defendedBy: the author is back to guessing why nothing covers the file.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/discover.mjs",
+          "find": "message: `defender-discovery-unsupported (${language.id}): declare defendedBy` }",
+          "replace": "message: 'no test covers this file' }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The line still says the defenders were discovered by import, blaming the tests for a gap in the tool.",
+          "faultClass": "condition-forced",
+          "file": "src/render.mjs",
+          "find": "showDiscovered && r.detail.reason !== 'defender-discovery-unsupported') why +=",
+          "replace": "showDiscovered) why +=",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "init stays silent for an Apex-only project: nothing says TestGuard cannot probe it until a probe is refused.",
+          "faultClass": "guard-removed",
+          "file": "src/init/init.mjs",
+          "find": "if (survey.probeable === 0 && survey.unsupported) {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "init prints the note even when the project has probeable source: a warning that is wrong for most projects.",
+          "faultClass": "condition-forced",
+          "file": "src/init/init.mjs",
+          "find": "survey.probeable === 0 && survey.unsupported",
+          "replace": "survey.unsupported",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "The note becomes a warning, so a plain init exits 1 and says git ignores a file.",
+          "faultClass": "guard-removed",
+          "file": "src/init/init.mjs",
+          "find": "notes.push(`TestGuard cannot probe",
+          "replace": "warnings.push(`TestGuard cannot probe",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TEST-GLOB-UNIVERSE",
+      "statement": "--test-glob (and testGlobs in testguard.config.json) names the tests of a --runner-cmd suite the built-in globs do not list: the files they match join the escalation universe and the universe hash, the option is refused without a custom command, and a glob that leaves the project is refused.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #332"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/test-glob.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The probe never adds the files --test-glob matches to the custom-command universe, so a suite the adapter globs do not know has no test to escalate against.",
+          "faultClass": "other",
+          "file": "src/probe/probe.mjs",
+          "find": "declaredDefenders(), matchTestGlobs(iso.projectDir, testGlobs))",
+          "replace": "declaredDefenders())",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The universe hash ignores the globs, so a verdict measured under other globs is reused.",
+          "faultClass": "other",
+          "file": "src/probe/universe.mjs",
+          "find": "...(globs.length ? { testGlobs: globs } : {})",
+          "replace": "...{}",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "--test-glob without --runner-cmd is accepted and silently ignored.",
+          "faultClass": "other",
+          "file": "src/commands/runner-options.mjs",
+          "find": "if (testGlobs.length > 0 && runnerCommand === undefined) {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A glob that leaves the project (a .. segment) is accepted.",
+          "faultClass": "other",
+          "file": "src/probe/test-globs.mjs",
+          "find": "if (glob.split('/').includes('..'))",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The scratch directory inside the tree is searched, so copies of the tests join the universe.",
+          "faultClass": "other",
+          "file": "src/probe/test-globs.mjs",
+          "find": "return inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside);",
+          "replace": "return true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "The config list is stringified into one flag value instead of kept as a list.",
+          "faultClass": "other",
+          "file": "src/config/project-config.mjs",
+          "find": "else if (key === 'testGlobs') out[flag] = [...value];",
+          "replace": "else if (key === 'testGlobs') out[flag] = String(value);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "Replay never adds the files --test-glob matches to its universe.",
+          "faultClass": "other",
+          "file": "src/replay/replay.mjs",
+          "find": "const named = matchTestGlobs(iso.projectDir, testGlobs);",
+          "replace": "const named = [];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F8",
+          "description": "The glob order typed changes the universe hash, so a reordered list re-measures every fault.",
+          "faultClass": "other",
+          "file": "src/probe/test-globs.mjs",
+          "find": "export const normalizeTestGlobs = (globs) => [...new Set(globs ?? [])].sort();",
+          "replace": "export const normalizeTestGlobs = (globs) => [...new Set(globs ?? [])];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-JEST-RUNNER-NATIVE-DISCOVERY",
+      "statement": "When the static layer cannot place a test, Jest itself is asked which tests reach the file (jest --listTests --json --findRelatedTests); a run that fails, times out, is unreadable or is cut by the run limit stays indeterminate and never becomes NOCOVER; answers are cached per target and discovery-config hash; only project files inside the test universe count.",
+      "source": {
+        "kind": "spec",
+        "ref": "docs/guides/writing-claims.md#discovery-and-why-mocks-do-not-count"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/jest-native-discovery.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A candidate Jest does not list is kept as a defender instead of leaving the indeterminate set.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/native-discovery.mjs",
+          "find": "if (!answer.files.has(entry.file) || (inUniverse && !inUniverse.has(entry.file))) continue;",
+          "replace": "if (false) continue;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A Jest run that fails, times out or prints something unreadable is read as an empty answer: the tests are no longer indeterminate and the file is reported NOCOVER by silence.",
+          "faultClass": "return-altered",
+          "file": "src/probe/native-discovery.mjs",
+          "find": "(error) => ({ ok: false, reason: text(error) }),",
+          "replace": "(error) => ({ ok: true, files: new Set() }),",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "An indeterminacy Jest cannot settle (a file the parser cannot read) is treated as one it can, and is cleared.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/native-discovery.mjs",
+          "find": "entry.issues.every((issue) => RESOLUTION_CODES.has(issue.code) && typeof issue.specifier === 'string')",
+          "replace": "entry.issues.every(() => true)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The run limit is never reached: the number of Jest processes is unbounded.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/native-discovery.mjs",
+          "find": "if (runs >= maxRuns) {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The cache ignores the discovery-config hash: an edit to the config or the resolver it imports reuses a stale answer.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/native-discovery.mjs",
+          "find": "key = `${runner.discoveryConfigHash(projectDir)}\\0${targetRel}`;",
+          "replace": "key = targetRel;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "A listed test that mocks a module no static rule can place is counted as a defender, though it may be mocking the subject.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/native-discovery.mjs",
+          "find": "if (mocksAnUnplacedName(projectDir, entry.file)) {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F7",
+          "description": "A related test outside the project is kept as a defender.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/jest.mjs",
+          "find": "catch { /* outside the project, or not a file: not a defender of ours */ }",
+          "replace": "catch { inside.push(file); }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F8",
+          "description": "Probing never asks Jest: a test the static layer cannot place stays indeterminate and the fault is unverifiable.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "await nativeDiscovery.resolve(discoverDefendersDetailed(iso.projectDir, fault.file, allTests), fault.file, allTests)",
+          "replace": "discoverDefendersDetailed(iso.projectDir, fault.file, allTests)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-LANGUAGE-TABLE-IS-ONE-MODULE",
+      "statement": "The table of source languages TestGuard recognizes but cannot probe lives in one module with no import of the probe, so the gate, status, init and defender discovery share one answer and no import cycle forms between them.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #331"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/unsupported-language.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Apex classes are no longer recognized as unprobeable source.",
+          "faultClass": "literal-changed",
+          "file": "src/gate/languages.mjs",
+          "find": "match: byExt('.cls', '.trigger') }",
+          "replace": "match: byExt('.trigger') }",
+          "defendedBy": [
+            "test/unsupported-language.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A language id with no table entry reports an empty name.",
+          "faultClass": "literal-changed",
+          "file": "src/gate/languages.mjs",
+          "find": "?.name ?? id;",
+          "replace": "?.name ?? '';",
+          "defendedBy": [
+            "test/unsupported-language.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The language tally no longer sorts ids, so the document order depends on the change order.",
+          "faultClass": "statement-deleted",
+          "file": "src/gate/languages.mjs",
+          "find": "for (const id of [...ids].sort())",
+          "replace": "for (const id of [...ids])",
+          "defendedBy": [
+            "test/unsupported-language.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-UNREADABLE-TSCONFIG-IS-INDETERMINATE",
+      "statement": "A tsconfig or jsconfig the alias reader cannot parse makes defender discovery indeterminate instead of dropping its paths, and a discovery failure caused by an unparsable config file says so without the dependency advice.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #330"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/tsconfig-unreadable.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An unreadable tsconfig adds no opaque catch-all rule, so its aliases are dropped and the closure reads as complete.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/rank.mjs",
+          "find": "rules.push({ prefix: '', suffix: '', wildcard: true, targets: [], opaque: true, configFile: cfgPath });",
+          "replace": "void 0;",
+          "defendedBy": [
+            "test/tsconfig-unreadable.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The unresolvable-runner message adds the node-modules advice even when a config file cannot be parsed.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/index.mjs",
+          "find": "if (sel.configError)",
+          "replace": "if (false)",
+          "defendedBy": [
+            "test/tsconfig-unreadable.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Runner selection no longer marks a discovery failure caused by an unparsable config.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/index.mjs",
+          "find": "error.configUnreadable ? { configError: true } : {}",
+          "replace": "error.configUnreadable ? {} : {}",
+          "defendedBy": [
+            "test/tsconfig-unreadable.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The tsconfig parse failure is not flagged as a config problem.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "discovery config ${path} is not valid JSON: ${error.message}`, { cause: error, configUnreadable: true }",
+          "replace": "discovery config ${path} is not valid JSON: ${error.message}`, { cause: error }",
+          "defendedBy": [
+            "test/tsconfig-unreadable.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The indeterminate record message no longer names the unreadable config file.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/probe.mjs",
+          "find": "unreadable config: ${unreadableConfigs.slice(0, 5).join(', ')}",
+          "replace": "unreadable config",
+          "defendedBy": [
+            "test/tsconfig-unreadable.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "No config is reported as unreadable even when the alias reader added an opaque rule for it.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/rank.mjs",
+          "find": ".filter((rule) => rule.opaque && rule.configFile)",
+          "replace": ".filter((rule) => false)",
+          "defendedBy": [
+            "test/tsconfig-unreadable.test.mjs"
+          ],
           "producedBy": {
             "producer": "agent",
             "by": "claude"
