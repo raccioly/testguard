@@ -21014,6 +21014,114 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-UNREADABLE-TSCONFIG-IS-INDETERMINATE",
+      "statement": "A tsconfig or jsconfig the alias reader cannot parse makes defender discovery indeterminate instead of dropping its paths, and a discovery failure caused by an unparsable config file says so without the dependency advice.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #330"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/tsconfig-unreadable.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An unreadable tsconfig adds no opaque catch-all rule, so its aliases are dropped and the closure reads as complete.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/rank.mjs",
+          "find": "rules.push({ prefix: '', suffix: '', wildcard: true, targets: [], opaque: true, configFile: cfgPath });",
+          "replace": "void 0;",
+          "defendedBy": [
+            "test/tsconfig-unreadable.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The unresolvable-runner message adds the node-modules advice even when a config file cannot be parsed.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/index.mjs",
+          "find": "if (sel.configError)",
+          "replace": "if (false)",
+          "defendedBy": [
+            "test/tsconfig-unreadable.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Runner selection no longer marks a discovery failure caused by an unparsable config.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/index.mjs",
+          "find": "error.configUnreadable ? { configError: true } : {}",
+          "replace": "error.configUnreadable ? {} : {}",
+          "defendedBy": [
+            "test/tsconfig-unreadable.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The tsconfig parse failure is not flagged as a config problem.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "discovery config ${path} is not valid JSON: ${error.message}`, { cause: error, configUnreadable: true }",
+          "replace": "discovery config ${path} is not valid JSON: ${error.message}`, { cause: error }",
+          "defendedBy": [
+            "test/tsconfig-unreadable.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The indeterminate record message no longer names the unreadable config file.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/probe.mjs",
+          "find": "unreadable config: ${unreadableConfigs.slice(0, 5).join(', ')}",
+          "replace": "unreadable config",
+          "defendedBy": [
+            "test/tsconfig-unreadable.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "No config is reported as unreadable even when the alias reader added an opaque rule for it.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/rank.mjs",
+          "find": ".filter((rule) => rule.opaque && rule.configFile)",
+          "replace": ".filter((rule) => false)",
+          "defendedBy": [
+            "test/tsconfig-unreadable.test.mjs"
+          ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
     }
   ]
 }

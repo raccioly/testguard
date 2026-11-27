@@ -215,6 +215,14 @@ fault inside it. So `NOCOVER` means exactly "no test file imports this source
 without mocking it". `claims` prints the split (for example `18 import · 16
 mock · 2 can detect`).
 
+TestGuard reads `tsconfig.json` and `jsconfig.json` (and the files they extend
+or reference) the way `tsc` does: comments and trailing commas are fine. If one
+of them cannot be parsed at all, TestGuard cannot tell which names are aliases.
+Tests that import a bare name are then indeterminate
+(`defender-discovery-indeterminate`), never `NOCOVER`. Fix the file. If the
+same parse error stops runner discovery, the error names the file and gives no
+`--node-modules` advice, because installing nothing will help.
+
 TestGuard reads `moduleNameMapper` from `jest.config.*` and `package.json#jest`
 as text. It does not run the config. It reads a literal object whose keys look
 like `^c/(.*)$` and whose values look like `<rootDir>/src/$1/$1`. If it cannot

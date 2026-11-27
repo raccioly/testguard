@@ -58,6 +58,20 @@ export async function discoverRunnerManifest(runner, check, projectDir, budgetMs
 }
 
 /**
+ * The precondition message for a runner that did not resolve. The dependency
+ * advice is for a missing install; a config file that cannot be parsed gets
+ * only its own error (#330).
+ */
+export function runnerUnresolvableMessage({ sel, mode }) {
+  const where = mode === 'worktree' ? 'scratch worktree' : 'project';
+  if (sel.configError) return `test runner is not resolvable in the ${where} (${sel.error}). Fix that config file; no dependency change will help.`;
+  const advice = mode === 'worktree'
+    ? 'If dependencies are missing, pass --node-modules <path>, or run with --in-place. Otherwise fix the discovery error above.'
+    : 'If dependencies are missing, install them first. Otherwise fix the discovery error above.';
+  return `test runner is not resolvable in the ${where} (${sel.error}). ${advice}`;
+}
+
+/**
  * Pick the project runner: an explicit name, or the first of vitest, jest,
  * python that is resolvable from the project. Returns
  * { runner, version, source, engine, manifest, testFiles } only after the
@@ -89,7 +103,7 @@ export async function selectRunner({ projectDir, sourceDir, python, name = 'auto
     try {
       manifest = await discoverRunnerManifest(r, c, projectDir, budgetFor ? budgetFor() : budgetMs);
     } catch (error) {
-      return { error: `${r.name}: test discovery failed: ${error.message}` };
+      return { error: `${r.name}: test discovery failed: ${error.message}`, ...(error instanceof DiscoveryError && error.configUnreadable ? { configError: true } : {}) };
     }
     selected = { ...selected, manifest };
     const testFiles = manifest.files.length;

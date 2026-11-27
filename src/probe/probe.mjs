@@ -20,9 +20,9 @@ import { BudgetExhaustedError } from '../command-budget.mjs';
 import { completeRecords, budgetSummary, notReachedRecord, isNotReached } from './partial-budget.mjs';
 import { applyContent, applyFault, locate } from './inject.mjs';
 import { resolveDefenders, parseCommandTemplate, bareReporterHint, BUDGET_GRACE_MS } from './runners/shared.mjs';
-import { selectRunner, discoverRunnerManifest, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns, runnerLabel, runnerFor } from './runners/index.mjs';
+import { selectRunner, runnerUnresolvableMessage, discoverRunnerManifest, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns, runnerLabel, runnerFor } from './runners/index.mjs';
 import { classify, shouldStopEarly } from './classify.mjs';
-import { blastRadius, rank } from './rank.mjs';
+import { blastRadius, rank, unreadableAliasConfigs } from './rank.mjs';
 import { classifyIndependence } from './independence.mjs';
 import { killKindReasonOf } from './kill-kind.mjs';
 import { escalationPlan, escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf, isReusable, inputsMatch, defenderSelection } from './attribution.mjs';
@@ -528,8 +528,7 @@ async function measureProbe({
       const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, python, name: runnerName, budgetMs, budgetFor: () => commandBudget?.runBudget(budgetMs) ?? budgetMs });
       commandBudget?.assertOpen();
       if (sel.error) {
-        throw new PreconditionError(`test runner is not resolvable in the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${sel.error}). ` +
-          (mode === 'worktree' ? 'If dependencies are missing, pass --node-modules <path>, or run with --in-place. Otherwise fix the discovery error above.' : 'If dependencies are missing, install them first. Otherwise fix the discovery error above.'), 'runner-unresolvable');
+        throw new PreconditionError(runnerUnresolvableMessage({ sel, mode }), 'runner-unresolvable');
       }
       runner = sel.runner;
       runnerVersion = sel.version;
@@ -811,7 +810,7 @@ async function measureProbe({
       const common = { claim, fault, defenders, discovered: declared === null, byRunner: byRunner(defenders), mocking: mockInfo.mocking, signals: mockInfo.signals };
       try {
         if (!declared && mockInfo.indeterminate.length > 0) {
-          return { record: discoveryIndeterminateRecord({ ...common, inputs: safeInputs(iso.projectDir, fault, defenders, { testUniverseHash, discoveryHashes }), indeterminate: mockInfo.indeterminate }) };
+          return { record: discoveryIndeterminateRecord({ ...common, inputs: safeInputs(iso.projectDir, fault, defenders, { testUniverseHash, discoveryHashes }), indeterminate: mockInfo.indeterminate, unreadableConfigs: unreadableAliasConfigs(projectDir) }) };
         }
         const args = { ...common, typechecker, typecheckBudget: () => commandBudget?.runBudget(budgetMs) ?? budgetMs, typecheckCut: (granted, outcome) => commandBudget?.assertNotCut(granted, budgetMs, outcome.status === 'timeout' ? 1 : 0), allTests, iso, onWarn, confirmRuns, escalate, controlCache, stage, prior: prior.get(`${claim.id}/${fault.id}`)?.record, priorRunId: prior.get(`${claim.id}/${fault.id}`)?.runId, priorTypecheck: prior.get(`${claim.id}/${fault.id}`)?.typecheck, testUniverseHash, discoveryHashes, ensureBaseline, dependencyHasher,
           historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root };
@@ -1220,9 +1219,12 @@ export function errorRecord({ claim, fault, defenders, discovered, byRunner, moc
 }
 
 /** Automatic discovery failed closed: uncertainty can never become `nocover`. */
-export function discoveryIndeterminateRecord({ claim, fault, defenders, discovered, byRunner, mocking = [], signals = [], inputs, indeterminate }) {
+export function discoveryIndeterminateRecord({ claim, fault, defenders, discovered, byRunner, mocking = [], signals = [], inputs, indeterminate, unreadableConfigs = [] }) {
   const first = indeterminate[0];
-  const message = `${indeterminate.length} candidate test file${indeterminate.length === 1 ? '' : 's'} could not be resolved safely; first: ${first.file} (${first.reason ?? 'unknown'})`.slice(0, 1024);
+  // A config the alias reader could not parse is why every bare specifier is
+  // indeterminate: name it (#330), keeping the whole message within the schema cap.
+  const named = unreadableConfigs.length ? `; unreadable config: ${unreadableConfigs.slice(0, 5).join(', ')}` : '';
+  const message = `${`${indeterminate.length} candidate test file${indeterminate.length === 1 ? '' : 's'} could not be resolved safely; first: ${first.file} (${first.reason ?? 'unknown'})`.slice(0, 1024 - named.length)}${named}`;
   return {
     fingerprint: fingerprint({ claimId: claim.id, subjectId: fault.id, file: fault.file, verdict: 'unverifiable' }),
     claim: { id: claim.id, statement: claim.statement, severity: claim.severity, source: claim.source, producedBy: claim.producedBy },
