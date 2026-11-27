@@ -103,7 +103,7 @@ const surfaces = [
   // release runs build-one-pager.mjs --require-chrome straight after the sync.
   // Sync the two separately and they disagree — the failure that is worse than
   // being stale, because the document then contradicts itself.
-  ['docs/testguard-explained.html', /(Technical Brief · v)\d+\.\d+\.\d+( · MIT)/, `$1${version}$2`],
+  ['docs/testguard-explained.html', /(Technical Brief · v)\d+\.\d+\.\d+((?: · Ricardo Accioly)? · MIT)/, `$1${version}$2`],
   // The consumer-facing example at the top of the hooks manifest. It read
   // v0.1.0 for eighteen releases because nothing looked at it.
   ['.pre-commit-hooks.yaml', /(raccioly\/testguard\n#\s+rev: )v\d+\.\d+\.\d+/, `$1v${version}`],

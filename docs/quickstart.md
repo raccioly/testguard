@@ -1,21 +1,22 @@
 # Quickstart
 
-This page takes you from nothing to a first test that TestGuard has admitted,
-in about ten minutes. It is for anyone trying TestGuard for the first time on
-a JavaScript or TypeScript project with a green vitest or jest suite. First
-you watch it find a real blind spot in the repository's own demo project; then
-you run the same loop on a small project of your own. Every block of output
-below was captured from a real run; long paths are shortened with `…`.
+This page takes you from nothing to a first test that TestGuard has admitted.
+It takes about ten minutes. It is for anyone who tries TestGuard for the first
+time on a JavaScript or TypeScript project with a green vitest or jest suite.
 
-You need Node ≥ 20 and `git`. Other ways to install, and what each needs, are
-in [installation](installation.md).
+First you watch TestGuard find a real blind spot in the demo project in this
+repository. Then you run the same loop on a small project of your own. Every
+block of output below comes from a real run. Long paths are shortened with `…`.
+
+You need Node ≥ 20 and `git`. [Installation](installation.md) shows other ways
+to install and what each way needs.
 
 ## 1. Watch it work: the known-answer fixture
 
-The repository ships a tiny project, `fixtures/known-answer/`, built to
-produce every verdict TestGuard can emit. Its audit-log test checks the row
-with `expect.objectContaining({...})` and never names the `content` field, so
-writing the **raw secret** into the audit row keeps the suite green.
+The repository includes a tiny project, `fixtures/known-answer/`. It produces
+every verdict TestGuard can emit. Its audit-log test checks the row with
+`expect.objectContaining({...})` and never names the `content` field. So if
+the code writes the **raw secret** into the audit row, the suite stays green.
 
 ```bash
 git clone https://github.com/raccioly/testguard.git
@@ -25,11 +26,11 @@ node cli/testguard.mjs claims fixtures/known-answer   # what the fixture claims
 node cli/testguard.mjs probe fixtures/known-answer    # try to falsify every claim
 ```
 
-Inside the TestGuard repository you run the CLI from source as
-`node cli/testguard.mjs`, because a package is never installed into its own
-`node_modules`. In your own project it is `npx testguard-cli`.
+Inside the TestGuard repository, you run the CLI from source as
+`node cli/testguard.mjs`. A package is never installed into its own
+`node_modules`. In your own project, you run `npx testguard-cli`.
 
-The probe takes seconds on this fixture and exits `1`:
+The probe takes a few seconds on this fixture and exits `1`:
 
 ```text
 SURVIVED        REDACT-001/F1          critical src/redact.mjs  Audit row carries the raw input instead of the redacted text.
@@ -49,21 +50,22 @@ NOCOVER         EXPORT-002/F1          medium   src/export.mjs  Export keeps the
 evidence: …/fixtures/known-answer/.testguard/evidence.json
 ```
 
-Read the first line. TestGuard swapped the redacted text for the raw input in
-`src/redact.mjs`, ran the audit-row test three times, and it passed every
-time. That is `SURVIVED`: the **fault** survived, which is the bad news. A
+Read the first line. TestGuard replaced the redacted text with the raw input
+in `src/redact.mjs` and ran the audit-row test three times. The test passed
+every time. That is `SURVIVED`: the **fault** survived, which is bad news. A
 healthy report is mostly `killed`.
 
-The other verdicts are there on purpose; the fixture's
-[README](../fixtures/known-answer/README.md) explains each one, and
-[verdicts](reference/verdicts.md) says what to do about each.
+The other verdicts are there on purpose. The fixture's
+[README](../fixtures/known-answer/README.md) explains each one.
+[Verdicts](reference/verdicts.md) says what to do about each one.
 
 ## 2. Your own project
 
-The rest of this page runs the loop on a small billing module. Use your own
-project if it has a green vitest or jest suite; the commands are the same.
+The rest of this page runs the loop on a small billing module. If your own
+project has a green vitest or jest suite, use it instead. The commands are the
+same.
 
-The starting point is one source file and one test:
+You start with one source file and one test:
 
 ```js
 // src/billing.mjs
@@ -108,9 +110,9 @@ Commit these files.
 
 `init` writes the files an AI agent reads at session start: a skill, a hook
 that prints the blind-spot brief, and an `AGENTS.md` section. It also ignores
-the `.testguard/` files that are regenerated on every run. If you do not use
-an agent, the files are harmless; [AI agents](guides/ai-agents.md) explains
-them. Commit them.
+the `.testguard/` files that every run regenerates. If you do not use an
+agent, the files do no harm. [AI agents](guides/ai-agents.md) explains them.
+Commit them.
 
 ### Ask where you are
 
@@ -126,10 +128,10 @@ next:     [scaffold] testguard scaffold src/billing.mjs
 why:      1 source module exist and none carries a claim. Start with src/billing.mjs, …
 ```
 
-`status` exits `2`: there is nothing to probe yet. `init` does not create a
-claims file, and `claims` and `probe` stop with
-`error: cannot read claims file testguard.claims.json` until one exists. Start
-with an empty one:
+`status` exits `2` because there is nothing to probe yet. `init` does not
+create a claims file. Until a claims file exists, `claims` and `probe` stop
+with `error: cannot read claims file testguard.claims.json`. Start with an
+empty claims file:
 
 ```json
 {
@@ -144,9 +146,9 @@ npx testguard-cli claims        # 0 claims in testguard.claims.json — exit 0
 npx testguard-cli probe         # "claims file declares no claims; nothing to verify" — exit 2
 ```
 
-`probe` refuses an empty claims file with exit `2`, because a run that
-verified nothing must not look like a pass. While you adopt TestGuard in CI,
-`probe --allow-empty` skips a valid empty file with exit `0` and says so. See
+`probe` refuses an empty claims file with exit `2`. A run that verified
+nothing must not look like a pass. While you adopt TestGuard in CI,
+`probe --allow-empty` skips a valid empty file, exits `0` and says so. See
 [GitHub Actions](guides/ci/github-actions.md#adopting-with-zero-claims).
 
 ### Let `scaffold` propose faults
@@ -163,7 +165,7 @@ Next: Supply intended observable behavior from a requirement, ADR, bug or incide
 ```
 
 The draft holds mechanical proposals under a `TODO-CLAIM-1` placeholder. Each
-fault is an exact source change that would break something:
+fault is an exact change to the source that breaks something:
 
 ```json
 {
@@ -177,16 +179,16 @@ fault is an exact source change that would break something:
 }
 ```
 
-A proposal is not a claim. `scaffold` read the code; it does not know what the
-code is **meant** to do, and a claim written from the code would only restate
-whatever the code does today, bugs included.
+A proposal is not a claim. `scaffold` reads the code. It does not know what
+the code is **meant** to do. A claim written from the code only restates what
+the code does today, bugs included.
 
 ### Turn one proposal into a claim
 
-Take the intent from somewhere other than the implementation: a requirement,
-a ticket, an incident. Here the billing requirements say an empty order must
-be refused. Write that sentence, keep the matching fault, and record where the
-intent came from:
+Take the intent from a source other than the implementation, such as a
+requirement, a ticket or an incident. Here the billing requirements say the
+code must refuse an empty order. Write that sentence, keep the matching fault,
+and record where the intent came from:
 
 ```json
 {
@@ -230,8 +232,8 @@ anchor preflight: 1 faults checked, 1 ok, 0 invalid in 27ms
 ```
 
 `claims` also prints an annotation advisory: the claim has no `@claim`
-comment in the source. It is optional and does not change any verdict; see
-[writing claims](guides/writing-claims.md).
+comment in the source. The comment is optional and does not change any
+verdict. See [writing claims](guides/writing-claims.md).
 
 ### Probe it
 
@@ -254,11 +256,11 @@ SURVIVED        BILLING-EMPTY-ORDER/F1 high     src/billing.mjs  Guard never tri
 evidence: .testguard/evidence.json
 ```
 
-The probe exits `1`. It first ran the defender three times on unmodified code
-(it must be green, or nothing can be concluded), then three times with the
-guard disabled. The test stayed green: nothing in the suite checks that an
-empty order is refused. Your working tree was never touched; the fault was
-applied in a scratch git worktree.
+The probe exits `1`. First it ran the defender three times on unmodified code.
+The defender must be green, or the probe cannot conclude anything. Then it ran
+the defender three times with the guard disabled. The test stayed green, so
+nothing in the suite checks that the code refuses an empty order. The probe
+never touched your working tree. It applied the fault in a scratch worktree.
 
 ### Read the SURVIVED
 
@@ -284,9 +286,9 @@ Do not close these by asserting current behaviour; write a test that fails on th
    test/billing.test.mjs stayed green with this fault applied; add an assertion that fails on it and passes on HEAD. …
 ```
 
-The fix for a `SURVIVED` is always a test, never an edit to the claims file.
-Weakening a fault to make it go away is recorded: `status` lists any fault
-edited after it survived.
+The fix for a `SURVIVED` is always a test. It is never an edit to the claims
+file. TestGuard records it if you weaken a fault to make the fault go away:
+`status` lists any fault that you edited after it survived.
 
 ### Write the test, then `admit` it
 
@@ -308,15 +310,15 @@ ADMITTED — test/billing.test.mjs passes on HEAD and fails on the fault of BILL
 evidence: .testguard/evidence-partial.json (partial; not the canonical evidence file)
 ```
 
-`admit` is the two-gate rule: the new test must pass on unmodified code **and**
-fail on every fault of the claim, three runs out of three. It reads your
-uncommitted test (it probes a snapshot of the working tree), exits `0` for
-`ADMITTED` and `1` for `NOT ADMITTED`, and writes partial evidence so the
-canonical file is untouched.
+`admit` applies the two-gate rule. The new test must pass on unmodified code
+**and** fail on every fault of the claim, three runs out of three. It reads
+your uncommitted test, because it probes a snapshot of the working tree. It
+exits `0` for `ADMITTED` and `1` for `NOT ADMITTED`. It writes partial
+evidence, so the canonical file stays unchanged.
 
-A plain `probe` would refuse here. It probes the committed `HEAD`, and with a
-defender edited but not committed it stops with exit `2` rather than silently
-test the old file:
+A plain `probe` refuses here. It probes the committed `HEAD`. If you edited a
+defender and did not commit it, `probe` stops with exit `2`. It does not
+silently test the old file:
 
 ```text
 error: 1 defender/target file has uncommitted changes (test/billing.test.mjs); worktree mode probes HEAD (bee6ee9), so those changes would be silently ignored. Commit them, run with --include-dirty to probe the working tree, use --in-place, or --ignore-dirty if you mean HEAD as committed.
@@ -335,11 +337,12 @@ baseline: 0 unproven findings frozen at 47209033778e → .testguard/baseline.jso
 Commit this file; from now on only new findings gate.
 ```
 
-A baseline records every finding that is still unproven, so later probes fail
-only on **new** ones. Here nothing is unproven, so it freezes zero; on a real
-codebase the first baseline is how you adopt TestGuard without fixing every
-survivor first. Commit `.testguard/baseline.json`; the rest of `.testguard/`
-is regenerated and already ignored.
+A baseline records every finding that is still unproven. Later probes then
+fail only on **new** findings. Here nothing is unproven, so the baseline
+freezes zero findings. On a real codebase, the first baseline lets you adopt
+TestGuard without first fixing every survivor. Commit
+`.testguard/baseline.json`. TestGuard regenerates the rest of `.testguard/`,
+and `init` already ignores it.
 
 ```bash
 npx testguard-cli status        # state: clean — 1 claims / 1 faults; 1 killed; 0 new, 0 baselined
@@ -347,8 +350,8 @@ npx testguard-cli status        # state: clean — 1 claims / 1 faults; 1 killed
 
 ### Keep new code claimed
 
-From here on, `gate` fails a change that adds source with no claim. Add an
-unclaimed `src/shipping.mjs` and run the pre-commit form:
+From now on, `gate` fails a change that adds source with no claim. Add an
+unclaimed `src/shipping.mjs` and run the pre-commit form of the command:
 
 ```bash
 npx testguard-cli gate --changed HEAD --include-dirty   # the working tree against HEAD
@@ -361,21 +364,21 @@ UNCLAIMED  src/shipping.mjs  (source, nearest claim BILLING-EMPTY-ORDER)
 Next: state the claim for each UNCLAIMED file (scaffold proposes the faults), or add a testguard.ignore.json path entry with a reason that a reviewer will accept.
 ```
 
-One unclaimed file exits `1`. In a pull request the same command runs as
-`gate --changed origin/main`.
+One unclaimed file makes the command exit `1`. In a pull request, run the
+same command as `gate --changed origin/main`.
 
 ## What you committed
 
 | File | Why it is committed |
 |---|---|
-| `testguard.claims.json` | the claims and their faults; it is code, review it like code |
+| `testguard.claims.json` | the claims and their faults; review it like code |
 | `.testguard/baseline.json` | the frozen contract: what was already unproven when you adopted |
 | `.claude/skills/testguard/SKILL.md`, `.claude/settings.json`, `AGENTS.md` | the agent layer from `init` |
-| `.gitignore` | the regenerated `.testguard/` files `init` ignores |
+| `.gitignore` | the regenerated `.testguard/` files that `init` ignores |
 
 ## Next
 
 - [Writing claims](guides/writing-claims.md): what makes a claim worth defending, and where the intent comes from
 - [Adopting TestGuard in an existing project](guides/existing-projects.md): the same loop on a real codebase, with a baseline
-- [GitHub Actions](guides/ci/github-actions.md): the gate on every pull request, the probe on main
+- [GitHub Actions](guides/ci/github-actions.md): the gate on every pull request and the probe on main
 - [Verdicts](reference/verdicts.md): every verdict and the one fix for it

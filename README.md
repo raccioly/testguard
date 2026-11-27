@@ -15,10 +15,10 @@
 > Breaks your code on purpose and reports every promise your tests did not
 > notice breaking.
 
-**Not a test generator. A claim verifier.** Test generation is what happens
-after a claim turns out to be unfalsifiable.
+**Not a test generator. A claim verifier.** Test generation comes after a
+claim turns out to be unfalsifiable.
 
-Third tool following the Guard pattern, alongside
+TestGuard is the third tool that follows the Guard pattern. The other two are
 [`docguard-cli`](https://www.npmjs.com/package/docguard-cli) (docs ↔ code) and
 [`websec-validator`](https://pypi.org/project/websec-validator/) (attack
 surface ↔ code). All three run one loop:
@@ -29,8 +29,8 @@ surface ↔ code). All three run one loop:
 ## In one minute
 
 **Coverage tells you a line ran. It never tells you anyone checked the
-result.** So a codebase can be fully covered and completely undefended, and
-nothing in CI will say a word.
+result.** A codebase can be fully covered and completely undefended. Nothing
+in CI tells you.
 
 Here is a real test, from this repository's own fixture:
 
@@ -41,20 +41,22 @@ expect(store.writeAudit).toHaveBeenCalledWith(
 ```
 
 `objectContaining` ignores keys it does not list. Swap the redacted text for
-the **raw secret** and this test still passes. Coverage of that line: 100%.
-The audit log now leaks the very thing it exists to protect.
+the **raw secret** and this test still passes. Coverage of that line is 100%.
+The audit log now leaks the data it exists to protect.
 
-**The method: break the code deliberately, then watch what the tests do.**
+**The method: break the code on purpose, then watch what the tests do.**
 
-- **killed** — you broke it, a test failed. Good. That behaviour is genuinely
-  defended.
-- **SURVIVED** — you broke it, everything stayed green. A blind spot.
+- **killed** — you broke the code and a test failed. Good. The suite really
+  defends that behaviour.
+- **SURVIVED** — you broke the code and every test stayed green. This is a
+  blind spot.
 
-The word trips everyone once: it is the *fault* that survived, not the test.
-**SURVIVED is the bad news.** A healthy report is full of `killed`.
+The word confuses everyone once: it is the *fault* that survived, not the
+test. **SURVIVED is the bad news.** A healthy report is full of `killed`.
 
-But *"did the tests fail?"* is a sloppy question — a red suite is not proof of
-detection. So there are seven verdicts, and each means something different:
+But *"did the tests fail?"* is not a precise question. A red suite is not
+proof of detection. So there are seven verdicts, and each one means something
+different:
 
 | Verdict | What it means |
 |---|---|
@@ -66,21 +68,21 @@ detection. So there are seven verdicts, and each means something different:
 | `TIMEOUT` | The suite hung. A hang is not a detection. |
 | `FLAKY-DEFENDER` | The tests are not reliable enough on untouched code to be asked the question. |
 
-Every ambiguity rounds toward *unproven*: three runs rather than one, a green
-baseline required before any fault is injected, and a timeout, a load failure
-or a mixed result is never a kill. The reason is the constraint the whole
-design follows from — **a tool that reports everything as caught is worse than
-no tool at all, because nobody questions good news.**
+When a result is unclear, TestGuard treats it as *unproven*. It runs three
+times, not once. It needs a green baseline before it injects any fault. A
+timeout, a load failure or a mixed result is never a kill. The whole design
+follows one rule: **a tool that reports everything as caught is worse than no
+tool at all, because nobody questions good news.**
 
-**What is not new:** breaking code to test your tests is *mutation testing*,
-and it dates to the 1970s. Stryker, PIT, mutmut and Cosmic Ray all do it.
+**What is not new:** breaking code to test your tests is *mutation testing*.
+It dates to the 1970s. Stryker, PIT, mutmut and Cosmic Ray all do it.
 
 **What is different is the question.** Classic mutation testing mutates
-everything mechanically and hands you *"mutation score: 73%"* — a number that
-is not actionable, not auditable, and cannot tell you which promise is at
-risk. TestGuard binds every fault to a **stated claim**, so the output is not
-a score but a finding: *"Your project says a missing scope fails closed.
-Nothing checks that."* That is the difference between a metric and an audit.
+everything mechanically and gives you *"mutation score: 73%"*. That number is
+not actionable and not auditable. It cannot tell you which promise is at risk.
+TestGuard binds every fault to a **stated claim**. So the output is a finding,
+not a score: *"Your project says a missing scope fails closed. Nothing checks
+that."* That is the difference between a metric and an audit.
 
 📄 **[Read the six-page technical brief (PDF)](https://github.com/raccioly/testguard/blob/main/docs/testguard-explained.pdf)**
 — the idea on page one, then the field evidence, the anatomy of a run, the
@@ -88,38 +90,39 @@ verdicts, the loop and its calibration, and the prior art.
 
 ## Why
 
-Coverage cannot tell a test that pins *correct* behaviour from one that pins
-a *defect*. An agent that writes both the code and its tests encodes whatever
-it believed — including its bugs — and the suite goes green.
+Coverage cannot tell a test that pins *correct* behaviour from a test that
+pins a *defect*. An agent that writes both the code and its tests encodes what
+it believed, including its bugs. The suite goes green.
 
-Measured on a real, entirely AI-authored production codebase with ~4,900
-disciplined tests (no snapshots, 0.4% zero-assertion): **8 of 9 real
-historical bugs were invisible to the suite**, worst case 2,451 tests green
-on known-broken code. The largest gap was a compliance-critical path with
-100% coverage, where the one assertion that mattered used
-`expect.objectContaining({...})` and omitted the field carrying the data.
+On a real, entirely AI-authored production codebase with ~4,900
+disciplined tests (no snapshots, 0.4% zero-assertion), **the suite missed 8 of
+9 real historical bugs.** In the worst case, 2,451 tests stayed green on
+known-broken code. The largest gap was a compliance-critical path with 100%
+coverage. The one assertion that mattered used `expect.objectContaining({...})`
+and left out the field that carried the data.
 
-A second, independent run on a different AI-authored codebase (63 test
-files, 458 tests, 24 hand-written security claims, 39 faults): **21 of 39
-faults survived a fully green suite — 9 of them critical.** Super-admin
-gating, membership checks, cookie flags and the whole authorization callback
-could be disabled without a single test noticing. One test file had
-re-implemented the authorization logic *inside the test* and asserted
-against the copy: fifteen green tests, zero detection. After wrapper-level
-tests were written against the survivors, 39/39 were killed.
+A second, independent run used a different AI-authored codebase (63 test
+files, 458 tests, 24 hand-written security claims, 39 faults). **21 of 39
+faults survived a fully green suite, and 9 of them were critical.** No test
+noticed when super-admin gating, membership checks, cookie flags and the
+whole authorization callback were disabled. One test file had re-implemented the
+authorization logic *inside the test* and asserted against the copy. It gave
+fifteen green tests and zero detection. After wrapper-level tests were
+written against the survivors, 39/39 faults were killed.
 
-The peer-reviewed picture in 2026 says the same thing from the other side.
+The peer-reviewed research in 2026 says the same thing from the other side.
 Coverage and mutation score of LLM-generated suites track effectiveness only
-when the code under test is assumed correct; once it may be buggy they "no
-longer serve as reliable indicators" ([Zhao, Zhou and Cohen, ISSTA 2026](https://arxiv.org/abs/2607.22880)).
-Buggy code steers a model toward tests that assert the bug, and prompting
-with the specification is the mitigation that works ([arXiv 2607.22883](https://arxiv.org/abs/2607.22883)) —
-which is why a claim here comes from intent, a fault is bound to the claim,
-and the brief hands the agent the claim before it writes. And agents
-saturate whatever tests they can see, with the gap to held-out tests
-growing about 28 points per tenfold increase in code size ([SpecBench](https://arxiv.org/abs/2605.21384)).
+when the code under test is assumed correct. Once the code may be buggy, they
+"no longer serve as reliable indicators" ([Zhao, Zhou and Cohen, ISSTA 2026](https://arxiv.org/abs/2607.22880)).
+Buggy code steers a model toward tests that assert the bug. Prompting with the
+specification is the mitigation that works ([arXiv 2607.22883](https://arxiv.org/abs/2607.22883)).
+So in TestGuard, a claim comes from intent, a fault is bound to the claim, and
+the brief gives the agent the claim before it writes. Also, agents saturate
+whatever tests they can see. The gap to held-out tests grows about 28 points
+per tenfold increase in code size ([SpecBench](https://arxiv.org/abs/2605.21384)).
 Every generator on the market admits a test because it compiles, passes and
-raises coverage. TestGuard admits it because it fails when the claim is false.
+raises coverage. TestGuard admits a test because it fails when the claim is
+false.
 
 ## Install
 
@@ -133,8 +136,8 @@ raises coverage. TestGuard admits it because it fails when the claim is false.
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-gate`, `testguard-probe` |
 | GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.26.3/packaging/gitlab/testguard.gitlab-ci.yml` |
 
-Requirements, offline installs, `ENOVERSIONS` and every CI option are in the
-[installation guide](https://github.com/raccioly/testguard/blob/main/docs/installation.md).
+The [installation guide](https://github.com/raccioly/testguard/blob/main/docs/installation.md)
+covers requirements, offline installs, `ENOVERSIONS` and every CI option.
 
 ## Make it fast
 
@@ -144,14 +147,13 @@ testguard probe --claim <ID> --confirm 1       # while writing one test: fast, p
 testguard probe                                # nightly, or when asked: every claim
 ```
 
-- Faults already run in parallel: half the CPUs, at most 4 (`--serial` for one at a time).
-- Every kill is confirmed by a run alone, so a suite that shares a port or a database cannot fake one.
-- Unchanged verdicts are reused; a `--changed` or `--claim` run reuses the last full probe.
-- `testguard init` writes a pre-push hook that runs the first command, and `init --ci github|gitlab` a CI job that runs it on pull requests and the full probe nightly.
+- Faults already run in parallel: half the CPUs, at most 4 (`--serial` runs one at a time).
+- A run on its own confirms every kill. So a suite that shares a port or a database cannot fake a kill.
+- TestGuard reuses unchanged verdicts. A `--changed` or `--claim` run reuses the last full probe.
+- `testguard init` writes a pre-push hook that runs the first command. `init --ci github|gitlab` writes a CI job that runs it on pull requests and runs the full probe nightly.
 
-Slow anyway? `testguard status` prints `advice` with the command to run, and
-[why is this slow?](https://github.com/raccioly/testguard/blob/main/docs/guides/performance.md#why-is-this-slow)
-is the checklist.
+Still slow? `testguard status` prints `advice` with the command to run.
+The checklist is [why is this slow?](https://github.com/raccioly/testguard/blob/main/docs/guides/performance.md#why-is-this-slow).
 
 ## Quickstart
 
@@ -174,8 +176,8 @@ unclaimed changes or invalid fault anchors, `2` a precondition failed and
 nothing was probed, `3` usage. Every command except `mcp` accepts `--json`.
 
 The [quickstart](https://github.com/raccioly/testguard/blob/main/docs/quickstart.md)
-walks through a first claim end to end. Adding TestGuard to a codebase that
-already has a large suite has its own guide:
+walks through a first claim from start to end. A codebase that already has a
+large suite has its own guide:
 [adopting TestGuard in an existing project](https://github.com/raccioly/testguard/blob/main/docs/guides/existing-projects.md).
 
 ## Languages and test runners
@@ -188,29 +190,29 @@ already has a large suite has its own guide:
 | Python ≥ 3.8 | pytest, or stdlib `unittest` when pytest is absent | the same seven, in Python syntax |
 | Anything else | `--runner-cmd` with a jest-compatible JSON report | hand-written faults |
 
-One claim can be defended by a vitest test and a pytest test at once. Runner
-resolution, discovery, mocks and limits are in the
-[languages and runners reference](https://github.com/raccioly/testguard/blob/main/docs/reference/languages-and-runners.md).
+A vitest test and a pytest test can defend one claim at the same time. The
+[languages and runners reference](https://github.com/raccioly/testguard/blob/main/docs/reference/languages-and-runners.md)
+covers runner resolution, discovery, mocks and limits.
 
-When your tests need runner flags (`--runner unittest --python .venv/bin/python`,
-a `--runner-cmd`, a `--node-modules`), commit them once in
-`testguard.config.json` and every hook, CI line and agent can run plain
+Your tests may need runner flags (`--runner unittest --python .venv/bin/python`,
+a `--runner-cmd`, a `--node-modules`). Commit them once in
+`testguard.config.json`. Then every hook, CI line and agent can run plain
 `testguard probe`:
 
 ```json
 { "schemaVersion": 1, "runner": "unittest", "python": ".venv/bin/python" }
 ```
 
-A flag you type, then `TESTGUARD_PYTHON`-style variables, still win;
-`--no-config` ignores the file. Keys and rules are in the
+A flag you type wins over the file. `TESTGUARD_PYTHON`-style variables also win
+over it. `--no-config` ignores the file. The keys and rules are in the
 [configuration reference](https://github.com/raccioly/testguard/blob/main/docs/reference/configuration.md#testguardconfigjson-how-this-projects-tests-run).
 
 ## Use it with your AI agent
 
-TestGuard is meant to be driven by an agent. `testguard init` installs a skill
-that teaches the operating loop, an `AGENTS.md` section, and a session-start
-hook that briefs every session with the ranked blind spots before it writes
-code. For Claude Code, the hook in `.claude/settings.json` is:
+An agent is meant to drive TestGuard. `testguard init` installs three things:
+a skill that teaches the operating loop, an `AGENTS.md` section, and a
+session-start hook. The hook gives every session the ranked blind spots before
+the agent writes code. For Claude Code, the hook in `.claude/settings.json` is:
 
 ```json
 { "hooks": { "SessionStart": [ { "hooks": [
@@ -218,11 +220,12 @@ code. For Claude Code, the hook in `.claude/settings.json` is:
 ] } ] } }
 ```
 
-It resolves the project's own install, then a `testguard` on `PATH`, and ends
-in `true`, so it can never break a session or reach the network. Any other
-harness can use `testguard mcp` (five read-only tools over stdio) or
-`testguard status --json`. Setup for Claude Code, Codex, Cursor and others is
-in the [AI agents guide](https://github.com/raccioly/testguard/blob/main/docs/guides/ai-agents.md).
+The hook uses the project's own install first. If there is none, it uses a
+`testguard` on `PATH`. It ends in `true`, so it can never break a session or
+reach the network. Any other harness can use `testguard mcp` (five read-only
+tools over stdio) or `testguard status --json`. Setup for Claude Code, Codex,
+Cursor and others is in the
+[AI agents guide](https://github.com/raccioly/testguard/blob/main/docs/guides/ai-agents.md).
 
 ## Documentation
 
@@ -237,15 +240,15 @@ in the [AI agents guide](https://github.com/raccioly/testguard/blob/main/docs/gu
 
 ## What TestGuard is not
 
-- **Not a test generator.** It judges a test the agent wrote (`admit`); the
-  generating half stays with the agent.
-- **Not a mutation-score dashboard.** No blanket mutants, no single score, no
-  threshold. Faults are few and bound to stated claims; findings are ranked,
-  never summed.
-- **Not a coverage tool.** A line executed says nothing about whether an
+- **Not a test generator.** It judges a test the agent wrote (`admit`). The
+  agent still generates the tests.
+- **Not a mutation-score dashboard.** It has no blanket mutants, no single
+  score and no threshold. Faults are few and bound to stated claims. TestGuard
+  ranks findings and never sums them.
+- **Not a coverage tool.** An executed line says nothing about whether an
   assertion would notice. `NOCOVER` here means no test even imports the file.
 - **Not a network client.** The CLI never opens a socket and collects no
-  telemetry. One exact-pinned runtime dependency (`ajv`), Node ≥ 20, MIT.
+  telemetry. It has one exact-pinned runtime dependency (`ajv`), needs Node ≥ 20, and uses the MIT license.
 
 ## Try it
 
@@ -256,13 +259,13 @@ git clone https://github.com/raccioly/testguard && cd testguard && npm install
 npm test                                  # includes probing the fixture end to end
 ```
 
-`fixtures/known-answer/` is a tiny project whose audit-row test asserts with
+`fixtures/known-answer/` is a tiny project. Its audit-row test asserts with
 `expect.objectContaining({...})` and omits the `content` key. Swap the
-redacted text for the raw input and the test stays green. `probe` reports it
-as `SURVIVED`; the fixture's [README](https://github.com/raccioly/testguard/blob/main/fixtures/known-answer/README.md)
-walks through every verdict. The same blind spot in Python is
+redacted text for the raw input and the test stays green. `probe` reports the
+fault as `SURVIVED`. The fixture's [README](https://github.com/raccioly/testguard/blob/main/fixtures/known-answer/README.md)
+walks through every verdict. The same blind spot in Python is in
 [`fixtures/known-answer-python/`](https://github.com/raccioly/testguard/blob/main/fixtures/known-answer-python/README.md),
-run under both stdlib `unittest` and `pytest`, which must agree on every
+It runs under both stdlib `unittest` and `pytest`. They must agree on every
 verdict.
 
 ## Status
@@ -271,25 +274,25 @@ Fourteen commands (`status`, `init`, `claims`, `probe`, `admit`, `baseline`,
 `brief`, `gate`, `scaffold`, `sweep`, `concerns`, `replay`, `clean`, `mcp`). Runners
 for vitest, jest, Playwright, Node's built-in test runner, pytest and stdlib
 `unittest`, plus `--runner-cmd` for anything that writes a jest-compatible
-report. Hand-authored faults and a mechanical scaffold for JavaScript,
+report. Hand-authored faults, and a mechanical scaffold for JavaScript,
 TypeScript and Python. The contract is fourteen JSON Schemas under
 [`spec/`](https://github.com/raccioly/testguard/blob/main/spec/README.md),
 shared with the other Guard tools. Every release is in the
 [changelog](https://github.com/raccioly/testguard/blob/main/CHANGELOG.md).
 
-Not yet: test generation (the acceptance half, `admit`, exists; the
-generating half stays the agent's), AST-aware producers, and the transfer of
-a calibration between repositories. `replay` measures that transfer now;
-whether it carries to a repository with no history is unproven. Each is
-designed for; none is claimed.
+Not yet: test generation (`admit`, the acceptance half, exists; the agent
+still does the generating half), AST-aware producers, and the transfer of a
+calibration between repositories. `replay` measures that transfer now. Whether
+it carries to a repository with no history is unproven. We designed for each
+of these, and we claim none of them.
 
 ## Contributing
 
-Bug reports, field reports and documentation fixes are welcome. Read
+We welcome bug reports, field reports and documentation fixes. First read
 [CONTRIBUTING.md](https://github.com/raccioly/testguard/blob/main/CONTRIBUTING.md)
-and [AGENTS.md](https://github.com/raccioly/testguard/blob/main/AGENTS.md)
-first; for help, see [SUPPORT.md](https://github.com/raccioly/testguard/blob/main/SUPPORT.md),
-and report vulnerabilities privately per
+and [AGENTS.md](https://github.com/raccioly/testguard/blob/main/AGENTS.md).
+For help, see [SUPPORT.md](https://github.com/raccioly/testguard/blob/main/SUPPORT.md).
+Report vulnerabilities privately, as described in
 [SECURITY.md](https://github.com/raccioly/testguard/blob/main/SECURITY.md).
 
 ## Licence

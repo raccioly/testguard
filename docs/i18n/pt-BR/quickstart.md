@@ -1,25 +1,26 @@
-> 🌐 Esta é uma tradução. A página em inglês é a referência oficial: [docs/quickstart.md](https://github.com/raccioly/testguard/blob/main/docs/quickstart.md). Traduzido da v0.18.3.
+> 🌐 Esta é uma tradução. A página em inglês é a referência oficial: [docs/quickstart.md](https://github.com/raccioly/testguard/blob/main/docs/quickstart.md). Traduzido da v0.26.1.
 
 # Início rápido
 
-Esta página leva você do zero a um primeiro teste admitido pelo TestGuard, em
-cerca de dez minutos. Ela é para quem está experimentando o TestGuard pela
-primeira vez em um projeto JavaScript ou TypeScript com uma suíte de testes
-vitest ou jest verde. Primeiro você o vê encontrar um ponto cego real no
-próprio projeto de demonstração do repositório; depois roda o mesmo ciclo em
-um pequeno projeto seu. Cada bloco de saída abaixo foi capturado de uma
-execução real; caminhos longos foram encurtados com `…`.
+Esta página leva você do zero a um primeiro teste que o TestGuard admitiu.
+Ela leva cerca de dez minutos. É para quem usa o TestGuard pela primeira vez
+em um projeto JavaScript ou TypeScript com uma suíte vitest ou jest verde.
 
-Você precisa de Node ≥ 20 e `git`. Outras formas de instalar, e o que cada uma
-exige, estão em [instalação](../../installation.md).
+Primeiro você vê o TestGuard encontrar um ponto cego real no projeto de
+demonstração deste repositório. Depois você roda o mesmo ciclo em um pequeno
+projeto seu. Cada bloco de saída abaixo vem de uma execução real. Os caminhos
+longos foram encurtados com `…`.
+
+Você precisa de Node ≥ 20 e `git`. A [instalação](../../installation.md) mostra
+outras formas de instalar e o que cada uma exige.
 
 ## 1. Veja funcionando: a fixture known-answer
 
-O repositório inclui um projeto minúsculo, `fixtures/known-answer/`, feito para
-produzir todos os vereditos que o TestGuard pode emitir. O teste de log de
+O repositório inclui um projeto minúsculo, `fixtures/known-answer/`. Ele
+produz todos os vereditos que o TestGuard pode emitir. O teste do log de
 auditoria dele verifica a linha com `expect.objectContaining({...})` e nunca
-menciona o campo `content`, então gravar o **segredo em claro** na linha de
-auditoria mantém a suíte verde.
+cita o campo `content`. Então, se o código gravar o **segredo em claro** na
+linha de auditoria, a suíte continua verde.
 
 ```bash
 git clone https://github.com/raccioly/testguard.git
@@ -29,11 +30,11 @@ node cli/testguard.mjs claims fixtures/known-answer   # what the fixture claims
 node cli/testguard.mjs probe fixtures/known-answer    # try to falsify every claim
 ```
 
-Dentro do repositório do TestGuard você roda a CLI a partir do código-fonte,
-como `node cli/testguard.mjs`, porque um pacote nunca é instalado no próprio
-`node_modules`. No seu projeto, é `npx testguard-cli`.
+Dentro do repositório do TestGuard, você roda a CLI a partir do código-fonte
+como `node cli/testguard.mjs`. Um pacote nunca é instalado no próprio
+`node_modules`. No seu projeto, você roda `npx testguard-cli`.
 
-A sondagem (probe) leva segundos nesta fixture e sai com `1`:
+O probe leva alguns segundos nesta fixture e sai com `1`:
 
 ```text
 SURVIVED        REDACT-001/F1          critical src/redact.mjs  Audit row carries the raw input instead of the redacted text.
@@ -54,22 +55,22 @@ evidence: …/fixtures/known-answer/.testguard/evidence.json
 ```
 
 Leia a primeira linha. O TestGuard trocou o texto mascarado pela entrada em
-claro em `src/redact.mjs`, rodou o teste da linha de auditoria três vezes, e
-ele passou em todas. Isso é `SURVIVED`: quem sobreviveu foi a **falha injetada
-(fault)**, e essa é a má notícia. Um relatório saudável é, na maior parte,
+claro em `src/redact.mjs`. Depois rodou o teste da linha de auditoria três
+vezes. O teste passou todas as vezes. Isso é `SURVIVED`: a **falha injetada**
+sobreviveu, e essa é a má notícia. Um relatório saudável tem quase só
 `killed`.
 
-Os outros vereditos estão ali de propósito; o
-[README](../../../fixtures/known-answer/README.md) da fixture explica cada um,
-e [vereditos](../../reference/verdicts.md) diz o que fazer em cada caso.
+Os outros vereditos estão ali de propósito. O
+[README](../../../fixtures/known-answer/README.md) da fixture explica cada um.
+Os [vereditos](../../reference/verdicts.md) dizem o que fazer em cada caso.
 
 ## 2. O seu próprio projeto
 
-O restante desta página roda o ciclo em um pequeno módulo de cobrança. Use o
-seu próprio projeto se ele tiver uma suíte vitest ou jest verde; os comandos
-são os mesmos.
+O resto desta página roda o ciclo em um pequeno módulo de cobrança. Se o seu
+projeto tem uma suíte vitest ou jest verde, use o seu. Os comandos são os
+mesmos.
 
-O ponto de partida é um arquivo-fonte e um teste:
+Você começa com um arquivo-fonte e um teste:
 
 ```js
 // src/billing.mjs
@@ -114,10 +115,10 @@ Commit these files.
 
 O `init` grava os arquivos que um agente de IA lê no início da sessão: uma
 skill, um hook que imprime o briefing de pontos cegos e uma seção no
-`AGENTS.md`. Ele também ignora os arquivos de `.testguard/` que são
-regenerados a cada execução. Se você não usa um agente, os arquivos são
-inofensivos; [agentes de IA](../../guides/ai-agents.md) explica cada um deles.
-Faça commit deles.
+`AGENTS.md`. Ele também ignora os arquivos de `.testguard/` que cada execução
+regenera. Se você não usa um agente, os arquivos não causam dano. O guia de
+[agentes de IA](../../guides/ai-agents.md) explica cada um deles. Faça commit
+deles.
 
 ### Pergunte onde você está
 
@@ -133,10 +134,10 @@ next:     [scaffold] testguard scaffold src/billing.mjs
 why:      1 source module exist and none carries a claim. Start with src/billing.mjs, …
 ```
 
-O `status` sai com `2`: ainda não há nada para sondar. O `init` não cria um
-arquivo de alegações (claims), e `claims` e `probe` param com
-`error: cannot read claims file testguard.claims.json` até que ele exista.
-Comece com um vazio:
+O `status` sai com `2`, porque ainda não há nada para sondar. O `init` não
+cria um arquivo de alegações. Enquanto esse arquivo não existe, `claims` e
+`probe` param com `error: cannot read claims file testguard.claims.json`.
+Comece com um arquivo de alegações vazio:
 
 ```json
 {
@@ -151,10 +152,10 @@ npx testguard-cli claims        # 0 claims in testguard.claims.json — exit 0
 npx testguard-cli probe         # "claims file declares no claims; nothing to verify" — exit 2
 ```
 
-O `probe` recusa um arquivo de alegações vazio com saída `2`, porque uma
-execução que não verificou nada não pode parecer um sucesso. Enquanto você
-adota o TestGuard no CI, `probe --allow-empty` pula um arquivo vazio válido
-com saída `0` e avisa que fez isso. Veja
+O `probe` recusa um arquivo de alegações vazio e sai com `2`. Uma execução
+que não verificou nada não pode parecer uma aprovação. Enquanto você adota o
+TestGuard no CI, `probe --allow-empty` pula um arquivo vazio válido, sai com
+`0` e avisa que fez isso. Veja
 [GitHub Actions](../../guides/ci/github-actions.md#adopting-with-zero-claims).
 
 ### Deixe o `scaffold` propor falhas
@@ -171,7 +172,7 @@ Next: Supply intended observable behavior from a requirement, ADR, bug or incide
 ```
 
 O rascunho guarda propostas mecânicas sob um placeholder `TODO-CLAIM-1`. Cada
-falha é uma alteração exata no código-fonte que quebraria alguma coisa:
+falha é uma mudança exata no código-fonte que quebra alguma coisa:
 
 ```json
 {
@@ -185,16 +186,16 @@ falha é uma alteração exata no código-fonte que quebraria alguma coisa:
 }
 ```
 
-Uma proposta não é uma alegação. O `scaffold` leu o código; ele não sabe o que
-o código **deveria** fazer, e uma alegação escrita a partir do código só
-repetiria o que o código faz hoje, bugs incluídos.
+Uma proposta não é uma alegação. O `scaffold` lê o código. Ele não sabe o que
+o código **deve** fazer. Uma alegação escrita só a partir do código apenas
+repete o que o código faz hoje, bugs incluídos.
 
 ### Transforme uma proposta em alegação
 
-Tire a intenção de algum lugar que não seja a implementação: um requisito, um
-ticket, um incidente. Aqui, os requisitos de cobrança dizem que um pedido
-vazio deve ser recusado. Escreva essa frase, mantenha a falha correspondente e
-registre de onde veio a intenção:
+Tire a intenção de uma fonte que não seja a implementação, como um requisito,
+um ticket ou um incidente. Aqui, os requisitos de cobrança dizem que o código
+deve recusar um pedido vazio. Escreva essa frase, mantenha a falha
+correspondente e registre de onde veio a intenção:
 
 ```json
 {
@@ -224,7 +225,7 @@ registre de onde veio a intenção:
 }
 ```
 
-Confira a âncora antes de gastar uma sondagem com ela:
+Confira a âncora antes de gastar um probe com ela:
 
 ```bash
 npx testguard-cli claims --check-anchors    # finds every anchor and parses every replacement; runs no tests
@@ -238,8 +239,8 @@ anchor preflight: 1 faults checked, 1 ok, 0 invalid in 27ms
 ```
 
 O `claims` também imprime um aviso sobre anotação: a alegação não tem um
-comentário `@claim` no código-fonte. Ele é opcional e não muda nenhum
-veredito; veja [escrevendo alegações](../../guides/writing-claims.md).
+comentário `@claim` no código-fonte. O comentário é opcional e não muda
+nenhum veredito. Veja [escrevendo alegações](../../guides/writing-claims.md).
 
 ### Rode o probe
 
@@ -262,11 +263,12 @@ SURVIVED        BILLING-EMPTY-ORDER/F1 high     src/billing.mjs  Guard never tri
 evidence: .testguard/evidence.json
 ```
 
-O probe sai com `1`. Primeiro ele rodou o defensor (defender) três vezes no
-código sem modificação (ele precisa estar verde, senão nada pode ser
-concluído), depois três vezes com o guard desativado. O teste continuou
-verde: nada na suíte verifica que um pedido vazio é recusado. A sua working
-tree nunca foi tocada; a falha foi aplicada em uma git worktree temporária.
+O probe sai com `1`. Primeiro, ele rodou o defensor três vezes no código sem
+modificação. O defensor precisa estar verde, senão o probe não conclui nada.
+Depois, ele rodou o defensor três vezes com o guard desativado. O teste
+continuou verde. Isso significa que nada na suíte verifica se o código recusa
+um pedido vazio. O probe nunca tocou na sua working tree. Ele aplicou a falha
+em uma worktree temporária.
 
 ### Leia o SURVIVED
 
@@ -292,9 +294,10 @@ Do not close these by asserting current behaviour; write a test that fails on th
    test/billing.test.mjs stayed green with this fault applied; add an assertion that fails on it and passes on HEAD. …
 ```
 
-A correção de um `SURVIVED` é sempre um teste, nunca uma edição no arquivo de
-alegações. Enfraquecer uma falha para fazê-la sumir fica registrado: o
-`status` lista toda falha editada depois de ter sobrevivido.
+A correção de um `SURVIVED` é sempre um teste. Nunca é uma edição no arquivo
+de alegações. O TestGuard registra se você enfraquece uma falha para fazê-la
+sumir: o `status` lista toda falha que você editou depois que ela
+sobreviveu.
 
 ### Escreva o teste e depois rode `admit`
 
@@ -316,14 +319,14 @@ ADMITTED — test/billing.test.mjs passes on HEAD and fails on the fault of BILL
 evidence: .testguard/evidence-partial.json (partial; not the canonical evidence file)
 ```
 
-O `admit` é a regra das duas barreiras: o novo teste precisa passar no código
-sem modificação **e** falhar em cada falha injetada da alegação, em três de
-três execuções. Ele lê o seu teste ainda não commitado (sonda um snapshot da
-working tree), sai com `0` para `ADMITTED` e `1` para `NOT ADMITTED`, e grava
-uma evidência parcial para que o arquivo canônico fique intocado.
+O `admit` aplica a regra das duas barreiras. O novo teste precisa passar no
+código sem modificação **e** falhar em cada falha da alegação, em três de três
+execuções. Ele lê o seu teste ainda não commitado, porque sonda um snapshot da
+working tree. Ele sai com `0` para `ADMITTED` e com `1` para `NOT ADMITTED`.
+Ele grava uma evidência parcial, então o arquivo canônico não muda.
 
-Um `probe` simples recusaria aqui. Ele sonda o `HEAD` commitado e, com um
-defensor editado mas não commitado, para com saída `2` em vez de testar
+Um `probe` simples recusa aqui. Ele sonda o `HEAD` commitado. Se você editou um
+defensor e não fez commit, o `probe` para com saída `2`. Ele não testa
 silenciosamente o arquivo antigo:
 
 ```text
@@ -343,22 +346,22 @@ baseline: 0 unproven findings frozen at 47209033778e → .testguard/baseline.jso
 Commit this file; from now on only new findings gate.
 ```
 
-Uma baseline registra cada achado que ainda não foi comprovado, para que
-probes posteriores falhem só com os **novos**. Aqui nada está sem comprovação,
-então ela congela zero; em uma base de código real, a primeira baseline é
-como você adota o TestGuard sem precisar corrigir cada sobrevivente antes.
-Faça commit de `.testguard/baseline.json`; o resto de `.testguard/` é
-regenerado e já está ignorado.
+Uma baseline registra cada achado que ainda não foi comprovado. Os probes
+seguintes falham só com os achados **novos**. Aqui nada está sem comprovação,
+então a baseline congela zero achados. Em uma base de código real, a primeira
+baseline permite adotar o TestGuard sem corrigir antes cada sobrevivente.
+Faça commit de `.testguard/baseline.json`. O TestGuard regenera o resto de
+`.testguard/`, e o `init` já o ignora.
 
 ```bash
 npx testguard-cli status        # state: clean — 1 claims / 1 faults; 1 killed; 0 new, 0 baselined
 ```
 
-### Mantenha o código novo coberto por alegações
+### Mantenha o código novo com alegações
 
 Daqui em diante, o `gate` reprova uma mudança que adiciona código-fonte sem
 alegação. Adicione um `src/shipping.mjs` sem alegação e rode a forma de
-pre-commit:
+pre-commit do comando:
 
 ```bash
 npx testguard-cli gate --changed HEAD --include-dirty   # the working tree against HEAD
@@ -371,14 +374,14 @@ UNCLAIMED  src/shipping.mjs  (source, nearest claim BILLING-EMPTY-ORDER)
 Next: state the claim for each UNCLAIMED file (scaffold proposes the faults), or add a testguard.ignore.json path entry with a reason that a reviewer will accept.
 ```
 
-Um arquivo sem alegação sai com `1`. Em um pull request, o mesmo comando roda
-como `gate --changed origin/main`.
+Um arquivo sem alegação faz o comando sair com `1`. Em um pull request, rode
+o mesmo comando como `gate --changed origin/main`.
 
 ## O que você commitou
 
 | Arquivo | Por que ele é commitado |
 |---|---|
-| `testguard.claims.json` | as alegações e as falhas delas; é código, revise como código |
+| `testguard.claims.json` | as alegações e as falhas delas; revise-o como código |
 | `.testguard/baseline.json` | o contrato congelado: o que já estava sem comprovação quando você adotou |
 | `.claude/skills/testguard/SKILL.md`, `.claude/settings.json`, `AGENTS.md` | a camada de agente criada pelo `init` |
 | `.gitignore` | os arquivos regenerados de `.testguard/` que o `init` ignora |
@@ -387,5 +390,5 @@ como `gate --changed origin/main`.
 
 - [Escrevendo alegações](../../guides/writing-claims.md): o que faz uma alegação valer a defesa, e de onde vem a intenção
 - [Adotando o TestGuard em um projeto existente](../../guides/existing-projects.md): o mesmo ciclo em uma base de código real, com uma baseline
-- [GitHub Actions](../../guides/ci/github-actions.md): o gate em cada pull request, o probe na main
+- [GitHub Actions](../../guides/ci/github-actions.md): o gate em cada pull request e o probe na main
 - [Vereditos](../../reference/verdicts.md): cada veredito e a única correção para ele

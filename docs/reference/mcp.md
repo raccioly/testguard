@@ -1,11 +1,11 @@
 # MCP server reference
 
 `testguard mcp` serves TestGuard's read-only documents over the Model Context
-Protocol, so the operating loop works in any agent harness, not only the one
-that runs the session-start hook. This page is for wiring it into Claude Code,
-Cursor, Codex or another MCP client, and for anyone writing against its tools.
-How an agent should use them day to day is in the
-[AI agents guide](../guides/ai-agents.md).
+Protocol. So the operating loop works in any agent harness, not only the one
+that runs the session-start hook. Use this page to connect it to Claude Code,
+Cursor, Codex or another MCP client. It is also for anyone who writes code
+against its tools. The [AI agents guide](../guides/ai-agents.md) explains how
+an agent uses the tools day to day.
 
 ```bash
 npx testguard-cli mcp            # JSON-RPC 2.0 on stdio
@@ -15,22 +15,23 @@ npx testguard-cli init --mcp     # print the config for Claude Code, Cursor and 
 ## Why no tool runs a probe
 
 Every tool is read-only, and none of them runs a test. A probe is
-long-running and budgeted, and the person should see it happen, so
-`testguard_next_command` hands back the exact shell line for the agent to run
-in its own terminal instead. Nothing here writes a file either: editing a
-claims file through a connector would bypass the record TestGuard keeps of
-every fault edit. The server declares only a `tools` capability: no prompts, no
-resources, no sampling.
+long-running and budgeted, and the person should see it happen. So
+`testguard_next_command` gives the agent the exact shell line to run in its own
+terminal instead. No tool writes a file either. Editing a claims file through
+a connector would bypass the record TestGuard keeps of every fault edit. The
+server declares only a `tools` capability: no prompts, no resources, no
+sampling.
 
-It is hand-written against a pinned protocol version rather than built on the
-official SDK, because TestGuard keeps one exact-pinned runtime dependency.
-Tests speak the wire format to a real child process and check each tool
+The server is hand-written against a pinned protocol version. It does not use
+the official SDK, because TestGuard keeps one exact-pinned runtime dependency.
+Tests speak the wire format to a real child process. They check each tool
 against the CLI's own `--json` output, so the two cannot drift.
 
 ## Register the server
 
-`testguard init --mcp` prints these snippets and writes none of them: a
-harness's configuration is your file, and often a global one. Add one.
+`testguard init --mcp` prints these snippets. It writes none of them, because
+a harness's configuration is your file, and often a global one. Add the
+snippet for your harness yourself.
 
 **Claude Code**: `.mcp.json` in the project root, or `claude mcp add`.
 
@@ -74,10 +75,10 @@ command = "npx"
 args = ["-y", "testguard-cli", "mcp"]
 ```
 
-These launch the server through `npx -y`, which fetches the package from the
-registry if it is not installed. That happens once, when the harness starts
-the server; the tools themselves make no network calls. Every tool's `dir`
-defaults to the directory the harness starts the server in.
+These snippets launch the server through `npx -y`. It fetches the package from
+the registry if the package is not installed. That happens once, when the
+harness starts the server. The tools themselves make no network calls. Every
+tool's `dir` defaults to the directory where the harness starts the server.
 
 ## Protocol
 
@@ -87,7 +88,7 @@ defaults to the directory the harness starts the server in.
 | Protocol version | `2025-06-18` |
 | Capabilities | `{ "tools": { "listChanged": false } }` |
 | Server info | `{ "name": "testguard", "version": "<installed version>" }` |
-| Methods | `initialize`, `tools/list`, `tools/call`, `ping`; the notifications `notifications/initialized` and `notifications/cancelled` are accepted and never answered |
+| Methods | `initialize`, `tools/list`, `tools/call`, `ping`. The server accepts the notifications `notifications/initialized` and `notifications/cancelled` and never answers them. |
 | Tool annotations | `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false` on every tool |
 
 The `initialize` result carries these instructions for the client:
@@ -98,13 +99,13 @@ The `initialize` result carries these instructions for the client:
 
 A successful `tools/call` returns the document twice: as JSON text in
 `content[0].text` and as `structuredContent`. A tool that fails returns a
-normal result with `isError: true` and the text `<tool> failed: <reason>`, so
+normal result with `isError: true` and the text `<tool> failed: <reason>`. So
 the agent can read the reason and act without losing the connection. Protocol
 errors use the standard JSON-RPC codes: `-32700` invalid JSON, `-32600` a
 request that is not an object, `-32601` an unknown method, `-32602` an unknown
-tool, `-32603` an internal error. The server outlives any single bad request.
+tool, `-32603` an internal error. One bad request never stops the server.
 
-`testguard mcp` takes no options. `--json` is refused with exit `3`, because
+`testguard mcp` takes no options. It refuses `--json` with exit `3`, because
 anything printed on stdout would corrupt the protocol stream. It exits `0`
 when stdin closes.
 
@@ -115,14 +116,15 @@ Every tool rejects arguments it does not list. Three arguments recur:
 | Argument | Type | Meaning |
 |---|---|---|
 | `dir` | string | Project directory, where `testguard.claims.json` lives. Defaults to the server's working directory. |
-| `changed` | string | A git reference to measure the change against, so claim coverage of the change is included. Without it the reference is detected as the CLI does (see [gate](cli.md#gate)). |
-| `evidence` | string | Read this evidence document instead of `<dir>/.testguard/evidence.json`, for example CI's, fetched as an artifact. |
+| `changed` | string | A git reference to measure the change against. The result then includes claim coverage of the change. Without it, the server detects the reference the way the CLI does (see [gate](cli.md#gate)). |
+| `evidence` | string | Read this evidence document instead of `<dir>/.testguard/evidence.json`. For example, read the evidence from CI, fetched as an artifact. |
 
 ### testguard_status
 
-Where the project stands and the one next action: the same document as
-`testguard status --json`, and the single source of truth every other
-rendering derives from. Read it before deciding anything.
+Where the project stands, and the one next action. It returns the same
+document as `testguard status --json`. This document is the single source of
+truth: every other rendering derives from it. Read it before you decide
+anything.
 
 | Input | Output |
 |---|---|
@@ -131,11 +133,12 @@ rendering derives from. Read it before deciding anything.
 ### testguard_brief
 
 Where the suite is blind, ranked and capped, with one hint per finding and
-unclaimed changed files first: the same content the session-start hook prints.
+unclaimed changed files first. It has the same content as the session-start
+hook prints.
 
 | Input | Output |
 |---|---|
-| `dir`, `changed`, `evidence`, `max` (integer 1–50, default 20) | The brief document ([`brief.schema.json`](../../spec/schemas/brief.schema.json)). With no evidence: the unclaimed-changes brief if there are unclaimed changes, otherwise `{note, next}`. The baseline is always `<dir>/.testguard/baseline.json` when present. |
+| `dir`, `changed`, `evidence`, `max` (integer 1–50, default 20) | The brief document ([`brief.schema.json`](../../spec/schemas/brief.schema.json)). With no evidence, the output is the unclaimed-changes brief if there are unclaimed changes. Otherwise it is `{note, next}`. The baseline is always `<dir>/.testguard/baseline.json` when present. |
 
 ### testguard_claims
 
@@ -144,7 +147,7 @@ against `@claim` annotations in source.
 
 | Input | Output |
 |---|---|
-| `dir`, `since` (a git reference) | `{path, claims, drift}`, plus `removed` when `since` is given: every claim or fault that existed at that reference and does not now, with `claim` and `fault` entries in `<dir>/testguard.ignore.json` applied. With no claims file: `{path, claims: [], note}`. Always reads `<dir>/testguard.claims.json`. |
+| `dir`, `since` (a git reference) | `{path, claims, drift}`. When `since` is given, the output also has `removed`: every claim or fault that existed at that reference and does not now, with `claim` and `fault` entries in `<dir>/testguard.ignore.json` applied. With no claims file, the output is `{path, claims: [], note}`. The tool always reads `<dir>/testguard.claims.json`. |
 
 ### testguard_evidence
 
@@ -153,7 +156,7 @@ whole document can be large, so ask for one claim when you can.
 
 | Input | Output |
 |---|---|
-| `dir`, `evidence`, `claim`, `fault` (with `claim`) | The evidence document ([`evidence.schema.json`](../../spec/schemas/evidence.schema.json)). With `claim`, only that claim's records (and with `fault`, only that fault's), plus `filtered: {claim, fault?}`. With no evidence: `{note, path}`. |
+| `dir`, `evidence`, `claim`, `fault` (with `claim`) | The evidence document ([`evidence.schema.json`](../../spec/schemas/evidence.schema.json)). With `claim`, only that claim's records (and with `fault`, only that fault's), plus `filtered: {claim, fault?}`. With no evidence, the output is `{note, path}`. |
 
 ### testguard_next_command
 
@@ -161,7 +164,7 @@ The exact shell command to run next, with the reason. It never runs anything.
 
 | Input | Output |
 |---|---|
-| `dir`, `changed`, `evidence` | `{state, action, command, why, target?, file?, loop, advice?}`: the status document's `next`; `loop`, the commands an agent runs between steps (`afterChangingCode`: `testguard probe --changed auto`, `whileWritingOneTest`: `testguard probe --claim <ID> --confirm 1`, `beforeCommittingATest`: `testguard admit <test-file> --claim <ID>`, `full`: `testguard probe`, and `rule`: the full probe only when the person asks, or nightly); and the status document's `advice`, when any. |
+| `dir`, `changed`, `evidence` | `{state, action, command, why, target?, file?, loop, advice?}`: the status document's `next`; `loop`, the commands an agent runs between steps (`afterChangingCode`: `testguard probe --changed auto`, `whileWritingOneTest`: `testguard probe --claim <ID> --confirm 1`, `beforeCommittingATest`: `testguard admit <test-file> --claim <ID>`, `full`: `testguard probe`, and `rule`: the full probe only when the person asks, or nightly); and the status document's `advice`, when it has any. |
 
 A call and its answer, on the known-answer fixture:
 

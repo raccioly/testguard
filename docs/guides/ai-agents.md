@@ -1,25 +1,26 @@
 # Using TestGuard with your AI agent
 
-TestGuard is meant to be driven by an AI agent, not typed by a person. This
-guide is for the developer setting that up: what `init` installs for each
-harness, the exact session-start hook, the operating loop the agent follows,
-and prompts you can paste to get it going. An agent that writes both the code
-and its tests encodes whatever it believed, bugs included, and the suite goes
-green; TestGuard is the check that does not share those beliefs.
+An AI agent is meant to drive TestGuard. A person is not meant to type the
+commands. This guide is for the developer who sets that up. It covers what
+`init` installs for each harness, the exact session-start hook, the operating
+loop that the agent follows, and prompts that you can paste to get started. An
+agent that writes both the code and its tests encodes what it believed, bugs
+included, and the suite goes green. TestGuard is the check that does not share
+those beliefs.
 
 ## Setup by harness
 
 | Harness | What `init` gives it | What else to do |
 |---|---|---|
-| **Claude Code** | the skill at `.claude/skills/testguard/SKILL.md`, a `SessionStart` hook in `.claude/settings.json`, and a TestGuard section in `AGENTS.md` | nothing; commit the files. Optionally add the MCP server. |
-| **Codex** | the `AGENTS.md` section, which Codex reads, and which points at the skill file for the full loop | `init` writes nothing under `.codex/`. For MCP, add the snippet `init --mcp` prints for `~/.codex/config.toml`. |
-| **Cursor** | the `AGENTS.md` section and the skill file, as plain Markdown | add the snippet `init --mcp` prints for `.cursor/mcp.json`. If your setup does not load `AGENTS.md`, paste that section into the harness's own rules. |
+| **Claude Code** | the skill at `.claude/skills/testguard/SKILL.md`, a `SessionStart` hook in `.claude/settings.json`, and a TestGuard section in `AGENTS.md` | nothing; commit the files. You can also add the MCP server. |
+| **Codex** | the `AGENTS.md` section, which Codex reads and which points at the skill file for the full loop | `init` writes nothing under `.codex/`. For MCP, add the snippet that `init --mcp` prints for `~/.codex/config.toml`. |
+| **Cursor** | the `AGENTS.md` section and the skill file, as plain Markdown | add the snippet that `init --mcp` prints for `.cursor/mcp.json`. If your setup does not load `AGENTS.md`, paste that section into the rules of the harness. |
 | **Any other harness** | the same files | have the agent run `testguard status --json` and do what `next.command` says. That one call is the whole interface. |
 
-Every harness ends up on the same source of truth: `status --json` computes
-the project's state and the one next action from the claims file, the
+Every harness uses the same source of truth. `status --json` computes the
+state of the project and the one next action from the claims file, the
 evidence, the baseline and the working tree. The CLI text, the brief and the
-skill all derive from it, so they cannot disagree.
+skill all come from it, so they cannot disagree.
 
 ## Install the agent layer
 
@@ -40,22 +41,23 @@ Commit these files.
 `init` writes two layers to two places:
 
 - The **agent layer** (skill, hook, `AGENTS.md` section) goes to the **git
-  root**, because that is where an agent session runs. Installed in a
-  subdirectory, it would never be read.
-- The **project layer** (the `.gitignore` lines for regenerated
+  root**, because an agent session runs there. An agent never reads an agent
+  layer that you install in a subdirectory.
+- The **project layer** (the `.gitignore` lines for the regenerated
   `.testguard/` files) goes beside the claims file.
 
 A second project in the same repository (`init backend`) adds one hook entry
-and one `AGENTS.md` bullet, never a duplicate; `--here` keeps everything in the
+and one `AGENTS.md` bullet, never a duplicate. `--here` keeps everything in the
 subdirectory when that subdirectory is its own agent root. `init` is
-idempotent. If a file it wrote is ignored by `.gitignore`, it says so and
-exits `1`, because an agent in a fresh clone would never see it.
+idempotent. If `.gitignore` ignores a file that `init` wrote, `init` says so
+and exits `1`, because an agent in a fresh clone would never see that file.
 
 An ordinary `init` never overwrites an existing skill or an `AGENTS.md`
 section that already lists the project. `--force` replaces the skill file
 (and, with `--ci-evidence`, the helper script) but does not refresh an
-`AGENTS.md` section; use it with approval and review the diff. Upgrading the package does not
-refresh a copied skill: see [upgrading](../upgrade.md).
+`AGENTS.md` section. Use `--force` with approval and review the diff. An
+upgrade of the package does not refresh a copied skill. See
+[upgrading](../upgrade.md).
 
 ## The session-start hook
 
@@ -78,8 +80,8 @@ refresh a copied skill: see [upgrading](../upgrade.md).
 }
 ```
 
-For a nested project such as `backend/`, the entry it adds checks the
-project's own install first, then the root's:
+For a nested project such as `backend/`, the entry that `init` adds checks the
+install of the project first, then the install at the root:
 
 ```json
 {
@@ -88,26 +90,26 @@ project's own install first, then the root's:
 }
 ```
 
-Why it is shaped this way:
+The hook has this shape for these reasons:
 
-- It resolves the project's installed binary, then a `testguard` on `PATH`,
-  then does nothing. It ends in `true`, so it can never break a session.
-- It never reaches the network.
-  There is no package-runner fallback in it in any form: one that declines to
-  install still resolves the package from the registry first.
-  Any earlier TestGuard hook, whichever release wrote it, is replaced in
-  place when you run `init` again, so a session never briefs twice.
-- `brief --text` prints only, and exits `0` silently when there is no evidence
+- It uses the installed binary of the project first, then a `testguard` on
+  `PATH`, and then does nothing. It ends in `true`, so it can never break a
+  session.
+- It never reaches the network. It has no package-runner fallback in any form.
+  A package runner that declines to install still resolves the package from the
+  registry first. When you run `init` again, it replaces any earlier TestGuard
+  hook in place, whichever release wrote it. So a session never briefs twice.
+- `brief --text` only prints. It exits `0` silently when there is no evidence
   yet. The brief names the install that answered (`local install`,
-  `npx cache`, `pnpm dlx cache`, `bunx cache` or `global`), so a stale
-  binary, global or cached, is visible.
+  `npx cache`, `pnpm dlx cache`, `bunx cache` or `global`). So you can see a
+  stale binary, global or cached.
 
-For other harnesses with a session-start mechanism, the same command works
+For other harnesses that have a session-start mechanism, the same command works
 unchanged.
 
 ## The operating loop
 
-Between those steps the agent follows the fast loop, stated as commands:
+Between those steps, the agent follows the fast loop. These are the commands:
 
 ```bash
 testguard probe --changed auto              # after changing code
@@ -116,13 +118,13 @@ testguard admit <test-file> --claim <ID>    # before committing that test
 testguard probe                             # the full probe: only when asked, or nightly
 ```
 
-Faults already run in parallel and every kill is confirmed by a run alone, so
-the agent never passes `--serial` unless a suite cannot share the machine.
-`status` and the brief carry `advice` lines when a run leaves speed on the
-table, each with the command to run.
+Faults already run in parallel, and a run alone confirms every kill. So the
+agent never passes `--serial` unless a suite cannot share the machine.
+`status` and the brief carry `advice` lines when a run wastes time. Each line
+has the command to run.
 
-The skill teaches one loop. The agent never infers state from which files
-exist; it asks:
+The skill teaches one loop. The agent never infers the state from the files
+that exist. It asks:
 
 ```bash
 testguard status --json
@@ -142,13 +144,14 @@ and acts on `state` and `next`:
 | `clean` | everything killed or baselined | `testguard baseline` if `next` says so; otherwise nothing, or expand the claimed surface when `next` points at an unclaimed module |
 
 `next.action` is one of `scaffold`, `claim`, `probe`, `write-test`,
-`baseline`, `review-fault-change`, `repair-fault` or `none`, and
-`next.command` is the shell line (or, for `write-test`, the instruction) to
-follow. `status` exits `0` when clean, `1` when something is unproven, stale,
-unclaimed or has an invalid anchor, and `2` when there is nothing to probe yet.
-The document's shape is [`status.schema.json`](../../spec/schemas/status.schema.json).
+`baseline`, `review-fault-change`, `repair-fault` or `none`. `next.command` is
+the shell line to follow (for `write-test`, it is the instruction). `status`
+exits `0` when clean. It exits `1` when something is unproven, stale,
+unclaimed or has an invalid anchor. It exits `2` when there is nothing to probe
+yet. The shape of the document is
+[`status.schema.json`](../../spec/schemas/status.schema.json).
 
-A real `unproven` result, from the audit-log example in
+This is a real `unproven` result, from the audit-log example in
 [Writing claims](writing-claims.md#2-an-audit-log-field-survived-then-fixed):
 
 ```json
@@ -167,51 +170,53 @@ A real `unproven` result, from the audit-log example in
 | `SURVIVED` | write a test in the defender file that fails with the fault applied and passes on `HEAD` |
 | `SURVIVED [killed-by-undeclared-tests: …]` | add those test files to the claim's `defendedBy` |
 | `NOCOVER` | write a new test file that imports the target and asserts the claim |
-| `UNVERIFIABLE` | fix the fault definition (or the defenders' import), never the code |
+| `UNVERIFIABLE` | fix the fault definition (or the import of the defenders), never the code |
 | `FAULT-INVALID` | fix the fault definition |
 | `TIMEOUT` | write an assertion that fails on it; a hang is not a detection |
 | `FLAKY-DEFENDER` | fix the flake first; no verdict is trustworthy until then |
 
-The full table, with signals, is in [verdicts](../reference/verdicts.md).
+[Verdicts](../reference/verdicts.md) has the full table, with signals.
 
 ### The two-gate rule
 
-Every test the agent writes must pass two gates: **green on unmodified
+Every test that the agent writes must pass two gates: **green on unmodified
 `HEAD`**, and **red on every fault of the claim**, three runs out of three. One
-command checks both, on the uncommitted test, without touching the tree:
+command checks both gates on the uncommitted test, and it does not touch the
+tree:
 
 ```bash
 testguard admit test/audit.test.mjs --claim AUDIT-ACTOR-001
 ```
 
-`ADMITTED` (exit `0`) means commit it. `NOT ADMITTED` (exit `1`) names the
-first blocking fault. `--confirm 1` gives a fast `ADMITTED?` that must be
-confirmed at 3 before committing. Details are in
-[Writing claims](writing-claims.md#admit-the-two-gate-rule).
+`ADMITTED` (exit `0`) means: commit the test. `NOT ADMITTED` (exit `1`) names
+the first blocking fault. `--confirm 1` gives a fast `ADMITTED?`. Confirm it at
+3 before you commit. [Writing claims](writing-claims.md#admit-the-two-gate-rule)
+has the details.
 
 ### Rules the agent does not get to bend
 
-- **Never make a fault die by editing the claims file.** Editing a claim that
-  was wrong is allowed, but every fault edited after it survived is listed in
-  `status` with its previous verdict. Say why in the commit.
-- **A test that asserts current behaviour is not a fix.** If it would pass
-  with the fault applied, it defends nothing.
+- **Never make a fault die by editing the claims file.** You may edit a claim
+  that was wrong. But `status` lists every fault that someone edited after it
+  survived, with its previous verdict. Say why in the commit.
+- **A test that asserts current behavior is not a fix.** If it would pass with
+  the fault applied, it defends nothing.
 - **Never re-implement the code under test inside the test.** Drive the real
   function and assert the outcome. A test file that copies the logic and
-  asserts against the copy can be green forever while the real code is broken.
+  asserts against the copy can stay green forever while the real code is
+  broken.
 - **Every new or changed source file needs a claim.** Run
-  `testguard gate --changed HEAD --include-dirty` before committing; a new test
-  file must appear in some claim's `defendedBy`.
-- **`--confirm 1` results are provisional**: they print with `?` and cannot be
-  baselined.
+  `testguard gate --changed HEAD --include-dirty` before you commit. A new test
+  file must appear in the `defendedBy` of some claim.
+- **`--confirm 1` results are provisional.** They print with `?` and you cannot
+  baseline them.
 - **Do not commit half-written tests to satisfy a probe.** Use
   `--include-dirty`.
-- **Commit `.testguard/baseline.json`; never commit `evidence.json` or
+- **Commit `.testguard/baseline.json`. Never commit `evidence.json` or
   `brief.json`.** See [artifacts](../reference/artifacts.md).
 
 ## Prompts to paste
 
-These work in any harness once `init` has run.
+These work in any harness after `init` has run.
 
 ```text
 Adopt TestGuard in this repo following docs/guides/existing-projects.md.
@@ -240,43 +245,43 @@ or fault. For each, tell me whether it was SURVIVED when it was removed.
 ## Running it through MCP
 
 When a harness cannot run the skill or the hook, `testguard mcp` serves the
-same documents over the Model Context Protocol on stdio, and
-`testguard init --mcp` prints a ready config for Claude Code, Cursor and Codex
-(printed, never written: a harness config is yours to place). Its five tools
-are read-only, and none runs a probe: `testguard_next_command` returns the
-shell line for the agent to run where you can see it, plus the fast loop
-(`loop`) and any speed `advice`. Tools and config are in
-[the MCP reference](../reference/mcp.md).
+same documents over the Model Context Protocol on stdio. `testguard init --mcp`
+prints a ready config for Claude Code, Cursor and Codex. It prints the config
+and never writes it, because you place the config of a harness yourself. The
+server has five tools. They are read-only, and none runs a probe.
+`testguard_next_command` returns the shell line for the agent to run where you
+can see it, plus the fast loop (`loop`) and any speed `advice`.
+[The MCP reference](../reference/mcp.md) covers the tools and the config.
 
 ## CI evidence in a local session
 
-Evidence lives where `probe` ran and is not committed, so on a fresh clone the
-brief is empty and `status` says `unprobed` even when CI has full evidence.
-Point either command at CI's document:
+Evidence stays where `probe` ran, and you do not commit it. So on a fresh
+clone, the brief is empty and `status` says `unprobed`, even when CI has full
+evidence. Point either command at the document from CI:
 
 ```bash
 testguard status . --evidence .testguard/ci/evidence.json
 testguard brief . --text --evidence .testguard/ci/evidence.json
 ```
 
-A provided document is marked `evidenceSource: provided`, both commits are
-named, and staleness is still computed from its recorded input hashes, so a
-file you edited since CI ran goes `evidence-stale`.
-`init --ci-evidence github` (or `gitlab`) writes an on-demand helper,
-`.testguard/fetch-ci-evidence.sh`, that fetches the artifact with the platform
-CLI you already have; it runs only when you run it.
-Where CI writes that artifact is in [GitHub Actions](ci/github-actions.md) and
-[GitLab](ci/gitlab.md); which files are which is in
-[artifacts](../reference/artifacts.md).
+TestGuard marks a document that you provide as `evidenceSource: provided`. It
+names both commits. It still computes staleness from the recorded input hashes
+of the document. So if you edited a file since CI ran, the state goes to
+`evidence-stale`. `init --ci-evidence github` (or `gitlab`) writes an on-demand
+helper, `.testguard/fetch-ci-evidence.sh`. The helper fetches the artifact with
+the platform CLI that you already have. It runs only when you run it.
+[GitHub Actions](ci/github-actions.md) and [GitLab](ci/gitlab.md) show where CI
+writes that artifact. [Artifacts](../reference/artifacts.md) explains which
+file is which.
 
 ## Version checks are advice, not installs
 
-The skill and the `AGENTS.md` section ask the agent, once per session and only
-if your network policy permits, to compare the CLI it is actually running with
-the registry's latest stable version, and to suggest an upgrade and ask before
-changing anything. TestGuard's CLI and hook make no such check themselves, and
-a failed or skipped check changes no verdict, evidence or exit code. See
-[upgrading](../upgrade.md).
+The skill and the `AGENTS.md` section ask the agent to compare the CLI that it
+actually runs with the latest stable version in the registry. The agent does
+this once per session, and only if your network policy permits. The agent then
+suggests an upgrade and asks before it changes anything. The CLI and the hook
+of TestGuard make no such check. A failed or skipped check changes no verdict,
+evidence or exit code. See [upgrading](../upgrade.md).
 
 ## Next
 

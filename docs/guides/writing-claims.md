@@ -1,56 +1,62 @@
 # Writing claims
 
-This guide is for whoever authors `testguard.claims.json`: a developer, a
-reviewer, or an agent working under review. It covers what makes a claim worth
-writing, every field of a claim and a fault, how defenders are chosen, three
-complete worked examples, the tools that propose faults for you, and how to
-remove a claim without it looking like a cover-up. The model behind it is in
-[How TestGuard works](../concepts/how-it-works.md).
+This guide is for whoever writes `testguard.claims.json`: a developer, a
+reviewer, or an agent that works under review. It covers these topics:
+
+- what makes a claim worth writing
+- every field of a claim and a fault
+- how TestGuard chooses defenders
+- three complete worked examples
+- the tools that propose faults for you
+- how to remove a claim in the open
+
+The model behind it is in [How TestGuard works](../concepts/how-it-works.md).
 
 ## What makes a good claim
 
-A claim is an **observable promise**: something a caller, a user or an
+A claim is an **observable promise**: something that a caller, a user or an
 auditor could see go wrong. Write it the way the project would state it to a
 reviewer, not the way the code implements it.
 
 | Weak | Better | Why |
 |---|---|---|
-| "`requireAdmin` checks roles." | "A caller without the admin role is refused." | Names the outcome, not the mechanism. A refactor keeps the promise. |
-| "The audit function works." | "Every audit row records the id of the actor who performed the action." | Falsifiable: one dropped field makes it false. |
-| "Rate limiting is correct." | "A client that has made `limit` requests in the last 60 seconds is refused the next one." | Says which input, which outcome, which forbidden outcome. |
+| "`requireAdmin` checks roles." | "A caller without the admin role is refused." | It names the outcome, not the mechanism. A refactor keeps the promise. |
+| "The audit function works." | "Every audit row records the id of the actor who performed the action." | You can falsify it: one dropped field makes it false. |
+| "Rate limiting is correct." | "A client that has made `limit` requests in the last 60 seconds is refused the next one." | It says which input, which outcome and which forbidden outcome. |
 
 ### Intent comes first, and from outside the code
 
 A test written by reading the code encodes whatever the code does, bugs
-included. So the intended behaviour has to come from somewhere the
-implementation did not: a requirement, an ADR, a bug report, an incident.
+included. So the intended behavior must come from a source other than the
+implementation: a requirement, an ADR, a bug report, an incident.
 Before you adopt any draft, write down:
 
 - the **inputs** (who calls, with what);
 - the **expected outcome**;
-- the **forbidden outcome**, which is what each fault will try to produce.
+- the **forbidden outcome**, which is what each fault tries to produce.
 
 Record where it came from in `source.kind` and `source.ref`. When no such
-source exists, keep `source.kind: "inferred"` and say so: an inferred claim is
+source exists, keep `source.kind: "inferred"` and say so. An inferred claim is
 still useful, but it is not independent intent. TestGuard never fetches or
 authenticates a reference, and a passing test does not establish intent.
-Paraphrasing the code into a sentence is not independent intent either.
+A sentence that paraphrases the code is not independent intent either.
 
 `scaffold` drafts always declare `inferred`, even when grouped under an
-annotation; supplying the source is your job. When you scaffold under an
-existing claim with `--claim`, that claim's statement and source are kept.
+annotation. You must supply the source. When you scaffold under an existing
+claim with `--claim`, TestGuard keeps that claim's statement and source.
 
 ### Keep claims small
 
-One promise per claim, and the fewest faults that would make it false. A claim
-that bundles three promises gives a verdict nobody can act on, and costs more
-to probe: each fault runs its defenders N times. Two or three precise faults
-beat ten loose ones.
+Write one promise per claim, with the fewest faults that would make it false.
+A claim that bundles three promises gives a verdict that nobody can act on. It
+also costs more to probe, because each fault runs its defenders N times. Two or
+three precise faults are better than ten loose ones.
 
 ## Anatomy of a claim
 
 Claims live in `testguard.claims.json` beside your project's `package.json` or
-`pyproject.toml`. Point editors at the schema for completion and validation:
+`pyproject.toml`. Point your editor at the schema for completion and
+validation:
 
 ```json
 {
@@ -62,18 +68,18 @@ Claims live in `testguard.claims.json` beside your project's `package.json` or
 
 | Field | Required | What it is |
 |---|---|---|
-| `id` | yes | Stable identifier: letters, digits, `.`, `_`, `-`, starting with a letter or digit, up to 128 characters. Use a hyphen (`AUTH-ADMIN-001`) so a source annotation can name it. Renaming changes every fingerprint derived from it. |
+| `id` | yes | Stable identifier: letters, digits, `.`, `_`, `-`, starting with a letter or digit, up to 128 characters. Use a hyphen (`AUTH-ADMIN-001`) so a source annotation can name it. A rename changes every fingerprint derived from the id. |
 | `statement` | yes | The promise in plain language, up to 2,000 characters. |
 | `source` | yes | `{ "kind": …, "ref": … }`: where the intent came from. `ref` is optional and opaque (up to 512 characters). |
 | `severity` | yes | `critical`, `high`, `medium` or `low`. Drives ranking and the `--severity` gate floor. |
 | `producedBy` | yes | `{ "producer": "human" \| "agent" \| "operator" \| "derived", "by", "reviewedBy", "at" }`. Only `producer` is required. |
 | `defendedBy` | no | Globs for the test files that defend the claim. Absent or empty means discover them. |
-| `serial` | no | `true`: this claim's tests cannot share the machine (a fixed port, one database), so under the fault fan-out its faults are probed alone, after the others, and the records say `serialDeclared`. Prefer making the tests parallel-safe with `TESTGUARD_WORKER`. |
+| `serial` | no | `true`: this claim's tests cannot share the machine (a fixed port, one database). Under the fault fan-out, TestGuard probes its faults alone, after the others, and the records say `serialDeclared`. Prefer to make the tests parallel-safe with `TESTGUARD_WORKER`. |
 | `faults` | yes | At least one fault. |
 | `tags` | no | Unique identifiers for your own grouping. |
 
 `claims` rejects duplicate claim ids and duplicate fault ids within a claim.
-The tables on this page are for authoring; the complete file format is in
+The tables on this page help you write claims. The complete file format is in
 [configuration](../reference/configuration.md#claims-file).
 
 ### Source kinds
@@ -89,13 +95,13 @@ The tables on this page are for authoring; the complete file format is in
 | `manual` | a person stating it directly, with no document behind it |
 | `annotation` | a `@claim` annotation in source (see [below](#linking-claims-from-source)) |
 | `comment` | a code comment |
-| `inferred` | nobody supplied it; it was read off the code |
+| `inferred` | nobody supplied it. TestGuard read it off the code |
 
-These are declared labels, not authenticated independence, and not a strength
-order. Ranking weights `spec` and `adr` highest and `annotation` and `comment`
-lowest, but a label never waives a finding. `producedBy.producer` is separate:
-it records who *wrote the entry*, while `source` records where the *intent*
-came from.
+These are declared labels. They are not authenticated independence, and they
+are not a strength order. Ranking weights `spec` and `adr` highest and
+`annotation` and `comment` lowest, but a label never waives a finding.
+`producedBy.producer` is separate. It records who *wrote the entry*, while
+`source` records where the *intent* came from.
 
 ### Naming the requirement a claim defends
 
@@ -106,67 +112,69 @@ structured requirement reference:
 "source": { "kind": "spec", "ref": "req:acme.billing#FR-003" }
 ```
 
-The part before `#` is the spec ID and the part after it is the requirement
-ID. A requirement-tracing tool can then tell which evidence speaks for which
-requirement without guessing from a file path; DocGuard uses it to report the
-tests that cite a changed requirement as re-verified. The form must be
-declared with `kind: "spec"`. A malformed `req:` reference, or one under
-another kind, fails validation. TestGuard never resolves it, so a spec ID that
-does not exist is still valid here; the consumer checks it.
+The part before `#` is the spec ID. The part after it is the requirement ID.
+A requirement-tracing tool can then tell which evidence speaks for which
+requirement, without a guess from a file path. DocGuard uses it to report the
+tests that cite a changed requirement as re-verified. You must declare the form
+with `kind: "spec"`. A malformed `req:` reference, or one under another kind,
+fails validation. TestGuard never resolves it, so a spec ID that does not exist
+is still valid here. The consumer checks it.
 
 ## Faults
 
-A fault is one concrete way the claim could be false, written as an exact
+A fault is one concrete way that the claim could be false, written as an exact
 substitution.
 
 | Field | Required | What it is |
 |---|---|---|
 | `id` | yes | Unique within the claim (`F1`, `F2`…). |
-| `description` | yes | What the fault does, in words a reviewer can check against the claim. |
-| `faultClass` | yes | The shape of the break; see below. |
+| `description` | yes | What the fault does, in words that a reviewer can check against the claim. |
+| `faultClass` | yes | The shape of the break. See below. |
 | `file` | yes | Project-relative path of the file to change. No absolute paths, no `..`. |
 | `find` | yes | Exact text to locate. Whitespace and `\n` count. |
 | `replace` | yes | Exact replacement. May be empty (deletes `find`). Must differ from `find`. |
 | `expectHits` | no, default `1` | How many times `find` must occur in `file`. Any other count is `UNVERIFIABLE`, never a skip. |
 | `occurrence` | no, default `1` | Which occurrence to replace, 1-based. Must not exceed `expectHits`. |
-| `defendedBy` | no | Overrides the claim's defenders for this fault; see [Defenders](#defenders). |
+| `defendedBy` | no | Overrides the claim's defenders for this fault. See [Defenders](#defenders). |
 | `producedBy` | yes | Same shape as the claim's. |
 
-Leave `method` out. It defaults to `fault-injection`, the only method claimspec
-v1 fully specifies; `assertion` and `scan` are reserved for other Guard tools.
+Leave `method` out. It defaults to `fault-injection`, the only method that
+claimspec v1 fully specifies. `assertion` and `scan` are reserved for other
+Guard tools.
 
 **Fault classes:** `guard-removed`, `condition-forced`, `statement-deleted`,
 `variable-swap`, `literal-changed`, `call-removed`, `return-altered`,
 `exception-swallowed`, `field-dropped`, `argument-swapped`, `element-removed`,
-`handler-dropped`, `other`. The class does not change how the fault is
-applied; it is the join key [replay](replay.md) uses to calibrate how often
-bugs of that shape escape.
+`handler-dropped`, `other`. The class does not change how TestGuard applies
+the fault. It is the join key that [replay](replay.md) uses to calibrate how
+often bugs of that shape escape.
 
 ### What makes a good fault
 
 - **It makes the statement false, and nothing else.** If the claim is "the
-  actor is recorded", drop the actor field; do not also break the timestamp.
-- **It compiles.** A replacement that does not load is `FAULT-INVALID`: a run
-  spent saying nothing about the tests.
+  actor is recorded", drop the actor field. Do not also break the timestamp.
+- **It compiles.** A replacement that does not load is `FAULT-INVALID`. That
+  spends a run and says nothing about the tests.
 - **It is observable.** If no input could reveal the change, the fault is an
-  equivalent mutant and will survive forever. Rewrite it.
+  equivalent mutant and survives forever. Rewrite it.
 - **Its anchor is unique.** Prefer a full line or a distinctive fragment. When
   the same text legitimately occurs twice, set `expectHits` to the real count
   and `occurrence` to the one you mean.
 
 ### Anchors rot; check them cheaply
 
-An anchor is exact text, so editing the guarded line breaks it. Find out
-before a probe does:
+An anchor is exact text, so editing the guarded line breaks it. Find the
+problem before a probe does:
 
 ```bash
 npx testguard-cli claims --check-anchors   # locate every anchor; syntax-check replacements
 ```
 
-It locates every anchor, and parses each replacement in memory for `.js`,
-`.mjs`, `.cjs` and Python files (other files are located but not parsed). It
-runs no tests, creates no worktree and changes no file, and exits `1` when an
-anchor is missing or ambiguous or a checked replacement does not compile:
+It locates every anchor. It also parses each replacement in memory for `.js`,
+`.mjs`, `.cjs` and Python files (it locates other files but does not parse
+them). It runs no tests, creates no worktree and changes no file. It exits `1`
+when an anchor is missing or ambiguous or a checked replacement does not
+compile:
 
 ```text
 OK               AUTH-ADMIN-001/F1  src/auth.mjs — 1 hit, expected 1; javascript syntax ok
@@ -174,13 +182,13 @@ OK               AUDIT-ACTOR-001/F1  src/audit.mjs — 1 hit, expected 1; javasc
 anchor preflight: 4 faults checked, 4 ok, 0 invalid in 23ms
 ```
 
-It reports and stops; it never guesses a new anchor. Repair the fault so it
-still means the same thing, then re-probe. `status` reports
-`invalid-anchors` before any evidence state for the same reason.
+It reports and stops. It never guesses a new anchor. Repair the fault so it
+still means the same thing, then re-probe. For the same reason, `status`
+reports `invalid-anchors` before any evidence state.
 
 ## Defenders
 
-Defenders are chosen at three levels, most specific first:
+TestGuard chooses defenders at three levels, most specific first:
 
 | Where | Meaning |
 |---|---|
@@ -189,44 +197,44 @@ Defenders are chosen at three levels, most specific first:
 | claim `defendedBy: ["…"]` | every fault without its own `defendedBy` inherits these |
 | absent everywhere (or a claim-level `[]`) | discovery |
 
-A typical split: a unit-level fault selects `["test/unit/rate.test.mjs"]` while
+A typical split: a unit-level fault selects `["test/unit/rate.test.mjs"]`, and
 an integration fault inherits the claim's broader set. `claims` prints the
 selection per fault (`RATE-WINDOW-001/F2: fault (discovery) — …`), and the
 evidence records where each selection came from. Changing a selection
-invalidates verdict reuse; narrowing a fault's set after it was killed is
-warned about. Re-probe and read the verdict rather than assume.
+invalidates verdict reuse. TestGuard warns when you narrow a fault's set after
+the fault was killed. Re-probe and read the verdict. Do not assume the result.
 
 ### Discovery, and why mocks do not count
 
-Discovery picks the test files that import the fault's target: by relative
-path, `tsconfig` `paths` (through `extends` and `references`), vite/vitest
-`resolve.alias` and `package.json` `imports`, following the imported symbol
-through barrel files. Then it removes every file that **mocks** the target:
-a test that `vi.mock`s or `jest.mock`s a module cannot detect a fault inside
-it. `NOCOVER` therefore means exactly "no test file imports this source
+Discovery picks the test files that import the fault's target. It follows
+relative paths, `tsconfig` `paths` (through `extends` and `references`),
+vite/vitest `resolve.alias` and `package.json` `imports`. It follows the
+imported symbol through barrel files. Then it removes every file that **mocks**
+the target. A test that `vi.mock`s or `jest.mock`s a module cannot detect a
+fault inside it. So `NOCOVER` means exactly "no test file imports this source
 without mocking it". `claims` prints the split (for example `18 import · 16
 mock · 2 can detect`).
 
 A mocking file that never asserts on anything it imported from the target
-carries the signal `mocked-never-asserted`, the cheapest blind-spot signal
-there is. If the mock is deliberate, say why with a comment on or above it:
+carries the signal `mocked-never-asserted`. It is the cheapest blind-spot
+signal. If the mock is on purpose, say why with a comment on or above it:
 
 ```js
 // unasserted: the mailer is mocked only to stop network calls; delivery is claimed in mailer.test.mjs
 vi.mock('../src/mailer.mjs');
 ```
 
-The signal is then recorded as `unasserted-annotated` with your reason:
-silenced, never hidden. Python's `patch("pkg.mod.fn")` replaces one attribute,
-not the module, so that file stays a defender; see the
-[Python guide](python.md). All signals are listed in
-[verdicts](../reference/verdicts.md).
+TestGuard then records the signal as `unasserted-annotated` with your reason.
+The signal is silenced, never hidden. Python's `patch("pkg.mod.fn")` replaces
+one attribute, not the module, so that file stays a defender. See the
+[Python guide](python.md). [verdicts](../reference/verdicts.md) lists all
+signals.
 
 ## Worked examples
 
-Three small claims from three neutral domains, each validated with
-`claims` and `claims --check-anchors` and probed with Node's built-in runner.
-Together they make one valid claims file: put the three objects in one
+These are three small claims from three neutral domains. Each one is validated
+with `claims` and `claims --check-anchors` and probed with Node's built-in
+runner. Together they make one valid claims file. Put the three objects in one
 `claims` array.
 
 ### 1. An authorization guard (killed)
@@ -267,8 +275,8 @@ The claim, from a written requirement:
 ```
 
 `test/auth.test.mjs` asserts that a `viewer` is refused with
-`assert.throws(…, /forbidden/)`. With the fault applied that assertion fails in
-all three runs, so the fault is `killed`.
+`assert.throws(…, /forbidden/)`. With the fault applied, that assertion fails
+in all three runs, so the fault is `killed`.
 
 ### 2. An audit-log field (SURVIVED, then fixed)
 
@@ -312,13 +320,13 @@ and the newline:
 ```
 
 The existing test checks `row.action` and `row.target` and never names
-`actor`, so the suite stays green with the field gone:
+`actor`. So the suite stays green with the field gone:
 
 ```text
 SURVIVED        AUDIT-ACTOR-001/F1     high     src/audit.mjs  The actor field is dropped from the audit row.
 ```
 
-The fix is a test that names the field, here by asserting the whole row:
+The fix is a test that names the field. Here it asserts the whole row:
 
 ```js
 test('an audit row records who acted', () => {
@@ -337,8 +345,8 @@ npx testguard-cli admit test/audit.test.mjs --claim AUDIT-ACTOR-001 --runner nod
 ADMITTED — test/audit.test.mjs passes on HEAD and fails on the fault of AUDIT-ACTOR-001, 3/3. Commit it.
 ```
 
-This is the same blind spot as `expect.objectContaining({…})` omitting a key:
-a partial assertion cannot fail on a field it does not list.
+This is the same blind spot as `expect.objectContaining({…})` that omits a
+key. A partial assertion cannot fail on a field that it does not list.
 
 ### 3. A rate-limit window (two faults, mixed defender selection)
 
@@ -353,8 +361,9 @@ export function allow(hits, now, limit = 5) {
 }
 ```
 
-Two different ways the promise can break, each its own fault. `F1` inherits
-the claim's defender; `F2` sets `defendedBy: []` to request discovery:
+The promise can break in two different ways. Each way is its own fault. `F1`
+inherits the claim's defender. `F2` sets `defendedBy: []` to request
+discovery:
 
 ```json
 {
@@ -398,8 +407,8 @@ the claim's defender; `F2` sets `defendedBy: []` to request discovery:
 A test that sends five requests one to five seconds ago and expects the sixth
 to be refused kills both faults. Note what `scaffold` proposed for this file
 on its own: one `literal-changed` fault on `limit = 5`, and nothing for the
-window or the comparison. Mechanical proposals are a starting point; the
-faults that express the promise are yours to write.
+window or the comparison. Mechanical proposals are a starting point. You write
+the faults that express the promise.
 
 ## Check your work
 
@@ -410,58 +419,60 @@ npx testguard-cli probe --claim AUTH-ADMIN-001 # probe one claim (repeat or comm
 npx testguard-cli admit test/auth.test.mjs --claim AUTH-ADMIN-001   # judge one test against one claim
 ```
 
-`probe --claim` updates `.testguard/evidence.json` with what it measured and
-carries every other record only when its inputs are unchanged, marking each one
-(`carried`), so a subset never masquerades as a full run. A provisional run
-writes `.testguard/evidence-partial.json` instead. While iterating, `--no-escalate` and
-`--confirm 1` make a fast provisional pass; finish with the defaults.
+`probe --claim` updates `.testguard/evidence.json` with what it measured. It
+carries every other record only when its inputs are unchanged, and it marks
+each one (`carried`). So a subset never passes for a full run. A provisional
+run writes `.testguard/evidence-partial.json` instead. While you iterate,
+`--no-escalate` and `--confirm 1` make a fast provisional pass. Finish with the
+defaults.
 
 ## admit: the two-gate rule
 
-A test is admitted only when it passes **both** gates: green on unmodified
-`HEAD`, and red on every fault of the claim, N out of N.
+A test is admitted only when it passes **both** gates. It must be green on
+unmodified `HEAD`, and red on every fault of the claim, N out of N.
 
 ```bash
 npx testguard-cli admit test/auth.test.mjs --claim AUTH-ADMIN-001
 npx testguard-cli admit test/auth.test.mjs --claim AUTH-ADMIN-001 --fault F1 --confirm 1   # fast, provisional
 ```
 
-- `ADMITTED` (exit `0`): every fault is killed N/N by defenders that are green
-  N/N.
-- `NOT ADMITTED` (exit `1`): names the first blocking fault and what to do.
+- `ADMITTED` (exit `0`): defenders that are green N/N kill every fault N/N.
+- `NOT ADMITTED` (exit `1`): it names the first blocking fault and what to do.
 - Exit `3`: the test file is not a declared or discovered defender of the claim.
   Add it to `defendedBy` first.
 
-`admit` is `probe --claim <ID> --include-dirty` under another name, so it judges
-your uncommitted test without touching the tree and can never disagree with
-the gate. Its evidence goes to `.testguard/evidence-partial.json`. A
-`--confirm 1` result prints `ADMITTED?` and must be confirmed at 3 before you
-commit. Generators admit a test because it compiles, passes and raises
-coverage; `admit` admits it because it fails when the claim is false.
+`admit` is `probe --claim <ID> --include-dirty` under another name. So it
+judges your uncommitted test without touching the tree, and it can never
+disagree with the gate. Its evidence goes to `.testguard/evidence-partial.json`.
+A `--confirm 1` result prints `ADMITTED?`. Confirm it at 3 before you commit.
+Generators admit a test because it compiles, passes and raises coverage.
+`admit` admits a test because it fails when the claim is false.
 
 ## Linking claims from source
 
 A `@claim <ID>` comment in a source file links that file to a claim. `claims`
-reconciles both directions:
+checks both directions:
 
-- an annotation whose id is not in the claims file is reported as
-  `UNDECLARED` (a claim with no fault model) and exits `1`;
-- a claim with `source.kind: "annotation"` that no source file carries is
-  reported as `STALE` and also exits `1`.
+- It reports an annotation whose id is not in the claims file as
+  `UNDECLARED` (a claim with no fault model) and exits `1`.
+- It reports a claim with `source.kind: "annotation"` that no source file
+  carries as `STALE`, and it also exits `1`.
 
-Two rules keep the scan honest. **Test files are not scanned**: a claim
-asserted by a test is the authorship trap the tool exists for. And **an
+Two rules keep the scan honest. **The scan skips test files.** A claim that a
+test asserts is the authorship trap that the tool exists to prevent. And **an
 annotation id must contain a hyphen**, so prose such as "@claim annotations"
-is never mistaken for one. Hidden directories, `node_modules`, `dist`,
-`coverage` and nested projects with their own claims file are skipped too.
+is never mistaken for one. The scan also skips hidden directories,
+`node_modules`, `dist`, `coverage` and nested projects with their own claims
+file.
 
 Other declared claims with no source link produce an `ANNOTATION ADVISORY`
-note. It is advice only: it never changes verification state, the next action
-or an exit code, and exact fault anchors are checked either way. A link is
-lexical, not authenticated intent or ownership. `status` computes the same
-advice with a bounded scan (10,000 entries, 1,000 files, 64 directory levels,
-256 KiB per file, 2 MiB total) and reports it as unavailable rather than
-concluding an id is absent when the bound is reached.
+note. It is advice only. It never changes verification state, the next action
+or an exit code, and TestGuard checks exact fault anchors either way. A link is
+lexical. It is not authenticated intent or ownership. `status` computes the
+same advice with a bounded scan (10,000 entries, 1,000 files, 64 directory
+levels, 256 KiB per file, 2 MiB total). When the scan reaches a bound,
+`status` reports the advice as unavailable. It does not conclude that an id is
+absent.
 
 ### Placing annotations: `claims --annotate`
 
@@ -478,22 +489,22 @@ No files changed. Review this selection, then rerun with --apply; the plan is re
 
 - It places a file-header comment in JavaScript, TypeScript or Python files.
   Select claims by repeating `--claim` or with comma-separated ids.
-- Every invocation recomputes its plan; a preview is not a saved approval.
-  `--out` is refused; `--json` output conforms to
+- Every invocation recomputes its plan. A preview is not a saved approval.
+  It refuses `--out`. `--json` output conforms to
   [`annotations.schema.json`](../../spec/schemas/annotations.schema.json) and
   carries no source contents or verdicts.
 - An unsupported, ambiguous or unsafe target blocks the whole selection.
-  Files are capped at 2 MiB each and 16 MiB in total. BOM, shebang, Python
-  encoding cookie, newline style and permissions are preserved.
+  Files are capped at 2 MiB each and 16 MiB in total. It preserves the BOM,
+  shebang, Python encoding cookie, newline style and permissions.
 - `--apply` takes an exclusive lock and keeps fsynced originals in an
-  owner-only recovery directory outside the checkout, whose path it prints. It
-  never reclaims an existing lock or rolls back over your edits. It is
-  recoverable, not atomic: an interruption can leave partial content, so
-  compare the retained originals before recovering.
-- A claims file outside the project can be previewed but cannot authorize
+  owner-only recovery directory outside the checkout. It prints the path of
+  that directory. It never reclaims an existing lock and never rolls back over
+  your edits. It is recoverable, not atomic. An interruption can leave partial
+  content, so compare the retained originals before you recover.
+- You can preview a claims file outside the project, but it cannot authorize
   writes.
-- Exit codes: preview `0` when applicable, `2` when refused; apply `0` only
-  after verified completion, `2` on refusal or partial failure; `3` for
+- Exit codes: preview `0` when applicable, `2` when refused. Apply `0` only
+  after verified completion, `2` on refusal or partial failure. `3` for
   malformed options.
 
 Placement is file-level. It is not symbol ownership or proof of anything, and
@@ -501,10 +512,10 @@ it does not change claim origins, evidence or baselines.
 
 ## From proposal to claim: scaffold, sweep and concerns
 
-Writing a fault by hand means reading the code to find an exact anchor. Field
+To write a fault by hand, you read the code to find an exact anchor. Field
 reports found that about 80% of hand-written faults are one of nine shapes, so
-TestGuard proposes them. Everything it proposes is a **draft**: never your
-claims file, never a verdict.
+TestGuard proposes them. Everything it proposes is a **draft**. It is never
+your claims file and never a verdict.
 
 ### scaffold
 
@@ -530,31 +541,33 @@ npx testguard-cli scaffold src/auth.ts --json                  # print the draft
 syntax: `if <guard>:` → `if False:`, `return <check>` → `return True`,
 `verify=True` → `verify=False`, a parameter-derived argument swapped for
 `None`, a key dropped from a payload `dict` or an allow-list. Three
-differences are deliberate, each to avoid a fault that cannot compile:
+differences are on purpose. Each one avoids a fault that cannot compile:
 
-- a statement is replaced with `pass`, never deleted, because an emptied block
-  is an `IndentationError`;
-- a line that leaves a bracket open, or sits inside one opened earlier, is
-  never removed;
-- module-level dunder assignments (`__version__`, `__all__`) are not proposed,
-  because nobody writes a test for them; module-level constants still are.
+- It replaces a statement with `pass` and never deletes it, because an emptied
+  block is an `IndentationError`.
+- It never removes a line that leaves a bracket open, or sits inside a bracket
+  opened earlier.
+- It does not propose module-level dunder assignments (`__version__`,
+  `__all__`), because nobody writes a test for them. It still proposes
+  module-level constants.
 
-The two JSX shapes have no Python meaning and are absent rather than faked.
+The two JSX shapes have no meaning in Python. TestGuard leaves them out and
+does not fake them.
 
-Every proposal's `find` is the exact line with `expectHits`/`occurrence`
-computed from the file, so it is valid by construction. Its provenance is
-`producer: "derived"`, `defendedBy` is prefilled from the tests that import the
-module, and proposals are grouped under a preceding `@claim` annotation or by
-enclosing function. Without a supplied id, groups are named `TODO-CLAIM-1`,
-`TODO-CLAIM-2`… and statements begin `TODO:`. A proposal becomes a claim only
-when a human replaces the statement with the intent, drops the faults that do
-not express it, and moves it into `testguard.claims.json`. The heuristics are
-deterministic, with no AST and no model; a proposal the tool cannot anchor is
-never emitted.
+The `find` of every proposal is the exact line. TestGuard computes
+`expectHits`/`occurrence` from the file, so the proposal is valid by
+construction. Its provenance is `producer: "derived"`. `defendedBy` is
+prefilled from the tests that import the module. Proposals are grouped under a
+preceding `@claim` annotation or by enclosing function. Without a supplied id,
+groups are named `TODO-CLAIM-1`, `TODO-CLAIM-2`… and statements begin `TODO:`.
+A proposal becomes a claim only when a human replaces the statement with the
+intent, drops the faults that do not express it, and moves it into
+`testguard.claims.json`. The heuristics are deterministic, with no AST and no
+model. TestGuard never emits a proposal that it cannot anchor.
 
 **Appending to a draft you already started.** `--into` adds faults from one
 or more source files to an existing draft inside the project, under exactly
-one existing claim id, keeping that claim's statement, source and earlier
+one existing claim id. It keeps that claim's statement, source and earlier
 faults:
 
 ```bash
@@ -562,14 +575,14 @@ npx testguard-cli scaffold src/auth.ts src/session.ts --into drafts/auth.json --
 npx testguard-cli scaffold src/auth.ts src/session.ts --into drafts/auth.json --claim AUTH-ADMIN-001         # update the draft
 ```
 
-Without `--json` it keeps a private recovery copy outside the checkout and
+Without `--json`, it keeps a private recovery copy outside the checkout and
 reports the draft as **unproven**. It refuses the canonical claims, evidence
 and baseline paths, a draft outside the project, and conflicting options.
-Limits: 32 sources, 2 MiB per source or draft, 16 MiB of source in total,
-4,096 generated proposals.
+The limits are 32 sources, 2 MiB per source or draft, 16 MiB of source in
+total, and 4,096 generated proposals.
 
 **Inspecting an input before you write intent.** Two read-only modes describe
-an authoring input without producing faults:
+an authoring input and produce no faults:
 
 ```bash
 npx testguard-cli scaffold --from-document docs/requirements.md --json   # metadata about a plain-text document, not its text
@@ -577,15 +590,15 @@ npx testguard-cli scaffold --from-fix <full-commit-id> --json            # the p
 ```
 
 Each takes exactly one input and no other options except `--json`. A fix id
-must be a full lowercase SHA-1 or SHA-256 commit id with exactly one parent;
-documents are capped at 2 MiB. Output goes to stdout only and says
+must be a full lowercase SHA-1 or SHA-256 commit id with exactly one parent.
+Documents are capped at 2 MiB. Output goes to stdout only and says that
 verification was not performed. Document text and commit subjects are
-untrusted data, not instructions and not an authenticated claim.
+untrusted data. They are not instructions and not an authenticated claim.
 
 ### sweep: no claim needed
 
-When there are no claims yet, `sweep` proposes faults for the changed files
-that carry no claim, probes a bounded selection, and reports what a green
+When you have no claims yet, `sweep` proposes faults for the changed files
+that carry no claim. It probes a bounded selection and reports what a green
 suite did not notice:
 
 ```bash
@@ -605,24 +618,26 @@ These are PROPOSALS, not claims. Keep the ones worth defending: state the
 claim, copy its fault into testguard.claims.json, and probe it from then on.
 ```
 
-A sweep never writes `testguard.claims.json`, and its evidence
+A sweep never writes `testguard.claims.json`. Its evidence
 (`.testguard/sweep-evidence.json`) never replaces `.testguard/evidence.json`.
 Only `survived` and `nocover` exit `1`. Deferred faults beyond the cap are
-not a verdict: raise `--cap` or sweep a smaller change.
+not a verdict. Raise `--cap` or sweep a smaller change.
 
-`--save-paths` aims the same sweep at every file that writes to storage
-instead of the diff, and reports the surface first (writes, files, payload
-fields) because a finding list without a denominator invites you to assume the
-rest is fine. It also states what the defenders could prove at all: when every
-defender mocks the persistence layer, a clean result is evidence that nothing
-could have measured persistence, not evidence that saving works. A test that
-replaced the database proves the call shape, never that the row landed.
+`--save-paths` aims the same sweep at every file that writes to storage,
+instead of the diff. It reports the surface first (writes, files, payload
+fields). A finding list without a denominator makes you assume that the rest is
+fine. The report also states what the defenders could prove at all. Suppose
+every defender mocks the persistence layer. A clean result then shows that
+nothing could have measured persistence. It does not show that saving works. A
+test that replaced the database proves the call shape, never that the row
+landed.
 
 ### Concerns
 
-One sentence, many files. A claim names one promise precisely, which is why a large application never
-finishes writing them. A **concern** names a *kind* of promise and where to
-look for it, in `testguard.concerns.json`:
+One sentence, many files. A claim names one promise precisely. For that
+reason, you never finish writing claims for a large application. A **concern**
+names a *kind* of promise and where to look for it, in
+`testguard.concerns.json`:
 
 ```json
 {
@@ -646,23 +661,24 @@ npx testguard-cli sweep --concern ADMIN-GUARDS  # aim a sweep at one
 
 `targets.kind` is `glob` (match paths), `write-sites` (every storage write) or
 `changed` (whatever diff the caller is measuring). `faultClasses` narrows the
-producers; absent or `null` means every class. Two concerns ship built in:
+producers. Absent or `null` means every class. Two concerns are built in:
 `SAVE-PERSISTS` (what `--save-paths` uses) and `CHANGED-CODE`. There is no
-built-in authorization concern, because a guess at "which files check
-permissions" is the noise that gets a check switched off; a project that knows
-its own auth layer says so in a few lines, as above. Declaring a concern with a
-built-in's id replaces it, and the replacement is reported.
+built-in authorization concern. A guess at "which files check permissions" is
+the noise that gets a check switched off. A project that knows its own auth
+layer says so in a few lines, as above. If you declare a concern with a
+built-in's id, it replaces the built-in, and TestGuard reports the
+replacement.
 
-A concern is never a claim. It says where to look, the probe says what it
-found, and a human states the sentence worth defending. No model is involved,
-so every verifying command stays offline.
+A concern is never a claim. It says where to look. The probe says what it
+found. A human states the sentence worth defending. No model is involved, so
+every verifying command stays offline.
 
 ## When a file carries nothing to claim
 
-`gate` fails on every changed source file with no claim. When a file genuinely
-carries nothing to claim (generated code, a thin wrapper whose logic is
-claimed elsewhere), excuse it in `testguard.ignore.json` with a reason a
-reviewer will accept:
+`gate` fails on every changed source file with no claim. Sometimes a file
+carries nothing to claim (generated code, or a thin wrapper whose logic is
+claimed elsewhere). Then excuse it in `testguard.ignore.json` with a reason that
+a reviewer will accept:
 
 ```json
 {
@@ -680,20 +696,21 @@ reviewer will accept:
 }
 ```
 
-`reason` is required (at least eight characters) because it is the whole point
-of the mechanism. Add `expires` where you can: an expired entry excuses nothing
-and is reported as `EXPIRED`. `gate` prints every entry it relied on. The full
-format is in [configuration](../reference/configuration.md).
+`reason` is required (at least eight characters), because the reason is the
+whole point of the mechanism. Add `expires` where you can. An expired entry
+excuses nothing and is reported as `EXPIRED`. `gate` prints every entry it
+relied on. The full format is in
+[configuration](../reference/configuration.md).
 
-An ignore entry excuses a file from the change gate; it does not take
-anything out of a probe. `probe` never reads the ignore file, so a claim you
-wrote is always probed and no entry can hide a survivor. To accept a finding
-you know about, freeze it with `testguard baseline`.
+An ignore entry excuses a file from the change gate. It does not take
+anything out of a probe. `probe` never reads the ignore file, so it always
+probes a claim you wrote, and no entry can hide a survivor. To accept a finding
+that you know about, freeze it with `testguard baseline`.
 
 ## Removing or renaming a claim
 
-Claims can be wrong, superseded or split, so removal is allowed. It is never
-silent, because deleting a claim is the cheapest way to make a finding
+Claims can be wrong, superseded or split, so you may remove one. The removal
+is never silent. Deleting a claim is the cheapest way to make a finding
 disappear:
 
 ```bash
@@ -705,10 +722,10 @@ REMOVED    AUDIT-ACTOR-001 (high, 1 fault) — last verdict survived
 ```
 
 `removed-claim` and `removed-fault` exit `1`. A rename that keeps the
-statement verbatim is reported as `renamed-claim` and does not; renaming
-still changes the fingerprints, so expect the baseline to see new ids. To
-excuse a removal, add an ignore entry naming the claim (`kind: "claim"`) or one
-fault (`kind: "fault"`, pattern `<claimId>/<faultId>`):
+statement verbatim is reported as `renamed-claim` and does not exit `1`.
+A rename still changes the fingerprints, so expect the baseline to see new ids.
+To excuse a removal, add an ignore entry that names the claim (`kind: "claim"`)
+or one fault (`kind: "fault"`, pattern `<claimId>/<faultId>`):
 
 ```json
 {
@@ -721,9 +738,10 @@ fault (`kind: "fault"`, pattern `<claimId>/<faultId>`):
 }
 ```
 
-Editing a fault is visible the same way: `status` lists a fault whose content
-changed after it survived, with its previous verdict, and makes reviewing that
-edit the next action. Never make a fault die by editing it; write the test.
+An edit to a fault is visible the same way. `status` lists a fault whose
+content changed after it survived, with its previous verdict, and makes
+reviewing that edit the next action. Never make a fault die by editing it.
+Write the test.
 
 ## Next
 
