@@ -2,6 +2,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { workerEnv } from '../worker-env.mjs';
 import { registerChild, assertNotCancelled } from './lifecycle.mjs';
 import { readBoundedJsonFile } from './discovery.mjs';
+import { readJunitReport } from './junit.mjs';
 import { processRows, terminateProcessTree, TIMEOUT_CLEANUP_WARNING, KILL, descendantPids } from './process-tree.mjs';
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -13,6 +14,8 @@ import { matchGlobs } from '../../util/glob.mjs';
 
 export const TEST_GLOBS = ['**/*.test.js', '**/*.test.mjs', '**/*.test.cjs', '**/*.test.ts', '**/*.test.mts', '**/*.test.tsx', '**/*.test.jsx',
   '**/*.spec.js', '**/*.spec.mjs', '**/*.spec.cjs', '**/*.spec.ts', '**/*.spec.mts', '**/*.spec.tsx', '**/*.spec.jsx'];
+/** The source extensions the JavaScript and TypeScript adapters make probeable: the `extensions` each declares. */
+export const JS_EXTENSIONS = Object.freeze(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.jsx', '.tsx']);
 export const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
 /** Node's own advisory warnings about the probed project's configuration; never about the fault. */
@@ -335,9 +338,10 @@ export function parseReport(report, durationMs, kinds) {
  * runner's command line; `command` (tests) or `commandTemplate` (--runner-cmd)
  * override it.
  */
-export function runProcess({ projectDir, files, budgetMs = 120_000, command, commandTemplate, argv, env = {}, parse = parseReport, cleanupOnClose = false, graceMs = BUDGET_GRACE_MS, processList = processRows }) {
+export function runProcess({ projectDir, files, budgetMs = 120_000, command, commandTemplate, argv, env = {}, parse = parseReport, reportFormat = 'jest', cleanupOnClose = false, graceMs = BUDGET_GRACE_MS, processList = processRows }) {
   assertNotCancelled();
-  const outFile = join(scratchRoot(), `testguard-run-${randomBytes(6).toString('hex')}.json`);
+  const junit = commandTemplate !== undefined && reportFormat === 'junit';
+  const outFile = join(scratchRoot(), `testguard-run-${randomBytes(6).toString('hex')}.${junit ? 'xml' : 'json'}`);
   const [cmd, ...args] = command
     ?? (commandTemplate ? expandCommand(commandTemplate, files, outFile) : argv(files, outFile));
   // A runner that names its report through the environment (Playwright) gets `{out}` substituted there too.
@@ -367,7 +371,7 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
       if (settled) return;
       settled = true;
       scope.dispose();
-      rmSync(outFile, { force: true });
+      rmSync(outFile, { force: true, recursive: true });
       // The net under every parser: an `error` run that arrived without words gets the runner's last stderr line, else its exit status.
       if (result.run.outcome === 'error' && !String(result.loadMessage ?? '').trim()) {
         result.loadMessage = stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? `the runner reported an error without a message (exited with ${exit})`;
@@ -419,7 +423,9 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
         result = { run: { ...noRun('error'), durationMs }, timeouts: 0, loadMessage: stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? `runner produced no report (exited with ${exit})`, failedTests: [] };
       } else {
         try {
-          result = parse(readBoundedJsonFile(outFile), durationMs);
+          // A JUnit report (a file, or a directory of them) is turned into the
+          // jest-compatible shape and read by `parseReport`, never by an adapter's own parser.
+          result = junit ? parseReport(readJunitReport(outFile), durationMs) : parse(readBoundedJsonFile(outFile), durationMs);
         } catch (e) {
           result = { run: { ...noRun('error'), durationMs }, timeouts: 0, loadMessage: `unreadable report: ${e.message}`, failedTests: [] };
         }

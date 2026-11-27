@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/config.schema.json",
+  "schemaVersion": 1,
+  "runner": "vitest",
+  "python": ".venv/bin/python",
+  "nodeModules": "../node_modules",
+  "typecheck": true,
+  "workers": 2,
+  "faultWorkers": "auto",
+  "confirm": 3,
+  "budget": 180000,
+  "runnerCmd": "./run-tests.sh {out} {files}",
+  "reportFormat": "junit"
+}

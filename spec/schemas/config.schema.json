@@ -16,6 +16,10 @@
       "description": "--runner-cmd: a custom command; must contain {files} and {out}. Run as an argv, never through a shell.",
       "type": "string", "minLength": 1, "maxLength": 4096
     },
+    "reportFormat": {
+      "description": "--report-format: how the report of a `runnerCmd` is read, `jest` (the default: the jest-compatible JSON) or `junit` (JUnit XML, one file or a directory of them at {out}). Means nothing without a command, from this file or from --runner-cmd.",
+      "enum": ["jest", "junit"]
+    },
     "python": {
       "description": "--python: a bare command looked up on PATH (python3), or a path relative to the project directory that stays inside the repository (.venv/bin/python). TESTGUARD_PYTHON wins over it.",
       "$ref": "#/$defs/relativeOrCommand"

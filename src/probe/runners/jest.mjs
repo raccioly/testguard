@@ -1,9 +1,10 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { TEST_GLOBS, runProcess, checkRunner, runnerArgv, listTestFiles } from './shared.mjs';
+import { TEST_GLOBS, JS_EXTENSIONS, runProcess, checkRunner, runnerArgv, listTestFiles } from './shared.mjs';
 import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs, normalizeDiscoveredFiles, runDiscoveryProcess } from './discovery.mjs';
 
 export const name = 'jest';
+export const extensions = JS_EXTENSIONS;
 // jest's default testMatch also collects anything under __tests__/.
 export const testGlobs = [...TEST_GLOBS, '**/__tests__/**/*.js', '**/__tests__/**/*.mjs', '**/__tests__/**/*.cjs', '**/__tests__/**/*.ts', '**/__tests__/**/*.tsx', '**/__tests__/**/*.jsx'];
 const DISCOVERY_CONFIG_FILES = ['js', 'mjs', 'cjs', 'ts', 'cts', 'json'].map((ext) => `jest.config.${ext}`);

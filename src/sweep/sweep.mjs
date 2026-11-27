@@ -167,6 +167,7 @@ export async function sweep({
   workers = 1,
   serial = workers === 1,
   runnerCommand,
+  reportFormat,
   runnerName,
   nodeModules,
   python,
@@ -278,6 +279,7 @@ export async function sweep({
       // has no meaning here, and it is the most expensive thing the probe does.
       escalate: false,
       runnerCommand,
+      reportFormat,
       runnerName,
       nodeModules,
       python,

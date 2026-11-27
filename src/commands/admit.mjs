@@ -123,6 +123,7 @@ export async function admitCommand({ file, values, version, projectConfig }, io)
     only: [claimId],
     escalate: false,
     runnerCommand: runner.runnerCommand,
+    reportFormat: runner.reportFormat,
     runnerName: values.runner,
     nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
     python: runner.python,

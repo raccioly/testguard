@@ -225,7 +225,9 @@ check order is this rule.
    exposes only the failed `expect` step and the error's class name to a
    reporter; a failed `expect` step the test then swallowed, before failing
    some other way, is misread as an assertion. A custom `--runner-cmd`
-   reports what its jest-compatible report carries; without `failureDetails`
+   reports what its report carries (jest-compatible JSON, or JUnit XML with
+   `--report-format junit`, see [Report formats](#report-formats)); without
+   `failureDetails` (or, in JUnit XML, a `type` that names an assertion class)
    every failure is an exception, and when that is the only reason (every
    exception failure of every run was one the runner gave nothing to classify,
    counted as `testRun.kindNotReported`) the record says so with
@@ -1445,7 +1447,7 @@ error (exit 3).
 
 `testguard.config.json` in the project directory (#301) holds the defaults of
 the options that describe **how** the project's tests run: `runner`,
-`runnerCmd`, `python`, `nodeModules`, `typecheck` (`true` is the project's own
+`runnerCmd`, `reportFormat`, `python`, `nodeModules`, `typecheck` (`true` is the project's own
 compiler, a string the command), `workers`, `faultWorkers`, `confirm` and
 `budget`, each standing for the flag of the same meaning. Nothing in it
 selects what is probed or shapes output. Schema: `config.schema.json`.
@@ -1928,7 +1930,7 @@ only for a custom command, which resolves nothing. A `--runner-cmd` run
 records `{ "name": "custom-command", "commandHash": <sha256 of the command's
 parsed words> }`, never the name of the adapter that happens to read its report
 (a Maven build is not Vitest); it carries no `version` and no `source`, and
-reuse requires the same hash. Evidence from before this rule named the adapter
+reuse requires the same hash and the same `reportFormat` (below). Evidence from before this rule named the adapter
 and carried no hash: it stays readable and is remeasured. Evidence that
 recorded no runner, or a different one, is remeasured.
 `status.cost.measurements` copies these measurements when available. Historical
@@ -1943,6 +1945,53 @@ live per-run deadline as test execution.
 The regression suite caps outer concurrency at two workers in CI. Interactive
 runs reserve one available CPU and use at most two workers; a two-core machine
 therefore uses one. Nested built-in runners retain their one-worker default.
+
+## Report formats
+
+A custom `--runner-cmd` writes its report at `{out}`. `--report-format <jest|junit>`
+(`reportFormat` in `testguard.config.json`; default `jest`; usage error, exit 3,
+for another value, and without a `--runner-cmd` from either source) says how
+that report is read. It applies to `probe`, `admit`, `sweep` and `replay`.
+
+`jest` is the jest-compatible JSON report. `junit` is JUnit XML at `{out}`:
+one file, or a directory of `.xml` files (one level, by name order; a link or
+another file type is ignored). Both are converted to one report shape and
+decided by one rule set, so a kill, a timeout, a load failure and an unread
+report mean the same thing in either.
+
+1. **Shape.** A `<testsuite>` is a test file result and a `<testcase>` a test.
+   A `<failure>` or `<error>` child makes it failed, a `<skipped>` child makes
+   it pending (neither passed nor failed). A `<testsuite>` that only groups
+   other suites has no test of its own. Nothing inside a comment, a CDATA
+   block or an attribute is read as an element.
+2. **Load failure.** A suite that reports `errors` or `failures` and has no
+   `<testcase>` is a load failure: the run is `error`, and the message is its
+   own `<error>` text when it has one.
+3. **Empty is an error.** A run with no test case is `error` (the runner
+   collected no tests), never `pass`.
+4. **Assertion or exception.** When `<failure>` or `<error>` has a `type`
+   attribute, that is the identity: the failure is an assertion exactly when
+   `type` is one of `org.opentest4j.AssertionFailedError`,
+   `java.lang.AssertionError`, `junit.framework.AssertionFailedError`,
+   `AssertionFailedError`, `AssertionError`, `System.AssertException`. Any
+   other type is an exception, whatever the message says. Only when `type` is
+   absent or empty is the exception class at the head of the first line of the
+   `message` attribute, or of the element's text, read, and only as one of the
+   same whole names followed by `:` or the end of the line. A failure that
+   fits neither is an exception: unknown never rounds toward assertion.
+5. **Timeouts never kill.** `type` `org.junit.runners.model.TestTimedOutException`,
+   `java.util.concurrent.TimeoutException`, `TimeoutError`, `asyncio.TimeoutError`
+   or `asyncio.exceptions.TimeoutError` is a timeout.
+6. **Unreadable is an error.** A document with an element never closed, a file
+   with no `<testsuite>`, a directory with no `.xml` file, a file over 64 MiB in
+   total, or more than 10,000 files is `error` with `unreadable report: <why>`.
+   No file at `{out}` and a non-zero exit is the `error` it always was.
+7. **Identity.** The evidence records `run.runner.reportFormat: "junit"` beside
+   the command hash of a `custom-command` runner, and nothing for `jest`, so
+   evidence that predates the option is the same record. Reuse requires the
+   same format, and the test universe hash of a custom command binds it.
+   `reportFormat` on any other runner is invalid. A replay records it in
+   `runner.reportFormat` under the same rule.
 
 ## Fault fan-out
 
@@ -1963,8 +2012,19 @@ configuration](#project-configuration)); then `auto`. `auto` is `min(4, floor(cp
 runners are already running as the probe starts (the contention check), an
 automatic n is halved (at least one) and the probe says so; a chosen n is
 kept. The evidence records `run.faultWorkersSource` (`auto`, `flag`, `env`,
-`config`, `serial`, `in-place`) and, for `auto` only, `run.cpus`. The library API
+`config`, `serial`, `in-place`, `runner`) and, for `auto` only, `run.cpus`. The library API
 defaults to one and records no source unless its caller passes one.
+
+**A runner that shares external state (#329).** A runner adapter that exports
+`sharedExternalState: true` (see [RUNNER-ADAPTER.md](RUNNER-ADAPTER.md)) uses
+one resource, such as an org or a server, that two faults in flight would
+share. When any runner of the probe declares it and the width resolved to
+more than one, the engine probes one fault at a time in one scratch tree,
+whatever the width was asked for by flag, environment, configuration or
+`auto`, and warns that it did. The evidence then records no `run.faultWorkers`
+and `run.faultWorkersSource: "runner"`. A width that was already one keeps the
+source it had. The validator rejects `run.faultWorkers` beside the source
+`runner`, as it does beside `serial` and `in-place`.
 
 1. **Plan, then measure.** Every fault is first planned in claim/fault order
    on the first scratch tree with no fault applied anywhere: defender

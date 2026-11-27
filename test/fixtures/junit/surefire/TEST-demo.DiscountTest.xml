@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="demo.DiscountTest" time="0.052" tests="5" errors="1" skipped="1" failures="2">
+  <properties>
+    <property name="java.version" value="21.0.2"/>
+    <property name="line.separator" value="&#10;"/>
+  </properties>
+  <testcase name="memberGetsTenPercent()" classname="demo.DiscountTest" time="0.021"/>
+  <testcase name="nonMemberPaysFull()" classname="demo.DiscountTest" time="0.004">
+    <failure message="expected: &lt;100&gt; but was: &lt;90&gt;" type="org.opentest4j.AssertionFailedError"><![CDATA[org.opentest4j.AssertionFailedError: expected: <100> but was: <90>
+	at demo.DiscountTest.nonMemberPaysFull(DiscountTest.java:14)
+]]></failure>
+  </testcase>
+  <testcase name="rejectsNegative()" classname="demo.DiscountTest" time="0.003">
+    <error message="boom &amp; more" type="java.lang.NullPointerException">java.lang.NullPointerException: boom &amp; more
+	at demo.Discount.apply(Discount.java:5)
+</error>
+  </testcase>
+  <testcase name="legacyJunit4Style()" classname="demo.DiscountTest" time="0.002">
+    <failure message="expected:&lt;1&gt; but was:&lt;2&gt;" type="junit.framework.AssertionFailedError">junit.framework.AssertionFailedError: expected:&lt;1&gt; but was:&lt;2&gt;</failure>
+  </testcase>
+  <testcase name="disabledForNow()" classname="demo.DiscountTest" time="0">
+    <skipped/>
+  </testcase>
+</testsuite>

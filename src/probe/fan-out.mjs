@@ -69,6 +69,25 @@ export function resolveFaultWorkers({ flag, env = {}, config, serial = false, in
 }
 
 /**
+ * Does any runner in this run declare `sharedExternalState: true`? Such a
+ * runner deploys to, or tests against, one org, server or database that every
+ * fault in flight would share (#329), so a second fault would run beside the
+ * first one's. Only the literal `true` counts: anything else is the default.
+ */
+export const runnerSharesExternalState = (runners) => runners.some((runner) => runner?.sharedExternalState === true);
+
+/**
+ * The fan-out a run may use once its runners are known: one fault at a time,
+ * whatever was asked for, when any of them shares external state. The source
+ * becomes `runner` only when that changed the count, so a run that was
+ * already one at a time keeps saying why.
+ */
+export function applySharedExternalState({ faultWorkers, source }, runners) {
+  const forced = faultWorkers > 1 && runnerSharesExternalState(runners);
+  return { faultWorkers: forced ? 1 : faultWorkers, source: forced ? 'runner' : source, forced, asked: faultWorkers };
+}
+
+/**
  * Other test runners were already busy when the probe started: an automatic
  * count is halved, because the machine is not the probe's to divide. A count
  * somebody chose is theirs.

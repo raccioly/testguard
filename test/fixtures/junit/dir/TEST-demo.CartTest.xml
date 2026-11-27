@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="demo.CartTest" tests="1" errors="0" skipped="0" failures="1">
+  <testcase name="addsItem" classname="demo.CartTest" time="0.01">
+    <failure message="expected: not &lt;null&gt;" type="java.lang.AssertionError">java.lang.AssertionError: expected: not null</failure>
+  </testcase>
+</testsuite>

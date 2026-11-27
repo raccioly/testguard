@@ -297,6 +297,7 @@ plain `testguard probe` runs the tests correctly everywhere. Schema:
 |---|---|---|
 | `runner` | `--runner` | `vitest`, `jest`, `playwright`, `python`, `pytest`, `unittest`, `node-test` or `auto` |
 | `runnerCmd` | `--runner-cmd` | a command containing `{files}` and `{out}`, run as an argv, never through a shell. A reporter file path in it (`--test-reporter=./tools/reporter.mjs`) must start with `./` or be absolute, because Node reads a bare value as a package name |
+| `reportFormat` | `--report-format` | `jest` (the default) or `junit`: how the report of a `runnerCmd` is read. It needs a command, from this file or from `--runner-cmd` |
 | `python` | `--python` | a bare command looked up on `PATH` (`python3`), or a path relative to the project directory |
 | `nodeModules` | `--node-modules` | a directory relative to the project directory (`../node_modules` in a workspace package) |
 | `typecheck` | `--typecheck` | `true` runs the project's own `tsc`. A string is the command. Applies to `probe` and `claims --check-anchors` |

@@ -65,6 +65,7 @@ export const name = 'python';
  * discovery and report `nocover`, which costs the truth.
  */
 export const testGlobs = ['**/test_*.py', '**/test*.py', '**/*_test.py'];
+export const extensions = ['.py'];
 
 const PY_FILE = /\.py$/;
 const TIMEOUT = /\bTimeout >|\btimed out\b|\bTimeoutError\b/i;
@@ -331,7 +332,7 @@ export const run = makeRun(null);
 
 /** `--runner pytest` / `--runner unittest`: the same adapter with the engine pinned. */
 export function pinned(engine) {
-  return { name: engine, testGlobs, owns, tests, parseReport, fatalEdit, check: makeCheck(engine), run: makeRun(engine) };
+  return { name: engine, testGlobs, extensions, owns, tests, parseReport, fatalEdit, check: makeCheck(engine), run: makeRun(engine) };
 }
 
 /**

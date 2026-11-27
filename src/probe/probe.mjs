@@ -33,7 +33,7 @@ import { createDependencyHasher, instrumentOf } from './dependencies.mjs';
 import { createTypechecker, needsFaultRecheck, sameTypecheck } from './typecheck.mjs';
 import { withCommandWorkers, withWorker } from './worker-env.mjs';
 import { fillSlots, treeState } from './tree-reuse.mjs';
-import { aloneDisagrees, contentionRoundDown, createBusyClock, createOverlapTracker, deferLastRun, mustConfirmAlone, needsSerialRemeasure, orderedEmitter, parseFaultWorkers, runPool, singleFlight } from './fan-out.mjs';
+import { aloneDisagrees, applySharedExternalState, contentionRoundDown, createBusyClock, createOverlapTracker, deferLastRun, mustConfirmAlone, needsSerialRemeasure, orderedEmitter, parseFaultWorkers, runPool, singleFlight } from './fan-out.mjs';
 
 
 /** Is `child` the same file as `root`, or under it? Both must already be real paths. */
@@ -107,8 +107,9 @@ export function runnerRecord(name, version, source) {
  * it and the command text never reaches the evidence. A command resolves
  * nothing, so it has no version and no source.
  */
-export function customCommandRunner(commandTemplate) {
-  return { name: 'custom-command', commandHash: sha256(JSON.stringify(commandTemplate)) };
+export function customCommandRunner(commandTemplate, reportFormat) {
+  // The jest default is never written, so evidence from before `--report-format` is the same record.
+  return { name: 'custom-command', commandHash: sha256(JSON.stringify(commandTemplate)), ...(reportFormat === 'junit' ? { reportFormat } : {}) };
 }
 
 /**
@@ -132,7 +133,7 @@ export function sameRunner(previousRun, current) {
   const recorded = previousRun?.runner;
   if (!recorded) return false;
   return recorded.name === current.name && recorded.version === current.version && recorded.source === current.source
-    && recorded.commandHash === current.commandHash;
+    && recorded.commandHash === current.commandHash && recorded.reportFormat === current.reportFormat;
 }
 
 /**
@@ -329,6 +330,7 @@ async function measureProbe({
   budgetMs = 120_000,
   commandBudget,
   runnerCommand,
+  reportFormat,
   runnerName = 'auto',
   nodeModules,
   python,
@@ -533,13 +535,22 @@ async function measureProbe({
     }
     // Under a command template the adapter only reads the report; what ran is
     // the command, and it is what the evidence names (#332).
-    recordedRunner = commandTemplate ? customCommandRunner(commandTemplate) : runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), runnerSource);
+    recordedRunner = commandTemplate ? customCommandRunner(commandTemplate, reportFormat) : runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), runnerSource);
     ctx.recordedRunner = recordedRunner;
     runnersUsed.set(recordedRunner.name, recordedRunner.version);
     // Files an owning runner (Playwright) claims run under it, whatever the
     // project runner is; it must resolve before the first such defender runs.
     const owned = OWNED_RUNNERS.filter((r) => r !== runner
       && !(r.name === 'python' && ['python', 'pytest', 'unittest'].includes(runner.name)));
+    // A runner that shares external state (an org, a server) runs one fault at
+    // a time in one tree, whatever --fault-workers asked for (#329).
+    const fanOut = applySharedExternalState({ faultWorkers, source: faultWorkersSource }, [runner, ...owned]);
+    if (fanOut.forced) {
+      onWarn(`the ${runner.name} runner shares external state between runs, so faults are probed one at a time in one tree (--fault-workers ${fanOut.asked} is not used).`);
+      faultWorkers = fanOut.faultWorkers;
+      faultWorkersSource = fanOut.source;
+      ctx.faultWorkers = faultWorkers;
+    }
     let ownedChecked = new Map();
     let manifests = new Map(primaryManifest ? [[runner, primaryManifest]] : []);
     if (!commandTemplate) {
@@ -593,7 +604,7 @@ async function measureProbe({
       ? commandUniverse([...runner.tests(iso.projectDir).filter((t) => !owned.some((r) => r.owns(iso.projectDir, t))), ...owned.flatMap((r) => r.tests(iso.projectDir))], declaredDefenders())
       : [...ownerByFile.keys()].sort());
     const testUniverseHash = commandTemplate
-      ? hashCustomCommandUniverse(allTests, commandTemplate, runner.name)
+      ? hashCustomCommandUniverse(allTests, commandTemplate, runner.name, reportFormat)
       : hashNativeTestUniverse(manifests);
     const baselineCache = new Map();
     const discoveryHashCache = new Map();
@@ -634,7 +645,7 @@ async function measureProbe({
     const runDefenders = async (files, targets = [], treeDir = iso.projectDir) => {
       if (commandTemplate) {
         const granted = commandBudget?.runBudget(budgetMs) ?? budgetMs;
-        const result = await timedRun(runner, { projectDir: treeDir, sourceDir: projectDir, python, files, budgetMs: granted, commandTemplate, serial, workers, targets });
+        const result = await timedRun(runner, { projectDir: treeDir, sourceDir: projectDir, python, files, budgetMs: granted, commandTemplate, reportFormat, serial, workers, targets });
         commandBudget?.assertOpen();
         commandBudget?.assertNotCut(granted, budgetMs, result.timeouts);
         return result;

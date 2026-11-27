@@ -6,7 +6,7 @@ import { dirname } from 'node:path';
 import { createRequire } from 'node:module';
 import { connect } from 'node:net';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { runProcess, listTestFiles, firstInformativeLine, runnerArgv } from './shared.mjs';
+import { JS_EXTENSIONS, runProcess, listTestFiles, firstInformativeLine, runnerArgv } from './shared.mjs';
 import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs, normalizeDiscoveredFiles, runDiscoveryReportProcess } from './discovery.mjs';
 import { globToRegExp } from '../../util/glob.mjs';
 
@@ -34,6 +34,7 @@ import { globToRegExp } from '../../util/glob.mjs';
  */
 
 export const name = 'playwright';
+export const extensions = JS_EXTENSIONS;
 
 const CONFIG_FILES = ['playwright.config.ts', 'playwright.config.mts', 'playwright.config.js', 'playwright.config.mjs', 'playwright.config.cjs'];
 const SPEC_GLOBS = ['**/*.spec.js', '**/*.spec.mjs', '**/*.spec.cjs', '**/*.spec.ts', '**/*.spec.mts', '**/*.spec.tsx', '**/*.spec.jsx',
