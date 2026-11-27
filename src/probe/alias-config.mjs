@@ -224,3 +224,184 @@ export function readConfigAliases(text, { configFile, projectDir }) {
   }
   return { rules, opaque };
 }
+
+/**
+ * Jest `moduleNameMapper` (#334), read from the config's tokens like the vite
+ * aliases above, never by running the config. Jest resolves a test's imports
+ * with this map, so a test that imports its subject through a mapped name is
+ * invisible to discovery unless the map is read.
+ *
+ * Returns `{ rules, opaque }`; a rule is `{ prefix, suffix, wildcard, targets }`
+ * (the shape of a tsconfig `paths` rule). A Jest key is a regular expression;
+ * only the forms `^lit$`, `^lit`, `^lit(.*)$` and `^lit(.*)lit$` are
+ * translated (`(.+)` too, which over-matches the empty capture, the safe
+ * side), with `<rootDir>/…$1` (`$1` may repeat) or a package name as the value. Style and asset
+ * stubs (`\.(css|png)$`) and the `.js` rewrite for ESM TypeScript are dropped:
+ * they name no source module. Jest tries the keys in order, the resolver ranks
+ * them by length, so a later rule the resolver would prefer gets no target and
+ * its specifiers are indeterminate.
+ *
+ * Anything else makes the result `opaque` (every bare specifier is then
+ * indeterminate): a mapper that is not a literal object (a variable, a call, a
+ * spread, a shorthand), a pattern or value that cannot be translated, a
+ * config that is not a literal object (a call such as `createJestConfig(…)`,
+ * a spread), and every option that changes resolution outside the mapper
+ * (`resolver`, `modulePaths`, `moduleDirectories`, `rootDir`, `projects`, a
+ * preset other than ts-jest).
+ */
+const ASSET_EXTENSIONS = new Set(['css', 'less', 'scss', 'sass', 'styl', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'avif', 'woff', 'woff2', 'ttf', 'eot', 'otf', 'mp3', 'mp4', 'wav', 'webm']);
+const ASSET_KEY = /^\^?(?:\(\.[*+]\)|\.[*+])?\\\.(?:\(([a-z0-9|]+)\)|([a-z0-9]+))\$$/;
+const OPAQUE_JEST_KEYS = new Set(['resolver', 'modulePaths', 'moduleDirectories', 'rootDir', 'projects']);
+
+function translateJestPattern(src) {
+  if (!src.startsWith('^')) return null;
+  let i = 1;
+  const literal = () => {
+    let out = '';
+    while (i < src.length) {
+      const c = src[i];
+      if (c === '\\') {
+        if (!/[./\-@:~#%=]/.test(src[i + 1] ?? '')) return null;
+        out += src[i + 1];
+        i += 2;
+      } else if (/[A-Za-z0-9_@/~#:%=-]/.test(c)) { out += c; i++; } else break;
+    }
+    return out;
+  };
+  const prefix = literal();
+  if (prefix === null) return null;
+  let capture = false;
+  let suffix = '';
+  if (src.startsWith('(.*)', i) || src.startsWith('(.+)', i)) {
+    capture = true;
+    i += 4;
+    suffix = literal();
+    if (suffix === null) return null;
+  }
+  const anchored = src[i] === '$';
+  if (anchored) i++;
+  if (i !== src.length || (suffix && !anchored)) return null;
+  if (capture) return { prefix, suffix, wildcard: true, capture };
+  return { prefix, suffix: '', wildcard: !anchored, capture };
+}
+
+/** `targets` (absolute, `*` for `$1`), `'package'` (resolves outside the project) or null (not evaluable). */
+function jestTargets(values, { capture }, rootDir) {
+  const out = [];
+  let packages = 0;
+  for (const v of values) {
+    if (typeof v !== 'string' || v.includes('*') || /\$(?!1(?![0-9]))/.test(v) || (!capture && v.includes('$'))) return null;
+    if (v.startsWith('<rootDir>')) {
+      const rest = v.slice('<rootDir>'.length);
+      if ((rest && !rest.startsWith('/')) || rest.includes('<')) return null;
+      out.push(resolve(rootDir, `.${rest}`.replaceAll('$1', '*')));
+    } else if (v.startsWith('.') || v.startsWith('/') || v.includes('<')) return null;
+    else packages++;
+  }
+  if (packages) return packages === values.length ? 'package' : null;
+  return out;
+}
+
+const jestSpecificity = (rule) => rule.prefix.length + rule.suffix.length;
+function jestMatches(rule, specifier) {
+  return rule.wildcard
+    ? specifier.startsWith(rule.prefix) && specifier.endsWith(rule.suffix) && specifier.length >= jestSpecificity(rule)
+    : specifier === rule.prefix;
+}
+/** Could one specifier match both rules? Over-approximated for two wildcards. */
+function jestOverlap(a, b) {
+  if (!a.wildcard && !b.wildcard) return a.prefix === b.prefix;
+  if (!a.wildcard) return jestMatches(b, a.prefix);
+  if (!b.wildcard) return jestMatches(a, b.prefix);
+  const either = (x, y, test) => test(x, y) || test(y, x);
+  return either(a.prefix, b.prefix, (x, y) => x.startsWith(y)) && either(a.suffix, b.suffix, (x, y) => x.endsWith(y));
+}
+/** The resolver picks an exact rule over a wildcard, else the longer one. Does it pick `first` over `later`? */
+function resolverPrefers(first, later) {
+  if (first.wildcard !== later.wildcard) return !first.wildcard;
+  return jestSpecificity(first) > jestSpecificity(later);
+}
+
+/** Does the file export a literal object (`module.exports = {…}`, `export default {…}`, or a binding of one)? */
+function exportsLiteralObject(tokens) {
+  const startsObject = (i) => pu(tokens[i], '{');
+  for (let i = 0; i < tokens.length; i++) {
+    let at = -1;
+    if (id(tokens[i], 'module') && pu(tokens[i + 1], '.') && id(tokens[i + 2], 'exports') && pu(tokens[i + 3], '=')) at = i + 4;
+    else if (id(tokens[i], 'export') && id(tokens[i + 1], 'default')) at = i + 2;
+    if (at === -1) continue;
+    if (startsObject(at)) return true;
+    if (!id(tokens[at]) || ['async', 'function', 'class', 'new'].includes(tokens[at].value)) continue;
+    const name = tokens[at].value;
+    for (let j = 0; j < tokens.length - 2; j++) {
+      if (!(['const', 'let', 'var'].some((w) => id(tokens[j], w)) && id(tokens[j + 1], name))) continue;
+      let k = j + 2;
+      if (pu(tokens[k], ':')) while (k < tokens.length && !pu(tokens[k], '=')) k++;
+      if (pu(tokens[k], '=') && startsObject(k + 1)) return true;
+    }
+  }
+  return false;
+}
+
+export function readJestModuleNameMapper(text, { projectDir, json = false }) {
+  const none = { rules: [], opaque: false };
+  let source = text;
+  if (json) {
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed === undefined) return none;
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return { rules: [], opaque: true };
+      source = JSON.stringify(parsed);
+    } catch { return { rules: [], opaque: true }; }
+  }
+  let tokens;
+  try { tokens = tokenizeModule(source); } catch { return { rules: [], opaque: true }; }
+  if (!json && !exportsLiteralObject(tokens)) return { rules: [], opaque: true };
+  let opaque = false;
+  const translated = [];
+  const keyAt = (i) => (id(tokens[i]) || tokens[i].type === 'string') && !pu(tokens[i - 1], '.');
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    // A spread (`...x`) may bring in any of it.
+    if (pu(t, '.') && pu(tokens[i + 1], '.') && pu(tokens[i + 2], '.')) { opaque = true; continue; }
+    if (!keyAt(i)) continue;
+    const shorthand = id(t) && (pu(tokens[i + 1], ',') || pu(tokens[i + 1], '}')) && (pu(tokens[i - 1], '{') || pu(tokens[i - 1], ','));
+    const named = shorthand || pu(tokens[i + 1], ':');
+    if (!named) continue;
+    if (OPAQUE_JEST_KEYS.has(t.value) || shorthand && t.value === 'preset') { opaque = true; continue; }
+    if (t.value === 'preset') {
+      const v = tokens[i + 2];
+      if (!(v?.type === 'string' && (v.value === 'ts-jest' || v.value.startsWith('ts-jest/')))) opaque = true;
+      continue;
+    }
+    if (t.value !== 'moduleNameMapper') continue;
+    if (shorthand || !pu(tokens[i + 2], '{')) { opaque = true; continue; }
+    const after = skipBalanced(tokens, i + 2);
+    const entries = after === -1 ? null : items(tokens, i + 2, after - 1);
+    if (!entries) { opaque = true; continue; }
+    for (const [s, e] of entries) {
+      const key = tokens[s];
+      if (key.type !== 'string' || !pu(tokens[s + 1], ':')) { opaque = true; continue; }
+      let values = null; // string values, or null when any is not a string literal
+      if (e - s === 3 && tokens[s + 2].type === 'string') values = [tokens[s + 2].value];
+      else if (pu(tokens[s + 2], '[') && skipBalanced(tokens, s + 2) === e) {
+        const elements = items(tokens, s + 2, e - 1);
+        if (elements?.length && elements.every(([a, b]) => b - a === 1 && tokens[a].type === 'string')) values = elements.map(([a]) => tokens[a].value);
+      }
+      const asset = ASSET_KEY.exec(key.value);
+      if (asset && (asset[1] ?? asset[2]).split('|').every((ext) => ASSET_EXTENSIONS.has(ext))) continue; // a stub for a file that is no source module
+      if (key.value === '^(\\.{1,2}/.*)\\.js$' && values?.length === 1 && values[0] === '$1') continue; // the ESM `.js` rewrite; the resolver already tries the TypeScript source
+      const pattern = translateJestPattern(key.value);
+      if (!pattern) { opaque = true; continue; }
+      const targets = values ? jestTargets(values, pattern, projectDir) : null;
+      if (targets === 'package') continue; // outside the project, like any package
+      translated.push({ prefix: pattern.prefix, suffix: pattern.suffix, wildcard: pattern.wildcard, targets: targets ?? [] });
+    }
+  }
+  // Jest tries the keys in order; where the resolver would not pick the earlier
+  // rule for a specifier both match, that specifier must not resolve.
+  const rules = translated.map((rule, j) => (
+    translated.slice(0, j).some((earlier) => jestOverlap(earlier, rule) && !resolverPrefers(earlier, rule)) ? { ...rule, targets: [] } : rule
+  ));
+  return { rules, opaque };
+}

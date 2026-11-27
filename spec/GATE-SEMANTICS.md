@@ -268,6 +268,14 @@ check order is this rule.
    evidence records the early stop (`detail.escalationStoppedEarly`). Stopping
    can only fail to *name* a killer, never upgrade a verdict, which is the
    pessimistic side.
+   Escalation that was wanted but cannot run, because the test universe has no
+   test outside the defenders, is recorded as
+   `detail.escalationSkipped: "no-test-outside-defenders"` and shown on the
+   console line. It is never present together with `escalated`, and it is not
+   recorded for `--no-escalate` (a choice) nor for an unexecuted subject
+   (already `unverifiable`). Under `--runner-cmd` the universe is the adapter's
+   file globs plus every claim's declared defenders, so a suite the globs do
+   not know can escalate between the tests the claims name.
 6. **A verdict names the commit it is about.** Evidence records `repo.head`;
    when the working tree was probed instead, `repo.snapshot` holds the
    throwaway commit that captured it. A tool must refuse to probe a commit
@@ -1056,6 +1064,15 @@ Security- and money-shaped path names are explicit tie-breaking signals, never
 semantic claims about a file. Churn, path risk and claim coverage remain raw
 facts: they are never collapsed into one health score.
 
+Files in a language the tool recognizes but cannot probe are not source
+modules. The optional `surface.unsupportedModules` (`total` and `byLanguage`
+by language id) counts them beside the denominator, so a count of supported
+modules is never read as the whole project. It is present only when there is
+at least one such file, and `total` equals the sum of `byLanguage`. Tests cannot
+be told from source in these languages, so they are counted too. In a status
+that measured a change, `changes.unsupported` counts the changed files of that
+kind that were excluded; it never exceeds `changes.excluded`.
+
 ### Intent-first scaffold authoring
 
 Unannotated generated draft groups use unfinished `TODO-CLAIM-N` identifiers,
@@ -1142,6 +1159,13 @@ merge-base in the working tree — file by file:
   matches a documented never-claimed pattern (`*.d.ts`, `*.config.*`,
   fixtures, mocks, snapshots, the tool's own directory). Exclusions are
   listed, never silent.
+- A changed file in a language the tool recognizes as source but cannot probe
+  (Apex, Java, Kotlin, Scala, C#, Go, Ruby, PHP, DataWeave, Salesforce Flow,
+  Mule XML) is **excluded** with `by: "unsupported-language"` and its
+  `language` id, never as `non-source`. It is a gap, not a file that never
+  needed a claim. It is not evaluated, and it is not covered unless an
+  **unexpired** `path` ignore entry excuses it. The same default and user
+  exclusions apply first.
 - A changed source file is **covered** when at least one fault anchors to it,
   when it is a test file that resolves as a defender of some claim, or when an
   **unexpired** `path` ignore entry excuses it.
@@ -1162,7 +1186,11 @@ Rules:
    names it in `defendedBy` (or discovery resolves it as a defender).
 4. **Never a silent pass on nothing.** A non-empty change whose files were
    all excluded passes with an explicit "0 evaluated" line; a tool offers a
-   strict mode that fails it instead. An empty change is an honest `0`.
+   strict mode that fails it instead. An empty change is an honest `0`. In
+   strict mode a change that holds any unexcused `unsupported-language` file
+   also fails, even when other files are covered: the gate never reports
+   "every changed source file is claimed" over source it could not read.
+   Without strict it passes, and names the language and count.
 5. **The reference is inferred only from recorded intent.** Resolution stops
    at the first available source: an explicit flag, `TESTGUARD_CHANGED_REF`, a
    CI-provided base, the configured remote's symbolic default branch, then a
@@ -1191,7 +1219,7 @@ Rules:
 Exit codes: `0` every changed parent-owned source file is claimed or excused
 (or nothing changed); delegated projects still require separate child gates.
 `1` at least one uncovered file (or strict mode over an
-all-excluded or all-delegated change); `2` the change cannot be evaluated (unresolvable
+all-excluded or all-delegated change, or over any unsupported-language file); `2` the change cannot be evaluated (unresolvable
 reference, invalid claims or ignore file, no repository); `3` no reference.
 
 ## Write boundary
@@ -1896,8 +1924,13 @@ ran, so pytest and unittest differ), version and `source`. `source` is recorded
 for every resolved runner — `project` (the project's package, its virtualenv,
 or an interpreter named by path), `path` (an executable found on PATH,
 including a bare command name given to `--python`) or `builtin` — and is absent
-only for a custom command, which resolves nothing. Evidence that recorded no
-runner, or a different one, is remeasured.
+only for a custom command, which resolves nothing. A `--runner-cmd` run
+records `{ "name": "custom-command", "commandHash": <sha256 of the command's
+parsed words> }`, never the name of the adapter that happens to read its report
+(a Maven build is not Vitest); it carries no `version` and no `source`, and
+reuse requires the same hash. Evidence from before this rule named the adapter
+and carried no hash: it stays readable and is remeasured. Evidence that
+recorded no runner, or a different one, is remeasured.
 `status.cost.measurements` copies these measurements when available. Historical
 `totalMs` and cost gates retain their existing record attribution, including
 reused durations and repeated shared baseline durations. Older evidence has no

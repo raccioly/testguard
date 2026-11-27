@@ -1,22 +1,18 @@
 import { readFileSync, existsSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve, extname } from 'node:path';
 import { walk } from '../util/glob.mjs';
+import { parseJsonc } from '../util/jsonc.mjs';
 import { createImportResolver } from './imports.mjs';
-import { readConfigAliases } from './alias-config.mjs';
+import { readConfigAliases, readJestModuleNameMapper } from './alias-config.mjs';
 import { pyBlastRadius } from './pyimports.mjs';
 
 const aliasCache = new Map();
-
-/** Minimal JSONC: strip comments and trailing commas, as tsconfig allows. */
-function parseJsonc(text) {
-  return JSON.parse(text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1'));
-}
 
 /**
  * Alias rules for a project: tsconfig/jsconfig `compilerOptions.paths` (with
  * `baseUrl`, following a relative `extends` a few levels, and every
  * `references[].path` — Vite projects keep `paths` in `tsconfig.app.json`),
- * vite/vitest `resolve.alias` read as text, and package.json `imports`. Bare
+ * vite/vitest `resolve.alias` and Jest `moduleNameMapper` read as text, and package.json `imports`. Bare
  * specifiers that match no rule are ignored, as documented.
  */
 function loadAliasContext(projectDir) {
@@ -75,9 +71,26 @@ function loadAliasContext(projectDir) {
     if (opaque) rules.push({ prefix: '', suffix: '', wildcard: true, targets: [], opaque: true });
   }
 
+  // Jest `moduleNameMapper` (#334): jest.config.* and package.json#jest, read
+  // as text. What cannot be read adds the same catch-all, with no target.
+  const addJest = ({ rules: mapped, opaque }) => {
+    rules.push(...mapped);
+    if (opaque) rules.push({ prefix: '', suffix: '', wildcard: true, targets: [], opaque: true });
+  };
+  for (const f of ['js', 'mjs', 'cjs', 'ts', 'cts', 'json'].map((ext) => `jest.config.${ext}`)) {
+    const path = join(projectDir, f);
+    if (!existsSync(path)) continue;
+    configFiles.add(path);
+    addJest(readJestModuleNameMapper(readFileSync(path, 'utf8'), { projectDir, json: f.endsWith('.json') }));
+  }
+
   const pkgPath = join(projectDir, 'package.json');
   if (existsSync(pkgPath)) {
     configFiles.add(pkgPath);
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+      if (pkg.jest !== undefined) addJest(readJestModuleNameMapper(JSON.stringify(pkg.jest), { projectDir, json: true }));
+    } catch {}
     try {
       const imports = JSON.parse(readFileSync(pkgPath, 'utf8')).imports ?? {};
       for (const [pattern, target] of Object.entries(imports)) {
@@ -107,7 +120,7 @@ function aliasCandidates(specifier, rules) {
     if (r.wildcard) {
       if (specifier.startsWith(r.prefix) && specifier.endsWith(r.suffix) && specifier.length >= r.prefix.length + r.suffix.length) {
         const star = specifier.slice(r.prefix.length, specifier.length - r.suffix.length);
-        for (const t of r.targets) out.push(t.replace('*', star));
+        for (const t of r.targets) out.push(t.replaceAll('*', star));
       }
     } else if (specifier === r.prefix) {
       out.push(...r.targets);

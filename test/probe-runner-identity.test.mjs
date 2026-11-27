@@ -71,11 +71,11 @@ it('a verdict measured under one runner is not reused under another', async () =
   const { loadClaims } = await import('../src/claims/load.mjs');
   const opts = { projectDir: dir, claims: loadClaims(join(dir, 'testguard.claims.json')), runnerCommand: `${node} runner.cjs {files} {out}`, confirmRuns: 1, budgetMs: 5000, escalate: false };
   const first = await probe({ ...opts, runnerName: 'vitest' });
-  expect(first.run.runner.name).toBe('vitest');
+  expect(first.run.runner.name).toBe('custom-command'); // the command ran; the adapter only reads its report
   const same = await probe({ ...opts, runnerName: 'vitest', previous: first });
   expect(same.records[0].reusedFrom).toBe(first.run.id);
   const other = await probe({ ...opts, runnerName: 'jest', previous: first });
-  expect(other.run.runner.name).toBe('jest');
+  expect(other.run.runner.name).toBe('custom-command');
   expect(other.records[0]).not.toHaveProperty('reusedFrom');
 }, 30_000);
 
@@ -94,3 +94,17 @@ it('any change to the command re-measures, not only one that fixes a load failur
   expect(changed.records[0]).not.toHaveProperty('reusedFrom');
   expect(changed.records[0].inputs.testUniverseHash).not.toBe(first.records[0].inputs.testUniverseHash);
 }, 30_000);
+
+// The run-level reuse rule itself, with every other input equal: only the
+// recorded runner differs. A rule that stops asking turns this one case true.
+it('reusableRun refuses evidence measured by another runner and accepts the same one', async () => {
+  const { reusableRun, runnerRecord } = await import('../src/probe/probe.mjs');
+  const instrument = { toolVersion: '9.9.9', digest: 'd' };
+  const previous = {
+    tool: { version: '9.9.9' },
+    run: { confirmRuns: 3, workers: 1, serial: true, runner: runnerRecord('vitest', '3.2.4', 'project'), instrument },
+  };
+  const policy = { confirmRuns: 3, workers: 1, runner: runnerRecord('vitest', '3.2.4', 'project'), instrument };
+  expect(reusableRun(previous, policy)).toBe(true);
+  expect(reusableRun(previous, { ...policy, runner: runnerRecord('jest', '3.2.4', 'project') })).toBe(false);
+});

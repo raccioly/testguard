@@ -7,6 +7,7 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } 
 import { childScope, scratchRoot } from '../../scratch-dir.mjs';
 import { sha256 } from '../../util/hash.mjs';
 import { globToRegExp, walk } from '../../util/glob.mjs';
+import { parseJsonc } from '../../util/jsonc.mjs';
 import { parseModuleSource, tokenizeModule } from '../imports.mjs';
 import { resolveAliased } from '../rank.mjs';
 import { terminateProcessTree, TIMEOUT_CLEANUP_WARNING } from './process-tree.mjs';
@@ -467,7 +468,7 @@ const staticConfigReferences = (path, bytes) => {
   const text = decodeUtf8(bytes, `discovery config ${path}`);
   if (extname(path) === '.json') {
     try {
-      return { paths: jsonConfigReferences(JSON.parse(text)), imports: new Set() };
+      return { paths: jsonConfigReferences(parseJsonc(text)), imports: new Set() };
     } catch (error) {
       throw new DiscoveryError(`discovery config ${path} is not valid JSON: ${error.message}`, { cause: error });
     }

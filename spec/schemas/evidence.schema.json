@@ -81,6 +81,10 @@
               "type": "string",
               "maxLength": 64
             },
+            "commandHash": {
+              "description": "Present exactly when `name` is `custom-command` (a `--runner-cmd` run): the sha256 of the command's parsed words (the command text is never recorded). A custom command resolves nothing, so it carries no `version` and no `source`. Reuse requires the same hash. Evidence from before this field named the adapter that read the command's report (`vitest` under `--runner auto`) and carried no hash; it stays readable and is never reused for a custom command.",
+              "$ref": "urn:claimspec:v1:common#/$defs/sha256"
+            },
             "source": {
               "description": "Where the runner was resolved from; recorded for every resolved runner and absent only for a custom command. `project`: the runner package resolved from the project, the project's virtualenv, or an interpreter named by path. `path`: an executable found on PATH ran instead (including a bare command name given to --python). `builtin`: the explicitly selected node-test engine uses the Node executable running TestGuard; its version is required. Reuse requires the same name, version and source.",
               "enum": [
@@ -560,6 +564,10 @@
             "escalated": {
               "description": "True when the fault survived its declared defenders and a broader test set was then run.",
               "type": "boolean"
+            },
+            "escalationSkipped": {
+              "description": "Present on a `survived` record whose escalation was wanted but could not run, because the test universe holds no test outside the defenders (`no-test-outside-defenders`). Nobody asked the wider suite, so the survivor means less than one that was asked: an undeclared test may well kill it. Never present together with `escalated`, and never recorded for `--no-escalate`. Under `--runner-cmd` the universe is the adapter's globs plus every claim's declared defenders.",
+              "enum": ["no-test-outside-defenders"]
             },
             "escalationStoppedEarly": {
               "description": "Why the escalation loop ran fewer than N times. `no-common-failure`: no test failed in every run so far, so no further run could name an undeclared killer. Stopping can only fail to NAME a killer, never upgrade a verdict.",

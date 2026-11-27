@@ -75,6 +75,16 @@ export async function scaffoldCommand({ projectDir, file, files = file ? [file] 
   const existingClaims = existsSync(claimsPath) ? loadClaims(claimsPath) : undefined;
   const { doc, stats } = scaffoldFile({ projectDir, file: rel, claimId, existingClaims, toolVersion: version });
 
+  if (stats.unsupported) {
+    // Say what TestGuard cannot do, and stop: an empty draft or a "no test
+    // file imports this module" line would name the wrong cause. Exit stays 0,
+    // as for any scaffold that proposes nothing. The note goes to stderr so
+    // `--json` stdout stays one parseable claims document.
+    const { extension, language } = stats.unsupported;
+    io.err(`scaffold has no producers for ${extension}${language ? ` (${language})` : ''}: nothing was proposed. Write faults by hand (see Writing claims) and declare defendedBy, because TestGuard cannot discover defenders for ${extension} files.`);
+    if (values.json) io.out(JSON.stringify(doc, null, 2));
+    return 0;
+  }
   if (values.json) {
     io.out(JSON.stringify(doc, null, 2));
     return 0;

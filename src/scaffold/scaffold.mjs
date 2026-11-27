@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { proposalsForLine, functionHead, functionParams } from './producers.mjs';
 import * as py from './producers.python.mjs';
@@ -16,6 +16,27 @@ const NO_FIELD_DROPS = /\.(test|spec)\.[cm]?[jt]sx?$|(^|\/)(__tests__|__fixtures
 const NO_FIELD_DROPS_PY = /(^|\/)(test[^/]*\.py|[^/]*_test\.py|conftest\.py)$|(^|\/)(tests?|__fixtures__|fixtures|migrations)\//;
 
 const isPython = (file) => file.endsWith('.py');
+const isDirectory = (projectDir, file) => { try { return statSync(join(projectDir, file)).isDirectory(); } catch { return false; } };
+// Producers exist for JavaScript-family files and Python only. Any other
+// extension has no producer set: the JavaScript line shapes are not valid
+// Java, Apex, XML or DataWeave (`undefined`, JSX element removal), so a file in
+// another language is refused out loud instead of being scanned as JavaScript.
+const JS_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.jsx', '.tsx']);
+const LANGUAGE_NAMES = new Map([
+  ['.java', 'Java'], ['.kt', 'Kotlin'], ['.scala', 'Scala'], ['.groovy', 'Groovy'], ['.cs', 'C#'], ['.go', 'Go'], ['.rb', 'Ruby'], ['.php', 'PHP'], ['.rs', 'Rust'],
+  ['.cls', 'Apex'], ['.trigger', 'Apex'], ['.xml', 'XML'], ['.dwl', 'DataWeave'],
+]);
+function extensionOf(file) {
+  const base = file.slice(file.lastIndexOf('/') + 1);
+  const dot = base.lastIndexOf('.');
+  return dot > 0 ? base.slice(dot).toLowerCase() : '';
+}
+/** `{ extension, language }` when scaffold has no producers for `file`, else null. */
+export function unsupportedLanguage(file) {
+  const extension = extensionOf(file);
+  if (extension === '.py' || JS_EXTENSIONS.has(extension)) return null;
+  return { extension: extension || '(none)', language: LANGUAGE_NAMES.get(extension) ?? null };
+}
 
 /**
  * JavaScript line scan: enclosing function tracked by brace depth, `@claim`
@@ -139,6 +160,13 @@ export function scaffoldFile({ projectDir, file, claimId, existingClaims, toolVe
   if (admittedSource !== undefined && typeof admittedSource !== 'string') throw new Error('source must be a string');
   // Internal authoring can scan bytes already admitted through a descriptor.
   // Legacy callers still read the file; supplied empty text never falls back.
+  // A directory is not a language: it keeps failing at the read, as before.
+  const unsupported = isDirectory(projectDir, file) ? null : unsupportedLanguage(file);
+  if (unsupported) {
+    // Never scan it: no producer set exists, so nothing here would be valid.
+    const doc = { $schema: './node_modules/testguard-cli/spec/schemas/claims.schema.json', schemaVersion: 1, claims: [] };
+    return { doc, stats: { proposals: 0, claims: 0, byClass: {}, defendedBy: [], unsupported } };
+  }
   const source = admittedSource === undefined ? readFileSync(join(projectDir, file), 'utf8') : admittedSource;
   const lines = source.split('\n');
   const producedBy = { producer: 'derived', by: `testguard scaffold ${toolVersion}` };

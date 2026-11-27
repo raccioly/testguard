@@ -36,6 +36,7 @@
     "sourceModules": 3,
     "claimedModules": 2,
     "unclaimedModules": 1,
+    "unsupportedModules": { "total": 4, "byLanguage": { "apex": 3, "salesforce-flow": 1 } },
     "history": {
       "available": true,
       "maxCommits": 200,

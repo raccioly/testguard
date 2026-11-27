@@ -13,7 +13,7 @@ you are evaluating TestGuard. Read it also if your probe just refused with
 | Runners | `vitest`, `jest`, `playwright`, `node-test`, custom `--runner-cmd` | `vitest`, `jest`, `playwright`, custom `--runner-cmd` | `vitest`, `jest`, `playwright` | `python` (`pytest` or `unittest`) |
 | Picked by `auto` | `vitest`, then `jest` | `vitest`, then `jest` | `vitest`, then `jest` | `python`, when no JavaScript runner sees a test; a `.py` defender always runs under Python |
 | How the code is loaded | the runner's own loader | the runner's own transform. Vitest compiles TypeScript itself. Jest uses the transform the project already configures. TestGuard adds none | the runner's transform, as for TypeScript | the project's interpreter |
-| Defender discovery | test files that import the fault's file: relative paths, `tsconfig`/`jsconfig` `paths` (through `extends` and `references`), vite/vitest `resolve.alias`, `package.json#imports`, re-exports through barrel files | as JavaScript; a `./x.js` specifier also resolves to `x.ts`/`x.tsx` (`.mjs` → `.mts`, `.cjs` → `.cts`) | as TypeScript | test files that import the fault's module by dotted module name, however it reached `sys.path` |
+| Defender discovery | test files that import the fault's file: relative paths, `tsconfig`/`jsconfig` `paths` (through `extends` and `references`), vite/vitest `resolve.alias`, Jest `moduleNameMapper` (a literal object), `package.json#imports`, re-exports through barrel files | as JavaScript; a `./x.js` specifier also resolves to `x.ts`/`x.tsx` (`.mjs` → `.mts`, `.cjs` → `.cts`) | as TypeScript | test files that import the fault's module by dotted module name, however it reached `sys.path` |
 | Mock awareness | `vi.mock` / `jest.mock` (and `doMock`, `unstable_mockModule`) of the target removes the file as a defender | as JavaScript | as JavaScript | only a `patch()` of the whole module removes a defender; an attribute patch keeps it and raises `target-attribute-patched` |
 | Scaffold producers | the seven shared shapes; the two JSX shapes only where a line is JSX | as JavaScript | all nine: the seven shared shapes plus `element-removed` and `handler-dropped` | the seven shared shapes, in Python syntax |
 | `claims --check-anchors` | anchor located and replacement parsed (`.js`, `.mjs`, `.cjs`) | anchor located; replacement not parsed (a broken one surfaces at probe time as `fault-invalid`); with `--typecheck`, also type checked | anchor located; replacement not parsed; with `--typecheck`, also type checked | anchor located and replacement parsed by the project's interpreter |
@@ -96,11 +96,20 @@ The evidence records where every resolved runner came from in `runner.source`:
   `--python`.
 - `builtin`: `node-test`, the Node running TestGuard.
 
-A `--runner-cmd` resolves nothing and records no source.
+A `--runner-cmd` resolves nothing and records no source. It records the
+command as the runner, with the hash of its parsed words. The command text is
+never written to the evidence.
 
 ```json
 "runner": { "name": "vitest", "version": "3.2.4", "source": "project" }
 "runner": { "name": "node-test", "version": "24.18.0", "source": "builtin" }
+```
+
+A `--runner-cmd` run records the command, never the adapter that reads its
+report:
+
+```json
+"runner": { "name": "custom-command", "commandHash": "4b0f6c2a…" }
 ```
 
 A Python run records the engine that actually ran, never the adapter name:
@@ -110,7 +119,8 @@ A Python run records the engine that actually ran, never the adapter name:
 ```
 
 The runner is part of what a verdict measured. A later probe reuses a verdict
-only when it records the same name, version and source.
+only when it records the same name, version and source. For a `--runner-cmd`,
+it must record the same command hash instead.
 
 An unresolvable runner is a precondition failure (exit `2`). It is never a
 verdict about the tests.
@@ -315,8 +325,17 @@ error. The command exits `3` with the reason before anything runs.
 - **One execution boundary.** Every selected defender, including Playwright
   and `.py` files, goes to your one command.
 - **A static test universe.** The universe is the `--runner` adapter's file
-  globs (Vitest's under `auto`) plus the Playwright- and Python-owned files.
-  It is not a native listing. `--require-origin` cannot certify against it.
+  globs (Vitest's under `auto`), the Playwright- and Python-owned files, and
+  every file that any claim or fault lists in `defendedBy`. It is not a native
+  listing. `--require-origin` cannot certify against it.
+- **Escalation only sees that universe.** For a suite the adapter's globs do
+  not know (JUnit, Apex, MUnit), a test that no claim declares is not in the
+  universe. To let a survivor be checked against another test, list that test
+  in the `defendedBy` of some claim. When the universe has no test outside the
+  defenders, escalation is skipped. The record says
+  `detail.escalationSkipped: "no-test-outside-defenders"`, and the console line
+  says `[escalation skipped: the test universe has no test outside the
+  defenders]`. Read such a `SURVIVED` as "not yet checked against other tests".
 - **No worker flags.** `--workers` and `--serial` do not edit your command.
   Put the runner's own parallelism flags in the template.
 - **The template is part of reuse.** The test universe's hash binds the
@@ -357,8 +376,11 @@ and the runner would look for them in the wrong place.
 
 - **Languages other than JavaScript, TypeScript and Python.** Defender
   discovery, the scaffold, anchor syntax checks and `gate` cover only the
-  extensions in the matrix above. `gate` excludes every other file as
-  `non-source`.
+  extensions in the matrix above. `gate` reports a changed file in a
+  known language it cannot probe (Apex, Java, Kotlin, Scala, C#, Go, Ruby,
+  PHP, DataWeave, Salesforce Flow and Mule XML) as `unsupported-language`, and
+  `gate --strict` fails on it. `status` counts these files beside the
+  supported modules. Every other file is `non-source`.
 - **Built-in runners beyond Vitest, Jest, Playwright, Node's test runner and
   Python.** Others go through `--runner-cmd` and need a reporter that writes
   the jest-compatible shape.

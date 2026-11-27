@@ -225,6 +225,10 @@ export async function sweep({
       skipped.push({ file, reason: e.message.split('\n')[0].slice(0, 200) });
       continue;
     }
+    if (result.stats.unsupported) {
+      skipped.push({ file, reason: `scaffold has no producers for ${result.stats.unsupported.extension}` });
+      continue;
+    }
     if (result.stats.proposals === 0) {
       skipped.push({ file, reason: 'no line in this file matches a fault producer' });
       continue;

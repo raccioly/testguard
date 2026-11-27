@@ -169,7 +169,7 @@ async function replayIn({
       startedAt,
       finishedAt: new Date().toISOString(),
       range,
-      runner: { name: runnerUsed.name, ...(runnerVersion ? { version: runnerVersion } : {}) },
+      runner: runnerCommand ? { name: 'custom-command' } : { name: runnerUsed.name, ...(runnerVersion ? { version: runnerVersion } : {}) },
       confirmRuns,
       candidates: found.length,
       duplicates,

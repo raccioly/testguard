@@ -4612,8 +4612,8 @@
           "description": "Uncovered files no longer decide the exit code.",
           "faultClass": "condition-forced",
           "file": "src/gate/changed.mjs",
-          "find": "const exitCode = uncovered.length > 0 ? 1 : strict && changed.length > 0 && evaluated === 0 ? 1 : 0;",
-          "replace": "const exitCode = strict && changed.length > 0 && evaluated === 0 ? 1 : 0;",
+          "find": "const exitCode = uncovered.length > 0 ? 1 : strict && changed.length > 0 && (evaluated === 0 || hasGap) ? 1 : 0;",
+          "replace": "const exitCode = strict && changed.length > 0 && (evaluated === 0 || hasGap) ? 1 : 0;",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -11735,8 +11735,8 @@
           "description": "The custom-command universe hashes only the files, so a fixed command reuses the broken command's verdicts.",
           "faultClass": "field-dropped",
           "file": "src/probe/universe.mjs",
-          "find": "  return sha256(JSON.stringify({ schemaVersion: 2, source: 'custom-command-static', command: commandTemplate, files }));",
-          "replace": "  return sha256(JSON.stringify({ schemaVersion: 2, source: 'custom-command-static', files }));",
+          "find": "  return sha256(JSON.stringify({ schemaVersion: 3, source: 'custom-command-static', adapter, command: commandTemplate, files }));",
+          "replace": "  return sha256(JSON.stringify({ schemaVersion: 3, source: 'custom-command-static', adapter, files }));",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -11747,8 +11747,8 @@
           "description": "The probe hashes an empty command into the universe, so any two commands look identical to reuse.",
           "faultClass": "argument-swapped",
           "file": "src/probe/probe.mjs",
-          "find": "      ? hashCustomCommandUniverse(allTests, commandTemplate)",
-          "replace": "      ? hashCustomCommandUniverse(allTests, [])",
+          "find": "      ? hashCustomCommandUniverse(allTests, commandTemplate, runner.name)",
+          "replace": "      ? hashCustomCommandUniverse(allTests, [], runner.name)",
           "defendedBy": [
             "test/probe-runner-identity.test.mjs"
           ],
@@ -11780,8 +11780,8 @@
           "description": "Reuse compares only the runner's name, so an upgraded runner or a global binary of the same name stands in for the measurement.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "  return recorded.name === current.name && recorded.version === current.version && recorded.source === current.source;",
-          "replace": "  return recorded.name === current.name;",
+          "find": "  return recorded.name === current.name && recorded.version === current.version && recorded.source === current.source\n    && recorded.commandHash === current.commandHash;",
+          "replace": "  return recorded.name === current.name && recorded.commandHash === current.commandHash;",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -11837,8 +11837,8 @@
           "description": "The probe drops the resolved source before recording the runner.",
           "faultClass": "argument-swapped",
           "file": "src/probe/probe.mjs",
-          "find": "    recordedRunner = runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), runnerSource);",
-          "replace": "    recordedRunner = runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), undefined);",
+          "find": "    recordedRunner = commandTemplate ? customCommandRunner(commandTemplate) : runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), runnerSource);",
+          "replace": "    recordedRunner = commandTemplate ? customCommandRunner(commandTemplate) : runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), undefined);",
           "defendedBy": [
             "test/resource-timing.test.mjs"
           ],
@@ -16706,8 +16706,8 @@
           "description": "An alias map that cannot be read adds no catch-all rule.",
           "faultClass": "statement-deleted",
           "file": "src/probe/rank.mjs",
-          "find": "    if (opaque) rules.push({ prefix: '', suffix: '', wildcard: true, targets: [], opaque: true });",
-          "replace": "",
+          "find": "    }\n    if (opaque) rules.push({ prefix: '', suffix: '', wildcard: true, targets: [], opaque: true });",
+          "replace": "    }",
           "defendedBy": [
             "test/alias-forms.test.mjs"
           ],
@@ -20261,6 +20261,371 @@
           "file": "src/cli.mjs",
           "find": "    io.err(`unknown command: ${command}`);\n    io.err(\"Run 'testguard --help' for usage.\");",
           "replace": "    io.err(`unknown command: ${command}`);\n    io.err(USAGE);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-TSCONFIG-IS-JSONC",
+      "statement": "A tsconfig or jsconfig is read as JSONC by every reader: comments, trailing commas and a byte order mark are accepted, a comment-like sequence inside a string (a \"src/**/*.ts\" glob, a URL) is kept, and invalid JSON still fails with the JSON.parse message.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #330"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/jsonc.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Discovery parses a tsconfig with strict JSON again, so a header comment refuses the probe.",
+          "faultClass": "other",
+          "file": "src/probe/runners/discovery.mjs",
+          "find": "jsonConfigReferences(parseJsonc(text))",
+          "replace": "jsonConfigReferences(JSON.parse(text))",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The alias reader strips comments with a regex that also matches inside strings, so an include glob drops every paths alias.",
+          "faultClass": "other",
+          "file": "src/probe/rank.mjs",
+          "find": "cfg = parseJsonc(readFileSync(cfgPath, 'utf8'));",
+          "replace": "cfg = JSON.parse(readFileSync(cfgPath, 'utf8').replace(/\\/\\*[\\s\\S]*?\\*\\//g, ''));",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The shared parser stops tracking strings, so a comment-like sequence inside a string is removed.",
+          "faultClass": "other",
+          "file": "src/util/jsonc.mjs",
+          "find": "if (c === '\"') {",
+          "replace": "if (false) {",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-UNSUPPORTED-LANGUAGE-IS-A-GAP",
+      "statement": "A changed file in a language TestGuard recognizes as source but cannot probe (Apex, Java, Kotlin, Scala, C#, Go, Ruby, PHP, DataWeave, Salesforce Flow, Mule XML) is reported as an unsupported-language gap with its language, never as non-source: gate --strict fails on it even beside covered files, the plain gate output never says every changed source file is claimed, and status counts these files beside the supported source modules instead of leaving them out.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #331"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/unsupported-language.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The gate files an unsupported-language source file under non-source again, so it vanishes like a README.",
+          "faultClass": "other",
+          "file": "src/gate/changed.mjs",
+          "find": "excluded.push({ file, by: 'unsupported-language', language: gap.id });",
+          "replace": "excluded.push({ file, by: 'non-source' });",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "--strict ignores unsupported-language files when other files were evaluated, so a mixed change passes.",
+          "faultClass": "other",
+          "file": "src/gate/changed.mjs",
+          "find": "(evaluated === 0 || hasGap)",
+          "replace": "(evaluated === 0)",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The gate prints the all-claimed line over a change that holds an unsupported-language file.",
+          "faultClass": "other",
+          "file": "src/gate/changed.mjs",
+          "find": "doc.evaluated > 0 && !gaps) lines.push",
+          "replace": "doc.evaluated > 0) lines.push",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "The status surface drops the unsupported-language count, so a Java module reads 0 of 0 with nothing beside it.",
+          "faultClass": "other",
+          "file": "src/status/surface.mjs",
+          "find": "...(unsupported ? { unsupportedModules: unsupported } : {}),",
+          "replace": "...(unsupported ? {} : {}),",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "An unexpired ignore entry no longer excuses an unsupported-language file.",
+          "faultClass": "other",
+          "file": "src/gate/changed.mjs",
+          "find": "const excuse = pathEntries.find((p) => !p.expired && p.re.test(file));",
+          "replace": "const excuse = null;",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RUNNER-CMD-IDENTITY",
+      "statement": "A --runner-cmd run records the command (custom-command plus the hash of its parsed words) as the runner, never the adapter that reads its report; its test universe holds every declared defender; and a survivor whose escalation could not run says so (detail.escalationSkipped) instead of looking like one that was asked.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #332"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/runner-cmd-identity.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The evidence names the adapter, not the command, as the runner.",
+          "faultClass": "other",
+          "file": "src/probe/probe.mjs",
+          "find": "recordedRunner = commandTemplate ? customCommandRunner(commandTemplate) : runnerRecord(",
+          "replace": "recordedRunner = commandTemplate ? runnerRecord(labelOf(runner), undefined, undefined) : runnerRecord(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Reuse ignores the command hash, so a verdict measured by another command is carried forward.",
+          "faultClass": "other",
+          "file": "src/probe/probe.mjs",
+          "find": "    && recorded.commandHash === current.commandHash;",
+          "replace": "    && true;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The custom-command universe drops the declared defenders, so a non-JavaScript suite has nothing to escalate against.",
+          "faultClass": "other",
+          "file": "src/probe/probe.mjs",
+          "find": "return [...new Set([...nativeTests, ...declaredDefenders])].sort();",
+          "replace": "return [...new Set([...nativeTests])].sort();",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "An escalation that cannot run is silent.",
+          "faultClass": "other",
+          "file": "src/probe/attribution.mjs",
+          "find": "return broaderCount > 0 ? 'run' : 'skipped-no-test-outside-defenders';",
+          "replace": "return broaderCount > 0 ? 'run' : 'none';",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The adapter is dropped from the custom-command universe hash, so another adapter reuses the verdict.",
+          "faultClass": "other",
+          "file": "src/probe/universe.mjs",
+          "find": "source: 'custom-command-static', adapter, command",
+          "replace": "source: 'custom-command-static', command",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SCAFFOLD-REFUSES-LANGUAGES-WITHOUT-PRODUCERS",
+      "statement": "scaffold proposes faults only for JavaScript, TypeScript and Python files. For any other extension it proposes nothing, names the extension in a no-producers note, and never applies the JavaScript line shapes (no `undefined` argument in Java, no JSX element removal in XML).",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #333"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/scaffold.unsupported-language.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Every extension is treated as supported, so Java and XML are scanned with the JavaScript shapes again.",
+          "faultClass": "condition-forced",
+          "file": "src/scaffold/scaffold.mjs",
+          "find": "  if (unsupported) {",
+          "replace": "  if (false) {",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The support check calls every extension supported.",
+          "faultClass": "condition-forced",
+          "file": "src/scaffold/scaffold.mjs",
+          "find": "  if (extension === '.py' || JS_EXTENSIONS.has(extension)) return null;",
+          "replace": "  if (true) return null;",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The command stays silent for an unsupported file and reports the wrong cause.",
+          "faultClass": "condition-forced",
+          "file": "src/commands/scaffold.mjs",
+          "find": "  if (stats.unsupported) {",
+          "replace": "  if (false) {",
+          "expectHits": 1,
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-JEST-MODULE-NAME-MAPPER-FOLLOWED",
+      "statement": "A literal Jest `moduleNameMapper` (jest.config.* or package.json#jest) is resolved when discovering defenders; a mapper, config or resolution option it cannot evaluate makes the closure indeterminate, never smaller.",
+      "source": {
+        "kind": "spec",
+        "ref": "docs/guides/writing-claims.md#discovery-and-why-mocks-do-not-count"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/jest-mapper-aliases.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The mapper's rules are never added: a test that imports its subject through a mapped name is not discovered, and is reported NOCOVER.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/rank.mjs",
+          "find": "    rules.push(...mapped);",
+          "replace": "    ",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A mapper key the reader cannot translate is ignored instead of making the result indeterminate.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/alias-config.mjs",
+          "find": "if (!pattern) { opaque = true; continue; }",
+          "replace": "if (!pattern) { continue; }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A rule that Jest tries first but the resolver would rank second keeps its target: the specifier resolves to the wrong file.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/alias-config.mjs",
+          "find": "? { ...rule, targets: [] } : rule",
+          "replace": "? rule : rule",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "`resolver`, `modulePaths`, `moduleDirectories`, `rootDir` and `projects` no longer make the result indeterminate.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/alias-config.mjs",
+          "find": "OPAQUE_JEST_KEYS.has(t.value) ||",
+          "replace": "false ||",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A config that is not a literal object (a call such as createJestConfig) is read as if it had no mapper.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/alias-config.mjs",
+          "find": "if (!json && !exportsLiteralObject(tokens))",
+          "replace": "if (false)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "The jest config is not recorded as an alias dependency, so a change to it would not invalidate a reused result.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/rank.mjs",
+          "find": "    configFiles.add(path);\n    addJest(",
+          "replace": "    addJest(",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

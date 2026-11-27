@@ -12,7 +12,7 @@ import { coAuthorshipWarning, exceptionOnlyWarning, sortForReport, renderOrigins
 import { evaluateOriginPolicy } from '../probe/origin-policy.mjs';
 import { declaredOriginSummary } from '../../spec/lib/origins.mjs';
 import { intentHandoff } from '../scaffold/intent.mjs';
-import { computeChangedGate, defaultIgnorePath } from '../gate/changed.mjs';
+import { computeChangedGate, defaultIgnorePath, unsupportedTally, describeLanguages } from '../gate/changed.mjs';
 import { headSha, isAncestor, repoRoot } from '../git.mjs';
 import { availableParallelism } from 'node:os';
 import { computeAdvice, renderAdvice } from './advice.mjs';
@@ -123,6 +123,8 @@ function computeStatusCore({ projectDir, toolVersion, generatedAt = new Date().t
     const g = computeChangedGate({ projectDir, ref, includeDirty, toolVersion });
     changes = { ref: g.ref, base: g.base, includeDirty: g.includeDirty, changed: g.changed, evaluated: g.evaluated, excluded: g.excluded.length, uncovered: g.uncovered, reliedOn: g.reliedOn, expired: g.expired };
     if (g.nested?.length) changes.nested = g.nested;
+    const unsupported = unsupportedTally(g.excluded);
+    if (unsupported) changes.unsupported = unsupported;
     doc.changes = changes;
     if (existsSync(defaultIgnorePath(projectDir))) doc.paths.ignore = rel(defaultIgnorePath(projectDir));
   }
@@ -397,6 +399,7 @@ export function renderStatus(doc) {
     const s = doc.surface;
     const history = s.history.available ? `last ${s.history.commitsRead} commit${s.history.commitsRead === 1 ? '' : 's'}` : 'git history unavailable';
     lines.push(`surface:  ${s.claimedModules} of ${s.sourceModules} source modules carry a claim; ${s.highChurn.claimed} of ${s.highChurn.modules} highest-churn modules claimed (${history})`);
+    if (s.unsupportedModules) lines.push(`unsupported: ${s.unsupportedModules.total} more source file${s.unsupportedModules.total === 1 ? '' : 's'} in languages TestGuard cannot probe (${describeLanguages(s.unsupportedModules)})`);
     for (const item of s.rankedUnclaimed.slice(0, 3)) lines.push(`UNCLAIMED ${item.file} — ${item.changes} change${item.changes === 1 ? '' : 's'} in history window${item.riskSignals.length ? `; path risk: ${item.riskSignals.join(', ')}` : ''}`);
   }
   const coAuthored = doc.counts.killedCoAuthored ?? 0;
@@ -406,6 +409,7 @@ export function renderStatus(doc) {
   if (doc.changes) {
     const c = doc.changes;
     lines.push(`changes:  ${c.changed} file${c.changed === 1 ? '' : 's'} since ${c.ref}; ${c.evaluated} evaluated, ${c.excluded} excluded, ${c.uncovered.length} unclaimed`);
+    if (c.unsupported) lines.push(`unsupported: ${c.unsupported.total} changed file${c.unsupported.total === 1 ? '' : 's'} in languages TestGuard cannot probe (${describeLanguages(c.unsupported)}); ${c.unsupported.total === 1 ? 'it was' : 'they were'} not evaluated`);
     for (const u of c.uncovered) lines.push(`UNCLAIMED ${u.file} (${u.kind}) → ${u.suggestion}`);
     for (const r of c.reliedOn) lines.push(`excused   ${r.files.join(', ')} by ignore "${r.pattern}": ${r.reason}`);
     for (const e of c.expired) lines.push(`EXPIRED   ignore "${e.pattern}" no longer excuses ${e.files.join(', ')}`);

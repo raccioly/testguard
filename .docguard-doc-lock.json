@@ -40,11 +40,11 @@
           "tier": "content"
         },
         "src/gate/changed.mjs": {
-          "fingerprint": "sha256:a05973f3e8207c8e2539ae5cee17da5cadebe99c57a24b58a5dc301c77f02665",
+          "fingerprint": "sha256:fb5d8539c8fd223badf74bfe91434c75b8907ae5cc7f1e3b8fca768349213f31",
           "tier": "content"
         },
         "src/probe/attribution.mjs": {
-          "fingerprint": "sha256:76bcac10636869d654af29be8538ade6e8e72451a1722ef6941a5024861b98a1",
+          "fingerprint": "sha256:5f4f751c233cdbe16d1dfa843e671dea11066c4535ce18fd0d15d88918eca58f",
           "tier": "content"
         },
         "src/probe/classify.mjs": {
@@ -76,7 +76,7 @@
           "tier": "content"
         },
         "src/probe/probe.mjs": {
-          "fingerprint": "sha256:6e0ef4448e3f664fa1c28332342aaa064eead6985588a74412d7efcfe7e30382",
+          "fingerprint": "sha256:9e3a8fdc3475f51a2549f2c3676cc80c4f4a2950af2d6a6c606d02b957e1b906",
           "tier": "content"
         },
         "src/probe/progress.mjs": {
@@ -84,7 +84,7 @@
           "tier": "content"
         },
         "src/probe/rank.mjs": {
-          "fingerprint": "sha256:303e6b1bc282a3dbb517ce0acafafd935e06c82025bb27f0d7659359187ec4ee",
+          "fingerprint": "sha256:e6c7e7663a9e12b24dc19964f6e4955ce4653aa53650e78f51944bdfda29f4fe",
           "tier": "content"
         },
         "src/probe/worktree.mjs": {
@@ -96,7 +96,7 @@
           "tier": "content"
         },
         "src/status/status.mjs": {
-          "fingerprint": "sha256:9909b65c31b6f1ece6157c4bbd458035711bf2d07d3da7c54fc720dd385ac4ab",
+          "fingerprint": "sha256:bfb5c3c40aba0394d0a28447cda5df088998c235a04dfb7a2e2f10c06e72f1e1",
           "tier": "content"
         },
         "src/supply/concerns.mjs": {
@@ -120,13 +120,13 @@
           "tier": "content"
         },
         "src/sweep/sweep.mjs": {
-          "fingerprint": "sha256:898c33e4a1cda685531744a7cb1a3347638548070ea45ef48d30957c00d5682c",
+          "fingerprint": "sha256:20bd931fc853a973254e88595eb9b05733900878aa31255bd58dc11cf0c4ad4d",
           "tier": "content"
         }
       },
-      "reason": "Checked each covered file exists and the section's rows and descriptions against it",
+      "reason": "Re-read the rows for the changed gate, probe, rank, attribution, status and sweep modules against the code; the gate row now names unsupported-language gaps, the others are still accurate",
       "reviewedAt": "2026-11-27",
-      "reviewedRevision": "06e738bee1e09adf2ba1d0efa045d9e2659273ce"
+      "reviewedRevision": "1cad27a6be3d1f1ecce968c56ecd8b4ab7aa602e"
     },
     "docs-canonical/ARCHITECTURE.md#configuration-files": {
       "dependencies": {
