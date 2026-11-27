@@ -7,7 +7,9 @@ import { gitRaw } from '../git.mjs';
 import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { repoRoot as gitRoot, headSha, isDirty, snapshotWorkingTree } from '../git.mjs';
-import { discoverDefendersDetailed } from './discover.mjs';
+import { discoverDefendersDetailed, unsupportedDiscovery } from './discover.mjs';
+import { createNativeDiscovery } from './native-discovery.mjs';
+import { DISCOVERY_TIMEOUT_MS } from './runners/discovery.mjs';
 import { classifyDefenders } from './mocks.mjs';
 import { detectContention, contentionWarning, fanOutWarning, annotateTimeout } from './contention.mjs';
 import { availableParallelism } from 'node:os';
@@ -18,9 +20,9 @@ import { BudgetExhaustedError } from '../command-budget.mjs';
 import { completeRecords, budgetSummary, notReachedRecord, isNotReached } from './partial-budget.mjs';
 import { applyContent, applyFault, locate } from './inject.mjs';
 import { resolveDefenders, parseCommandTemplate, bareReporterHint, BUDGET_GRACE_MS } from './runners/shared.mjs';
-import { selectRunner, discoverRunnerManifest, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns, runnerLabel, runnerFor } from './runners/index.mjs';
+import { selectRunner, runnerUnresolvableMessage, discoverRunnerManifest, RUNNERS, OWNED_RUNNERS, partitionByRunner, mergeRuns, runnerLabel, runnerFor } from './runners/index.mjs';
 import { classify, shouldStopEarly } from './classify.mjs';
-import { blastRadius, rank } from './rank.mjs';
+import { blastRadius, rank, unreadableAliasConfigs } from './rank.mjs';
 import { classifyIndependence } from './independence.mjs';
 import { killKindReasonOf } from './kill-kind.mjs';
 import { escalationPlan, escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf, isReusable, inputsMatch, defenderSelection } from './attribution.mjs';
@@ -29,6 +31,7 @@ import { fingerprint } from '../../spec/lib/fingerprint.mjs';
 import { recordedOriginSummary } from '../../spec/lib/origins.mjs';
 import { persistenceSignalsFor } from '../supply/persistence.mjs';
 import { collectOwnedManifests, hashNativeTestUniverse, hashCustomCommandUniverse } from './universe.mjs';
+import { matchTestGlobs } from './test-globs.mjs';
 import { createDependencyHasher, instrumentOf } from './dependencies.mjs';
 import { createTypechecker, needsFaultRecheck, sameTypecheck } from './typecheck.mjs';
 import { withCommandWorkers, withWorker } from './worker-env.mjs';
@@ -117,10 +120,12 @@ export function customCommandRunner(commandTemplate, reportFormat) {
  * owned-runner files, plus every file any claim declares as a defender. The
  * globs find nothing for a suite they do not know (JUnit, Apex), and a
  * declared test is by definition a test; without it escalation has nothing to
- * ask. Sorted and de-duplicated, because it is hashed.
+ * ask. The files `--test-glob` matches join them (#332): they are how a suite
+ * the globs do not know (JUnit, Apex) names the tests no claim declares.
+ * Sorted and de-duplicated, because it is hashed.
  */
-export function commandUniverse(nativeTests, declaredDefenders) {
-  return [...new Set([...nativeTests, ...declaredDefenders])].sort();
+export function commandUniverse(nativeTests, declaredDefenders, matchedTests = []) {
+  return [...new Set([...nativeTests, ...declaredDefenders, ...matchedTests])].sort();
 }
 
 /**
@@ -331,6 +336,7 @@ async function measureProbe({
   commandBudget,
   runnerCommand,
   reportFormat,
+  testGlobs = [],
   runnerName = 'auto',
   nodeModules,
   python,
@@ -524,8 +530,7 @@ async function measureProbe({
       const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, python, name: runnerName, budgetMs, budgetFor: () => commandBudget?.runBudget(budgetMs) ?? budgetMs });
       commandBudget?.assertOpen();
       if (sel.error) {
-        throw new PreconditionError(`test runner is not resolvable in the ${mode === 'worktree' ? 'scratch worktree' : 'project'} (${sel.error}). ` +
-          (mode === 'worktree' ? 'If dependencies are missing, pass --node-modules <path>, or run with --in-place. Otherwise fix the discovery error above.' : 'If dependencies are missing, install them first. Otherwise fix the discovery error above.'), 'runner-unresolvable');
+        throw new PreconditionError(runnerUnresolvableMessage({ sel, mode }), 'runner-unresolvable');
       }
       runner = sel.runner;
       runnerVersion = sel.version;
@@ -601,13 +606,23 @@ async function measureProbe({
     // universe is hashed, so a `--claim` run must see the one a full run does.
     const declaredDefenders = () => claims.claims.flatMap((claim) => [claim, ...claim.faults].flatMap((x) => resolveDefenders(iso.projectDir, x.defendedBy ?? [])));
     const allTests = Object.freeze(commandTemplate
-      ? commandUniverse([...runner.tests(iso.projectDir).filter((t) => !owned.some((r) => r.owns(iso.projectDir, t))), ...owned.flatMap((r) => r.tests(iso.projectDir))], declaredDefenders())
+      ? commandUniverse([...runner.tests(iso.projectDir).filter((t) => !owned.some((r) => r.owns(iso.projectDir, t))), ...owned.flatMap((r) => r.tests(iso.projectDir))], declaredDefenders(), matchTestGlobs(iso.projectDir, testGlobs))
       : [...ownerByFile.keys()].sort());
     const testUniverseHash = commandTemplate
-      ? hashCustomCommandUniverse(allTests, commandTemplate, runner.name, reportFormat)
+      ? hashCustomCommandUniverse(allTests, commandTemplate, runner.name, testGlobs, reportFormat)
       : hashNativeTestUniverse(manifests);
     const baselineCache = new Map();
     const discoveryHashCache = new Map();
+    // What the static import layer cannot place, the project runner can (#334):
+    // Jest lists the tests that reach a file under its own resolution. Only for
+    // the project runner and never under a command template, where nothing says
+    // what the command resolves with.
+    const nativeDiscovery = createNativeDiscovery({
+      runner: commandTemplate ? null : runner,
+      projectDir: iso.projectDir,
+      timeoutMs: Math.min(DISCOVERY_TIMEOUT_MS, budgetMs),
+      onNote: onWarn,
+    });
     // Hashes and parses are cached only where the tree cannot change between
     // faults: the scratch worktree. In place, the user's tree is live.
     const dependencyHasher = createDependencyHasher(iso.projectDir, { cache: iso.mode === 'worktree' });
@@ -781,17 +796,17 @@ async function measureProbe({
      * is listed, because a declared defender that mocks the subject is a
      * broken evidence chain the author should see.
      */
-    const faultDefenders = ({ claim, fault }) => {
+    const faultDefenders = async ({ claim, fault }) => {
       const { requested } = defenderSelection(claim, fault);
       const declared = requested.length ? resolveDefenders(iso.projectDir, requested) : null;
       const excluded = declared && !commandTemplate ? declared.filter((file) => !ownerByFile.has(file)) : [];
-      const mockInfo = declared ? classifyDefenders(iso.projectDir, fault.file, declared) : discoverDefendersDetailed(iso.projectDir, fault.file, allTests);
+      const mockInfo = declared ? classifyDefenders(iso.projectDir, fault.file, declared) : await nativeDiscovery.resolve(discoverDefendersDetailed(iso.projectDir, fault.file, allTests), fault.file, allTests);
       const defenders = declared ?? mockInfo.canDetect;
       const discoveryHashes = declared ? {} : hashDiscoveryDependencies(iso.projectDir, mockInfo.dependencies, iso.mode === 'worktree' ? discoveryHashCache : new Map());
       return { declared, excluded, mockInfo, defenders, discoveryHashes };
     };
     const prePlanOne = async ({ claim, fault }) => {
-      const { declared, excluded, mockInfo, defenders, discoveryHashes } = faultDefenders({ claim, fault });
+      const { declared, excluded, mockInfo, defenders, discoveryHashes } = await faultDefenders({ claim, fault });
       if (declared && !commandTemplate) {
         for (const file of excluded) {
           const expectedOwner = owned.find((candidate) => candidate.owns?.(iso.projectDir, file));
@@ -806,7 +821,7 @@ async function measureProbe({
       const common = { claim, fault, defenders, discovered: declared === null, byRunner: byRunner(defenders), mocking: mockInfo.mocking, signals: mockInfo.signals };
       try {
         if (!declared && mockInfo.indeterminate.length > 0) {
-          return { record: discoveryIndeterminateRecord({ ...common, inputs: safeInputs(iso.projectDir, fault, defenders, { testUniverseHash, discoveryHashes }), indeterminate: mockInfo.indeterminate }) };
+          return { record: discoveryIndeterminateRecord({ ...common, inputs: safeInputs(iso.projectDir, fault, defenders, { testUniverseHash, discoveryHashes }), indeterminate: mockInfo.indeterminate, unreadableConfigs: unreadableAliasConfigs(projectDir) }) };
         }
         const args = { ...common, typechecker, typecheckBudget: () => commandBudget?.runBudget(budgetMs) ?? budgetMs, typecheckCut: (granted, outcome) => commandBudget?.assertNotCut(granted, budgetMs, outcome.status === 'timeout' ? 1 : 0), allTests, iso, onWarn, confirmRuns, escalate, controlCache, stage, prior: prior.get(`${claim.id}/${fault.id}`)?.record, priorRunId: prior.get(`${claim.id}/${fault.id}`)?.runId, priorTypecheck: prior.get(`${claim.id}/${fault.id}`)?.typecheck, testUniverseHash, discoveryHashes, ensureBaseline, dependencyHasher,
           historyRef: snapshot ?? (mode === 'worktree' ? head : 'HEAD'), historyDir: root };
@@ -875,7 +890,7 @@ async function measureProbe({
      */
     const carryOne = async (claim, fault, priorRecord) => {
       try {
-        const { declared, excluded, mockInfo, defenders, discoveryHashes } = faultDefenders({ claim, fault });
+        const { declared, excluded, mockInfo, defenders, discoveryHashes } = await faultDefenders({ claim, fault });
         if (excluded.length || (!declared && mockInfo.indeterminate.length > 0)) return 'inputs-changed';
         const inputs = faultInputs({ treeDir: iso.projectDir, fault, defenders, testUniverseHash, discoveryHashes, dependencyHasher });
         const contentHash = subjectOf(fault, sha256).contentHash;
@@ -1215,9 +1230,12 @@ export function errorRecord({ claim, fault, defenders, discovered, byRunner, moc
 }
 
 /** Automatic discovery failed closed: uncertainty can never become `nocover`. */
-export function discoveryIndeterminateRecord({ claim, fault, defenders, discovered, byRunner, mocking = [], signals = [], inputs, indeterminate }) {
+export function discoveryIndeterminateRecord({ claim, fault, defenders, discovered, byRunner, mocking = [], signals = [], inputs, indeterminate, unreadableConfigs = [] }) {
   const first = indeterminate[0];
-  const message = `${indeterminate.length} candidate test file${indeterminate.length === 1 ? '' : 's'} could not be resolved safely; first: ${first.file} (${first.reason ?? 'unknown'})`.slice(0, 1024);
+  // A config the alias reader could not parse is why every bare specifier is
+  // indeterminate: name it (#330), keeping the whole message within the schema cap.
+  const named = unreadableConfigs.length ? `; unreadable config: ${unreadableConfigs.slice(0, 5).join(', ')}` : '';
+  const message = `${`${indeterminate.length} candidate test file${indeterminate.length === 1 ? '' : 's'} could not be resolved safely; first: ${first.file} (${first.reason ?? 'unknown'})`.slice(0, 1024 - named.length)}${named}`;
   return {
     fingerprint: fingerprint({ claimId: claim.id, subjectId: fault.id, file: fault.file, verdict: 'unverifiable' }),
     claim: { id: claim.id, statement: claim.statement, severity: claim.severity, source: claim.source, producedBy: claim.producedBy },
@@ -1406,6 +1424,9 @@ async function planFault(args, pre) {
       // A record a converging run carried (#293) is reused here under the full
       // rule, live baseline included: it is no longer a carried record.
       const { carried, ...reused } = prior;
+      // A `nocover` recorded before #331 named no cause: name it on reuse, never change the verdict.
+      const unsupported = prior.verdict === 'nocover' && prior.defenders?.discovered && !prior.detail?.reason ? unsupportedDiscovery(fault.file) : null;
+      if (unsupported) reused.detail = { ...prior.detail, ...unsupported };
       return { record: { ...reused, defenders: { ...prior.defenders, ...defenderSelection(claim, fault) }, reusedFrom: prior.reusedFrom ?? priorRunId } };
     }
   }
@@ -1553,6 +1574,12 @@ function finalizeFault(state, tree, { detail, rawProbeRuns, subjectReached }) {
   const { iso, toRepoPath } = tree;
   const { verdict, reason, killKind } = classify({ defenders, anchor, baselineRuns: detail.baselineRuns, probeRuns: rawProbeRuns, confirmRuns, subjectReached, typecheck });
   if (reason && !detail.reason) detail.reason = reason;
+  // #331: no defenders found in a language discovery cannot read is a gap in
+  // the tool, not in the tests. Still `nocover`; only the cause is named.
+  if (verdict === 'nocover' && discovered) {
+    const unsupported = unsupportedDiscovery(fault.file);
+    if (unsupported) Object.assign(detail, unsupported);
+  }
   if (killKind) detail.killKind = killKind;
   const killKindReason = killKindReasonOf(rawProbeRuns, killKind);
   if (killKindReason) detail.killKindReason = killKindReason;

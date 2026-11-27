@@ -110,6 +110,15 @@
       "faultWorkers": 2,
       "at": "2026-11-12",
       "why": "The sharded total ceiling (2360 s) was an absolute number derived for about 790 faults; the suite is 858 faults now and every pull request that adds a claim failed the gate (total 2315 s, nothing slower per fault). It becomes a per-fault ceiling: total normalized seconds <= perFaultSeconds x faults in the merged evidence. Measured: 2315 s over 858 faults = 2.70 s per fault; the previous derivation's 2102.5 s over 780 faults = 2.70 s as well. 3.0 s leaves about 11% headroom, the order of the 12% the absolute ceiling carried. The slowest-shard ceiling goes from 610 to 720 normalized seconds (12 minutes): it is the wall-time guard, and the suite's growth alone had pushed the slowest shard to 629 s. When it trips for size rather than for a regression, add a shard (`sharded.shards`, one place). The unsharded ceiling (2270 s) stays as history, unchanged for an unsharded probe; the report-only scoped run is unchanged."
+    },
+    {
+      "perFaultSeconds": 3.0,
+      "slowestShardSeconds": 720,
+      "shards": 5,
+      "unit": "normalized-elapsed-seconds",
+      "faultWorkers": 2,
+      "at": "2026-11-27",
+      "why": "The suite grew by about 40 faults (field-report fixes #330 to #334): total 2838 s over 1047 faults is 2.71 s per fault, inside the 3.0 s ceiling and unchanged per fault, but four shards put the slowest at 744 s against its 720 s wall-time ceiling (shard walls 658, 744, 721, 715). The ceiling stays; the guard says to add a shard when the suite only grew, so `shards` goes from 4 to 5 (about 570 s each at the same total)."
     }
   ],
   "measuredInCI": {
@@ -234,7 +243,7 @@
   "faultWorkers": 2,
   "shards": 1,
   "sharded": {
-    "shards": 4,
+    "shards": 5,
     "perFaultSeconds": 3.0,
     "slowestShardSeconds": 720,
     "unit": "normalized-elapsed-seconds",

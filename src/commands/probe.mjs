@@ -349,6 +349,7 @@ export async function probeCommand({ projectDir, values, version, projectConfig 
     onWarn: (m) => io.err(`warning: ${m}`),
     runnerCommand: runner.runnerCommand,
     reportFormat: runner.reportFormat,
+    testGlobs: runner.testGlobs,
     runnerName: values.runner,
     nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
     python: runner.python,

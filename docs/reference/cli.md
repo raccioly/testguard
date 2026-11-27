@@ -173,6 +173,11 @@ and some projects forbid those files in their own rules.
 | `--mcp` | off | Print the MCP server configuration for Claude Code, Cursor and Codex. It prints the configuration and never writes it. See [MCP](mcp.md#register-the-server). |
 | `--json` | off | Print `{done, skipped, warnings, agentRoot, dir, mcpConfig?}`. |
 
+When the project has no JavaScript, TypeScript or Python source, and it has
+files in a language TestGuard knows but cannot probe (for example Apex or Java),
+`init` prints a note that names the language and the file count. It changes
+neither the exit code nor the files written.
+
 **Exit:** `0`; `1` when git ignores a file `init` wrote (`init` reports it and
 does not offer it for commit); `2` when `.claude/settings.json` is not valid
 JSON or not an object `init` can add a hook to (the message names the file);
@@ -266,6 +271,7 @@ writes it.
 | `--runner <name>` | `auto` | Test runner. See the table below. |
 | `--runner-cmd "<cmd>"` | none | A custom runner command. It must contain `{files}` and `{out}`, e.g. `"pnpm vitest run {files} --reporter=json --outputFile={out}"`. A reporter file path in it must start with `./` (or be absolute), because Node reads a bare `--test-reporter=tools/x.mjs` as a package name. |
 | `--report-format <jest\|junit>` | `jest` | How the report of a `--runner-cmd` is read: the jest-compatible JSON (default), or JUnit XML (one file, or a directory of `.xml` files, at `{out}`). It needs `--runner-cmd`, and an unknown value exits `3`. See [JUnit XML reports](languages-and-runners.md#junit-xml-reports). |
+| `--test-glob <glob>` | none | Repeatable. Needs `--runner-cmd`; without it the exit is `3`, because a built-in runner lists its own tests. It names the tests of a suite the built-in globs do not know (JUnit, Apex, MUnit), as a glob relative to the project, written with `/` (for example `"src/test/**/*Test.java"`). An absolute path, a backslash or a `..` segment exits `3`. The files a glob matches join the test universe that escalation asks, beside the built-in globs and every claim's declared defenders. `node_modules`, build output and the scratch directory are never searched. The globs are part of the universe hash, so a new or changed glob re-measures. Without this flag, escalation under `--runner-cmd` can only ask the tests that a claim declares. See [custom runners](languages-and-runners.md#custom-runners). Also the `testGlobs` key of [`testguard.config.json`](configuration.md#testguardconfigjson-how-this-projects-tests-run). |
 | `--node-modules <dir>` | `TESTGUARD_NODE_MODULES` | `node_modules` to link into the scratch worktree when it cannot see yours. |
 | `--scratch-dir <dir>` | `TESTGUARD_SCRATCH_DIR`, else the OS temp directory | An existing, writable directory for every scratch worktree, temporary git index, runner report and runner temp directory. A missing or unwritable directory exits 2 before anything is written. The flag bounds where TestGuard writes. It does not sandbox the tests. See [where TestGuard writes](configuration.md#where-testguard-writes). |
 | `--typecheck[=<cmd>]` | off | Type check every fault before any test runs. Bare, the checker is the project's own `tsc --noEmit -p tsconfig.json --incremental`. TestGuard resolves it from the project or the linked `node_modules`, never a bundled compiler. A project with no `tsconfig.json`, or whose `typescript` does not resolve, needs `=<cmd>`. Otherwise the exit is `2`, and TestGuard never skips the check. TestGuard splits `<cmd>` into an argv like `--runner-cmd` and never runs it through a shell. Exit `0` means clean. Anything else is diagnostics, and the first line that says `error` is the message. TestGuard checks the unmodified tree first. If it is not clean, the exit is `2` naming the first diagnostic, and no evidence is written. A fault whose replacement does not type-check is `fault-invalid` / `replacement-does-not-typecheck` with zero test runs. A check over `--budget` is `timeout`. The program is the tsconfig's own, listed by `tsc --listFilesOnly`. A tsconfig whose program holds no project file (solution-style, references only) is exit `2`. The checker does not read some targets: `.py`; `.js` unless the tsconfig sets `allowJs` and `checkJs`; a `.ts` file the tsconfig does not include; and with `<cmd>`, every non-TypeScript file, since a command cannot say what it reads. TestGuard records these as `detail.typecheck: "not-applicable"` and probes them as before. The flag is recorded as `run.typecheck` and is part of the reuse key. Type validity belongs to the whole program. So TestGuard re-checks a reused record once (no test run), and carries it forward only if the answer is unchanged. A custom command's `version` is best-effort (its own `--version` plus the project's `typescript` when it resolves). Use `--no-reuse` if the checker can change without either changing. |
@@ -514,7 +520,7 @@ replaces `.testguard/evidence.json`.
 | `--command-budget <ms>` | none | Cooperative deadline for the whole sweep. When it expires, the sweep exits `2` and writes nothing. |
 | `--workers <n>` | `1` | Maximum built-in runner workers. |
 | `--serial` | off | One worker, even when `--workers` is higher. |
-| `--runner`, `--runner-cmd`, `--report-format`, `--node-modules` | as for [probe](#probe) | Runner selection. |
+| `--runner`, `--runner-cmd`, `--report-format`, `--test-glob`, `--node-modules` | as for [probe](#probe) | Runner selection. `--test-glob` needs `--runner-cmd`. |
 | `--python <path>` | as for [probe](#probe) | Interpreter for `.py` defenders (or `TESTGUARD_PYTHON`). |
 | `--claims <path>`, `--ignore <path>` | project defaults | Files used to decide which changed files are unclaimed. |
 | `--max <n>` | `20` | Findings printed in the text report. |
@@ -598,7 +604,7 @@ missed a real escaped bug of that class. It reports and never gates. See the
 | `--command-budget <ms>` | none | Cooperative deadline. When it expires, `replay` writes neither the replay nor the calibration. |
 | `--workers <n>` | `1` | Maximum built-in runner workers. |
 | `--serial` | off | One worker, even when `--workers` is higher. |
-| `--runner`, `--runner-cmd`, `--report-format`, `--node-modules` | as for [probe](#probe) | Runner selection. |
+| `--runner`, `--runner-cmd`, `--report-format`, `--test-glob`, `--node-modules` | as for [probe](#probe) | Runner selection. `--test-glob` needs `--runner-cmd`. |
 | `--python <path>` | as for [probe](#probe) | Interpreter for `.py` defenders (or `TESTGUARD_PYTHON`). |
 | `--out <path>` | `<dir>/.testguard/replay.json` | Replay document. The calibration is written as `calibration.json` in the same directory. |
 | `--calibration-out <path>` | beside the replay document | Write the calibration document to this path instead. |
@@ -639,7 +645,7 @@ the directory of `--claims`).
 | `--serial` | off | One worker, even when `--workers` is higher. |
 | `--claims <path>` | found from the test file | Claims file; its directory is the project. |
 | `--out <path>` | `<project>/.testguard/evidence-partial.json` | Evidence file. Never the canonical one. |
-| `--runner`, `--runner-cmd`, `--report-format`, `--node-modules` | as for [probe](#probe) | Runner selection. |
+| `--runner`, `--runner-cmd`, `--report-format`, `--test-glob`, `--node-modules` | as for [probe](#probe) | Runner selection. `--test-glob` needs `--runner-cmd`. |
 | `--python <path>` | as for [probe](#probe) | Interpreter for `.py` defenders (or `TESTGUARD_PYTHON`). |
 | `--quiet` | off | Suppress progress and the provisional warning. |
 | `--json` | off | Print `{admitted, provisional, claim, test, faults, evidence, command}`. |

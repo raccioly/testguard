@@ -1,5 +1,6 @@
 import { parseCommandTemplate } from '../probe/runners/shared.mjs';
 import { REPORT_FORMATS } from '../probe/runners/junit.mjs';
+import { checkTestGlob, normalizeTestGlobs } from '../probe/test-globs.mjs';
 
 /**
  * The runner options every command that runs tests shares — probe, admit,
@@ -10,6 +11,9 @@ import { REPORT_FORMATS } from '../probe/runners/junit.mjs';
  *
  * `--report-format` (jest, the default, or junit) names the format of a
  * `--runner-cmd` report and means nothing without one.
+ * `--test-glob` (repeatable; `testGlobs` in the config file) names the tests of a
+ * suite the built-in globs do not list. It only means something beside a
+ * custom command, so without one it is refused rather than ignored (#332).
  *
  * `python` is passed through as typed. Whether it is a command on PATH or a
  * path is decided in one place (`explicitInterpreter`), the same way for
@@ -30,9 +34,18 @@ export function runnerOptions(values) {
     if (!REPORT_FORMATS.includes(reportFormat)) return { error: `--report-format must be ${REPORT_FORMATS.join(' or ')} (got ${JSON.stringify(reportFormat)})` };
     if (runnerCommand === undefined) return { error: '--report-format needs --runner-cmd: it says how to read the report of a custom command' };
   }
+  const testGlobs = values['test-glob'] ?? [];
+  for (const glob of testGlobs) {
+    const problem = checkTestGlob(glob);
+    if (problem) return { error: `--test-glob ${JSON.stringify(glob)} ${problem}` };
+  }
+  if (testGlobs.length > 0 && runnerCommand === undefined) {
+    return { error: '--test-glob needs --runner-cmd: it names the tests of a custom command\'s suite, and a built-in runner lists its own tests' };
+  }
   const python = values.python;
   if (python !== undefined && python.trim() === '') {
     return { error: '--python must name an interpreter: a path such as .venv/bin/python, or a command on PATH such as python3' };
   }
-  return { runnerCommand, python, reportFormat };
+  const globs = normalizeTestGlobs(testGlobs);
+  return { runnerCommand, reportFormat, ...(globs.length ? { testGlobs: globs } : {}), python };
 }

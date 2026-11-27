@@ -1,5 +1,5 @@
 import { readFileSync, existsSync, realpathSync } from 'node:fs';
-import { dirname, join, resolve, extname } from 'node:path';
+import { dirname, join, relative, resolve, extname, sep } from 'node:path';
 import { walk } from '../util/glob.mjs';
 import { parseJsonc } from '../util/jsonc.mjs';
 import { createImportResolver } from './imports.mjs';
@@ -36,6 +36,10 @@ function loadAliasContext(projectDir) {
     try {
       cfg = parseJsonc(readFileSync(cfgPath, 'utf8'));
     } catch {
+      // A config tsc may accept but this reader cannot parse: its `paths` are
+      // unknown, so any bare specifier MAY be aliased. Same catch-all, no
+      // target, as an unreadable Vite or Jest map (#330): never a silent drop.
+      rules.push({ prefix: '', suffix: '', wildcard: true, targets: [], opaque: true, configFile: cfgPath });
       continue;
     }
     const co = cfg.compilerOptions ?? {};
@@ -102,6 +106,12 @@ function loadAliasContext(projectDir) {
   const context = { rules, configFiles: [...configFiles].map((file) => realpathSync(file)) };
   aliasCache.set(projectDir, context);
   return context;
+}
+
+/** The tsconfig/jsconfig files (project-relative) the alias reader could not parse; any bare specifier is indeterminate because of them (#330). */
+export function unreadableAliasConfigs(projectDir) {
+  const files = loadAliasContext(projectDir).rules.filter((rule) => rule.opaque && rule.configFile).map((rule) => relative(projectDir, rule.configFile).split(sep).join('/'));
+  return [...new Set(files)].sort();
 }
 
 /** The files the alias rules were read from (absolute, real paths). */

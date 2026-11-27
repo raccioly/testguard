@@ -5,6 +5,7 @@ import { sha256 } from '../util/hash.mjs';
 import { repoRoot, isDirty } from '../git.mjs';
 import { UsageError, PreconditionError } from '../probe/precondition-error.mjs';
 import { parseCommandTemplate } from '../probe/runners/shared.mjs';
+import { checkTestGlob } from '../probe/test-globs.mjs';
 import { CONFIG_FILE } from './config-file.mjs';
 
 /**
@@ -29,7 +30,7 @@ export { CONFIG_FILE };
 
 /** Each key and the flag it stands for. */
 export const CONFIG_FLAGS = Object.freeze({
-  runner: 'runner', runnerCmd: 'runner-cmd', reportFormat: 'report-format', python: 'python', nodeModules: 'node-modules', typecheck: 'typecheck',
+  runner: 'runner', runnerCmd: 'runner-cmd', reportFormat: 'report-format', testGlobs: 'test-glob', python: 'python', nodeModules: 'node-modules', typecheck: 'typecheck',
   workers: 'workers', faultWorkers: 'fault-workers', confirm: 'confirm', budget: 'budget',
 });
 
@@ -53,6 +54,7 @@ function describeError({ path, message }) {
   if (key === 'python' || key === 'nodeModules') return `"${key}" must be a relative path or a bare command, never absolute`;
   if (key === 'typecheck') return '"typecheck" must be true (the project\'s own tsc) or a command string';
   if (key === 'faultWorkers') return '"faultWorkers" must be a positive integer or "auto"';
+  if (key === 'testGlobs') return `"testGlobs" must be a non-empty list of distinct globs, each a relative path written with "/"${message ? ` (${message})` : ''}`;
   if (!key) return message;
   return `"${key}" ${message}`;
 }
@@ -87,6 +89,10 @@ export function readProjectConfig(projectDir, { source } = {}) {
   if (config.runnerCmd !== undefined) {
     try { parseCommandTemplate(config.runnerCmd); }
     catch (error) { throw new UsageError(`${CONFIG_FILE}: "runnerCmd" ${error.message}`); }
+  }
+  for (const glob of config.testGlobs ?? []) {
+    const problem = checkTestGlob(glob);
+    if (problem) throw new UsageError(`${CONFIG_FILE}: "testGlobs" entry ${JSON.stringify(glob)} ${problem}`);
   }
   const resolved = {};
   let root;
@@ -143,6 +149,7 @@ export function applyProjectConfig({ command, values, suppliedOptions = [], env 
     if (variable && env[variable] !== undefined && env[variable] !== '') { overridden.push({ key, by: 'env' }); continue; }
     const value = loaded.resolved[key] ?? loaded.config[key];
     if (key === 'faultWorkers') faultWorkers = String(value);
+    else if (key === 'testGlobs') out[flag] = [...value];
     else if (key === 'typecheck') out.typecheck = value === true ? '' : value;
     else out[flag] = String(value);
     keys.push(key);

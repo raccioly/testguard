@@ -113,8 +113,12 @@ describe('the help says only what each command accepts', () => {
 
   it.each(['admit', 'sweep', 'replay'])('%s help names every runner option it accepts, and --python', (command) => {
     const help = commandUsage(command);
-    for (const flag of ['--runner <name>', '--runner-cmd', '--node-modules', '--python <path>']) expect(help).toContain(flag);
+    for (const flag of ['--runner <name>', '--runner-cmd', '--test-glob <glob>', '--node-modules', '--python <path>']) expect(help).toContain(flag);
     expect(help).toMatch(/--python <path>.*TESTGUARD_PYTHON.*bare name is looked up on PATH/s);
+  });
+
+  it('probe help names --test-glob as repeatable and tied to --runner-cmd', () => {
+    expect(commandUsage('probe')).toMatch(/--test-glob <glob>\s+\(repeatable; needs --runner-cmd\)/);
   });
 
   it('probe --python states the real resolution order, and --serial does not claim the always-on xdist flag', () => {

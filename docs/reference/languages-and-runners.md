@@ -13,7 +13,7 @@ you are evaluating TestGuard. Read it also if your probe just refused with
 | Runners | `vitest`, `jest`, `playwright`, `node-test`, custom `--runner-cmd` | `vitest`, `jest`, `playwright`, custom `--runner-cmd` | `vitest`, `jest`, `playwright` | `python` (`pytest` or `unittest`) |
 | Picked by `auto` | `vitest`, then `jest` | `vitest`, then `jest` | `vitest`, then `jest` | `python`, when no JavaScript runner sees a test; a `.py` defender always runs under Python |
 | How the code is loaded | the runner's own loader | the runner's own transform. Vitest compiles TypeScript itself. Jest uses the transform the project already configures. TestGuard adds none | the runner's transform, as for TypeScript | the project's interpreter |
-| Defender discovery | test files that import the fault's file: relative paths, `tsconfig`/`jsconfig` `paths` (through `extends` and `references`), vite/vitest `resolve.alias`, Jest `moduleNameMapper` (a literal object), `package.json#imports`, re-exports through barrel files | as JavaScript; a `./x.js` specifier also resolves to `x.ts`/`x.tsx` (`.mjs` → `.mts`, `.cjs` → `.cts`) | as TypeScript | test files that import the fault's module by dotted module name, however it reached `sys.path` |
+| Defender discovery | test files that import the fault's file: relative paths, `tsconfig`/`jsconfig` `paths` (through `extends` and `references`), vite/vitest `resolve.alias`, Jest `moduleNameMapper` (a literal object; under Jest, `--findRelatedTests` answers for what the text cannot), `package.json#imports`, re-exports through barrel files | as JavaScript; a `./x.js` specifier also resolves to `x.ts`/`x.tsx` (`.mjs` → `.mts`, `.cjs` → `.cts`) | as TypeScript | test files that import the fault's module by dotted module name, however it reached `sys.path` |
 | Mock awareness | `vi.mock` / `jest.mock` (and `doMock`, `unstable_mockModule`) of the target removes the file as a defender | as JavaScript | as JavaScript | only a `patch()` of the whole module removes a defender; an attribute patch keeps it and raises `target-attribute-patched` |
 | Scaffold producers | the seven shared shapes; the two JSX shapes only where a line is JSX | as JavaScript | all nine: the seven shared shapes plus `element-removed` and `handler-dropped` | the seven shared shapes, in Python syntax |
 | `claims --check-anchors` | anchor located and replacement parsed (`.js`, `.mjs`, `.cjs`) | anchor located; replacement not parsed (a broken one surfaces at probe time as `fault-invalid`); with `--typecheck`, also type checked | anchor located; replacement not parsed; with `--typecheck`, also type checked | anchor located and replacement parsed by the project's interpreter |
@@ -151,6 +151,16 @@ when the project directory has a `package.json` or a
 
 **How files are discovered.** `jest --listTests --json --runInBand`, so Jest's
 own `testMatch`, `projects` and ignore patterns decide.
+
+**How defenders are discovered.** TestGuard reads imports and a literal
+`moduleNameMapper` from the text. For a test it cannot place that way (a custom
+`resolver`, `modulePaths`, a preset such as the Salesforce LWC one, a mapper
+that is computed), it asks Jest: `jest --listTests --json --findRelatedTests
+<target>`, run in the project with the project's own Jest. The tests Jest lists
+are the defenders (`discovery: runner-native`). A failed, timed out or unreadable
+answer stays indeterminate and is never read as "no test". There is at most one
+process for each target file and discovery configuration, and at most 64 per
+probe. Other runners do not have this step yet.
 
 **How it runs.** `jest --ci --json --outputFile=<tmp> --runInBand
 --runTestsByPath <files>`, or `--maxWorkers=<N>` instead of `--runInBand` when
@@ -374,20 +384,34 @@ error. The command exits `3` with the reason before anything runs.
   listing. `--require-origin` cannot certify against it.
 - **Escalation only sees that universe.** For a suite the adapter's globs do
   not know (JUnit, Apex, MUnit), a test that no claim declares is not in the
-  universe. To let a survivor be checked against another test, list that test
-  in the `defendedBy` of some claim. When the universe has no test outside the
-  defenders, escalation is skipped. The record says
+  universe. To let a survivor be checked against the rest of your suite, name
+  the suite with `--test-glob` (repeatable), for example
+  `--test-glob "src/test/**/*Test.java"`. It is a glob relative to the
+  project, written with `/`. The same list can live in the `testGlobs` key of
+  `testguard.config.json`. The files it matches join the universe, beside the
+  adapter's globs and the declared defenders. `node_modules`, build output and
+  the scratch directory are never searched. `--test-glob` needs `--runner-cmd`
+  and exits `3` without it. You can still list a test in the `defendedBy` of a
+  claim instead. When the universe has no test outside the defenders,
+  escalation is skipped. The record says
   `detail.escalationSkipped: "no-test-outside-defenders"`, and the console line
   says `[escalation skipped: the test universe has no test outside the
   defenders]`. Read such a `SURVIVED` as "not yet checked against other tests".
 - **No worker flags.** `--workers` and `--serial` do not edit your command.
   Put the runner's own parallelism flags in the template.
 - **The template is part of reuse.** The test universe's hash binds the
-  parsed command. So changing the `--runner-cmd` re-measures every fault.
-  Reformatting whitespace that parses to the same words does not. TestGuard
-  never writes the command text to the evidence, only the hash. TestGuard never
-  reuses a verdict whose defenders failed to load. So after you fix a broken
-  command, TestGuard always measures again.
+  parsed command and the `--test-glob` patterns. So changing the
+  `--runner-cmd`, or adding or changing a glob, re-measures every fault.
+  Reformatting whitespace that parses to the same words does not, and neither
+  does the order of the globs. A run with no `--test-glob` hashes as it did
+  before the option existed. TestGuard never writes the command text to the
+  evidence, only the hash. TestGuard never reuses a verdict whose defenders
+  failed to load. So after you fix a broken command, TestGuard always measures
+  again.
+- **`replay` takes `--test-glob` too.** The files it matches join the replay
+  universe. But `replay` still relates a test to the reverted source by its
+  imports, which TestGuard reads for JavaScript, TypeScript and Python only. A
+  test in another language joins the universe and is never run by `replay`.
 
 ### Worked examples
 
@@ -424,7 +448,11 @@ and the runner would look for them in the wrong place.
   known language it cannot probe (Apex, Java, Kotlin, Scala, C#, Go, Ruby,
   PHP, DataWeave, Salesforce Flow and Mule XML) as `unsupported-language`, and
   `gate --strict` fails on it. `status` counts these files beside the
-  supported modules. Every other file is `non-source`.
+  supported modules. A claim on such a file is `nocover` with the reason
+  `defender-discovery-unsupported (java): declare defendedBy`: discovery could
+  not look, so it does not say that the tests are missing. `init` prints a note
+  when a project has files in these languages and no JavaScript, TypeScript or
+  Python source. Every other file is `non-source`.
 - **Built-in runners beyond Vitest, Jest, Playwright, Node's test runner and
   Python.** Others go through `--runner-cmd` and need a reporter that writes
   the jest-compatible shape, or JUnit XML with `--report-format junit`. The

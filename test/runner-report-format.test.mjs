@@ -86,8 +86,8 @@ describe('the evidence names the report format of a custom command', () => {
   it('binds the format into the universe hash, and leaves the jest hash as it was', () => {
     const files = ['test/GuardTest.java'];
     const jest = hashCustomCommandUniverse(files, words, 'vitest');
-    expect(hashCustomCommandUniverse(files, words, 'vitest', 'jest')).toBe(jest);
-    expect(hashCustomCommandUniverse(files, words, 'vitest', 'junit')).not.toBe(jest);
+    expect(hashCustomCommandUniverse(files, words, 'vitest', [], 'jest')).toBe(jest);
+    expect(hashCustomCommandUniverse(files, words, 'vitest', [], 'junit')).not.toBe(jest);
   });
 
   it('the schema and validator accept it on a custom command only', () => {

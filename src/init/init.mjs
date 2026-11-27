@@ -5,6 +5,8 @@ import { spawnSync } from 'node:child_process';
 import { PreconditionError } from '../probe/worktree.mjs';
 import { PACKAGE, pinDevDependency, dependabotRule, renovateRule, RENOVATE_JSON, RENOVATE_OTHER } from './pin.mjs';
 import { hookActivation, activateHook } from './activation.mjs';
+import { languageSurvey } from '../status/surface.mjs';
+import { languageName } from '../gate/languages.mjs';
 import { TEMPLATE_VERSION, handWrittenTestguard, handWrittenTestguardHeading, agentsSectionHash, prePushBlock, prePushBlockName, githubWorkflow, gitlabCi, installStep, markSkill, skillState, parseManagedBlocks, replaceManagedBlock, scanInstalled, renderFinding } from './managed.mjs';
 
 const TEMPLATES = join(dirname(fileURLToPath(import.meta.url)), 'templates');
@@ -507,6 +509,18 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
     if (f.managed && (writing.has(f.file) || handled.has(f.file))) continue;
     if (f.reason === 'hook-inactive' && inactiveReported.has(f.file)) continue;
     outdated.push(renderFinding(f));
+  }
+
+  // A project whose source is all in a language TestGuard cannot probe yet (an
+  // Apex-only one, say): say so now, as a note. It changes neither the exit code
+  // nor a file written, and it is the first thing the user learns, not the
+  // last (#331). Mixed projects are `status`'s job: it counts both sides.
+  const survey = languageSurvey(projectDir);
+  if (survey.probeable === 0 && survey.unsupported) {
+    const byLanguage = Object.entries(survey.unsupported.byLanguage).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    const names = byLanguage.map(([id]) => languageName(id)).join(', ');
+    const counts = byLanguage.map(([id, n]) => `${n} ${languageName(id)} file${n === 1 ? '' : 's'}`).join(', ');
+    notes.push(`TestGuard cannot probe ${names} yet: this project has ${counts} and no JavaScript, TypeScript or Python source. To claim one of those files, declare defendedBy: probe cannot find its tests.`);
   }
 
   // ---- every check passed: write ----

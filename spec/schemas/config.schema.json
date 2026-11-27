@@ -20,6 +20,11 @@
       "description": "--report-format: how the report of a `runnerCmd` is read, `jest` (the default: the jest-compatible JSON) or `junit` (JUnit XML, one file or a directory of them at {out}). Means nothing without a command, from this file or from --runner-cmd.",
       "enum": ["jest", "junit"]
     },
+    "testGlobs": {
+      "description": "--test-glob (repeatable): globs, relative to the project directory and written with \"/\", that name the tests of a custom `runnerCmd` suite no built-in glob lists (JUnit, Apex, MUnit). The files they match join the test universe that escalation asks about, beside the adapter's globs and every claim's declared defenders, and the globs are bound into the universe hash. Only meaningful with a custom command (the `runnerCmd` key or --runner-cmd). A flag typed on the command line replaces the whole list. `..` segments are refused by TestGuard itself, since a glob that leaves the project could match nothing it may run.",
+      "type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 4096, "not": { "pattern": "^(/|\\\\|[A-Za-z]:)" } }
+    },
     "python": {
       "description": "--python: a bare command looked up on PATH (python3), or a path relative to the project directory that stays inside the repository (.venv/bin/python). TESTGUARD_PYTHON wins over it.",
       "$ref": "#/$defs/relativeOrCommand"

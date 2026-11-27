@@ -195,6 +195,7 @@ not the answer.
 | `--workers <n>` / `--serial` | `1` | runner worker ceiling, as for `probe` |
 | `--runner <name>` | `auto` | the project runner, as for `probe` |
 | `--runner-cmd "<cmd>"` | none | a custom runner command; see [Languages and runners](../reference/languages-and-runners.md#custom-runners) |
+| `--test-glob <glob>` | none | repeatable; needs `--runner-cmd`. Tests the built-in globs do not list join the replay universe. A test in a language other than JavaScript, TypeScript or Python is never run, because `replay` relates a test to the reverted source by its imports |
 | `--node-modules <dir>` | auto-linked | the `node_modules` to link into each scratch worktree (or `TESTGUARD_NODE_MODULES`) |
 | `--python <interpreter>` | discovered | the interpreter for Python defenders (or `TESTGUARD_PYTHON`), as for `probe`; see [Python](python.md#which-interpreter) |
 | `--out <path>` | `.testguard/replay.json` | the replay document; the calibration is written beside it |

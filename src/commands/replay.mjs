@@ -51,6 +51,7 @@ export async function replayCommand({ projectDir, values, version, projectConfig
     commandBudget,
     runnerCommand: runner.runnerCommand,
     reportFormat: runner.reportFormat,
+    testGlobs: runner.testGlobs,
     runnerName: values.runner,
     nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,
     python: runner.python,

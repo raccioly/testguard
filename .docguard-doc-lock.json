@@ -28,11 +28,11 @@
           "tier": "content"
         },
         "src/cli.mjs": {
-          "fingerprint": "sha256:cccddf7964626bcc9cc457ed206c978708e0b89348d0d7fda0efa319bcd568cb",
+          "fingerprint": "sha256:9738bc1e96ee8a392a4b1ab5cdef6e940a867f097a8527fafe0ab4f78939a58a",
           "tier": "content"
         },
         "src/config/project-config.mjs": {
-          "fingerprint": "sha256:39bea170ae15006d26a2f1051c3f254852d329aec81a9bd3d22cda2ca658f018",
+          "fingerprint": "sha256:755fda89fdc071cbba6942bf7138695c8672824954eda72c1f073fee0eb182e8",
           "tier": "content"
         },
         "src/evidence/writer.mjs": {
@@ -40,7 +40,7 @@
           "tier": "content"
         },
         "src/gate/changed.mjs": {
-          "fingerprint": "sha256:fb5d8539c8fd223badf74bfe91434c75b8907ae5cc7f1e3b8fca768349213f31",
+          "fingerprint": "sha256:5e06fcac81833ae3a2475a290268cb3570e1e09b8f0a80c4e2ae484d445744b9",
           "tier": "content"
         },
         "src/probe/attribution.mjs": {
@@ -60,7 +60,7 @@
           "tier": "content"
         },
         "src/probe/discover.mjs": {
-          "fingerprint": "sha256:41c78b61d8c5131b032e2961ac65dabe34c8fe301b9b7349477ffffdc0ee554f",
+          "fingerprint": "sha256:6adc17da8f4d6528c4709b4f10ad25915de10dbbadf9320dfcac29e877cca2f1",
           "tier": "content"
         },
         "src/probe/independence.mjs": {
@@ -76,7 +76,7 @@
           "tier": "content"
         },
         "src/probe/probe.mjs": {
-          "fingerprint": "sha256:9e3a8fdc3475f51a2549f2c3676cc80c4f4a2950af2d6a6c606d02b957e1b906",
+          "fingerprint": "sha256:4ea033cd16c809f8f4b773308d8a7eb0eb178a607d9d7c335ea8555b401d977a",
           "tier": "content"
         },
         "src/probe/progress.mjs": {
@@ -84,7 +84,7 @@
           "tier": "content"
         },
         "src/probe/rank.mjs": {
-          "fingerprint": "sha256:e6c7e7663a9e12b24dc19964f6e4955ce4653aa53650e78f51944bdfda29f4fe",
+          "fingerprint": "sha256:9a9dadabed37013cfb8d3e9214ef3efcde13e70a92d7f7211092bcf3c685ba74",
           "tier": "content"
         },
         "src/probe/worktree.mjs": {
@@ -120,13 +120,13 @@
           "tier": "content"
         },
         "src/sweep/sweep.mjs": {
-          "fingerprint": "sha256:20bd931fc853a973254e88595eb9b05733900878aa31255bd58dc11cf0c4ad4d",
+          "fingerprint": "sha256:a6cfa88617c8f22724ecfb433bfedc79b6d1b5346fabaeda676e83a9a5fce2c7",
           "tier": "content"
         }
       },
-      "reason": "Re-read the rows for the changed gate, probe, rank, attribution, status and sweep modules against the code; the gate row now names unsupported-language gaps, the others are still accurate",
+      "reason": "Re-read the rows for rank, probe and the runner modules after the tsconfig change; descriptions still match the code",
       "reviewedAt": "2026-11-27",
-      "reviewedRevision": "1cad27a6be3d1f1ecce968c56ecd8b4ab7aa602e"
+      "reviewedRevision": "1c4719762176ee670940f5661f31d3ec0c1b68e5"
     },
     "docs-canonical/ARCHITECTURE.md#configuration-files": {
       "dependencies": {

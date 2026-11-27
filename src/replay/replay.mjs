@@ -10,6 +10,7 @@ import { parseCommandTemplate } from '../probe/runners/shared.mjs';
 import { fileImportRelation } from '../probe/rank.mjs';
 import { IS_PY_TEST, pyFileImports } from '../probe/pyimports.mjs';
 import { isPython } from '../probe/discover.mjs';
+import { matchTestGlobs } from '../probe/test-globs.mjs';
 import { labelDiff } from './label.mjs';
 import { isKillRun } from '../probe/kill-kind.mjs';
 import { wilsonInterval, roundTo } from '../../spec/lib/wilson.mjs';
@@ -93,6 +94,7 @@ async function replayIn({
   serial = workers === 1,
   runnerCommand,
   reportFormat,
+  testGlobs = [],
   runnerName = 'auto',
   nodeModules,
   python,
@@ -127,7 +129,12 @@ async function replayIn({
     try {
       const commandTemplate = runnerCommand ? parseCommandTemplate(runnerCommand) : undefined;
       let universe;
-      if (!commandTemplate) {
+      if (commandTemplate) {
+        // The adapter's globs know no JUnit or Apex test; `--test-glob` names
+        // them (#332). Without it the universe is the adapter's, as before.
+        const named = matchTestGlobs(iso.projectDir, testGlobs);
+        if (named.length > 0) universe = Object.freeze({ files: Object.freeze([...new Set([...runnerUsed.tests(iso.projectDir), ...named])].sort()) });
+      } else {
         const budgetFor = () => commandBudget?.runBudget(budgetMs) ?? budgetMs;
         const sel = await selectRunner({ projectDir: iso.projectDir, sourceDir: projectDir, python, name: runnerName, budgetMs: budgetFor(), budgetFor });
         commandBudget?.assertOpen();
