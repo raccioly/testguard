@@ -15,8 +15,8 @@
 |---|---|---|
 | Node.js | >= 20.0.0 | `node:util.parseArgs`; CI also proves 22 and 24 |
 | git | any modern version | worktree isolation, diffs, snapshots, patch ids |
-| A test runner in the probed project | vitest, jest, or Playwright | resolved from that project's own `node_modules` |
-| Python | >= 3.8 | **only** to work on the PyPI wrapper in `testguard_cli/` |
+| A test runner in the probed project | vitest, jest, Playwright or `node:test`; pytest or `unittest` for Python | vitest, jest and Playwright are resolved from that project's own `node_modules`; Python runs under pytest when the interpreter can import it, otherwise `unittest` |
+| Python | >= 3.8 | to probe `.py` defenders, and to work on the PyPI wrapper in `testguard_cli/` |
 
 TestGuard installs one runtime dependency (`ajv`). It needs no compiler, no
 container, no service and no network access at run time.
@@ -27,16 +27,20 @@ None are required. All are optional overrides.
 
 | Variable | Read by | Effect |
 |---|---|---|
-| `TESTGUARD_NODE_MODULES` | `probe` | `node_modules` to link into the scratch worktree; same as `--node-modules` |
-| `TESTGUARD_SCRATCH_DIR` | `probe`, `sweep`, `replay`, `admit` | Existing, writable directory for every scratch worktree, temporary git index, runner report and runner temp directory; same as `--scratch-dir`, which wins. Missing or unwritable exits 2 before anything is written. Default: the OS temp directory |
-| `TESTGUARD_CHANGED_REF` | `gate`, `status --changed` | The reference a change is measured against; overrides CI and local Git detection |
+| `TESTGUARD_NODE_MODULES` | `probe`, `admit`, `sweep`, `replay`, `claims --check-anchors` | `node_modules` to link into the scratch worktree; same as `--node-modules`, which wins |
+| `TESTGUARD_PYTHON` | `probe`, `admit`, `sweep`, `replay`, `claims --check-anchors` | Python interpreter for `.py` defenders; same as `--python`, which wins |
+| `TESTGUARD_FAULT_WORKERS` | `probe` | How many faults to probe at once: a positive integer or `auto`; same as `--fault-workers`, which wins |
+| `TESTGUARD_WORKER_BASE` | `probe`, `admit`, `sweep` | Non-negative integer added to the `TESTGUARD_WORKER` index that runner processes receive, so two commands on one machine hand out different indices |
+| `TESTGUARD_SKIP_HOOK` | the pre-push hook `init` writes | Set to `1` to let one push through without a probe |
+| `TESTGUARD_SCRATCH_DIR` | `probe`, `sweep`, `replay`, `admit`, `clean` | Existing, writable directory for every scratch worktree, temporary git index, runner report and runner temp directory; same as `--scratch-dir`, which wins. Missing or unwritable exits 2 before anything is written. Default: the OS temp directory |
+| `TESTGUARD_CHANGED_REF` | `gate`, `sweep`, `status`, `brief`, `probe --changed auto`, the MCP tools | The reference a change is measured against; overrides CI and local Git detection |
 | `GITHUB_BASE_REF` | `gate` | GitHub Actions pull requests: the base branch |
 | `CI_MERGE_REQUEST_DIFF_BASE_SHA` | `gate` | GitLab merge request pipelines: exact diff base, needs no fetch |
 | `CI_MERGE_REQUEST_TARGET_BRANCH_NAME` | `gate` | GitLab fallback when the diff base sha is absent |
 | `CI` | runners | Set to `1` for every child process so runners use non-interactive output |
 
-The tool sets `PLAYWRIGHT_JSON_OUTPUT_FILE` and `FORCE_COLOR=0` on the
-processes it spawns. It reads no secret, no token and no credential.
+The tool sets `TESTGUARD_WORKER` (the index of the scratch tree), `PLAYWRIGHT_JSON_OUTPUT_FILE` and
+`FORCE_COLOR=0` on the processes it spawns. It reads no secret, no token and no credential.
 
 ## Local Git Discovery
 
@@ -56,6 +60,7 @@ local `feature` branch; those ambiguous cases require `--changed`.
 | `testguard.ignore.json` | you | yes | Reviewable scoping, every entry with a reason |
 | `.testguard/baseline.json` | tool, frozen by you | yes | The frozen debt contract |
 | `.testguard/evidence.json`, `brief.json`, `gate.json` | tool | no | Regenerated per run |
+| `testguard.config.json` | you | yes | Defaults for how this project's tests run (the keys stand for flags such as `--runner`, `--python`, `--node-modules`, `--fault-workers`) |
 | `.docguard.json`, `.docguardignore` | DocGuard | yes | Documentation contract for this repository |
 | `playwright.config.*` | your project | yes | Read as text to find `testDir`; never imported |
 | `tsconfig.json` / `vite.config.*` | your project | yes | Read for path aliases when discovering defenders |

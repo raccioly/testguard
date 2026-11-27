@@ -7484,7 +7484,7 @@
           "id": "F1",
           "description": "The teardown signals SIGTERM, which a child may ignore, instead of SIGKILL.",
           "faultClass": "return-altered",
-          "file": "src/probe/runners/shared.mjs",
+          "file": "src/probe/runners/process-tree.mjs",
           "find": "const KILL = 'SIGKILL';",
           "replace": "const KILL = 'SIGTERM';",
           "producedBy": {
@@ -7544,7 +7544,7 @@
           "id": "F8",
           "description": "A process table that fails to read is not retried while the tree is frozen, so a detached server is lost when its parent dies.",
           "faultClass": "guard-removed",
-          "file": "src/probe/runners/shared.mjs",
+          "file": "src/probe/runners/process-tree.mjs",
           "find": "} while (rows === null && Date.now() < until);",
           "replace": "} while (false);",
           "producedBy": {
@@ -10622,7 +10622,7 @@
           "id": "F1",
           "description": "Still-attributable detached descendants are omitted from timeout cleanup and can mutate the project after TestGuard returns.",
           "faultClass": "return-altered",
-          "file": "src/probe/runners/shared.mjs",
+          "file": "src/probe/runners/process-tree.mjs",
           "find": "  for (const pid of descendantPids(rows ?? [], child.pid)) {",
           "replace": "  for (const pid of []) {",
           "producedBy": {
@@ -10639,7 +10639,7 @@
           "id": "F2",
           "description": "Timeout diagnostics claim cleanup without warning that an already-reparented daemon may survive.",
           "faultClass": "return-altered",
-          "file": "src/probe/runners/shared.mjs",
+          "file": "src/probe/runners/process-tree.mjs",
           "find": "export const TIMEOUT_CLEANUP_WARNING = 'cleanup-unverified: TestGuard hard-killed the runner process group and descendants still attributable at timeout, but an already-reparented daemon may survive; use an OS or container containment boundary for daemonizing or untrusted commands';",
           "replace": "export const TIMEOUT_CLEANUP_WARNING = 'cleanup complete';",
           "producedBy": {

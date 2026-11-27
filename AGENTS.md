@@ -1,6 +1,9 @@
 # AI Agent Instructions — TestGuard
 
 <!-- docguard:last-reviewed 2026-11-12 -->
+<!-- docguard:validator specKit n/a — this repository keeps its own spec/ formats and claims, with no .specify/ or specs/ feature folders owner:@raccioly expires:2027-11-27 -->
+<!-- docguard:validator requirementAnchors n/a — requirements are traced by testguard.claims.json and the REQUIREMENTS.md matrix, not by source comments owner:@raccioly expires:2027-05-27 -->
+<!-- docguard:validator surfaceSync n/a — the CLI reference documents each command as a section heading, and test/docs.test.mjs enforces one per command; the list-format check does not fit owner:@raccioly expires:2027-05-27 -->
 
 Read this before changing anything. It is short on purpose.
 
@@ -51,6 +54,7 @@ tree). Records come out in claim/fault order.
 - `test/helpers/run-temp.mjs` — vitest `globalSetup`: one `tg-run-<pid>-<random>` temp directory per run, exported as `TMPDIR`, removed at the end; a dead run's is removed by the next. Do not create temp directories outside `os.tmpdir()` in tests.
 - `src/probe/cost.mjs` — cost report and gate (normalized elapsed seconds, valid for one width); `testguard.cost-budget.json`.
 - `src/probe/runners/` — one module per runner; a new one needs its own fixture with hand-verified expected verdicts.
+- `src/probe/runners/process-tree.mjs` — reads the process table and tears down a process tree; `src/probe/runners/shared.mjs` re-exports it, and it breaks the import cycle between that file and `src/probe/runners/discovery.mjs`.
 - `src/gate/changed.mjs` — `gate --changed`; `src/status/status.mjs` — the state machine (a new state is a spec change plus a template change).
 - `src/init/managed.mjs` — hashed markers for what `init` writes, so `--upgrade` spares edited blocks.
 - `src/scaffold/producers.mjs` — fault shapes; line heuristics, no AST, no LLM.

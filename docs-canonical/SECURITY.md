@@ -53,9 +53,8 @@ guarantees are about **what the tool is allowed to touch**:
   mutation only ever lived inside a scratch worktree — and is recorded on the
   record as `detail.restoreSkipped`. A permission failure is still raised in
   both modes, because it can mean a mutated file left on disk.
-- The tool never writes to a path outside the project directory except its own
-  temporary files, and `repoPath` in the schema rejects absolute paths and
-  parent traversal.
+- The tool writes only to the paths in rule 6 below. `repoPath` in the schema
+  rejects absolute paths and parent traversal.
 
 ## Secrets Management
 
@@ -98,8 +97,9 @@ recorded fallback (`run.runner.source`), and `npx` is never consulted.
 
 **4. Supply-chain posture is enforced in CI.**
 OSV scanning on every pull request and on a schedule; all GitHub Actions pinned
-by commit SHA, not by tag; Dependabot restricted to minor and patch with
-auto-merge only when the exact run is green on every Node leg.
+by commit SHA, not by tag; Dependabot opens grouped monthly pull requests.
+Auto-merge applies only to non-major bumps, and only when the exact run is
+green on every Node leg. A major bump waits for a human.
 
 **5. Untrusted repositories.** Probing a repository executes that
 repository's test suite. Run TestGuard against code you would already be willing
@@ -114,9 +114,10 @@ that and verify it.
 
 | Path | Written by | Why |
 |---|---|---|
-| the scratch directory (`--scratch-dir`, `TESTGUARD_SCRATCH_DIR`, else the OS temp directory) | `probe`, `sweep`, `replay`, `admit` | scratch worktrees, the temporary git index, runner report and sidecar reporter files, one private temp and data directory per runner process, each removed when its run ends; and `testguard-locks/`, the worktree-allocation lock directory (kept, empty between runs) |
+| the scratch directory (`--scratch-dir`, `TESTGUARD_SCRATCH_DIR`, else the OS temp directory) | `probe`, `sweep`, `replay`, `admit`; `clean` only removes | scratch worktrees, the temporary git index, runner report and sidecar reporter files, and, when a scratch directory is named, one private temp and data directory per runner process, each removed when its run ends; and `testguard-locks/`, which holds the worktree-allocation lock and one owner record per scratch tree (the directories are kept; the files are removed when the run ends, or by `clean` after an interrupted run) |
+| the OS temp directory, whatever `--scratch-dir` says | `claims --annotate --apply`, `scaffold --into`, `claims --check-anchors --typecheck` | a private recovery directory (mode 0700) that an annotation or draft write keeps and names in its report; for `--typecheck`, a scratch worktree and a type-check directory, removed when the check ends |
 | the evidence path (`--out`, else `<dir>/.testguard/`; `replay` also writes its calibration beside its report) | every command that writes evidence | the result of the run |
-| the repository's `.git` | `probe`, `sweep`, `replay`, `admit` | `worktrees/` metadata for each scratch worktree (removed with it), and loose objects when `--include-dirty` snapshots an unstaged tree |
+| the repository's `.git` | `probe`, `sweep`, `replay`, `admit`, `clean`, `claims --check-anchors --typecheck`; `init --activate-hook` | `worktrees/` metadata for each scratch worktree (removed with it, or by `clean` after an interrupted run), and loose objects when `--include-dirty` or `--typecheck` snapshots an unstaged tree; for `--activate-hook`, `core.hooksPath` or a `pre-push` hook file |
 | the working tree and `.testguard/` | `scaffold --into`, `claims --annotate --apply`, `init`, `baseline`, `--in-place` | commands whose job is to write the project; `probe --in-place` edits the fault target and restores it |
 
 `--scratch-dir` must name a directory that exists and can be written; otherwise
@@ -128,8 +129,8 @@ gets a `node_modules` directory of its own whose entries link to the shared
 install, so a tool that writes `node_modules/.vite-temp`, `.vite`, `.vitest` or
 `.cache` writes into the scratch tree. Tool caches that live in the temp
 directory (jest's haste map and transform cache, Playwright's transform cache)
-follow the runner's `TMPDIR`, which TestGuard points into the scratch
-directory. Python writes no bytecode (`PYTHONDONTWRITEBYTECODE`,
+follow the runner's `TMPDIR`. When a scratch directory is named, TestGuard
+points `TMPDIR` into it. Python writes no bytecode (`PYTHONDONTWRITEBYTECODE`,
 `PYTHONPYCACHEPREFIX`) and pytest runs with `-p no:cacheprovider`. The
 dirty-tree test discovery runs in your own tree, whose `node_modules` cannot be
 swapped; against a read-only install it asks vitest 4 and later for
@@ -139,8 +140,10 @@ whether the install was writable, never a path).
 **What this does not promise.** Tests under probe run the project's own code,
 with your privileges, and are not sandboxed. The write boundary lists where
 TestGuard and its built-in runners write; it does not stop a test from writing
-elsewhere, reading your files or opening a socket. Known leaks it does not
-close: vitest keeps an API token in the per-user data directory, which only
+elsewhere, reading your files or opening a socket. A run that exceeds its
+budget has its whole process tree killed. That teardown is best effort: a
+daemon that already reparented may survive, and the record says when the
+teardown was not confirmed. Known leaks it does not close: vitest keeps an API token in the per-user data directory, which only
 Linux redirects (`XDG_DATA_HOME`); macOS and Windows write it under the home
 directory. `--in-place` writes the working tree by definition. Use a container
 or VM for untrusted code, and give it a writable scratch directory.

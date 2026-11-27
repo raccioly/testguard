@@ -129,7 +129,7 @@ The model is not used here. Three of its design principles are.
 
 | Taken | Where it applies |
 |---|---|
-| **Strictly proper scoring rules as the objective.** Their stated rationale: naive optimisation maximises accuracy by destroying calibration, producing a confidently wrong model. A strictly proper scoring rule is maximised only by honest probabilities. | A binding constraint on the planned ranker feedback loop: it must optimise Brier or log score, never accuracy or F1. |
+| **Strictly proper scoring rules as the objective.** Their stated rationale: naive optimisation maximises accuracy by destroying calibration, producing a confidently wrong model. A strictly proper scoring rule is maximised only by honest probabilities. | A binding constraint on the ranker feedback loop (`src/supply/feedback.mjs`): it must optimise Brier or log score, never accuracy or F1. |
 | **A separate act/escalate channel**, distinct from the answer's own confidence. | Already the architecture of `classify()`: `killed`/`survived` and `unverifiable`/`nocover`/`flaky-defender` are different kinds of answer, not confident and unconfident versions of one. Recorded here so it is defended rather than collapsed. |
 | **Out-of-distribution is invisible to confidence** — their English checkpoint scored 0.000 accuracy at 95.2% confidence on Khmer. Detection must be structural and must precede inference. | Why `scaffold` returns nothing rather than guessing, and why `sweep` reports `skipped: no line in this file matches a fault producer` instead of an empty result. |
 
@@ -169,15 +169,17 @@ Recorded so they are not mistaken for decisions.
     were of this shape — findings nobody will write a test for, which is
     Google's definition of arid, in a syntax Google never mutated. Because the
     ordering learns from survival, these survivors also teach it to rank the
-    class higher. A line-oriented demotion is designed; it is not built.
+    class higher. `presentational()` in `src/supply/select.mjs` now sets that shape aside, counted and reported by `sweep` rather than dropped.
   - **Python continuation lines.** 81 of 600 proposals on a Python CLI
     (13.5%) did not compile, 77 of them a `statement-deleted` on a line that
     sits inside a bracket opened on an earlier line. `isIncomplete()` in
-    `src/scaffold/producers.python.mjs` checks only whether the line itself
+    `src/scaffold/producers.python.mjs` checked only whether the line itself
     leaves a bracket open. Measured with the tokenizer's exact depth, a
     running-depth guard on that class catches 74 of the 77 and drops no
     valid proposal. Not arid — a producer that spends probe runs saying
-    nothing — but found by the same pass.
+    nothing — but found by the same pass. `depthBefore()` in the same file
+    now applies that guard; a re-measurement found 7 of 526 proposals (1.3%)
+    still failing to compile.
 - **The persistence signal reached the evidence on 2026-09-22**
   (`persistence-payload-unasserted` in `evidence.defenders.signals`, a closed
   enum in the shared claimspec contract). No tool outside this repository

@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **User documentation rewritten in plain language.** The README, the root documents, the pages under `docs/`, the print brief and the pt-BR and es translations use short sentences, active voice and one term per concept. No command, flag, heading or fact changes. The brief's masthead now names the author, and `sync-release-version.mjs` accepts that form when it updates the brief's version.
 
+- **No import cycle between `shared.mjs` and `discovery.mjs`.** The process-table reading and process-tree teardown (`processRows`, `terminateProcessTree`, `TIMEOUT_CLEANUP_WARNING`) moved to `src/probe/runners/process-tree.mjs`; `shared.mjs` re-exports them, so no caller changes. The canonical documents were reviewed against the code and corrected where they were wrong (layer rules, environment variables, write boundary, CI jobs, test-file list), and CI now runs DocGuard 0.50.0.
+
 ## [0.26.3] - 2026-11-23
 
 Automated weekly release — everything merged since `v0.26.2`.

@@ -21,9 +21,33 @@ the test that defends it, and CI fails if any injected fault survives.
 | Conformance | `spec/conformance/` | Every valid example validates; every must-reject document is rejected for the defect its filename names | ~1 s |
 | Anchor preflight | `test/claims-anchors.test.mjs` | Exact anchors still locate, supported replacements parse, the check stays below one second, and CI reaches it before self-probe | <1 s |
 | Fixture acceptance | `test/probe.fixture.test.mjs`, `test/probe.jest.test.mjs`, `test/probe.playwright.test.mjs` | The whole pipeline reproduces a known-answer oracle, one per runner. The Playwright fixture carries its own dependencies: without `npm ci --prefix fixtures/known-answer-playwright` that file skips, and a skipped acceptance is not a passing one | 10–50 s each |
-| Self-verification | `testguard.claims.json`, run by `npm run self:probe` | The tool's own invariants survive fault injection | Historical cold measurement: **20.2 min** in the v0.10.1 release job on 2026-09-19 at `70e9d61` (154 faults, 924 defender runs, 1210 s). PR CI restores previous evidence for reuse. Current committed ceilings in `testguard.cost-budget.json`: 3600 s total and 100 s per claim, both in normalized seconds (raw seconds divided by a runner-speed factor from a reference workload timed before and after the probe; a missing or absurd reference fails the gate). Both gate CI, and neither changes for fault-specific selection |
+| Self-verification | `testguard.claims.json`, run by `npm run self:probe` | The tool's own invariants survive fault injection | Historical cold measurement: **20.2 min** in the v0.10.1 release job on 2026-09-19 at `70e9d61` (154 faults, 924 defender runs, 1210 s). PR CI restores previous evidence for reuse. Current committed ceilings in `testguard.cost-budget.json`: 2270 s total and 100 s per claim, both in normalized seconds (raw seconds divided by a runner-speed factor from a reference workload timed before and after the probe; a missing or absurd reference fails the gate). The sharded full self-probe in `ci.yml` is gated on the `sharded` block of the same file instead of the total: 3 s per fault and 720 s for the slowest of 4 shards (`check-shard-cost.mjs`). The per-claim ceiling applies in both, and none of these change for fault-specific selection |
 | Install smoke | `.github/scripts/install-smoke.mjs` | The **packed tarball** runs with production dependencies only | ~20 s |
 | Runtime budget | `ci.yml` | The suite has not silently started walking the wrong tree | gate, not a test |
+
+### Conformance suites
+
+`spec/conformance/*.test.mjs` is the home of the Conformance category. Each file
+validates examples and must-reject documents against the schemas and semantic
+rules in `spec/`, and pins why a document fails, so a validator rule cannot be
+dropped while another error keeps the file red.
+
+| File | What it pins |
+|---|---|
+| `schemas.test.mjs` | Every valid example validates; every invalid example is rejected for the reason its filename names; fingerprint derivation; calibration arithmetic; runner source and defender selection origin fields |
+| `advice.test.mjs` | `advice[]` in status and brief: a closed set of ids, each line a TestGuard command, and the command each rule produces |
+| `annotations.test.mjs` | The annotation-authoring document: preview, applied and partial states conform; inconsistent selections, unsafe paths, leaked source bytes and verdicts are rejected |
+| `authoring-input.test.mjs` | The read-only authoring-input document (a document's metadata, or a fix commit's complete path partition): no promoted or internal fields, path and size limits, one shared read/write validation boundary |
+| `budget.test.mjs` | `run.budget`, `run.failureKind` and not-reached records: `exhausted` agrees with the records, a not-reached record is unverifiable and never reused, and the failure kind decides the exit code |
+| `convergence.test.mjs` | Evidence from a scoped run that updated the canonical file: measured, carried and kept-stale records, each carried record naming the run that measured it, and never a provisional run |
+| `dependency-closure.test.mjs` | The dependency closure in evidence (GATE-SEMANTICS rule 8): only a complete closure licenses reuse, an indeterminate one names its reasons, and the reuse tally and instrument version must agree with the records |
+| `draft-append.test.mjs` | `appendDraft` publishes a complete claims document, keeps the supplied statement, source and faults, and is never valid as evidence |
+| `fault-workers.test.mjs` | Fault fan-out evidence: `run.faultWorkers`, serial re-measurement marks, the fan-out guard and its cost, baseline re-measurement, and a claim declared serial |
+| `kill-kind.test.mjs` | `detail.killKind` (assertion, exception-only, mixed) is checked against the probe runs rather than trusted; legacy evidence still conforms; the assertion policy in status sets the exit code |
+| `origin-policy.test.mjs` | The optional `originPolicy` in evidence, status and brief: a closed shape, arithmetic bound to the records, and the status exit codes it implies |
+| `origin-summaries.test.mjs` | The optional `origins` summary in evidence, status and brief: closed keys and totals that must agree with the document, so a plausible but invented split is rejected |
+| `origins.test.mjs` | Declared claim source kinds and `req:<spec-id>#<requirement-id>` references: the closed vocabulary, one shared pattern, pooled and scaffold-inferred drafts, and no authentication of independence |
+| `verdict-order.test.mjs` | `nocover` precedes an invalid anchor: an anchor reason on a fault with no defender is rejected |
 
 ### How the gate duration is measured
 
