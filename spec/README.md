@@ -84,6 +84,9 @@ optional declarations `sharedExternalState` and `extensions`. It is a contract
 about the probe engine's own plug-in point, not a data format.
 `lib/runner-adapter.mjs` checks a module against it and
 `conformance/runner-adapter.test.mjs` holds every built-in adapter to it.
+[`RUNNER-ADAPTER-APEX.md`](RUNNER-ADAPTER-APEX.md) is the specification of an Apex
+adapter that is not built: it runs code inside a Salesforce org, so it lists what
+a real org must confirm first.
 
 ## Conformance
 
