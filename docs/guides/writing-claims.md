@@ -220,8 +220,35 @@ as text. It does not run the config. It reads a literal object whose keys look
 like `^c/(.*)$` and whose values look like `<rootDir>/src/$1/$1`. If it cannot
 read the mapper (a variable, a call, a spread, a `resolver`, `modulePaths`,
 `moduleDirectories` or an unusual regular expression), it cannot say which
-tests reach the target. It then reports the tests as indeterminate and not as
-`NOCOVER`. Name the test in `defendedBy` to settle it.
+tests reach the target from the text alone.
+
+When the project runner is Jest, TestGuard then asks Jest itself. It runs
+`jest --listTests --json --findRelatedTests <target>` in the project, with the
+project's own Jest. Jest resolves with the project's own `moduleNameMapper`,
+`modulePaths`, preset and custom `resolver`. The tests it lists, inside the
+project and inside the test universe, are the defenders. This is runner-native
+discovery. The answer covers only the tests that were indeterminate because an
+import would not resolve. A test that mocks a module through a name TestGuard
+cannot place stays indeterminate, because it may be mocking the target.
+
+If Jest fails, times out, prints something TestGuard cannot read, or the run
+limit (64 Jest processes per probe) is reached, the tests stay indeterminate.
+They are never read as "no test". The record reads
+`defender-discovery-indeterminate` and its message names the reason. The
+verdict is not `NOCOVER`. Name the test in `defendedBy` to settle it.
+
+TestGuard asks once for each target file and each state of the discovery
+configuration. Parallel fault workers share the answer. An edit to
+`jest.config.*`, `package.json` or a file the config imports (a custom resolver,
+for example) is a new question. When Jest found defenders, the probe prints one
+line that says so (`discovery: runner-native`).
+
+Discovery reads imports in JavaScript, TypeScript and Python only. If the
+fault's file is in another language that TestGuard knows (Java, Apex and
+others), discovery cannot look, so it cannot say that no test covers the file.
+The record reads `defender-discovery-unsupported (java): declare defendedBy`
+and not `(defenders discovered by import)`. The verdict is still `NOCOVER` and
+it still fails the gate. List the tests in `defendedBy` to name them.
 
 A mocking file that never asserts on anything it imported from the target
 carries the signal `mocked-never-asserted`. It is the cheapest blind-spot

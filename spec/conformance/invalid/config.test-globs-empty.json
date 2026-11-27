@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "runnerCmd": "mvn-glue.sh {out} {files}",
+  "testGlobs": []
+}

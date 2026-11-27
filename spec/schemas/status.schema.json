@@ -660,7 +660,7 @@
       },
       "additionalProperties": false
     },
-    "projectConfigKey": { "enum": ["runner", "runnerCmd", "python", "nodeModules", "typecheck", "workers", "faultWorkers", "confirm", "budget"] },
+    "projectConfigKey": { "enum": ["runner", "runnerCmd", "testGlobs", "python", "nodeModules", "typecheck", "workers", "faultWorkers", "confirm", "budget"] },
     "claimResult": {
       "type": "object",
       "required": ["id", "result", "faults", "reasons"],

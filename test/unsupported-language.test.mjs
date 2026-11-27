@@ -186,3 +186,22 @@ describe('status surface: a second denominator for languages TestGuard cannot pr
     expect(validate('status', bad).errors.length).toBeGreaterThan(0);
   });
 });
+
+// The language table is one module with no probe import (it sits under the gate,
+// discovery and init alike); these pin its pure helpers.
+describe('the language table helpers', () => {
+  it('names a known id and falls back to the id itself, never an empty string', async () => {
+    const { languageName } = await import('../src/gate/languages.mjs');
+    expect(languageName('apex')).toBe('Apex');
+    expect(languageName('not-a-language')).toBe('not-a-language');
+  });
+
+  it('tallies ids in sorted order whatever the order they arrive in', async () => {
+    const { tallyLanguages } = await import('../src/gate/languages.mjs');
+    const tally = tallyLanguages(['java', 'apex', 'java', 'go']);
+    expect(tally.total).toBe(4);
+    expect(Object.keys(tally.byLanguage)).toEqual(['apex', 'go', 'java']);
+    expect(tally.byLanguage.java).toBe(2);
+    expect(tallyLanguages([])).toBeUndefined();
+  });
+});

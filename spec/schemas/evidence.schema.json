@@ -539,7 +539,7 @@
           "required": [],
           "properties": {
             "reason": {
-              "description": "Machine-readable qualifier, e.g. `anchor-missing`, `anchor-ambiguous`, `defenders-not-green`, `replacement-does-not-compile`, `replacement-does-not-typecheck`, `typecheck-timed-out`, `not-reached-within-budget` (the command budget ran out before this fault was fully measured; `unverifiable`, no runs, never reusable).",
+              "description": "Machine-readable qualifier, e.g. `anchor-missing`, `anchor-ambiguous`, `defenders-not-green`, `replacement-does-not-compile`, `replacement-does-not-typecheck`, `typecheck-timed-out`, `not-reached-within-budget` (the command budget ran out before this fault was fully measured; `unverifiable`, no runs, never reusable), `defender-discovery-unsupported` (a `nocover` whose fault file is in a language the tool cannot read imports in, so discovery could not look; `message` names the language and says to declare `defendedBy`; the verdict is unchanged and still gates).",
               "type": "string",
               "maxLength": 256
             },
@@ -656,7 +656,7 @@
               "const": true
             },
             "message": {
-              "description": "Human-readable detail for a reason that carries one: `probe-error` (the first line names what threw), `defenders-failed-to-load` (the runner's own first informative error line) and `subject-not-executed` (why the defenders may not have reached the subject) and `test-timed-out` for a run that exceeded its budget (that the run ended at the budget, whether its teardown was confirmed, and whether other test runners were busy). Never parsed; a reader should not have to reproduce the run to learn what happened.",
+              "description": "Human-readable detail for a reason that carries one: `probe-error` (the first line names what threw), `defenders-failed-to-load` (the runner's own first informative error line) and `subject-not-executed` (why the defenders may not have reached the subject) `defender-discovery-unsupported` (`defender-discovery-unsupported (java): declare defendedBy`) and `test-timed-out` for a run that exceeded its budget (that the run ended at the budget, whether its teardown was confirmed, and whether other test runners were busy). Never parsed; a reader should not have to reproduce the run to learn what happened.",
               "type": "string",
               "maxLength": 1024
             },

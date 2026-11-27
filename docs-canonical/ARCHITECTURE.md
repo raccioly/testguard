@@ -51,6 +51,7 @@ code were wrong, would anything fail?*
 | Cost | What a probe spent, per claim and per defender file, derived from evidence | `src/probe/cost.mjs` |
 | Progress | How a running probe reports itself, per reader: tty, plain, ndjson | `src/probe/progress.mjs` |
 | Change gate | Claim coverage of a diff; changed source in a language it cannot probe is named as a gap | `src/gate/changed.mjs` |
+| Source languages | The one table of languages TestGuard recognizes but cannot probe; it imports nothing from the probe, so the gate, status, init and discovery share it | `src/gate/languages.mjs` |
 | Sweep | The cold start: propose faults for changed files that carry no claim, probe a bounded selection, report what nothing noticed | `src/sweep/sweep.mjs` |
 | Claim supply | The concerns a sweep can be aimed by, which proposals are worth probing, what this project's own runs say about that, where it writes to storage, and why a survivor on a write path was missed | `src/supply/concerns.mjs`, `src/supply/select.mjs`, `src/supply/feedback.mjs`, `src/supply/savepath.mjs`, `src/supply/persistence.mjs` |
 | Baseline | Freeze debt; gate the delta; re-stamp | `src/baseline/baseline.mjs` |
