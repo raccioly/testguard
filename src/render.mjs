@@ -31,6 +31,7 @@ export function renderRecord(r, { provisional = false, showDiscovered = true } =
   } else if (r.detail.reason) {
     why = `  [${r.detail.reason}]`;
   }
+  if (r.detail.escalationSkipped) why += '  [escalation skipped: the test universe has no test outside the defenders]';
   if (r.verdict === 'killed' && r.detail.killKind === 'exception-only') why += '  [killed by exception only: no assertion failed]';
   if (r.defenders.discovered && showDiscovered) why += '  (defenders discovered by import)';
   return `${head} ${r.claim.severity.padEnd(8)} ${r.subject.file}  ${r.subject.description}${why}`;

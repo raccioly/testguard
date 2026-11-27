@@ -208,12 +208,20 @@ the fault was killed. Re-probe and read the verdict. Do not assume the result.
 
 Discovery picks the test files that import the fault's target. It follows
 relative paths, `tsconfig` `paths` (through `extends` and `references`),
-vite/vitest `resolve.alias` and `package.json` `imports`. It follows the
-imported symbol through barrel files. Then it removes every file that **mocks**
+vite/vitest `resolve.alias`, Jest `moduleNameMapper` and `package.json`
+`imports`. It follows the imported symbol through barrel files. Then it removes every file that **mocks**
 the target. A test that `vi.mock`s or `jest.mock`s a module cannot detect a
 fault inside it. So `NOCOVER` means exactly "no test file imports this source
 without mocking it". `claims` prints the split (for example `18 import · 16
 mock · 2 can detect`).
+
+TestGuard reads `moduleNameMapper` from `jest.config.*` and `package.json#jest`
+as text. It does not run the config. It reads a literal object whose keys look
+like `^c/(.*)$` and whose values look like `<rootDir>/src/$1/$1`. If it cannot
+read the mapper (a variable, a call, a spread, a `resolver`, `modulePaths`,
+`moduleDirectories` or an unusual regular expression), it cannot say which
+tests reach the target. It then reports the tests as indeterminate and not as
+`NOCOVER`. Name the test in `defendedBy` to settle it.
 
 A mocking file that never asserts on anything it imported from the target
 carries the signal `mocked-never-asserted`. It is the cheapest blind-spot
@@ -536,6 +544,12 @@ npx testguard-cli scaffold src/auth.ts --json                  # print the draft
 | `argument-swapped` | a call kept, its first argument swapped for `undefined` (and `{}` when the argument is itself a call), only when that argument derives from a parameter of the enclosing function or a request-like value (`req`, `ctx`, `event`, …) |
 | `element-removed` | a one-line JSX element, self-closing or paired, removed |
 | `handler-dropped` | an `on<Event>={…}` prop removed: the control renders and does nothing |
+
+`scaffold` has producers for JavaScript, TypeScript and Python only. For any
+other extension (`.java`, `.xml`, `.dwl`, and so on) it proposes nothing, writes
+no draft, and prints a line such as `scaffold has no producers for .java`. It
+still exits 0. TestGuard also cannot find defenders for those files, so write
+the faults by hand and declare `defendedBy`.
 
 `scaffold` reads **Python** too and proposes the same classes in Python
 syntax: `if <guard>:` → `if False:`, `return <check>` → `return True`,

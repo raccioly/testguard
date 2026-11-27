@@ -41,6 +41,19 @@ export function foldEscalationRun(state, { run, failedTests }) {
   return { runs, killers, stoppedEarly: killers.size === 0 ? 'no-common-failure' : undefined };
 }
 
+/**
+ * Whether a survivor is asked what the wider suite does, and what the record
+ * owes when it is not. `skipped-no-test-outside-defenders`: escalation was
+ * wanted and the subject was executed, but the test universe holds nothing
+ * beyond the defenders, so a `survived` carries less than it would with the
+ * answer. A recorded choice (`--no-escalate`), a kill and an unexecuted subject
+ * (already `unverifiable`) owe nothing.
+ */
+export function escalationPlan({ verdict, subjectReached, escalate, broaderCount }) {
+  if (verdict !== 'survived' || subjectReached === false || !escalate) return 'none';
+  return broaderCount > 0 ? 'run' : 'skipped-no-test-outside-defenders';
+}
+
 /** The initial attribution state, before any escalation run. */
 export const escalationStart = () => ({ runs: [], killers: null, stoppedEarly: undefined });
 

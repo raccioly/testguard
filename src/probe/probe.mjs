@@ -23,7 +23,7 @@ import { classify, shouldStopEarly } from './classify.mjs';
 import { blastRadius, rank } from './rank.mjs';
 import { classifyIndependence } from './independence.mjs';
 import { killKindReasonOf } from './kill-kind.mjs';
-import { escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf, isReusable, inputsMatch, defenderSelection } from './attribution.mjs';
+import { escalationPlan, escalationStart, foldEscalationRun, escalationResult, flakeRate, killersFromRuns, subjectOf, isReusable, inputsMatch, defenderSelection } from './attribution.mjs';
 import { hashFile, sha256 } from '../util/hash.mjs';
 import { fingerprint } from '../../spec/lib/fingerprint.mjs';
 import { recordedOriginSummary } from '../../spec/lib/origins.mjs';
@@ -101,6 +101,28 @@ export function runnerRecord(name, version, source) {
 }
 
 /**
+ * What a `--runner-cmd` run records as its runner: the command, never the
+ * adapter that happens to parse its report (a Maven build is not Vitest).
+ * Identified by the hash of the parsed words, so reformatting does not change
+ * it and the command text never reaches the evidence. A command resolves
+ * nothing, so it has no version and no source.
+ */
+export function customCommandRunner(commandTemplate) {
+  return { name: 'custom-command', commandHash: sha256(JSON.stringify(commandTemplate)) };
+}
+
+/**
+ * The test universe of a custom command: the adapter's file globs and
+ * owned-runner files, plus every file any claim declares as a defender. The
+ * globs find nothing for a suite they do not know (JUnit, Apex), and a
+ * declared test is by definition a test; without it escalation has nothing to
+ * ask. Sorted and de-duplicated, because it is hashed.
+ */
+export function commandUniverse(nativeTests, declaredDefenders) {
+  return [...new Set([...nativeTests, ...declaredDefenders])].sort();
+}
+
+/**
  * Reuse cannot stand in for a measurement by a different runner. pytest and
  * unittest are one adapter and two engines; a global vitest of the same
  * version is a different binary from the project's. Evidence that recorded no
@@ -109,7 +131,8 @@ export function runnerRecord(name, version, source) {
 export function sameRunner(previousRun, current) {
   const recorded = previousRun?.runner;
   if (!recorded) return false;
-  return recorded.name === current.name && recorded.version === current.version && recorded.source === current.source;
+  return recorded.name === current.name && recorded.version === current.version && recorded.source === current.source
+    && recorded.commandHash === current.commandHash;
 }
 
 /**
@@ -508,7 +531,9 @@ async function measureProbe({
       primaryManifest = sel.manifest;
       if (sel.engine) engines.set(sel.runner, sel.engine);
     }
-    recordedRunner = runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), runnerSource);
+    // Under a command template the adapter only reads the report; what ran is
+    // the command, and it is what the evidence names (#332).
+    recordedRunner = commandTemplate ? customCommandRunner(commandTemplate) : runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), runnerSource);
     ctx.recordedRunner = recordedRunner;
     runnersUsed.set(recordedRunner.name, recordedRunner.version);
     // Files an owning runner (Playwright) claims run under it, whatever the
@@ -561,11 +586,14 @@ async function measureProbe({
         }
       }
     }
-    const allTests = Object.freeze((commandTemplate
-      ? [...new Set([...runner.tests(iso.projectDir).filter((t) => !owned.some((r) => r.owns(iso.projectDir, t))), ...owned.flatMap((r) => r.tests(iso.projectDir))])]
-      : [...ownerByFile.keys()]).sort());
+    // Every claim's declared defenders, not only the selected ones: the
+    // universe is hashed, so a `--claim` run must see the one a full run does.
+    const declaredDefenders = () => claims.claims.flatMap((claim) => [claim, ...claim.faults].flatMap((x) => resolveDefenders(iso.projectDir, x.defendedBy ?? [])));
+    const allTests = Object.freeze(commandTemplate
+      ? commandUniverse([...runner.tests(iso.projectDir).filter((t) => !owned.some((r) => r.owns(iso.projectDir, t))), ...owned.flatMap((r) => r.tests(iso.projectDir))], declaredDefenders())
+      : [...ownerByFile.keys()].sort());
     const testUniverseHash = commandTemplate
-      ? hashCustomCommandUniverse(allTests, commandTemplate)
+      ? hashCustomCommandUniverse(allTests, commandTemplate, runner.name)
       : hashNativeTestUniverse(manifests);
     const baselineCache = new Map();
     const discoveryHashCache = new Map();
@@ -1481,7 +1509,11 @@ async function measureFault(state, tree, { priorRuns = [], overlap, allAlone = f
       // Skipped when the subject is not executed at all: nothing the wider
       // suite does could be evidence about a file nobody loads.
       const broader = allTests.filter((t) => !defenders.includes(t));
-      if (provisional.verdict === 'survived' && subjectReached !== false && escalate && broader.length > 0) {
+      const plan = escalationPlan({ verdict: provisional.verdict, subjectReached, escalate, broaderCount: broader.length });
+      // A survivor nobody could ask the wider suite about means less than one
+      // it was asked about; the record says which it is.
+      if (plan === 'skipped-no-test-outside-defenders') detail.escalationSkipped = 'no-test-outside-defenders';
+      if (plan === 'run') {
         // The rule lives in attribution.mjs as a pure fold; this loop only
         // decides when to stop asking the runner.
         let fold = escalationStart();

@@ -32,6 +32,12 @@ const schemaFor = (kind) => {
   return v;
 };
 
+const unsupportedSumErrors = (u, path) => {
+  if (!u) return [];
+  const sum = Object.values(u.byLanguage).reduce((a, b) => a + b, 0);
+  return sum === u.total ? [] : [{ path: `${path}/total`, message: `total (${u.total}) must equal the sum of byLanguage (${sum})` }];
+};
+
 const nestedErrors = (nested = [], prefix = '/nested', occupied = []) => {
   const errors = [];
   const projects = new Set();
@@ -209,6 +215,15 @@ const semantic = {
 
   evidence(doc) {
     const errors = [];
+    // A custom command is named as such, by the hash of its words, and
+    // resolves nothing; no native runner has a command.
+    const named = doc.run.runner;
+    if (named && (named.name === 'custom-command') !== (named.commandHash !== undefined)) {
+      errors.push({ path: '/run/runner', message: 'commandHash is recorded exactly when the runner is custom-command' });
+    }
+    if (named?.name === 'custom-command' && (named.version !== undefined || named.source !== undefined)) {
+      errors.push({ path: '/run/runner', message: 'a custom command resolves nothing: it records no version and no source' });
+    }
     if (doc.run.runner?.source === 'builtin' && (doc.run.runner.name !== 'node-test' || !/^(?:[2-9]\d|[1-9]\d{2,})\.\d+\.\d+(?:[-+].+)?$/.test(doc.run.runner.version ?? ''))) {
       errors.push({ path: '/run/runner', message: 'builtin source requires node-test and its actual Node version (20 or newer)' });
     }
@@ -332,6 +347,12 @@ const semantic = {
         const derived = r.verdict === 'killed' && r.detail.killKind === 'exception-only' && runs.length > 0
           && runs.every((x) => (x.kindNotReported ?? 0) > 0 && x.kindNotReported === (x.exceptionFailures ?? 0));
         if (!derived) errors.push({ path: `${p}/detail/killKindReason`, message: 'killKindReason is only valid on an exception-only kill whose every exception failure was unreported by the runner' });
+      }
+      // A skipped escalation is owed only to a survivor, and it is the
+      // opposite of an escalation that ran.
+      if (r.detail?.escalationSkipped !== undefined) {
+        if (r.verdict !== 'survived') errors.push({ path: `${p}/detail/escalationSkipped`, message: 'escalationSkipped is a property of a survivor; only survived records carry it' });
+        if (r.detail.escalated !== undefined) errors.push({ path: `${p}/detail/escalationSkipped`, message: 'escalationSkipped contradicts escalated: escalation either ran or was skipped' });
       }
       // Every rule below reads those fields, so a record that is already
       // malformed must not also throw on the way to being reported.
@@ -550,6 +571,9 @@ const semantic = {
 
   status(doc) {
     const errors = [];
+    errors.push(...unsupportedSumErrors(doc.surface?.unsupportedModules, '/surface/unsupportedModules'));
+    errors.push(...unsupportedSumErrors(doc.changes?.unsupported, '/changes/unsupported'));
+    if (doc.changes?.unsupported && doc.changes.unsupported.total > doc.changes.excluded) errors.push({ path: '/changes/unsupported/total', message: 'unsupported files are excluded files; the count cannot exceed excluded' });
     if (doc.cost?.measurements) {
       const m = doc.cost.measurements;
       if (Math.abs(m.elapsedMs - m.runnerMs - m.overheadMs) > 0.001) errors.push({ path: '/cost/measurements', message: 'elapsedMs must equal runnerMs plus overheadMs' });
@@ -636,12 +660,17 @@ const semantic = {
 
   gate(doc) {
     const errors = [];
+    doc.excluded.forEach((e, i) => {
+      if ((e.by === 'unsupported-language') !== (e.language !== undefined)) errors.push({ path: `/excluded/${i}/language`, message: 'language is present exactly when by is unsupported-language' });
+    });
+    const hasGap = doc.excluded.some((e) => e.by === 'unsupported-language');
+    if (doc.strict && hasGap && doc.exitCode !== 1) errors.push({ path: '/exitCode', message: 'strict must fail a change that holds an unsupported-language file; the gate never passes over source it could not read' });
     const nestedCount = (doc.nested ?? []).reduce((count, entry) => count + entry.files.length, 0);
     errors.push(...nestedErrors(doc.nested, '/nested', [...doc.covered, ...doc.uncovered, ...doc.excluded].map((entry) => entry.file)));
     if (doc.evaluated !== doc.covered.length + doc.uncovered.length) errors.push({ path: '/evaluated', message: `evaluated (${doc.evaluated}) must equal covered (${doc.covered.length}) + uncovered (${doc.uncovered.length})` });
     if (doc.changed !== doc.evaluated + doc.excluded.length + nestedCount) errors.push({ path: '/changed', message: `changed (${doc.changed}) must equal evaluated (${doc.evaluated}) + excluded (${doc.excluded.length}) + nested (${nestedCount})` });
     if (doc.uncovered.length > 0 && doc.exitCode !== 1) errors.push({ path: '/exitCode', message: 'an uncovered changed file must exit 1; the gate never passes over unclaimed code' });
-    if (doc.uncovered.length === 0 && doc.exitCode === 1 && !(doc.strict && doc.changed > 0 && doc.evaluated === 0)) errors.push({ path: '/exitCode', message: 'exit 1 without uncovered files is only valid under --strict when a non-empty change evaluated nothing' });
+    if (doc.uncovered.length === 0 && doc.exitCode === 1 && !(doc.strict && doc.changed > 0 && (doc.evaluated === 0 || hasGap))) errors.push({ path: '/exitCode', message: 'exit 1 without uncovered files is only valid under --strict when a non-empty change evaluated nothing or holds an unsupported-language file' });
     doc.covered.forEach((c, i) => {
       if (c.by === 'ignore' && !c.pattern) errors.push({ path: `/covered/${i}/pattern`, message: 'a file covered by an ignore entry must name the pattern that excused it' });
       if (c.by !== 'ignore' && !c.claimIds?.length) errors.push({ path: `/covered/${i}/claimIds`, message: `a file covered by a ${c.by} must name the claim(s)` });

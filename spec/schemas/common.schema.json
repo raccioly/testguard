@@ -118,6 +118,22 @@
       "if": { "type": "object", "required": ["ref"], "properties": { "ref": { "type": "string", "pattern": "^req:" } } },
       "then": { "properties": { "kind": { "const": "spec" } } }
     },
+    "unsupportedLanguages": {
+      "description": "Files in a language the tool recognizes as source but cannot probe, counted by language id. Never part of a supported denominator and never evidence of anything: it says how much code the claim counts do not describe.",
+      "type": "object",
+      "required": ["total", "byLanguage"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 1 },
+        "byLanguage": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "#/$defs/languageId" },
+          "additionalProperties": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "languageId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
     "nestedProject": {
       "description": "Changed files delegated to a separately validated descendant TestGuard project. This is not coverage or evidence; run that project's gate separately.",
       "type": "object",

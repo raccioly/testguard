@@ -24,9 +24,13 @@ export function hashNativeTestUniverse(manifests) {
  * command from the fixed one, and a verdict measured by one is not an answer
  * from the other. The parsed argv is hashed, so reformatting whitespace is not
  * a change and the command text never appears in the evidence.
+ *
+ * The adapter (`--runner`, vitest under `auto`) is bound too: it reads the
+ * command's report and chooses the negative control's edit, so another adapter
+ * is another measurement even though the evidence names only the command.
  */
-export function hashCustomCommandUniverse(files, commandTemplate) {
-  return sha256(JSON.stringify({ schemaVersion: 2, source: 'custom-command-static', command: commandTemplate, files }));
+export function hashCustomCommandUniverse(files, commandTemplate, adapter) {
+  return sha256(JSON.stringify({ schemaVersion: 3, source: 'custom-command-static', adapter, command: commandTemplate, files }));
 }
 
 /** Shared owning-adapter collection; check failures retain existing probe semantics. */

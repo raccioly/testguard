@@ -112,6 +112,7 @@
         "sourceModules": { "type": "integer", "minimum": 0 },
         "claimedModules": { "type": "integer", "minimum": 0 },
         "unclaimedModules": { "type": "integer", "minimum": 0 },
+        "unsupportedModules": { "description": "Present only when there are files in a language the tool cannot probe. A second denominator beside `sourceModules`: those files are not counted there. Tests cannot be told from source in these languages, so they are counted too.", "$ref": "urn:claimspec:v1:common#/$defs/unsupportedLanguages" },
         "history": {
           "type": "object",
           "required": ["available", "maxCommits", "commitsRead"],
@@ -554,6 +555,7 @@
       ],
       "properties": {
         "nested": { "type": "array", "items": { "$ref": "urn:claimspec:v1:common#/$defs/nestedProject" } },
+        "unsupported": { "description": "Present only when changed files are in a language the tool cannot probe (and no ignore entry excused them). They are counted in `excluded` and were not evaluated.", "$ref": "urn:claimspec:v1:common#/$defs/unsupportedLanguages" },
         "ref": {
           "type": "string",
           "minLength": 1,

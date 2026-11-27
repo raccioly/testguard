@@ -7,11 +7,12 @@
   "head": "9a7c5e3b1d0f8e6c4a2b0d8f6e4c2a0b8d6f4e2c",
   "includeDirty": false,
   "strict": false,
-  "changed": 5,
+  "changed": 6,
   "evaluated": 3,
   "excluded": [
     { "file": "README.md", "by": "non-source" },
-    { "file": "vitest.config.mjs", "by": "default:**/*.config.*" }
+    { "file": "vitest.config.mjs", "by": "default:**/*.config.*" },
+    { "file": "force-app/main/default/classes/DiscountService.cls", "by": "unsupported-language", "language": "apex" }
   ],
   "covered": [
     { "file": "src/redact.mjs", "by": "fault", "claimIds": ["REDACT-001", "REDACT-003"] },

@@ -915,7 +915,7 @@ export function createImportResolver(projectDir, { aliases = [], configFiles = [
         const suffix = rule.suffix ?? '';
         const star = rule.wildcard ? specifier.slice(rule.prefix.length, specifier.length - suffix.length) : '';
         for (const target of rule.targets ?? []) {
-          const expanded = expandBase(target.replace('*', star)).filter(isVisible);
+          const expanded = expandBase(target.replaceAll('*', star)).filter(isVisible);
           if (expanded.length) { bases.push(...expanded); break; } // ordered TS-path fallback
         }
       }

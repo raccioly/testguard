@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { git } from '../git.mjs';
-import { SOURCE_EXT, isDefaultExcluded, isTestFile, nestedProjectResolver } from '../gate/changed.mjs';
+import { SOURCE_EXT, isDefaultExcluded, isTestFile, nestedProjectResolver, unsupportedLanguage, tallyLanguages } from '../gate/changed.mjs';
 import { walk } from '../util/glob.mjs';
 
 export const HISTORY_COMMITS = 200;
@@ -32,6 +32,22 @@ function claimableModules(projectDir) {
     !isDefaultExcluded(file) && !ownerOf(file));
 }
 
+/**
+ * Files in a language TestGuard recognizes but cannot probe (#331). They stay
+ * out of the supported denominator and are counted beside it, so "0 of 13" is
+ * never the whole story. Tests cannot be told from source in these languages,
+ * so they are counted too; the default exclusions and nested projects apply.
+ */
+function unsupportedModules(projectDir) {
+  const ownerOf = nestedProjectResolver(projectDir);
+  const ids = [];
+  for (const file of listedFiles(projectDir)) {
+    const language = unsupportedLanguage(file);
+    if (language && existsSync(join(projectDir, file)) && !isDefaultExcluded(file) && !ownerOf(file)) ids.push(language.id);
+  }
+  return tallyLanguages(ids);
+}
+
 function recentChanges(projectDir, sourceModules) {
   const counts = new Map();
   try {
@@ -59,10 +75,12 @@ export function computeClaimedSurface({ projectDir, claims }) {
     b.changes - a.changes || b.riskSignals.length - a.riskSignals.length || a.file.localeCompare(b.file));
   const highChurn = ranked.slice(0, Math.min(HIGH_CHURN_MODULES, ranked.length));
   const rankedUnclaimed = ranked.filter((item) => !claimed.has(item.file)).slice(0, RANKED_UNCLAIMED);
+  const unsupported = unsupportedModules(projectDir);
   return {
     sourceModules: modules.size,
     claimedModules: claimed.size,
     unclaimedModules: modules.size - claimed.size,
+    ...(unsupported ? { unsupportedModules: unsupported } : {}),
     history: { available: history.available, maxCommits: HISTORY_COMMITS, commitsRead: history.commitsRead },
     highChurn: { modules: highChurn.length, claimed: highChurn.filter((item) => claimed.has(item.file)).length },
     rankedUnclaimed,

@@ -27,6 +27,52 @@ import { globToRegExp } from '../util/glob.mjs';
 // means a changed Python file could never be reported as uncovered and the
 // gate would pass while saying nothing.
 export const SOURCE_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.jsx', '.tsx', '.py']);
+
+/**
+ * Source TestGuard recognizes but cannot probe yet (#331). A changed file in
+ * one of these languages is a reported gap, never `non-source`: the gate would
+ * otherwise print "every changed source file carries a claim" over code it
+ * never looked at. The table is also the list of languages still to support;
+ * when a runner adapter lands, the language moves to `SOURCE_EXT`.
+ * `match` takes a repo-relative path with forward slashes.
+ */
+const byExt = (...exts) => (file) => exts.some((e) => file.endsWith(e));
+export const KNOWN_SOURCE = Object.freeze([
+  { id: 'apex', name: 'Apex', match: byExt('.cls', '.trigger') },
+  { id: 'java', name: 'Java', match: byExt('.java') },
+  { id: 'kotlin', name: 'Kotlin', match: byExt('.kt') },
+  { id: 'scala', name: 'Scala', match: byExt('.scala') },
+  { id: 'csharp', name: 'C#', match: byExt('.cs') },
+  { id: 'go', name: 'Go', match: byExt('.go') },
+  { id: 'ruby', name: 'Ruby', match: byExt('.rb') },
+  { id: 'php', name: 'PHP', match: byExt('.php') },
+  { id: 'dataweave', name: 'DataWeave', match: byExt('.dwl') },
+  { id: 'salesforce-flow', name: 'Salesforce Flow', match: byExt('.flow-meta.xml') },
+  { id: 'mule-xml', name: 'Mule XML', match: (file) => file.endsWith('.xml') && /(^|\/)src\/main\/mule\//.test(file) },
+]);
+
+/** The known-but-unprobeable language of a path, or null. Pure. */
+export const unsupportedLanguage = (file) => {
+  if (SOURCE_EXT.has(extname(file))) return null;
+  const hit = KNOWN_SOURCE.find((l) => l.match(file));
+  return hit ? { id: hit.id, name: hit.name } : null;
+};
+
+export const languageName = (id) => KNOWN_SOURCE.find((l) => l.id === id)?.name ?? id;
+
+/** `{ total, byLanguage }` over language ids, or undefined for none. Ids sort for a stable document. */
+export const tallyLanguages = (ids) => {
+  if (!ids.length) return undefined;
+  const byLanguage = {};
+  for (const id of [...ids].sort()) byLanguage[id] = (byLanguage[id] ?? 0) + 1;
+  return { total: ids.length, byLanguage };
+};
+
+/** "Apex 3, Java 1": largest first, name order on ties. */
+export const describeLanguages = ({ byLanguage }) => Object.entries(byLanguage)
+  .sort((a, b) => b[1] - a[1] || languageName(a[0]).localeCompare(languageName(b[0])))
+  .map(([id, n]) => `${languageName(id)} ${n}`).join(', ');
+
 const TEST_RE = /\.(test|spec)\.[cm]?[jt]sx?$/;
 // Python names tests by file, not by a dotted suffix: `test_foo.py`, `foo_test.py`.
 export const isTestFile = (f) => TEST_RE.test(f) || IS_PY_TEST.test(f);
@@ -54,6 +100,7 @@ export const explainExclusions = () => [
   'Files that are source by extension but never carry claims (excluded by default; add more with --exclude <glob>):',
   ...DEFAULT_EXCLUDES.map((g) => `  ${g}`),
   `Non-source files (anything but ${[...SOURCE_EXT].join(' ')}) are excluded before these patterns apply.`,
+  `Source in a language TestGuard cannot probe yet (${KNOWN_SOURCE.map((l) => l.name).join(', ')}) is reported as \`unsupported-language\`, never as non-source; --strict fails on it unless an ignore entry excuses it.`,
 ];
 
 /** Whether a source-shaped path is outside TestGuard's claimable module surface. */
@@ -283,11 +330,21 @@ export function computeChangedGate({ projectDir, ref, includeDirty = false, excl
       nested.get(owner).push(file);
       continue;
     }
-    if (!SOURCE_EXT.has(extname(file))) { excluded.push({ file, by: 'non-source' }); continue; }
+    const gap = unsupportedLanguage(file);
+    if (!gap && !SOURCE_EXT.has(extname(file))) { excluded.push({ file, by: 'non-source' }); continue; }
     const ux = userExcludes.find((x) => x.re.test(file));
     if (ux) { excluded.push({ file, by: `exclude:${ux.glob}` }); continue; }
     const dx = defaultExcludes.find((x) => x.re.test(file));
     if (dx) { excluded.push({ file, by: `default:${dx.glob}` }); continue; }
+    if (gap) {
+      // Known source the tool cannot read. An unexpired ignore entry can excuse
+      // it like any unclaimed file; nothing else can, and it is never evaluated.
+      const excuse = pathEntries.find((p) => !p.expired && p.re.test(file));
+      if (excuse) { excuse.files.push(file); covered.push({ file, by: 'ignore', pattern: excuse.entry.pattern }); continue; }
+      for (const p of pathEntries) if (p.expired && p.re.test(file)) p.files.push(file);
+      excluded.push({ file, by: 'unsupported-language', language: gap.id });
+      continue;
+    }
 
     const isTest = isTestFile(file);
     if (faultFiles.has(file)) { covered.push({ file, by: 'fault', claimIds: faultFiles.get(file) }); continue; }
@@ -312,7 +369,8 @@ export function computeChangedGate({ projectDir, ref, includeDirty = false, excl
   const evaluated = covered.length + uncovered.length;
   const reliedOn = pathEntries.filter((p) => !p.expired && p.files.length).map((p) => ({ pattern: p.entry.pattern, reason: p.entry.reason, ...(p.entry.expires ? { expires: p.entry.expires } : {}), files: p.files }));
   const expired = pathEntries.filter((p) => p.expired && p.files.length).map((p) => ({ pattern: p.entry.pattern, reason: p.entry.reason, expires: p.entry.expires, files: p.files }));
-  const exitCode = uncovered.length > 0 ? 1 : strict && changed.length > 0 && evaluated === 0 ? 1 : 0;
+  const hasGap = excluded.some((x) => x.by === 'unsupported-language');
+  const exitCode = uncovered.length > 0 ? 1 : strict && changed.length > 0 && (evaluated === 0 || hasGap) ? 1 : 0;
 
   return {
     schemaVersion: 1,
@@ -335,6 +393,9 @@ export function computeChangedGate({ projectDir, ref, includeDirty = false, excl
   };
 }
 
+/** The unsupported-language tally of a gate document's excluded list. */
+export const unsupportedTally = (excluded) => tallyLanguages(excluded.filter((x) => x.by === 'unsupported-language').map((x) => x.language));
+
 export function renderGate(doc) {
   const lines = [];
   const where = doc.includeDirty ? 'working tree' : `HEAD ${doc.head.slice(0, 7)}`;
@@ -344,7 +405,12 @@ export function renderGate(doc) {
   for (const e of doc.expired) lines.push(`EXPIRED    ignore "${e.pattern}" (expired ${e.expires}) no longer excuses ${e.files.join(', ')}`);
   for (const n of doc.nested ?? []) lines.push(`delegated  ${n.files.length} file(s) belong to the TestGuard project at ${n.project}/; run testguard gate ${n.project} --changed ${doc.ref}${doc.includeDirty ? ' --include-dirty' : ''}; child coverage has not been evaluated here`);
   if (doc.changed > 0 && doc.evaluated === 0) lines.push(`note: every changed file was excluded or delegated (${[...new Set(doc.excluded.map((x) => x.by))].join(', ')}); 0 evaluated${doc.strict ? ' — --strict makes this a failure' : ''}`);
+  const gaps = unsupportedTally(doc.excluded);
+  for (const [id, n] of Object.entries(gaps?.byLanguage ?? {})) {
+    const name = languageName(id);
+    lines.push(`UNSUPPORTED  ${n} ${name} file${n === 1 ? '' : 's'} changed; TestGuard cannot probe ${name} yet${doc.strict ? ' — --strict makes this a failure' : ''}`);
+  }
   if (doc.changed === 0) lines.push(`no changes since ${doc.ref}; nothing to claim`);
-  if (doc.uncovered.length === 0 && doc.exitCode === 0 && doc.evaluated > 0) lines.push('every changed source file carries a claim or an excusing ignore entry');
+  if (doc.uncovered.length === 0 && doc.exitCode === 0 && doc.evaluated > 0 && !gaps) lines.push('every changed source file carries a claim or an excusing ignore entry');
   return lines.join('\n');
 }

@@ -72,7 +72,8 @@ project only when you write its `testguard.claims.json`.
 | One project at the root | a root runner config (a Vitest workspace, a Jest `projects` list) runs every package's tests | one claims file and one gate for everything. Probes and baselines are not split by package |
 
 Defender discovery resolves relative imports and configured aliases
-(`tsconfig` `paths`, vite/vitest `resolve.alias`, `package.json#imports`). It
+(`tsconfig` `paths`, vite/vitest `resolve.alias`, Jest `moduleNameMapper`,
+`package.json#imports`). It
 does not resolve a bare package name such as `@acme/billing`. So you must list
 a cross-package defender in the claim's `defendedBy`. See
 [Languages and runners](../reference/languages-and-runners.md).

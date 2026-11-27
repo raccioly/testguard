@@ -430,7 +430,10 @@ because it would produce a misleading empty diff. The gate says which
 reference it chose.
 
 Source files are `.js .mjs .cjs .ts .mts .cts .jsx .tsx .py`. The gate
-excludes everything else as non-source. The default exclusions (`--explain`) are
+treats a changed file in a language it cannot probe (for example `.cls`,
+`.java`, `.dwl`) as a gap: it is listed as `unsupported-language`, and
+`--strict` fails on it unless an ignore entry excuses it. Every other file is
+non-source. The default exclusions (`--explain`) are
 `**/*.d.ts`, `**/*.config.*`, `**/*.stories.*`, `**/*.generated.*`,
 `**/fixtures/**`, `**/__fixtures__/**`, `**/__mocks__/**`,
 `**/__snapshots__/**` and `.testguard/**`. A directory with its own valid
