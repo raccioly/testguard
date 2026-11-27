@@ -21524,6 +21524,85 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-GATE-WALKS-ONCE",
+      "statement": "The changed-file gate walks the repository once for the whole command, so every declared and discovered defender resolves against one snapshot; the snapshot answers only for its own root, and the gate refuses a tree that changed while it was resolving.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #231"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/glob-inventory.test.mjs",
+        "test/gate-inventory-refusal.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The gate resolves each declared defender list with a fresh walk again.",
+          "faultClass": "guard-removed",
+          "file": "src/gate/changed.mjs",
+          "find": "declaredMemo.set(key, resolveDefenders(projectDir, requested, inventory))",
+          "replace": "declaredMemo.set(key, resolveDefenders(projectDir, requested))",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Discovery walks the repository again for every fault file.",
+          "faultClass": "guard-removed",
+          "file": "src/gate/changed.mjs",
+          "find": "discoveredMemo.set(file, discoverDefenders(projectDir, file, undefined, inventory))",
+          "replace": "discoveredMemo.set(file, discoverDefenders(projectDir, file))",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The gate no longer refuses a tree that changed while it resolved defenders.",
+          "faultClass": "guard-removed",
+          "file": "src/gate/changed.mjs",
+          "find": "if (inventoryChanged(inventory)) throw new InventoryError(",
+          "replace": "if (false) throw new InventoryError(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A snapshot answers for a root it was not taken from.",
+          "faultClass": "guard-removed",
+          "file": "src/util/glob.mjs",
+          "find": "if (resolve(root) !== inventory.root) throw new Error(",
+          "replace": "if (false) throw new Error(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A rename that keeps the file count is not seen as a change.",
+          "faultClass": "condition-forced",
+          "file": "src/util/glob.mjs",
+          "find": "|| now.some((f, i) => f !== inventory.files[i])",
+          "replace": "|| false",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
     }
   ]
 }

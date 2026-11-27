@@ -9,6 +9,7 @@ import { UsageError, errorDocument } from './probe/precondition-error.mjs';
 import { resolveScratchDir, withScratchBase } from './scratch-dir.mjs';
 import { RUNNER_NAMES } from './probe/runners/index.mjs';
 import { GitError } from './git.mjs';
+import { InventoryError } from './util/glob.mjs';
 import { SpecDocError } from './evidence/writer.mjs';
 import { probeCommand } from './commands/probe.mjs';
 import { claimsCommand } from './commands/claims.mjs';
@@ -473,7 +474,7 @@ async function dispatch(argv, io, seen) {
       io.err(e.message);
       return 3;
     }
-    if (e instanceof ClaimsError || e instanceof PreconditionError || e instanceof GitError || e instanceof SpecDocError) {
+    if (e instanceof ClaimsError || e instanceof PreconditionError || e instanceof GitError || e instanceof InventoryError || e instanceof SpecDocError) {
       io.err(`error: ${e.message}`);
       return 2;
     }
