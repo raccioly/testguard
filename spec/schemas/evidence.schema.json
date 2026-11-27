@@ -85,6 +85,10 @@
               "description": "Present exactly when `name` is `custom-command` (a `--runner-cmd` run): the sha256 of the command's parsed words (the command text is never recorded). A custom command resolves nothing, so it carries no `version` and no `source`. Reuse requires the same hash. Evidence from before this field named the adapter that read the command's report (`vitest` under `--runner auto`) and carried no hash; it stays readable and is never reused for a custom command.",
               "$ref": "urn:claimspec:v1:common#/$defs/sha256"
             },
+            "reportFormat": {
+              "description": "Present exactly when `name` is `custom-command` and the command's report is JUnit XML (`--report-format junit`, #329). The default, the jest-compatible JSON report, is never recorded, so evidence that predates the option is the same record. How a failure is read (an assertion type, a load failure, a timeout) is part of what was measured, so reuse requires the same format.",
+              "enum": ["junit"]
+            },
             "source": {
               "description": "Where the runner was resolved from; recorded for every resolved runner and absent only for a custom command. `project`: the runner package resolved from the project, the project's virtualenv, or an interpreter named by path. `path`: an executable found on PATH ran instead (including a bare command name given to --python). `builtin`: the explicitly selected node-test engine uses the Node executable running TestGuard; its version is required. Reuse requires the same name, version and source.",
               "enum": [
@@ -106,8 +110,8 @@
           "minimum": 2
         },
         "faultWorkersSource": {
-          "description": "How the fault-worker count was chosen: `auto` from the machine (`cpus`), `flag` (`--fault-workers`), `env` (`TESTGUARD_FAULT_WORKERS`), `config` (`faultWorkers` in testguard.config.json), `serial` (`--serial`: one fault at a time), `in-place` (one tree, so one fault at a time). Absent when the caller (the library API) did not say.",
-          "enum": ["auto", "flag", "env", "config", "serial", "in-place"]
+          "description": "How the fault-worker count was chosen: `auto` from the machine (`cpus`), `flag` (`--fault-workers`), `env` (`TESTGUARD_FAULT_WORKERS`), `config` (`faultWorkers` in testguard.config.json), `serial` (`--serial`: one fault at a time), `in-place` (one tree, so one fault at a time), `runner` (the runner declares `sharedExternalState`, so a wider request was reduced to one fault at a time in one tree, #329). Absent when the caller (the library API) did not say.",
+          "enum": ["auto", "flag", "env", "config", "serial", "in-place", "runner"]
         },
         "cpus": {
           "description": "The CPUs available to the process (`os.availableParallelism()`) an automatic fault-worker count was derived from. Present exactly when `faultWorkersSource` is `auto`.",

@@ -93,6 +93,7 @@ async function replayIn({
   workers = 1,
   serial = workers === 1,
   runnerCommand,
+  reportFormat,
   testGlobs = [],
   runnerName = 'auto',
   nodeModules,
@@ -158,7 +159,7 @@ async function replayIn({
         }
         universe = buildReplayRunnerUniverse(runnerUsed, manifests);
       }
-      const record = await replayOne({ fix, iso, root, projectDir, python, confirmRuns, budgetMs, commandBudget, workers, serial, commandTemplate, runner: runnerUsed, universe, onStage, index: i + 1, total: selected.length });
+      const record = await replayOne({ fix, iso, root, projectDir, python, confirmRuns, budgetMs, commandBudget, workers, serial, commandTemplate, reportFormat, runner: runnerUsed, universe, onStage, index: i + 1, total: selected.length });
       records.push(record);
       onProgress(record);
     } finally {
@@ -176,7 +177,7 @@ async function replayIn({
       startedAt,
       finishedAt: new Date().toISOString(),
       range,
-      runner: runnerCommand ? { name: 'custom-command' } : { name: runnerUsed.name, ...(runnerVersion ? { version: runnerVersion } : {}) },
+      runner: runnerCommand ? { name: 'custom-command', ...(reportFormat === 'junit' ? { reportFormat } : {}) } : { name: runnerUsed.name, ...(runnerVersion ? { version: runnerVersion } : {}) },
       confirmRuns,
       candidates: found.length,
       duplicates,
@@ -227,7 +228,7 @@ export function partitionReplayDefenders(files, primary, universe) {
   return groups;
 }
 
-async function replayOne({ fix, iso, root, projectDir, python, confirmRuns, budgetMs, commandBudget, workers, serial, commandTemplate, runner, universe, onStage, index, total }) {
+async function replayOne({ fix, iso, root, projectDir, python, confirmRuns, budgetMs, commandBudget, workers, serial, commandTemplate, reportFormat, runner, universe, onStage, index, total }) {
   // git reports paths from the REPOSITORY root; the runner and every file
   // operation here work inside the scratch worktree, relative to the PROJECT
   // directory. Map once, and refuse anything that would land outside the
@@ -343,7 +344,7 @@ async function replayOne({ fix, iso, root, projectDir, python, confirmRuns, budg
       // A custom command is one explicit execution boundary. Preserve that
       // contract exactly; TestGuard cannot infer several native engines from
       // an opaque user command.
-      res = await runner.run({ projectDir: iso.projectDir, sourceDir: projectDir, python, files: related, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, commandTemplate, workers, serial });
+      res = await runner.run({ projectDir: iso.projectDir, sourceDir: projectDir, python, files: related, budgetMs: commandBudget?.runBudget(budgetMs) ?? budgetMs, commandTemplate, reportFormat, workers, serial });
     } else {
       const parts = [];
       for (const [configuredRunner, files] of partitionReplayDefenders(related, runner, universe)) {

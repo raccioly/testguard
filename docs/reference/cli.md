@@ -270,6 +270,7 @@ writes it.
 | `--in-place` | off | Mutate the working tree instead of a scratch worktree. Only fault target files must be clean. |
 | `--runner <name>` | `auto` | Test runner. See the table below. |
 | `--runner-cmd "<cmd>"` | none | A custom runner command. It must contain `{files}` and `{out}`, e.g. `"pnpm vitest run {files} --reporter=json --outputFile={out}"`. A reporter file path in it must start with `./` (or be absolute), because Node reads a bare `--test-reporter=tools/x.mjs` as a package name. |
+| `--report-format <jest\|junit>` | `jest` | How the report of a `--runner-cmd` is read: the jest-compatible JSON (default), or JUnit XML (one file, or a directory of `.xml` files, at `{out}`). It needs `--runner-cmd`, and an unknown value exits `3`. See [JUnit XML reports](languages-and-runners.md#junit-xml-reports). |
 | `--test-glob <glob>` | none | Repeatable. Needs `--runner-cmd`; without it the exit is `3`, because a built-in runner lists its own tests. It names the tests of a suite the built-in globs do not know (JUnit, Apex, MUnit), as a glob relative to the project, written with `/` (for example `"src/test/**/*Test.java"`). An absolute path, a backslash or a `..` segment exits `3`. The files a glob matches join the test universe that escalation asks, beside the built-in globs and every claim's declared defenders. `node_modules`, build output and the scratch directory are never searched. The globs are part of the universe hash, so a new or changed glob re-measures. Without this flag, escalation under `--runner-cmd` can only ask the tests that a claim declares. See [custom runners](languages-and-runners.md#custom-runners). Also the `testGlobs` key of [`testguard.config.json`](configuration.md#testguardconfigjson-how-this-projects-tests-run). |
 | `--node-modules <dir>` | `TESTGUARD_NODE_MODULES` | `node_modules` to link into the scratch worktree when it cannot see yours. |
 | `--scratch-dir <dir>` | `TESTGUARD_SCRATCH_DIR`, else the OS temp directory | An existing, writable directory for every scratch worktree, temporary git index, runner report and runner temp directory. A missing or unwritable directory exits 2 before anything is written. The flag bounds where TestGuard writes. It does not sandbox the tests. See [where TestGuard writes](configuration.md#where-testguard-writes). |
@@ -277,7 +278,7 @@ writes it.
 | `--python <path>` | `TESTGUARD_PYTHON`, then `$VIRTUAL_ENV`, then `.venv`, `venv`, `.env` in the project, then `python3`, `python` on `PATH` | Interpreter for `.py` defenders, resolved against your working tree. TestGuard looks up a bare name on `PATH`. An explicit interpreter is the only one tried. TestGuard never replaces it with another. |
 | `--workers <n>` | `1` | Maximum built-in runner workers. Python stays serial. |
 | `--serial` | off | One test process at a time. That means one runner worker even when `--workers` is higher (vitest `--no-file-parallelism`, jest `--runInBand`, playwright `--workers=1`; pytest always runs with `-p no:xdist`). It also means one fault at a time (`--fault-workers 1`). With `--fault-workers` above 1 it is a usage error. Use it only for a suite that cannot share the machine. |
-| `--fault-workers <n\|auto>` | `auto` | Probe up to n faults at once, each in its own scratch worktree. `auto` is `min(4, floor(CPUs / 2))`, at least one, halved when other test runners are already running. `TESTGUARD_FAULT_WORKERS` sets it when the flag is absent. `--in-place` means one. TestGuard measures baselines once per defender set, with different sets side by side. Every kill rests on at least one probe run with no other fault in flight (`probeRuns[].alone`). Sometimes a run alone contradicts runs beside other faults. Then TestGuard marks the defender set `detail.notParallelSafe` and measures the fault again alone (`detail.remeasuredSerially`). It does the same for a contended timeout, inconsistent probe or suite-load failure. Records keep claim/fault order. TestGuard records `run.faultWorkers` (above one), `run.faultWorkersSource` and, for auto, `run.cpus`. See [performance](../guides/performance.md#probe-several-faults-at-once). |
+| `--fault-workers <n\|auto>` | `auto` | Probe up to n faults at once, each in its own scratch worktree. `auto` is `min(4, floor(CPUs / 2))`, at least one, halved when other test runners are already running. `TESTGUARD_FAULT_WORKERS` sets it when the flag is absent. `--in-place` means one, and so does a runner that declares `sharedExternalState` (`run.faultWorkersSource` is then `runner`). TestGuard measures baselines once per defender set, with different sets side by side. Every kill rests on at least one probe run with no other fault in flight (`probeRuns[].alone`). Sometimes a run alone contradicts runs beside other faults. Then TestGuard marks the defender set `detail.notParallelSafe` and measures the fault again alone (`detail.remeasuredSerially`). It does the same for a contended timeout, inconsistent probe or suite-load failure. Records keep claim/fault order. TestGuard records `run.faultWorkers` (above one), `run.faultWorkersSource` and, for auto, `run.cpus`. See [performance](../guides/performance.md#probe-several-faults-at-once). |
 | `--no-escalate` | off | Do not re-run survivors against the whole suite. Escalation runs the whole suite up to N times per survivor. |
 | `--no-reuse` | off | Re-probe claims whose recorded inputs have not changed. |
 | `--allow-empty` | off | Adoption only: a valid claims file with zero claims exits `0` instead of `2`, writes no evidence, and says verification was skipped. Has no effect with `--claim`. |
@@ -519,7 +520,7 @@ replaces `.testguard/evidence.json`.
 | `--command-budget <ms>` | none | Cooperative deadline for the whole sweep. When it expires, the sweep exits `2` and writes nothing. |
 | `--workers <n>` | `1` | Maximum built-in runner workers. |
 | `--serial` | off | One worker, even when `--workers` is higher. |
-| `--runner`, `--runner-cmd`, `--test-glob`, `--node-modules` | as for [probe](#probe) | Runner selection. `--test-glob` needs `--runner-cmd`. |
+| `--runner`, `--runner-cmd`, `--report-format`, `--test-glob`, `--node-modules` | as for [probe](#probe) | Runner selection. `--test-glob` needs `--runner-cmd`. |
 | `--python <path>` | as for [probe](#probe) | Interpreter for `.py` defenders (or `TESTGUARD_PYTHON`). |
 | `--claims <path>`, `--ignore <path>` | project defaults | Files used to decide which changed files are unclaimed. |
 | `--max <n>` | `20` | Findings printed in the text report. |
@@ -603,7 +604,7 @@ missed a real escaped bug of that class. It reports and never gates. See the
 | `--command-budget <ms>` | none | Cooperative deadline. When it expires, `replay` writes neither the replay nor the calibration. |
 | `--workers <n>` | `1` | Maximum built-in runner workers. |
 | `--serial` | off | One worker, even when `--workers` is higher. |
-| `--runner`, `--runner-cmd`, `--test-glob`, `--node-modules` | as for [probe](#probe) | Runner selection. `--test-glob` needs `--runner-cmd`. |
+| `--runner`, `--runner-cmd`, `--report-format`, `--test-glob`, `--node-modules` | as for [probe](#probe) | Runner selection. `--test-glob` needs `--runner-cmd`. |
 | `--python <path>` | as for [probe](#probe) | Interpreter for `.py` defenders (or `TESTGUARD_PYTHON`). |
 | `--out <path>` | `<dir>/.testguard/replay.json` | Replay document. The calibration is written as `calibration.json` in the same directory. |
 | `--calibration-out <path>` | beside the replay document | Write the calibration document to this path instead. |
@@ -644,7 +645,7 @@ the directory of `--claims`).
 | `--serial` | off | One worker, even when `--workers` is higher. |
 | `--claims <path>` | found from the test file | Claims file; its directory is the project. |
 | `--out <path>` | `<project>/.testguard/evidence-partial.json` | Evidence file. Never the canonical one. |
-| `--runner`, `--runner-cmd`, `--test-glob`, `--node-modules` | as for [probe](#probe) | Runner selection. `--test-glob` needs `--runner-cmd`. |
+| `--runner`, `--runner-cmd`, `--report-format`, `--test-glob`, `--node-modules` | as for [probe](#probe) | Runner selection. `--test-glob` needs `--runner-cmd`. |
 | `--python <path>` | as for [probe](#probe) | Interpreter for `.py` defenders (or `TESTGUARD_PYTHON`). |
 | `--quiet` | off | Suppress progress and the provisional warning. |
 | `--json` | off | Print `{admitted, provisional, claim, test, faults, evidence, command}`. |

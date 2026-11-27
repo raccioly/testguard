@@ -3,12 +3,13 @@ import { dirname, join } from 'node:path';
 import { scratchRoot } from '../../scratch-dir.mjs';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { TEST_GLOBS, runProcess, checkRunner, runnerArgv, listTestFiles, parseReport, resolveRunner, mergeRuns } from './shared.mjs';
+import { TEST_GLOBS, JS_EXTENSIONS, runProcess, checkRunner, runnerArgv, listTestFiles, parseReport, resolveRunner, mergeRuns } from './shared.mjs';
 import { nearestNodeModulesWritable } from '../node-modules-link.mjs';
 import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs, normalizeDiscoveredEntries, readBoundedJsonFile, runDiscoveryProcess } from './discovery.mjs';
 
 export const name = 'vitest';
 export const testGlobs = TEST_GLOBS;
+export const extensions = JS_EXTENSIONS;
 export const check = (opts) => checkRunner({ ...opts, pkg: 'vitest', bin: 'vitest' });
 export const tests = (projectDir) => listTestFiles(projectDir, testGlobs);
 const DISCOVERY_CONFIG_FILES = [

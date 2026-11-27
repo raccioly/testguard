@@ -221,6 +221,9 @@ const semantic = {
     if (named && (named.name === 'custom-command') !== (named.commandHash !== undefined)) {
       errors.push({ path: '/run/runner', message: 'commandHash is recorded exactly when the runner is custom-command' });
     }
+    if (named?.reportFormat !== undefined && named.name !== 'custom-command') {
+      errors.push({ path: '/run/runner', message: 'reportFormat is recorded only for a custom command: a native runner reads its own report' });
+    }
     if (named?.name === 'custom-command' && (named.version !== undefined || named.source !== undefined)) {
       errors.push({ path: '/run/runner', message: 'a custom command resolves nothing: it records no version and no source' });
     }
@@ -241,7 +244,7 @@ const semantic = {
     const source = doc.run.faultWorkersSource;
     if (source === 'auto' && doc.run.cpus === undefined) errors.push({ path: '/run/cpus', message: 'an automatic fault-worker count records the CPUs it was derived from' });
     if (doc.run.cpus !== undefined && source !== 'auto') errors.push({ path: '/run/cpus', message: 'cpus is recorded only for an automatic fault-worker count' });
-    if ((source === 'serial' || source === 'in-place') && doc.run.faultWorkers !== undefined) errors.push({ path: '/run/faultWorkers', message: `faultWorkersSource ${source} means one fault at a time` });
+    if ((source === 'serial' || source === 'in-place' || source === 'runner') && doc.run.faultWorkers !== undefined) errors.push({ path: '/run/faultWorkers', message: `faultWorkersSource ${source} means one fault at a time` });
     if (source === 'in-place' && doc.run.mode !== 'in-place') errors.push({ path: '/run/faultWorkersSource', message: 'faultWorkersSource in-place requires mode in-place' });
     const fanOut = doc.run.faultWorkers > 1;
     if (!fanOut && doc.run.measurements) {

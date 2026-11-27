@@ -3,10 +3,11 @@ import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { scratchRoot } from '../../scratch-dir.mjs';
 import { fileURLToPath } from 'node:url';
-import { runProcess } from './shared.mjs';
+import { JS_EXTENSIONS, runProcess } from './shared.mjs';
 import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs, normalizeDiscoveredFiles, readBoundedJsonFile, runDiscoveryProcess } from './discovery.mjs';
 
 export const name = 'node-test';
+export const extensions = JS_EXTENSIONS;
 export const testGlobs = []; // Native collection is authoritative; never guess from globs.
 const HERE = join(dirname(fileURLToPath(import.meta.url)), 'node');
 const RUNNER = join(HERE, 'runner.mjs');

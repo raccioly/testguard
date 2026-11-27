@@ -8370,8 +8370,8 @@
           "description": "The pinned runner drops fatalEdit, so a survivor probed with --runner pytest or --runner unittest is never checked against the negative control and reports survived however unreachable the subject is.",
           "faultClass": "field-dropped",
           "file": "src/probe/runners/python.mjs",
-          "find": "  return { name: engine, testGlobs, owns, tests, parseReport, fatalEdit, check: makeCheck(engine), run: makeRun(engine) };",
-          "replace": "  return { name: engine, testGlobs, owns, tests, parseReport, check: makeCheck(engine), run: makeRun(engine) };",
+          "find": "  return { name: engine, testGlobs, extensions, owns, tests, parseReport, fatalEdit, check: makeCheck(engine), run: makeRun(engine) };",
+          "replace": "  return { name: engine, testGlobs, extensions, owns, tests, parseReport, check: makeCheck(engine), run: makeRun(engine) };",
           "producedBy": {
             "producer": "human",
             "by": "maintainer"
@@ -10830,8 +10830,8 @@
           "description": "Read an oversized report without enforcing its byte limit.",
           "faultClass": "statement-deleted",
           "file": "src/probe/runners/shared.mjs",
-          "find": "          result = parse(readBoundedJsonFile(outFile), durationMs);",
-          "replace": "          result = parse(JSON.parse(readFileSync(outFile, 'utf8')), durationMs);",
+          "find": "          result = junit ? parseReport(readJunitReport(outFile), durationMs) : parse(readBoundedJsonFile(outFile), durationMs);",
+          "replace": "          result = junit ? parseReport(readJunitReport(outFile), durationMs) : parse(JSON.parse(readFileSync(outFile, 'utf8')), durationMs);",
           "producedBy": {
             "producer": "agent",
             "by": "codex"
@@ -11735,8 +11735,8 @@
           "description": "The custom-command universe hashes only the files, so a fixed command reuses the broken command's verdicts.",
           "faultClass": "field-dropped",
           "file": "src/probe/universe.mjs",
-          "find": "  return sha256(JSON.stringify({ schemaVersion: 3, source: 'custom-command-static', adapter, command: commandTemplate, files, ...(globs.length ? { testGlobs: globs } : {}) }));",
-          "replace": "  return sha256(JSON.stringify({ schemaVersion: 3, source: 'custom-command-static', adapter, files, ...(globs.length ? { testGlobs: globs } : {}) }));",
+          "find": "  return sha256(JSON.stringify({ schemaVersion: 3, source: 'custom-command-static', adapter, command: commandTemplate, files, ...(globs.length ? { testGlobs: globs } : {}), ...(reportFormat === 'junit' ? { reportFormat } : {}) }));",
+          "replace": "  return sha256(JSON.stringify({ schemaVersion: 3, source: 'custom-command-static', adapter, files, ...(globs.length ? { testGlobs: globs } : {}), ...(reportFormat === 'junit' ? { reportFormat } : {}) }));",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -11747,8 +11747,8 @@
           "description": "The probe hashes an empty command into the universe, so any two commands look identical to reuse.",
           "faultClass": "argument-swapped",
           "file": "src/probe/probe.mjs",
-          "find": "      ? hashCustomCommandUniverse(allTests, commandTemplate, runner.name, testGlobs)",
-          "replace": "      ? hashCustomCommandUniverse(allTests, [], runner.name, testGlobs)",
+          "find": "      ? hashCustomCommandUniverse(allTests, commandTemplate, runner.name, testGlobs, reportFormat)",
+          "replace": "      ? hashCustomCommandUniverse(allTests, [], runner.name, testGlobs, reportFormat)",
           "defendedBy": [
             "test/probe-runner-identity.test.mjs"
           ],
@@ -11780,8 +11780,8 @@
           "description": "Reuse compares only the runner's name, so an upgraded runner or a global binary of the same name stands in for the measurement.",
           "faultClass": "condition-forced",
           "file": "src/probe/probe.mjs",
-          "find": "  return recorded.name === current.name && recorded.version === current.version && recorded.source === current.source\n    && recorded.commandHash === current.commandHash;",
-          "replace": "  return recorded.name === current.name && recorded.commandHash === current.commandHash;",
+          "find": "  return recorded.name === current.name && recorded.version === current.version && recorded.source === current.source\n    && recorded.commandHash === current.commandHash && recorded.reportFormat === current.reportFormat;",
+          "replace": "  return recorded.name === current.name && recorded.commandHash === current.commandHash && recorded.reportFormat === current.reportFormat;",
           "producedBy": {
             "producer": "agent",
             "by": "claude"
@@ -11837,8 +11837,8 @@
           "description": "The probe drops the resolved source before recording the runner.",
           "faultClass": "argument-swapped",
           "file": "src/probe/probe.mjs",
-          "find": "    recordedRunner = commandTemplate ? customCommandRunner(commandTemplate) : runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), runnerSource);",
-          "replace": "    recordedRunner = commandTemplate ? customCommandRunner(commandTemplate) : runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), undefined);",
+          "find": "    recordedRunner = commandTemplate ? customCommandRunner(commandTemplate, reportFormat) : runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), runnerSource);",
+          "replace": "    recordedRunner = commandTemplate ? customCommandRunner(commandTemplate, reportFormat) : runnerRecord(labelOf(runner), runnerVersion ?? readRunnerVersion(projectDir, runner.name), undefined);",
           "defendedBy": [
             "test/resource-timing.test.mjs"
           ],
@@ -20429,7 +20429,7 @@
           "description": "The evidence names the adapter, not the command, as the runner.",
           "faultClass": "other",
           "file": "src/probe/probe.mjs",
-          "find": "recordedRunner = commandTemplate ? customCommandRunner(commandTemplate) : runnerRecord(",
+          "find": "recordedRunner = commandTemplate ? customCommandRunner(commandTemplate, reportFormat) : runnerRecord(",
           "replace": "recordedRunner = commandTemplate ? runnerRecord(labelOf(runner), undefined, undefined) : runnerRecord(",
           "producedBy": {
             "producer": "agent",
@@ -20441,7 +20441,7 @@
           "description": "Reuse ignores the command hash, so a verdict measured by another command is carried forward.",
           "faultClass": "other",
           "file": "src/probe/probe.mjs",
-          "find": "    && recorded.commandHash === current.commandHash;",
+          "find": "    && recorded.commandHash === current.commandHash && recorded.reportFormat === current.reportFormat;",
           "replace": "    && true;",
           "producedBy": {
             "producer": "agent",
@@ -21116,6 +21116,270 @@
           "defendedBy": [
             "test/tsconfig-unreadable.test.mjs"
           ],
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-JUNIT-REPORT-IS-NEVER-OPTIMISTIC",
+      "statement": "A JUnit XML report (--report-format junit) is read by the same rules as a jest report: a failure is an assertion only by its structured type (or, with no type, the exact class at the head of its message), a timeout never kills, a suite that errored with no test case is a load failure, and a truncated or non-JUnit document is an error, never a pass.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #329"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/junit-report.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A message that names an assertion class overrides a type that says it is something else, so an exception is counted as an assertion.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/junit.mjs",
+          "find": "if (type !== undefined && type !== '') return isAssertionType(type);",
+          "replace": "if (type !== undefined && type !== '') return isAssertionType(type) || isAssertionType(headClass(failure.attrs.message));",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A truncated report is read for what survived instead of refused.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/junit.mjs",
+          "find": "if (truncated) throw new Error(",
+          "replace": "if (false) throw new Error(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A suite with errors and no test case is no longer a load failure, so the runner's own reason is lost.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/junit.mjs",
+          "find": "const loadFailure = cases.length === 0 && count(suite.attrs.errors) + count(suite.attrs.failures) > 0;",
+          "replace": "const loadFailure = false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A timeout type is read as an ordinary exception, so a timeout kills.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/junit.mjs",
+          "find": "...(TIMEOUT_SET.has(type) ? { failureType: 'testTimeoutFailure' } : {}),",
+          "replace": "...({}),",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "Any type that contains an assertion class name counts as one: a subclass or a lookalike is read as an assertion.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/junit.mjs",
+          "find": "typeof type === 'string' && ASSERTION_SET.has(type);",
+          "replace": "typeof type === 'string' && /AssertionError|AssertionFailedError/.test(type);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-REPORT-FORMAT-IS-PART-OF-RUNNER-IDENTITY",
+      "statement": "--report-format junit needs --runner-cmd, is recorded as run.runner.reportFormat of a custom command (never for the jest default and never for a native runner), is bound into verdict reuse and the test universe hash, and reads the report of probe, admit, sweep and replay alike.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #329"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/runner-report-format.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Reuse ignores the report format, so a measurement read as one format stands in for the other.",
+          "faultClass": "other",
+          "file": "src/probe/probe.mjs",
+          "find": "    && recorded.commandHash === current.commandHash && recorded.reportFormat === current.reportFormat;",
+          "replace": "    && recorded.commandHash === current.commandHash;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The universe hash ignores the report format.",
+          "faultClass": "other",
+          "file": "src/probe/universe.mjs",
+          "find": "...(reportFormat === 'junit' ? { reportFormat } : {}) }));",
+          "replace": "}));",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "--report-format without --runner-cmd is accepted.",
+          "faultClass": "guard-removed",
+          "file": "src/commands/runner-options.mjs",
+          "find": "if (runnerCommand === undefined) return { error: '--report-format needs",
+          "replace": "if (false) return { error: '--report-format needs",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A native runner may record a report format.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/validate.mjs",
+          "find": "if (named?.reportFormat !== undefined && named.name !== 'custom-command') {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "The runner reads a JUnit report as jest JSON, whatever was asked.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/shared.mjs",
+          "find": "const junit = commandTemplate !== undefined && reportFormat === 'junit';",
+          "replace": "const junit = false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SHARED-EXTERNAL-STATE-IS-ONE-FAULT-AT-A-TIME",
+      "statement": "A runner that declares sharedExternalState: true is probed one fault at a time in one tree, whatever fault width was asked for, and the evidence says the runner decided it; only the literal true has that effect.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/RUNNER-ADAPTER.md#sharedexternalstate"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/shared-external-state.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The declaration is ignored: the requested width is used.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/fan-out.mjs",
+          "find": "const forced = faultWorkers > 1 && runnerSharesExternalState(runners);",
+          "replace": "const forced = false;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Any defined value of the export counts, so `false` forces serial.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/fan-out.mjs",
+          "find": "runner?.sharedExternalState === true",
+          "replace": "runner?.sharedExternalState !== undefined",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The probe computes the decision and never applies it.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/probe.mjs",
+          "find": "      faultWorkers = fanOut.faultWorkers;\n",
+          "replace": "\n",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-RUNNER-ADAPTER-CONTRACT-IS-CHECKED",
+      "statement": "Every adapter the engine can select satisfies the published runner adapter contract (spec/RUNNER-ADAPTER.md), and the structural check fails on a module that does not.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/RUNNER-ADAPTER.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "spec/conformance/runner-adapter.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An adapter that names no test universe passes.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/runner-adapter.mjs",
+          "find": "if (!isFn(adapter.tests) && !isFn(adapter.discoverTests)) bad(",
+          "replace": "if (false) bad(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "An adapter that owns files without listing them passes.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/runner-adapter.mjs",
+          "find": "if (adapter.owns !== undefined && !isFn(adapter.tests)) bad(",
+          "replace": "if (false) bad(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Any extension string passes.",
+          "faultClass": "condition-forced",
+          "file": "spec/lib/runner-adapter.mjs",
+          "find": "if (!EXTENSION.test(ext)) bad(",
+          "replace": "if (false) bad(",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

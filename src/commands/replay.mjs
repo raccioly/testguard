@@ -50,6 +50,7 @@ export async function replayCommand({ projectDir, values, version, projectConfig
     serial: values.serial || workers === 1,
     commandBudget,
     runnerCommand: runner.runnerCommand,
+    reportFormat: runner.reportFormat,
     testGlobs: runner.testGlobs,
     runnerName: values.runner,
     nodeModules: values['node-modules'] ? resolve(values['node-modules']) : process.env.TESTGUARD_NODE_MODULES,

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="python tests" tests="4" failures="2" errors="1">
+  <testsuite name="pytest" errors="0" failures="2" skipped="0" tests="4" time="0.1">
+    <testcase classname="tests.test_price" name="test_member" time="0.001"/>
+    <testcase classname="tests.test_price" name="test_header_names_the_class" time="0.001">
+      <failure message="AssertionError: expected 90">def test_header_names_the_class():
+&gt;       assert price(100, True) == 90
+E       AssertionError: expected 90</failure>
+    </testcase>
+    <testcase classname="tests.test_price" name="test_bare_assert" time="0.001">
+      <failure message="assert 91 == 90">def test_bare_assert(): ...</failure>
+    </testcase>
+    <testcase classname="tests.test_price" name="test_apex_style" time="0.001">
+      <failure message="System.AssertException: Assertion Failed: Expected: 90, Actual: 91"/>
+    </testcase>
+  </testsuite>
+</testsuites>

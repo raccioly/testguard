@@ -317,13 +317,57 @@ npx testguard-cli probe . --runner-cmd "pnpm vitest run {files} --reporter=json 
 |---|---|
 | `{files}` as a word of its own | it expands to one argument per selected test file, relative to the probed directory |
 | `{out}` somewhere | TestGuard replaces it with the path of a temporary report file. You may embed it, as in `--outputFile={out}` |
-| a report written to `{out}` in the jest-compatible JSON shape | the parser reads `testResults[]` (each with `status`, `message` and `assertionResults[]` carrying `status`, `fullName` or `title`, `failureMessages`) and the top-level `numTotalTests`, `numPassedTests`, `numFailedTests` and `success`. `vitest --reporter=json` and `jest --json` write it |
+| a report written to `{out}`: the jest-compatible JSON shape, or JUnit XML with `--report-format junit` | by default the parser reads `testResults[]` (each with `status`, `message` and `assertionResults[]` carrying `status`, `fullName` or `title`, `failureMessages`) and the top-level `numTotalTests`, `numPassedTests`, `numFailedTests` and `success`. `vitest --reporter=json` and `jest --json` write it |
 
 Single and double quotes group words. TestGuard does **not** run the command
 through a shell: no pipes, no `&&`, no `VAR=value` prefix, no glob expansion.
 Use `env VAR=value <cmd>` or a script when you need any of those. The command
 runs with the probed directory as its working directory. That is the scratch
 worktree, unless you pass `--in-place`.
+
+### JUnit XML reports
+
+Most stacks that TestGuard has no adapter for write JUnit XML: Maven (Surefire
+and Failsafe), Gradle, `pytest --junitxml`, `karma-junit-reporter` and
+`sf apex run test --result-format junit`. Add `--report-format junit` (or
+`"reportFormat": "junit"` in `testguard.config.json`) and TestGuard reads that
+format at `{out}`. You do not write a converter.
+
+```bash
+npx testguard-cli probe . --runner-cmd "./tg-mvn.sh {out} {files}" --report-format junit
+```
+
+`{out}` is a path where nothing exists yet. Your command may write one XML file
+there, or create a directory there and put the reports in it. TestGuard reads
+every `.xml` file in that directory (`TEST-*.xml` and any other name), one
+level deep. It removes the file or directory after each run.
+
+| In the XML | TestGuard reads it as |
+|---|---|
+| `<testsuite>` | a test file result |
+| `<testcase>` | one test |
+| `<failure>` or `<error>` in a test case | a failed test |
+| `<skipped>` | a test that did not run: neither passed nor failed |
+| a suite with errors and no test case | a load failure. The run is an `error` and says why |
+| a suite with no test case and no error | an empty run. It is an `error`, never a pass |
+
+A failed test is an assertion when the `type` attribute of its `<failure>` or
+`<error>` is exactly one of these classes: `org.opentest4j.AssertionFailedError`,
+`java.lang.AssertionError`, `junit.framework.AssertionFailedError`,
+`AssertionFailedError`, `AssertionError` or `System.AssertException`. Any other
+type is an exception, even when its message mentions an assertion. When the
+reporter writes no `type`, TestGuard reads only the class at the head of the
+message (`System.AssertException: Expected: 1`), and only when it is one of
+those classes. A message such as `assert 1 == 2` names no class, so it is an
+exception. A timeout type (`TestTimedOutException`, `TimeoutException`,
+`TimeoutError`) is a timeout, and a timeout never kills.
+
+If your command writes no report and exits with an error (a compile error, for
+example), the run is an `error` with the last line of the command's error
+output, as for the jest format. A report that is cut short or is not a JUnit
+report is an `error` too. TestGuard never reads what it cannot read as a pass.
+The format is part of what the evidence records (`run.runner.reportFormat`), so
+changing it re-measures every fault. `--report-format` needs `--runner-cmd`.
 
 A report without a `testResults` array makes the defenders unverifiable. The
 load message says the command must emit the jest-compatible shape. A template
@@ -411,7 +455,9 @@ and the runner would look for them in the wrong place.
   Python source. Every other file is `non-source`.
 - **Built-in runners beyond Vitest, Jest, Playwright, Node's test runner and
   Python.** Others go through `--runner-cmd` and need a reporter that writes
-  the jest-compatible shape.
+  the jest-compatible shape, or JUnit XML with `--report-format junit`. The
+  contract that a new built-in adapter must meet is
+  [`spec/RUNNER-ADAPTER.md`](../../spec/RUNNER-ADAPTER.md).
 - **TypeScript, custom loaders, `NODE_OPTIONS` and module mocking under
   `node-test`.**
 - **Parallel Python runs.** Python is serial. `pytest-xdist` is disabled.

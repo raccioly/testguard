@@ -283,3 +283,4 @@ IDs, fingerprint derivation, N-run agreement and interval arithmetic.
 - [Configuration](configuration.md): the files TestGuard reads, not the ones it writes.
 - [Verdicts and signals](verdicts.md): the values inside evidence, replay and sweep documents.
 - [Gate semantics](../../spec/GATE-SEMANTICS.md): the normative rules behind the formats.
+- [Runner adapter contract](../../spec/RUNNER-ADAPTER.md): what a test-runner adapter must export and guarantee.

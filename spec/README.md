@@ -76,6 +76,15 @@ filtering/caps. Human renderings label these declarations as unauthenticated.
 Opt-in origin policy is available on complete confirmed candidate probes;
 offline projections remain audits, never current native freshness. See `GATE-SEMANTICS.md`.
 
+## Runner adapters
+
+[`RUNNER-ADAPTER.md`](RUNNER-ADAPTER.md) is the contract a test-runner adapter
+meets: the exports the probe engine reads, what each must do, and the two
+optional declarations `sharedExternalState` and `extensions`. It is a contract
+about the probe engine's own plug-in point, not a data format.
+`lib/runner-adapter.mjs` checks a module against it and
+`conformance/runner-adapter.test.mjs` holds every built-in adapter to it.
+
 ## Conformance
 
 `lib/validate.mjs` validates a document of any kind: JSON Schema first, then

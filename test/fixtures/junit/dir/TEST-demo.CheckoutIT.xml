@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="demo.CheckoutIT" time="1.204" tests="2" errors="0" skipped="0" failures="0">
+  <properties>
+    <property name="note" value="a &lt;testcase name=&quot;ghost&quot;&gt; in a property value"/>
+  </properties>
+  <testcase name="checkoutTotals" classname="demo.CheckoutIT" time="0.9"/>
+  <testcase name="checkoutRoundsUp" classname="demo.CheckoutIT" time="0.3">
+    <system-out><![CDATA[<testcase name="ghost"><failure message="x"/></testcase> printed by the code under test]]></system-out>
+  </testcase>
+  <!-- <testcase name="commented-out"><failure/></testcase> -->
+</testsuite>

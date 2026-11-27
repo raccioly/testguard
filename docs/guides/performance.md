@@ -260,6 +260,11 @@ default. The evidence records which one applied (`run.faultWorkersSource`, and
   honesty. Lower n, or keep `--budget` close to what a healthy run needs.
 - Each tree is one more checkout on disk (`node_modules` is linked, not
   copied). `--in-place` has one tree, so it probes one fault at a time.
+- A runner that shares one external resource between runs (an org, a server)
+  declares `sharedExternalState` in its adapter. TestGuard then probes one
+  fault at a time in one tree, whatever width you ask for, and says so. The
+  evidence records `run.faultWorkersSource: "runner"`. See the
+  [runner adapter contract](../../spec/RUNNER-ADAPTER.md).
 - A fan-out of any width reuses another fan-out's evidence, so a laptop and
   CI share it. A run that asked for one fault at a time never reuses it.
 - Two probes of the same repository at once are safe. Scratch-worktree

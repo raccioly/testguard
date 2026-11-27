@@ -29,14 +29,16 @@ export function hashNativeTestUniverse(manifests) {
  * The adapter (`--runner`, vitest under `auto`) is bound too: it reads the
  * command's report and chooses the negative control's edit, so another adapter
  * is another measurement even though the evidence names only the command.
+ * So is the report format (`--report-format junit`, #329): a failure is read by another rule.
  *
  * The `--test-glob` patterns are bound as well (#332), sorted so the order
  * typed is not a change. A run without them hashes exactly as it did before
  * the option existed, so verdicts measured then stay reusable.
  */
-export function hashCustomCommandUniverse(files, commandTemplate, adapter, testGlobs = []) {
+export function hashCustomCommandUniverse(files, commandTemplate, adapter, testGlobs = [], reportFormat) {
   const globs = normalizeTestGlobs(testGlobs);
-  return sha256(JSON.stringify({ schemaVersion: 3, source: 'custom-command-static', adapter, command: commandTemplate, files, ...(globs.length ? { testGlobs: globs } : {}) }));
+  // JUnit is part of the measurement (it decides what a failure is); the jest default is not written, so every earlier hash holds.
+  return sha256(JSON.stringify({ schemaVersion: 3, source: 'custom-command-static', adapter, command: commandTemplate, files, ...(globs.length ? { testGlobs: globs } : {}), ...(reportFormat === 'junit' ? { reportFormat } : {}) }));
 }
 
 /** Shared owning-adapter collection; check failures retain existing probe semantics. */

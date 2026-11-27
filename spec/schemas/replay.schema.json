@@ -57,6 +57,10 @@
             },
             "version": {
               "type": "string"
+            },
+            "reportFormat": {
+              "description": "`junit` when a custom command's report was read as JUnit XML (`--report-format junit`); absent for the jest-compatible default.",
+              "enum": ["junit"]
             }
           },
           "additionalProperties": false

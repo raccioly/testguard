@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="demo.BrokenTest" time="0.01" tests="0" errors="1" skipped="0" failures="0">
+  <error message="Could not initialize class demo.Config" type="java.lang.NoClassDefFoundError">java.lang.NoClassDefFoundError: Could not initialize class demo.Config
+	at demo.BrokenTest.&lt;clinit&gt;(BrokenTest.java:3)
+</error>
+</testsuite>

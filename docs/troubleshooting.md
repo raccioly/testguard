@@ -115,7 +115,7 @@ own runner ignores.
 ### Using a runner TestGuard does not know
 
 Use `--runner-cmd` with `{files}` and `{out}` placeholders and a
-jest-compatible JSON report. See
+jest-compatible JSON report, or JUnit XML with `--report-format junit`. See
 [languages and runners](reference/languages-and-runners.md).
 
 ## Probing

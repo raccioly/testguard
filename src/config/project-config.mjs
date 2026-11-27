@@ -30,7 +30,7 @@ export { CONFIG_FILE };
 
 /** Each key and the flag it stands for. */
 export const CONFIG_FLAGS = Object.freeze({
-  runner: 'runner', runnerCmd: 'runner-cmd', testGlobs: 'test-glob', python: 'python', nodeModules: 'node-modules', typecheck: 'typecheck',
+  runner: 'runner', runnerCmd: 'runner-cmd', reportFormat: 'report-format', testGlobs: 'test-glob', python: 'python', nodeModules: 'node-modules', typecheck: 'typecheck',
   workers: 'workers', faultWorkers: 'fault-workers', confirm: 'confirm', budget: 'budget',
 });
 

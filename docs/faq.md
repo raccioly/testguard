@@ -57,7 +57,7 @@ blast radius instead.
 JavaScript and TypeScript run under vitest, jest, Playwright and Node's
 built-in test runner. Python runs under pytest or stdlib `unittest`. Anything
 else runs through `--runner-cmd` if it can write a jest-compatible JSON
-report. See [languages and runners](reference/languages-and-runners.md).
+report or JUnit XML (`--report-format junit`). See [languages and runners](reference/languages-and-runners.md).
 
 ### Do I need claims for the whole codebase first?
 
