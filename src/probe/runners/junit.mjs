@@ -225,9 +225,17 @@ function readBounded(path, budget) {
  * Read the report at `path`: one XML file, or a directory of them
  * (`TEST-*.xml` and any other `*.xml`, one level, sorted by name; a link or a
  * file that is not `.xml` is ignored). Bounded in bytes and in files.
+ *
+ * An array is a list of XML files to read together (a Maven build writes one
+ * directory per module); the caller chose each one, so none is searched for.
  */
 export function readJunitReport(path, { maxBytes = MAX_JUNIT_BYTES, maxFiles = MAX_JUNIT_FILES } = {}) {
   const budget = { left: maxBytes, max: maxBytes };
+  if (Array.isArray(path)) {
+    if (path.length === 0) throw new Error('no JUnit XML report file was given');
+    if (path.length > maxFiles) throw new Error(`more than ${maxFiles} JUnit XML report files`);
+    return junitToReport(path.map((file) => readBounded(file, budget)));
+  }
   const stat = lstatSync(path);
   let files;
   if (stat.isDirectory()) {

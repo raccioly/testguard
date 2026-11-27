@@ -104,11 +104,13 @@ probe
                        append-only lines everywhere else, so a redirected log and CI see progress
                        instead of twenty silent minutes. Always on stderr; ndjson also streams verdicts
                        --confirm below 3 is PROVISIONAL: verdicts print with "?", evidence goes to .testguard/evidence-provisional.json
-  --runner <name>      vitest | jest | playwright | python | pytest | unittest | node-test | auto
+  --runner <name>      vitest | jest | playwright | python | pytest | unittest | node-test | maven | gradle | karma | auto
                        (default: auto — first of vitest, jest, python that resolves. A defender under playwright's testDir
                        always runs under playwright, and a .py defender always under python, whatever the project runner.
                        python picks pytest when the interpreter can import it and stdlib unittest otherwise; pytest and
-                       unittest pin that choice and fail rather than fall back. The engine that ran is what the evidence records.)
+                       unittest pin that choice and fail rather than fall back. The engine that ran is what the evidence records.
+                       maven, gradle and karma run a JVM or Angular project through its own build tool and read the JUnit XML it
+                       writes; they are explicit only, and auto never picks them.)
   --runner-cmd "<cmd>" custom runner; must contain {files} and {out}, e.g. "pnpm vitest run {files} --reporter=json --outputFile={out}"
   --report-format <f>  how a --runner-cmd report is read: jest (default; the jest-compatible JSON) or junit (JUnit XML, one file or a
                        directory of TEST-*.xml / *.xml at {out}: Maven Surefire and Failsafe, Gradle, pytest --junitxml,

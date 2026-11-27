@@ -337,8 +337,16 @@ export function parseReport(report, durationMs, kinds) {
  * timeout; only killing the process ends it. `argv(files, outFile)` is the
  * runner's command line; `command` (tests) or `commandTemplate` (--runner-cmd)
  * override it.
+ *
+ * `collect` is for a runner whose reports are written by the build, not to
+ * `{out}` (Maven and Gradle write XML under the module). When the process
+ * ends on its own, it is called with `{ code, signal, exit, stdout, stderr,
+ * durationMs, startedAt }` and returns the run result; a throw is an
+ * unreadable report, as for any other parser. It is ignored under a
+ * `commandTemplate`, where `{out}` keeps its meaning. `captureStdout` keeps
+ * the last 64 KiB of stdout for it: a build prints its compile errors there.
  */
-export function runProcess({ projectDir, files, budgetMs = 120_000, command, commandTemplate, argv, env = {}, parse = parseReport, reportFormat = 'jest', cleanupOnClose = false, graceMs = BUDGET_GRACE_MS, processList = processRows }) {
+export function runProcess({ projectDir, files, budgetMs = 120_000, command, commandTemplate, argv, env = {}, parse = parseReport, reportFormat = 'jest', cleanupOnClose = false, graceMs = BUDGET_GRACE_MS, processList = processRows, collect, captureStdout = false }) {
   assertNotCancelled();
   const junit = commandTemplate !== undefined && reportFormat === 'junit';
   const outFile = join(scratchRoot(), `testguard-run-${randomBytes(6).toString('hex')}.${junit ? 'xml' : 'json'}`);
@@ -354,6 +362,8 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
     child.once('close', scope.dispose);
     registerChild(child, () => terminateProcessTree(child));
     child.stdout.resume(); // Reports are read from the file; drain logs to prevent pipe backpressure.
+    let stdout = '';
+    if (captureStdout) child.stdout.on('data', (d) => (stdout = (stdout + d).slice(-65536)));
     let stderr = '';
     // Node prints MODULE_TYPELESS_PACKAGE_JSON (and friends) for the PROBED
     // project's config, not for anything the fault did. Keep it out of the
@@ -419,7 +429,13 @@ export function runProcess({ projectDir, files, budgetMs = 120_000, command, com
       const durationMs = Date.now() - started;
       if (cleanupOnClose) terminateProcessTree(child);
       let result;
-      if (!existsSync(outFile)) {
+      if (collect && commandTemplate === undefined) {
+        try {
+          result = collect({ code, signal, exit, stdout, stderr, durationMs, startedAt: started });
+        } catch (e) {
+          result = { run: { ...noRun('error'), durationMs }, timeouts: 0, loadMessage: `unreadable report: ${e.message}`, failedTests: [] };
+        }
+      } else if (!existsSync(outFile)) {
         result = { run: { ...noRun('error'), durationMs }, timeouts: 0, loadMessage: stderr.trim().split('\n').filter(Boolean).slice(-1)[0] ?? `runner produced no report (exited with ${exit})`, failedTests: [] };
       } else {
         try {

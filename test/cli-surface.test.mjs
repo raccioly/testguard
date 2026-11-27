@@ -11,7 +11,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { main, commandUsage, USAGE } from '../src/cli.mjs';
-import { SOURCE_EXT, explainExclusions, DEFAULT_EXCLUDES } from '../src/gate/changed.mjs';
+import { SOURCE_EXT, BUILD_SOURCE, explainExclusions, DEFAULT_EXCLUDES } from '../src/gate/changed.mjs';
+import { RUNNER_NAMES } from '../src/probe/runners/index.mjs';
 import { validate } from '../spec/lib/validate.mjs';
 import { FIXTURE_GIT } from './helpers/git.mjs';
 
@@ -197,5 +198,23 @@ describe('a usage error says what was wrong in one line, never the whole help (#
       expect(err).toHaveLength(2);
       expect(err[1]).toBe("Run 'testguard --help' for usage.");
     }
+  });
+});
+
+describe('the --runner help line is the list of runners the CLI accepts (#329)', () => {
+  it('names every runner, in the order of RUNNER_NAMES, then auto', () => {
+    const line = /--runner <name>\s+([^\n]+)/.exec(USAGE)[1];
+    expect(line.split('|').map((v) => v.trim())).toEqual([...RUNNER_NAMES, 'auto']);
+  });
+
+  it('says maven, gradle and karma are explicit only', () => {
+    const block = USAGE.slice(USAGE.indexOf('--runner <name>'), USAGE.indexOf('--runner-cmd'));
+    expect(block).toMatch(/maven, gradle and karma[\s\S]*explicit only[\s\S]*auto never picks them/);
+  });
+
+  it('gate --explain names the languages that are source only under a build file', () => {
+    const text = explainExclusions().join('\n');
+    for (const language of BUILD_SOURCE) expect(text).toContain(language.name);
+    expect(text).toMatch(/pom\.xml or Gradle build file/);
   });
 });

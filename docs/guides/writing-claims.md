@@ -580,11 +580,24 @@ npx testguard-cli scaffold src/auth.ts --json                  # print the draft
 | `element-removed` | a one-line JSX element, self-closing or paired, removed |
 | `handler-dropped` | an `on<Event>={…}` prop removed: the control renders and does nothing |
 
-`scaffold` has producers for JavaScript, TypeScript and Python only. For any
-other extension (`.java`, `.xml`, `.dwl`, and so on) it proposes nothing, writes
-no draft, and prints a line such as `scaffold has no producers for .java`. It
-still exits 0. TestGuard also cannot find defenders for those files, so write
-the faults by hand and declare `defendedBy`.
+`scaffold` has producers for JavaScript, TypeScript, Python and, in a project
+built with Maven or Gradle (a `pom.xml` or Gradle build file above the file),
+Java. For any other extension (`.kt`, `.xml`, `.dwl`, a `.java` file with no
+build file, and so on) it proposes nothing, writes no draft, and prints a line
+such as `scaffold has no producers for .kt`. It still exits 0. TestGuard also
+cannot find defenders for those files, so write the faults by hand and declare
+`defendedBy`.
+
+For Java the shapes are `condition-forced` (`if (x) {` to `if (false) {` and to
+`if (true) {`), `statement-deleted` (a one-line `if (...) return|throw|continue|break;`
+guard, null guards included), `call-removed` (`requireNonNull`),
+`return-altered` (a returned literal changed, or a boolean check made
+`return true;`), `literal-changed` (a boolean literal flipped) and
+`argument-swapped`. The swapped argument is `null`, never `undefined`, and only
+for a parameter of a reference type. A Java draft has no `defendedBy`: declare
+the JUnit test classes yourself, because TestGuard cannot read Java imports.
+`scaffold --into` and `scaffold --fix` accept JavaScript, TypeScript and Python
+files only.
 
 `scaffold` reads **Python** too and proposes the same classes in Python
 syntax: `if <guard>:` → `if False:`, `return <check>` → `return True`,

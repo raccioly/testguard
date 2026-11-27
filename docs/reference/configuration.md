@@ -295,7 +295,7 @@ plain `testguard probe` runs the tests correctly everywhere. Schema:
 
 | Key | Flag it stands for | Value |
 |---|---|---|
-| `runner` | `--runner` | `vitest`, `jest`, `playwright`, `python`, `pytest`, `unittest`, `node-test` or `auto` |
+| `runner` | `--runner` | `vitest`, `jest`, `playwright`, `python`, `pytest`, `unittest`, `node-test`, `maven`, `gradle`, `karma` or `auto` |
 | `runnerCmd` | `--runner-cmd` | a command containing `{files}` and `{out}`, run as an argv, never through a shell. A reporter file path in it (`--test-reporter=./tools/reporter.mjs`) must start with `./` or be absolute, because Node reads a bare value as a package name |
 | `reportFormat` | `--report-format` | `jest` (the default) or `junit`: how the report of a `runnerCmd` is read. It needs a command, from this file or from `--runner-cmd` |
 | `testGlobs` | `--test-glob` | a non-empty list of distinct globs, relative to the project directory and written with `/` (`"src/test/**/*Test.java"`). They name the tests of a `runnerCmd` suite that no built-in glob lists, so escalation can ask them. The list needs a custom command, from `runnerCmd` or `--runner-cmd`. A `--test-glob` you type replaces the whole list |

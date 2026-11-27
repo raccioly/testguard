@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
-import { extname, join } from 'node:path';
+import { join } from 'node:path';
 import { git } from '../git.mjs';
-import { SOURCE_EXT, isDefaultExcluded, isTestFile, nestedProjectResolver, unsupportedLanguage, tallyLanguages } from '../gate/changed.mjs';
+import { isDefaultExcluded, isTestFile, nestedProjectResolver, sourceClassifier, tallyLanguages } from '../gate/changed.mjs';
 import { walk } from '../util/glob.mjs';
 
 export const HISTORY_COMMITS = 200;
@@ -25,9 +25,10 @@ function listedFiles(projectDir) {
 
 function claimableModules(projectDir) {
   const ownerOf = nestedProjectResolver(projectDir);
+  const sources = sourceClassifier(projectDir);
   return listedFiles(projectDir).filter((file) =>
     existsSync(join(projectDir, file)) &&
-    SOURCE_EXT.has(extname(file)) &&
+    sources.probeable(file) &&
     !isTestFile(file) &&
     !isDefaultExcluded(file) && !ownerOf(file));
 }
@@ -40,9 +41,10 @@ function claimableModules(projectDir) {
  */
 function unsupportedModules(projectDir) {
   const ownerOf = nestedProjectResolver(projectDir);
+  const sources = sourceClassifier(projectDir);
   const ids = [];
   for (const file of listedFiles(projectDir)) {
-    const language = unsupportedLanguage(file);
+    const language = sources.unsupported(file);
     if (language && existsSync(join(projectDir, file)) && !isDefaultExcluded(file) && !ownerOf(file)) ids.push(language.id);
   }
   return tallyLanguages(ids);

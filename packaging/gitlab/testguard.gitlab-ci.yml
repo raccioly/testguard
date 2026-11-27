@@ -58,8 +58,8 @@ spec:
       type: boolean
       default: false
     runner:
-      description: "probe: vitest | jest | playwright | python | pytest | unittest | node-test | auto. `python` picks pytest when the interpreter can import it and stdlib unittest otherwise; `pytest`/`unittest` pin that choice and fail rather than fall back. The default Node image has no Python — set `image` to one that does before probing a Python project."
-      options: [vitest, jest, playwright, python, pytest, unittest, node-test, auto]
+      description: "probe: vitest | jest | playwright | python | pytest | unittest | node-test | maven | gradle | karma | auto. `python` picks pytest when the interpreter can import it and stdlib unittest otherwise; `pytest`/`unittest` pin that choice and fail rather than fall back. The default Node image has no Python — set `image` to one that does before probing a Python project."
+      options: [vitest, jest, playwright, python, pytest, unittest, node-test, maven, gradle, karma, auto]
       default: "auto"
     python:
       description: "probe: Python interpreter for .py defenders (default: $VIRTUAL_ENV, then the project .venv/venv, then python3 on PATH)"

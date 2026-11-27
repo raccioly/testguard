@@ -103,7 +103,7 @@ What is gated instead:
 | `src/probe/probe.mjs` | `test/probe.fixture.test.mjs`, `test/probe-preconditions.test.mjs`, `test/probe-error.test.mjs`, `test/fault-defenders.test.mjs` |
 | `src/probe/discover.mjs`, `src/probe/mocks.mjs` | `test/discover.test.mjs`, `test/mocks.test.mjs` |
 | `src/probe/rank.mjs` | `test/rank-aliases.test.mjs`, `test/discover.test.mjs` |
-| `src/probe/runners/` | `test/runner-vitest.test.mjs`, `test/runner-command.test.mjs`, `test/runner-playwright.test.mjs` |
+| `src/probe/runners/` | `test/runner-vitest.test.mjs`, `test/runner-command.test.mjs`, `test/runner-playwright.test.mjs`, `test/runner-jvm.test.mjs`, `test/runner-maven.test.mjs`, `test/runner-gradle.test.mjs`, `test/runner-karma.test.mjs` |
 | `src/probe/attribution.mjs` | `test/attribution.test.mjs` |
 | `src/probe/cost.mjs` | `test/cost.test.mjs` |
 | `src/probe/progress.mjs` | `test/progress.test.mjs` |
