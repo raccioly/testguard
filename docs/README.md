@@ -1,10 +1,9 @@
 # TestGuard documentation
 
 TestGuard breaks your code on purpose and reports every promise your tests did
-not notice breaking. These pages take you from a first run to a gate in CI,
-whether you are starting a project or adding TestGuard to one that already
-has thousands of tests. The [README](../README.md) is the one-page overview;
-everything below goes deeper.
+not notice breaking. These pages take you from a first run to a gate in CI.
+They fit a new project and a project that already has thousands of tests. The
+[README](../README.md) is the one-page overview. The pages below go deeper.
 
 ## Start here
 
@@ -15,11 +14,11 @@ everything below goes deeper.
 | Add it to a codebase that already has tests | [Adopting TestGuard in an existing project](guides/existing-projects.md) |
 | Start a new project with it from the first commit | [New projects](guides/new-projects.md) |
 | Check whether your language and test runner are supported | [Languages and runners](reference/languages-and-runners.md) |
-| Understand the idea before installing anything | [How it works](concepts/how-it-works.md) |
+| Understand the idea before you install anything | [How it works](concepts/how-it-works.md) |
 
 ## Guides
 
-Task-oriented pages: one goal each, with the commands in order.
+Each guide has one goal and gives the commands in order.
 
 - [Adopting TestGuard in an existing project](guides/existing-projects.md): gate the delta, claim the risky surface, baseline the rest
 - [New projects](guides/new-projects.md): claims before code
@@ -34,12 +33,12 @@ Task-oriented pages: one goal each, with the commands in order.
 
 ## Reference
 
-Exact facts, checked against the code by `test/docs.test.mjs`.
+Exact facts. `test/docs.test.mjs` checks them against the code.
 
 - [CLI](reference/cli.md): every command, every flag, exit codes
 - [Languages and runners](reference/languages-and-runners.md): the support matrix
 - [Configuration](reference/configuration.md): `testguard.claims.json`, `testguard.ignore.json`, concerns and environment variables
-- [Verdicts](reference/verdicts.md): what each result means and the one acceptable fix
+- [Verdicts](reference/verdicts.md): what each verdict means and the one acceptable fix
 - [Artifacts](reference/artifacts.md): every file TestGuard writes, what to commit, and the JSON Schemas
 - [MCP server](reference/mcp.md): the read-only tools for agent harnesses
 - [GATE-SEMANTICS.md](../spec/GATE-SEMANTICS.md): the normative rules for when CI goes red
@@ -55,9 +54,9 @@ Exact facts, checked against the code by `test/docs.test.mjs`.
 
 ## Translations
 
-The README and the quickstart are translated. English is authoritative; each
-translation names the release it was translated from, and its commands and
-output are the English blocks, unchanged.
+The README and the quickstart are translated. English is the authoritative
+version. Each translation names the release it was translated from. Its
+commands and output are the English blocks, unchanged.
 
 | Language | README | Quickstart |
 |---|---|---|
@@ -68,7 +67,7 @@ output are the English blocks, unchanged.
 ## Contributing to the docs
 
 A page that is wrong is a bug. [Open a documentation issue](https://github.com/raccioly/testguard/issues/new?template=documentation.md)
-or send a pull request; see [CONTRIBUTING.md](../CONTRIBUTING.md). Every
-command, flag and file name on these pages must match the code, and
-`npm test` fails when a CLI command, a runner, a CI input, a verdict or a
-status state is missing from its reference page, or when a link breaks.
+or send a pull request. See [CONTRIBUTING.md](../CONTRIBUTING.md). Every
+command, flag and file name on these pages must match the code. `npm test`
+fails when a CLI command, a runner, a CI input, a verdict or a status state is
+missing from its reference page. It also fails when a link breaks.

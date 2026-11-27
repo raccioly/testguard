@@ -1,11 +1,11 @@
 # Replay: would this suite have caught the bugs that already escaped?
 
-An injected fault is a fault somebody thought of. A bug that actually shipped
-is ground truth: a human already confirmed it was a defect, and there is no
-equivalent-mutant argument to have about it. `replay` puts real escaped bugs
-back into the code, one at a time, and asks whether the tests that existed
-noticed. This guide is for a post-mortem, for a team deciding how much to
-trust its suite, and for anyone reading a calibration document.
+An injected fault is a fault that somebody thought of. A bug that actually
+shipped is ground truth. A human already confirmed it was a defect, so there is
+no equivalent-mutant argument to have about it. `replay` puts real escaped bugs
+back into the code, one at a time. It asks whether the tests that existed
+noticed. This guide is for a post-mortem, for a team that decides how much to
+trust its suite, and for anyone who reads a calibration document.
 
 ## Run it
 
@@ -14,20 +14,21 @@ npx testguard-cli replay . --since HEAD~50..HEAD --max 10   # the last 50 commit
 npx testguard-cli replay . --since v1.4.0..HEAD             # everything since a release
 ```
 
-`--since` is required and takes any range `git log` accepts. A single ref such
-as a tag means every commit reachable from it, not the commits after it; use
-`<tag>..HEAD` for those.
+`--since` is required and takes any range that `git log` accepts. A single ref
+such as a tag means every commit reachable from it, not the commits after it.
+For the commits after it, use `<tag>..HEAD`.
 
 **`replay` reports and never gates.** It exits `0` whenever it completes,
-whatever it found: a bug that escaped is history, not a regression in this
+whatever it found. A bug that escaped is history, not a regression in this
 change, and a gate on history is a gate nobody can pass. It exits `2` when
-the range cannot be read or holds no fix commit, and `3` without `--since`.
+it cannot read the range or the range holds no fix commit. It exits `3`
+without `--since`.
 
 ## How fix commits are chosen
 
 A **fix commit** is a non-merge commit in the range that changes source
 **and** a test together. That pairing is the signal that a human confirmed a
-defect: someone changed behaviour and shipped a test for it.
+defect. Someone changed behavior and shipped a test for it.
 
 - Source is a `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, `.cts` or
   `.py` file that is not a test.
@@ -39,42 +40,43 @@ defect: someone changed behaviour and shipped a test for it.
   A commit whose source-and-test pair lies in another package is skipped.
 
 **One patch counts once.** A dual-branch topology carries the same fix under
-two or three shas, and counting it twice corrupts the corpus the calibration
-is computed from. Candidates are de-duplicated by `git patch-id --stable`;
-the summary says how many were dropped.
+two or three shas. Counting it twice corrupts the corpus that the calibration
+uses. `git patch-id --stable` removes duplicate candidates. The summary says
+how many it dropped.
 
-`--max <n>` keeps the first n unique fixes, newest first. It defaults to `20`,
+`--max <n>` keeps the first n unique fixes, newest first. It defaults to `20`
 because each fix costs a scratch worktree and N test runs.
 
 ## What happens to each fix
 
-In a scratch git worktree (your tree is never touched), at the fix commit:
+`replay` works in a scratch git worktree, at the fix commit. It never touches
+your tree. For each fix, it does these steps:
 
-1. **Revert only the source** to the fix's parent. A source file the fix
-   added is removed, because it did not exist before.
+1. **Revert only the source** to the fix's parent. Remove a source file that
+   the fix added, because it did not exist before.
 2. **Delete the test files the fix shipped**, whole. That test proves nothing
-   about what the suite knew before it existed.
-3. **Find what remains that could notice**: the test files that import a
-   reverted source file, resolved the same way as probe's defender discovery
-   (JavaScript imports and aliases, Python module names).
-4. **Run them N times** (`--confirm`, default `3`) and classify.
+   about what the suite knew before the test existed.
+3. **Find the remaining tests that could notice**: the test files that import
+   a reverted source file. Replay resolves them the same way as probe's
+   defender discovery (JavaScript imports and aliases, Python module names).
+4. **Run them N times** (`--confirm`, default `3`) and classify the result.
 
 | Verdict | Meaning |
 |---|---|
 | `caught` | a remaining test failed by assertion, in every run. The suite knew. |
-| `blind` | the suite stayed green on known-broken code. |
-| `nocover` | no test imports the reverted files — worse than blind. |
-| `flaky` | the runs disagreed, so nothing can be concluded. A flaky failure reads as detection, which biases this metric *optimistically*; mixed runs are never `caught`. |
+| `blind` | the suite stayed green on code known to be broken. |
+| `nocover` | no test imports the reverted files. This is worse than blind. |
+| `flaky` | the runs disagreed, so you can conclude nothing. A flaky failure looks like detection, which biases this metric *optimistically*. Mixed runs are never `caught`. |
 | `unverifiable` | the measurement failed; the reason says how. |
 
 The `unverifiable` reasons:
 
 | Reason | What happened |
 |---|---|
-| `no-prior-version` | every source file is new in this commit: it adds behaviour rather than correcting it, so there was nothing to be blind to |
+| `no-prior-version` | every source file is new in this commit. The commit adds behavior and does not correct it, so there was nothing to be blind to |
 | `revert-did-not-apply` | the source could not be put back to the parent |
-| `the-fix-shipped-the-only-test-file` | deleting the fix's test files left no test at all. Deleting a whole file can take older tests with it, and charging the project a miss for evidence the method destroyed would be wrong |
-| `defender-discovery-indeterminate` | an import could not be resolved safely, so "no test imports this" cannot be claimed |
+| `the-fix-shipped-the-only-test-file` | deleting the fix's test files left no test at all. Deleting a whole file can remove older tests with it. It would be wrong to charge the project a miss for evidence that the method destroyed |
+| `defender-discovery-indeterminate` | replay could not resolve an import safely, so it cannot claim that "no test imports this" |
 | `suite-failed-to-load` | the remaining tests did not load |
 | `timed-out` | a run exceeded `--budget` |
 | `failed-without-an-assertion` | every run failed, but not by an assertion |
@@ -95,14 +97,14 @@ replay: …/.testguard/replay.json
 calibration: …/.testguard/calibration.json
 ```
 
-Every fix that was not caught gets a line; caught fixes are only counted.
+Every fix that was not caught gets a line. Replay only counts caught fixes.
 
 ## Fault classes: the join key
 
-Each replayed bug is labelled with the injected-fault class its diff most
-resembles, read from the fix's **source** diff only (a test diff describes
-what was asserted, not what was broken). A fix adds what the bug lacked, so
-added lines weigh twice as much as removed ones.
+Replay gives each replayed bug the label of the injected-fault class that its
+diff most resembles. It reads only the fix's **source** diff. A test diff
+describes what the test asserted, not what was broken. A fix adds what the bug
+lacked, so added lines weigh twice as much as removed ones.
 
 | Label | The fix mostly… |
 |---|---|
@@ -116,16 +118,16 @@ added lines weigh twice as much as removed ones.
 | `other` | none of these shapes |
 
 When two shapes score the same, the more specific one wins, in the order of
-this table. An honest `other` is worth more than a confident wrong label. The label is the
-join key that turns an uninterpretable mutation score into a statement with a
-sample size: "when a real bug of this class escapes, how often does the suite
-miss it?"
+this table. An honest `other` is worth more than a confident wrong label. The
+label is the join key. It turns a mutation score that you cannot interpret into
+a statement with a sample size: "when a real bug of this class escapes, how
+often does the suite miss it?"
 
 ## Reading the calibration
 
 `replay` writes two documents: `.testguard/replay.json` (or `--out`) and
-`calibration.json` beside it. `init` gitignores both; they are regenerated
-per run.
+`calibration.json` beside it. `init` gitignores both. Each run regenerates
+them.
 
 ```json
 {
@@ -145,40 +147,41 @@ per run.
 }
 ```
 
-- **`p` is a miss rate**: the share of escaped bugs of that class the suite
-  did not catch (`positives / n`). A high `p` is bad.
-- **`ci` is the 95% Wilson score interval** around `p`. With `n = 2` it spans
-  most of the range; that is the point of printing it. Do not quote a `p`
+- **`p` is a miss rate**: the share of escaped bugs of that class that the
+  suite did not catch (`positives / n`). A high `p` is bad.
+- **`ci` is the 95% Wilson score interval** around `p`. With `n = 2`, it spans
+  most of the range. That is why replay prints it. Do not quote a `p`
   without its `n` and `ci`.
 - **Which verdicts count.** `caught`, `blind` and `nocover` are measurements
-  and enter the ratio, `nocover` as a miss: leaving it out would score a
-  project with no tests for a subsystem *better* than one with weak tests.
-  `flaky` and `unverifiable` are failed measurements and enter neither side.
-- **Which commits count** is recorded in `source.detail.candidateRule`. When
-  most replayed subjects use conventional-commit types, the rule is
-  `conventional-fix` and only `fix:` and `revert:` commits enter the
-  calibration: a reverted feature is not an escaped bug. A conventional
-  repository with no `fix:` in range yields an empty calibration and a message
-  to widen the range, never a fallback to counting features. Otherwise the
-  rule is `source-and-test` and every measured commit counts, because a fix
-  cannot be told from a feature. Two calibrations computed under different
-  rules are different populations; do not merge them.
+  and enter the ratio. `nocover` counts as a miss. If you left it out, a
+  project with no tests for a subsystem would score *better* than one with weak
+  tests. `flaky` and `unverifiable` are failed measurements. They enter neither
+  side.
+- **Which commits count** is recorded in `source.detail.candidateRule`. Say
+  most replayed subjects use conventional-commit types. Then the rule is
+  `conventional-fix`, and only `fix:` and `revert:` commits enter the
+  calibration. A reverted feature is not an escaped bug. A conventional
+  repository with no `fix:` in range gives an empty calibration and a message
+  to widen the range. It never falls back to counting features. Otherwise the
+  rule is `source-and-test`, and every measured commit counts, because you
+  cannot tell a fix from a feature. Two calibrations that use different
+  rules are different populations. Do not merge them.
 - **`caveat`** is the sentence to show beside any number you quote.
 
-Every `p` and `ci` is recomputable from `n` and `positives`, and the spec's
-validator recomputes them; the schema is
+You can recompute every `p` and `ci` from `n` and `positives`, and the spec's
+validator recomputes them. The schema is
 [`spec/schemas/calibration.schema.json`](../../spec/schemas/calibration.schema.json).
 
-A first run is expected to be high: every replayed bug is, by construction,
-one the suite missed. The number to move is this one, over time.
+Expect a high number on a first run. Every replayed bug is, by construction,
+one that the suite missed. The number to move is this one, over time.
 
 ## The open question this exists to answer
 
 Does a calibration learned on a repository *with* history transfer to a
 greenfield one that has none? AI-authored code has no history, so replay
-cannot help it directly, and calibration is the only bridge. That transfer is
-unproven. It is the core product bet, and `replay` is the instrument for
-testing it — not the answer.
+cannot help it directly. Calibration is the only bridge. That transfer is
+unproven. It is the core product bet. `replay` is the tool for testing it,
+not the answer.
 
 ## Flags
 
@@ -197,9 +200,8 @@ testing it — not the answer.
 | `--out <path>` | `.testguard/replay.json` | the replay document; the calibration is written beside it |
 | `--json` | off | print `{ replay, calibration, paths }` instead of the summary |
 
-Replay is slow — one worktree and N runs per fix — so
-start with a small `--max`, and see [Performance](performance.md) for
-budgets.
+Replay is slow because it uses one worktree and N runs per fix. Start with a
+small `--max`. See [Performance](performance.md) for budgets.
 
 ## Next
 

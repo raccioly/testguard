@@ -1,15 +1,17 @@
 # Monorepos
 
-This guide is for a repository that holds more than one package: how
-TestGuard decides where one project ends and the next begins, how to install
-the agent layer once for several projects, how the scratch worktree finds a
-workspace's dependencies, and how to run one CI leg per package.
+This guide is for a repository that holds more than one package. It explains
+how TestGuard decides where one project ends and the next begins. It shows how
+to install the agent layer once for several projects. It explains how the
+scratch worktree finds a workspace's dependencies. It shows how to run one CI
+leg per package.
 
 ## A claims file makes a project
 
 A TestGuard project is a directory that contains a `testguard.claims.json`.
-Each one is separate: its own claims, its own `.testguard/` evidence and
-baseline, its own gate. Nothing is merged across projects.
+Each project is separate. It has its own claims, its own `.testguard/`
+evidence and baseline, and its own gate. TestGuard merges nothing across
+projects.
 
 ```
 .
@@ -35,7 +37,7 @@ directory as the project, so run them from inside the package.
 
 ### What the parent does with a nested project
 
-A parent project never evaluates files that belong to a nested one. `gate`
+A parent project never evaluates files that belong to a nested project. `gate`
 reports them as **delegated** and names the command that does evaluate them:
 
 ```
@@ -46,39 +48,39 @@ delegated  1 file(s) belong to the TestGuard project at packages/billing/; run t
 ```
 
 Delegated files neither pass nor fail the parent's gate. The line says
-"child coverage has not been evaluated here" because that is the truth: run
-the child's gate too, which the CI matrix below does. With `--strict`, a change
-whose every file was excluded or delegated fails the parent's gate rather than
-passing with a note.
+"child coverage has not been evaluated here" because that is true. Run the
+child's gate too. The CI matrix below does this. With `--strict`, a change
+whose every file was excluded or delegated fails the parent's gate. Without
+it, the change passes with a note.
 
-The same boundary applies elsewhere: the `@claim` annotation scan behind
-`claims` and `status` skips nested projects, and so does the module surface
+The same boundary applies elsewhere. The `@claim` annotation scan behind
+`claims` and `status` skips nested projects. So does the module surface that
 `status` reports.
 
 A nested claims file must be a regular file, not a symlink, and must be valid.
-If it is not, the parent's `gate` stops with exit `2` instead of guessing
-where the boundary is.
+If it is not, the parent's `gate` stops with exit `2`. It does not guess where
+the boundary is.
 
-`init` does not create a claims file, so a directory becomes a separate
-project only once you write its `testguard.claims.json`.
+`init` does not create a claims file. A directory becomes a separate
+project only when you write its `testguard.claims.json`.
 
 ### One project per package, or one for the whole repository
 
 | Layout | Choose it when | Trade-off |
 |---|---|---|
-| One project per package | each package owns its tests and its runner config | defender discovery stays inside the package; a test in another package that imports this one by package name is not discovered |
-| One project at the root | a root runner config (a Vitest workspace, a Jest `projects` list) runs every package's tests | one claims file and one gate for everything; probes and baselines are not split by package |
+| One project per package | each package owns its tests and its runner config | defender discovery stays inside the package. Discovery does not find a test in another package that imports this one by package name |
+| One project at the root | a root runner config (a Vitest workspace, a Jest `projects` list) runs every package's tests | one claims file and one gate for everything. Probes and baselines are not split by package |
 
 Defender discovery resolves relative imports and configured aliases
-(`tsconfig` `paths`, vite/vitest `resolve.alias`, `package.json#imports`). A
-bare package name such as `@acme/billing` is not resolved, so a cross-package
-defender has to be listed in the claim's `defendedBy`. See
+(`tsconfig` `paths`, vite/vitest `resolve.alias`, `package.json#imports`). It
+does not resolve a bare package name such as `@acme/billing`. So you must list
+a cross-package defender in the claim's `defendedBy`. See
 [Languages and runners](../reference/languages-and-runners.md).
 
 ## `init` in a subdirectory
 
-Agent sessions run at the git root, so `init` installs the agent layer there
-— the skill, the session-start hook, the `AGENTS.md` section — and keeps the
+Agent sessions run at the git root. So `init` installs the agent layer there
+(the skill, the session-start hook, the `AGENTS.md` section). It keeps the
 project layer (the `.gitignore` lines) in the subdirectory:
 
 ```bash
@@ -92,8 +94,8 @@ npx testguard-cli init packages/billing
 + packages/billing/.gitignore: 12 lines added
 ```
 
-A second project adds one hook entry and one `AGENTS.md` bullet; it never
-duplicates the section or replaces the skill:
+A second project adds one hook entry and one `AGENTS.md` bullet. It never
+duplicates the section and never replaces the skill:
 
 ```bash
 npx testguard-cli init packages/auth
@@ -107,14 +109,14 @@ npx testguard-cli init packages/auth
 ```
 
 Each hook entry tries the package's own install, then the root's, then a
-`testguard` on PATH, and ends in `true`, so it can never break a session or
-reach the network:
+`testguard` on PATH. It ends in `true`. So it can never break a session and
+never uses the network:
 
 ```
 packages/billing/node_modules/.bin/testguard brief --text packages/billing 2>/dev/null || node_modules/.bin/testguard brief --text packages/billing 2>/dev/null || { command -v testguard >/dev/null 2>&1 && testguard brief --text packages/billing 2>/dev/null; } || true
 ```
 
-The `AGENTS.md` section lists every project, so an agent knows which
+The `AGENTS.md` section lists every project. So an agent knows which
 `status --json <dir>` to run:
 
 ```markdown
@@ -122,31 +124,31 @@ The `AGENTS.md` section lists every project, so an agent knows which
 - `packages/auth/`: claims in `packages/auth/testguard.claims.json`; run `testguard status --json packages/auth` and follow `next`.
 ```
 
-Use `--here` when the subdirectory is its own agent root — a package that
-agents open on its own — to keep the skill, hook and `AGENTS.md` in that
+Use `--here` when the subdirectory is its own agent root (a package that
+agents open on its own). Then the skill, hook and `AGENTS.md` stay in that
 directory instead of the git root. [AI agents](ai-agents.md) covers the agent
 layer itself.
 
 ## Dependencies in the scratch worktree
 
-A probe applies faults in a scratch git worktree of the whole repository, and
-a fresh worktree has no `node_modules`. TestGuard links the main tree's in:
-every `node_modules` directory up to three levels below the git root
-(`packages/billing/node_modules` is two), skipping hidden directories. A
-symlinked `node_modules` is linked to its resolved target.
+A probe applies faults in a scratch git worktree of the whole repository. A
+fresh worktree has no `node_modules`, so TestGuard links in the main tree's.
+It links every `node_modules` directory up to three levels below the git root
+(`packages/billing/node_modules` is two levels) and skips hidden directories.
+For a symlinked `node_modules`, it links the resolved target.
 
-JavaScript runners resolve the way Node's `require` does, walking up from the
-project directory, so a runner hoisted to the root `node_modules` is found
-from a package.
+JavaScript runners resolve the way Node's `require` does. They walk up from
+the project directory. So a package finds a runner that is hoisted to the root
+`node_modules`.
 
-When dependencies live somewhere else — deeper than three levels, under a
-hidden directory, outside the repository — the probe stops:
+Sometimes dependencies live somewhere else: deeper than three levels, under a
+hidden directory, or outside the repository. Then the probe stops:
 
 ```
 test runner is not resolvable in the scratch worktree (…). If dependencies are missing, pass --node-modules <path>, or run with --in-place. Otherwise fix the discovery error above.
 ```
 
-Name the directory, and TestGuard links it as the probed project's
+Name the directory. TestGuard then links it as the probed project's
 `node_modules` in the worktree:
 
 ```bash
@@ -155,23 +157,24 @@ TESTGUARD_NODE_MODULES=/abs/path/to/node_modules npx testguard-cli probe package
 ```
 
 `--node-modules` is accepted by `probe`, `admit`, `sweep` and `replay`.
-`--in-place` avoids the worktree altogether: it faults your working tree and
-restores it, and needs the fault target files to be clean.
+`--in-place` does not use the worktree. It applies faults to your working tree
+and restores it. The fault target files must be clean.
 
-A Python virtualenv is not linked; the interpreter is resolved against your
-working tree by absolute path. See [Python](python.md).
+TestGuard does not link a Python virtualenv. It resolves the interpreter
+against your working tree by absolute path. See [Python](python.md).
 
 ## Workspace runner commands
 
-When a package's tests only run through the package manager — a filtered
-command, a non-default config — give the command to `--runner-cmd`:
+Sometimes a package's tests run only through the package manager, with a
+filtered command or a non-default config. Then give the command to
+`--runner-cmd`:
 
 ```bash
 npx testguard-cli probe packages/billing --runner-cmd "pnpm --filter @acme/billing exec vitest run {files} --reporter=json --outputFile={out}"
 ```
 
-`{files}` are relative to the probed directory, and `pnpm --filter <package>
-exec` runs in that package's directory, so the two line up when the probed
+`{files}` are relative to the probed directory. `pnpm --filter <package>
+exec` runs in that package's directory. So the two match when the probed
 directory is the filtered package. A filter that moves the command into a
 different directory breaks the paths. [Languages and
 runners](../reference/languages-and-runners.md#custom-runners)
@@ -179,10 +182,10 @@ lists every requirement of the template.
 
 ## Replay in a monorepo
 
-`replay` scopes fix commits to the probed project. A commit that touched
-several packages counts only for its files inside this one, and a commit with
-no source-and-test pair inside the project is skipped rather than reported as
-a revert that did not apply:
+`replay` limits fix commits to the probed project. A commit that touched
+several packages counts only for its files inside this project. If a commit has
+no source-and-test pair inside the project, replay skips it. It does not report
+it as a revert that did not apply:
 
 ```bash
 npx testguard-cli replay packages/billing --since origin/main~200..origin/main
@@ -193,7 +196,7 @@ See [Replay](replay.md).
 ## One CI leg per package
 
 Run each project in its own matrix leg. Install the workspace once at the
-root; the Action's `working-directory` is the project directory.
+root. The Action's `working-directory` is the project directory.
 
 ```yaml
 name: testguard
@@ -227,8 +230,8 @@ jobs:
 ```
 
 The root leg (`.`) gates the files outside every package and prints the
-delegated lines; each package leg evaluates its own. `fail-fast: false` keeps
-every leg's verdicts visible. [GitHub Actions](ci/github-actions.md) and
+delegated lines. Each package leg evaluates its own files. `fail-fast: false`
+keeps every leg's verdicts visible. [GitHub Actions](ci/github-actions.md) and
 [GitLab CI](ci/gitlab.md) cover inputs, evidence artifacts and baselines.
 
 ## Next

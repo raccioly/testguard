@@ -1,31 +1,32 @@
 # Adopting TestGuard in an existing project
 
-This guide is for a team with a working codebase and a green test suite that
-wants to know what those tests actually defend, without stopping everything to
-write a claim for every file. You do not need to claim the whole system before
-TestGuard is useful. Install it in place, gate the **new** changes from day
-one, write the first few claims where a silent failure would hurt most, and
-freeze everything else as a baseline you pay down over time.
+This guide is for a team that has a working codebase and a green test suite.
+The team wants to know what those tests actually defend, and does not want to
+stop all work to write a claim for every file. You do not need to claim the
+whole system before TestGuard is useful. Install it in place. Gate the **new**
+changes from day one. Write the first few claims where a silent failure would
+hurt most. Freeze everything else as a baseline, and pay it down over time.
 
-Each step ends with a **Tell your agent** block: a sentence you can paste into
-Claude Code, Codex, Cursor or any other harness to have it run that step for
-you. The steps work the same whether a person or an agent runs them.
+Each step ends with a **Tell your agent** block. It is a sentence that you can
+paste into Claude Code, Codex, Cursor or any other harness, so that the agent
+runs that step for you. The steps work the same way whether a person or an
+agent runs them.
 
 ## Before you start
 
 | You need | Why |
 |---|---|
-| Node ≥ 20 and `git` | TestGuard is a Node CLI and probes inside a scratch git worktree. |
-| A test suite that is green on your default branch | Every probe starts by confirming the defenders pass N times on unmodified code. A red or flaky suite yields `FLAKY-DEFENDER`, not findings. |
+| Node ≥ 20 and `git` | TestGuard is a Node CLI. It probes inside a scratch worktree. |
+| A test suite that is green on your default branch | Every probe starts by confirming that the defenders pass N times on unmodified code. A red or flaky suite gives `FLAKY-DEFENDER`, not findings. |
 | The test runner declared by the project | vitest, jest or Playwright in `package.json`, or a Python interpreter with pytest (stdlib `unittest` otherwise). Anything else goes through `--runner-cmd`. See [languages and runners](../reference/languages-and-runners.md). |
 | Python ≥ 3.8 | Only when you probe Python code. |
 
 ## 1. Start from a reviewable baseline
 
-Create a branch for the adoption so every file TestGuard writes shows up in an
-ordinary code review. Install it as a development dependency, which pins the
-version your CI and your session-start hook will use, then run `init` from the
-repository root:
+Create a branch for the adoption. Then every file that TestGuard writes shows
+up in an ordinary code review. Install TestGuard as a development dependency.
+This pins the version that your CI and your session-start hook use. Then run
+`init` from the repository root:
 
 ```bash
 git switch -c chore/adopt-testguard
@@ -42,9 +43,10 @@ npx testguard init            # writes the agent layer at the git root
 + .gitignore: 12 lines added
 ```
 
-It does not create a claims file, change your tests or touch source code. If
-`AGENTS.md` or `.claude/settings.json` already exist, `init` adds its section
-or its hook line and leaves the rest alone. Review the diff, then commit it.
+`init` does not create a claims file, change your tests or touch source code.
+If `AGENTS.md` or `.claude/settings.json` already exist, `init` adds its
+section or its hook line and leaves the rest alone. Review the diff, then
+commit it.
 
 > **Tell your agent:** "Install testguard-cli as a dev dependency, run
 > `npx testguard init`, show me the diff, and commit it on a new branch."
@@ -55,8 +57,8 @@ or its hook line and leaves the rest alone. Review the diff, then commit it.
 npx testguard status
 ```
 
-On a project with no claims the answer is always `no-claims`, and the useful
-part is the **surface** line: how much of the codebase carries a claim, and
+On a project with no claims, the answer is always `no-claims`. The useful part
+is the **surface** line. It shows how much of the codebase carries a claim, and
 which modules change most often.
 
 ```
@@ -67,46 +69,47 @@ UNCLAIMED src/redact.mjs — 1 change in history window
 next:     [scaffold] testguard scaffold src/export.mjs
 ```
 
-The unclaimed modules are listed by churn over the last 200 commits. Code that
-changes often and carries no claim is where a regression is most likely to
-ship unnoticed, so that list is your first shortlist.
+`status` lists the unclaimed modules by churn over the last 200 commits. A
+regression is most likely to ship unnoticed in code that changes often and
+carries no claim. So that list is your first shortlist.
 
 `status --json` returns the same answer as one document with `state` and a
-single `next` action. Agents read that and nothing else; see
+single `next` action. Agents read that document and nothing else. See
 [AI agents](ai-agents.md).
 
-> **Tell your agent:** "Run `testguard status --json` and summarise the
+> **Tell your agent:** "Run `testguard status --json` and summarize the
 > surface line and the five highest-churn unclaimed modules."
 
 ## 3. Measure before you claim (recommended)
 
-An existing project has something a new one does not: **history**. Two
-commands use it to show you where the suite is blind before you have written a
-single claim.
+An existing project has something that a new project does not have:
+**history**. Two commands use it to show you where the suite is blind, before
+you write a single claim.
 
 **Replay the bugs that already escaped.** For each fix commit that changed
-source and a test together, `replay` reverts only the source, deletes the test
-the fix shipped, and asks whether the rest of the suite would have noticed.
+source and a test together, `replay` reverts only the source and deletes the
+test that the fix shipped. Then it asks whether the rest of the suite would
+have noticed.
 
 ```bash
 npx testguard replay --since HEAD~200..HEAD --max 20
 ```
 
-A `blind` or `nocover` row is a real bug your current suite would let through
-again. `replay` reports and never gates. See [replay](replay.md) for reading
-its calibration table.
+A `blind` or `nocover` row is a real bug that your current suite would let
+through again. `replay` reports and never gates. See [replay](replay.md) to
+learn how to read its calibration table.
 
-**Sweep the code that writes to storage.** "Does save actually save?" is the
-question coverage cannot answer:
+**Sweep the code that writes to storage.** Coverage cannot answer the
+question "Does save actually save?":
 
 ```bash
 npx testguard sweep --save-paths --cap 20
 ```
 
-It proposes faults for every file that writes to storage, probes a bounded
-selection, and reports which ones a green suite did not notice. It never
-writes `testguard.claims.json`. Its output is a list of candidates for your
-first claims, nothing more.
+`sweep` proposes faults for every file that writes to storage. It probes a
+bounded selection and reports which faults a green suite did not notice. It
+never writes `testguard.claims.json`. Its output is only a list of candidates
+for your first claims.
 
 > **Tell your agent:** "Run `testguard replay --since HEAD~200..HEAD --max 20`
 > and `testguard sweep --save-paths --cap 20`. Do not change any file. Report
@@ -114,8 +117,8 @@ first claims, nothing more.
 
 ## 4. Gate new changes from today
 
-This is the step that stops the gap from growing, and it costs nothing in
-existing code. `gate` fails a change whose source files carry no claim:
+This step stops the gap from growing, and it costs nothing in existing code.
+`gate` fails a change whose source files carry no claim:
 
 ```bash
 npx testguard gate --changed origin/main
@@ -127,29 +130,31 @@ UNCLAIMED  src/export.mjs  (source)
            → testguard scaffold src/export.mjs
 ```
 
-It only looks at the **delta**. Files nobody touches are not evaluated, so a
-legacy codebase with zero claims passes the gate on every pull request that
-leaves it alone, and fails only the ones that change unclaimed code.
+`gate` looks only at the **delta**. It does not evaluate files that nobody
+touches. So a legacy codebase with zero claims passes the gate on every pull
+request that leaves it alone. The gate fails only the pull requests that change
+unclaimed code.
 
-Three things make the gate livable while claims are still few:
+Three things make the gate easy to live with while you have few claims:
 
 - **An empty claims file is valid.** Commit `{ "schemaVersion": 1, "claims": [] }`
-  as `testguard.claims.json`. `probe --allow-empty` then exits 0 and says it
-  verified nothing, rather than blocking a push. The default `probe` still
+  as `testguard.claims.json`. Then `probe --allow-empty` exits 0 and says that
+  it verified nothing, instead of blocking a push. The default `probe` still
   exits 2 on zero claims, so this is an explicit choice.
-- **Excuse what will never carry a claim, with a reason.** Generated code,
-  thin wrappers whose logic lives elsewhere, a module scheduled for deletion:
-  add a `path` entry to `testguard.ignore.json`. The `reason` field is
-  required, the gate prints every entry it relied on, and an entry past its
-  `expires` date excuses nothing. See [configuration](../reference/configuration.md#ignore-file).
+- **Excuse, with a reason, what will never carry a claim.** Examples are
+  generated code, thin wrappers whose logic lives elsewhere, and a module that
+  you plan to delete. Add a `path` entry to `testguard.ignore.json`. The
+  `reason` field is required. The gate prints every entry that it relied on. An
+  entry past its `expires` date excuses nothing. See
+  [configuration](../reference/configuration.md#ignore-file).
 - **Wire it into CI with full history.** The gate needs the base commit, so
   check out with `fetch-depth: 0`. The ready-made jobs are in
   [GitHub Actions](ci/github-actions.md), [GitLab CI](ci/gitlab.md) and
   [pre-commit](ci/pre-commit.md).
 
 Do not start with a broad ignore such as `src/**`. A gate that excuses
-everything is a gate that reports nothing, and the reviewer reading the
-printed reliance list will see it.
+everything reports nothing, and the reviewer who reads the printed list of
+entries will see it.
 
 > **Tell your agent:** "Add an empty `testguard.claims.json`, add the TestGuard
 > gate to CI following docs/guides/ci/github-actions.md with
@@ -158,13 +163,14 @@ printed reliance list will see it.
 
 ## 5. Write the first claims where a silent failure hurts
 
-Pick **three to five** behaviours whose silent failure would be an incident:
-an authorization check, a payment amount, a field that must never reach a log
-or an export. Do not try to claim the whole system. Use the shortlist from
-steps 2 and 3.
+Pick **three to five** behaviors whose silent failure would be an incident.
+Examples are an authorization check, a payment amount, and a field that must
+never reach a log or an export. Do not try to claim the whole system. Use the
+shortlist from steps 2 and 3.
 
-For each one, have `scaffold` propose the faults mechanically. Here it reads
-the redaction module of the [known-answer fixture](../../fixtures/known-answer/README.md):
+For each behavior, have `scaffold` propose the faults mechanically. Here it
+reads the redaction module of the
+[known-answer fixture](../../fixtures/known-answer/README.md):
 
 ```bash
 npx testguard scaffold src/redact.mjs
@@ -176,13 +182,14 @@ defendedBy prefilled from imports: test/redact.test.mjs
 draft: .testguard/scaffold-redact.json
 ```
 
-The draft lands in `.testguard/`, never in your claims file. Each proposal has
-a `TODO:` statement because a tool cannot know what the code is *supposed* to
-do. Supply that from a source independent of the code (a requirement, an ADR,
-a bug report, an incident), keep the faults that express it, drop the rest,
-and move the claim into `testguard.claims.json`. Record where the intent came
-from in the claim's `source`; if you have no such source, keep it `inferred`.
-[Writing claims](writing-claims.md) covers what makes a claim worth keeping.
+The draft goes to `.testguard/`, never to your claims file. Each proposal has a
+`TODO:` statement, because a tool cannot know what the code is *supposed* to
+do. Supply that statement from a source that is independent of the code (a
+requirement, an ADR, a bug report or an incident). Keep the faults that express
+it and drop the rest. Then move the claim into `testguard.claims.json`. Record
+where the intent came from in the `source` of the claim. If you have no such
+source, keep it `inferred`. [Writing claims](writing-claims.md) explains what
+makes a claim worth keeping.
 
 Then probe just those claims:
 
@@ -192,20 +199,20 @@ npx testguard probe --claim AUTH-ADMIN,BILLING-TOTAL --no-escalate
 ```
 
 Expect survivors. A first probe on an established suite almost always finds
-some, and each one is a sentence of the form *"the project says X, and
-nothing checks it."* That is the finding, not a failure of the adoption.
+some. Each survivor is a sentence of this form: *"the project says X, and
+nothing checks it."* That is the finding. It is not a failure of the adoption.
 
 > **Tell your agent:** "For src/auth/require-admin.ts, run `testguard scaffold`.
-> The intended behaviour is: <paste the requirement or bug>. Keep only the
-> faults that break that behaviour, write the claim into
+> The intended behavior is: <paste the requirement or bug>. Keep only the
+> faults that break that behavior, write the claim into
 > testguard.claims.json with source kind `spec` and that reference, then run
 > `testguard probe --claim <ID>`. Do not write tests yet."
 
 ## 6. Freeze a baseline
 
 You will not fix every survivor this week, and you should not have to before
-the gate is useful. `baseline` freezes today's unproven findings so that from
-now on only **new** ones fail:
+the gate is useful. `baseline` freezes today's unproven findings. From then on,
+only **new** findings fail:
 
 ```bash
 npx testguard probe                  # full confirmation (3 runs per verdict)
@@ -215,16 +222,17 @@ git commit -m "test: adopt TestGuard with baseline"
 ```
 
 Commit `.testguard/baseline.json`. Do not commit `evidence.json` or
-`brief.json`; `init` already ignored them. `baseline` refuses provisional
-`--confirm 1` evidence, so the debt you freeze is debt that was measured.
+`brief.json`. `init` already ignored them. `baseline` refuses provisional
+`--confirm 1` evidence, so the debt that you freeze is debt that TestGuard
+measured.
 
 From this point on, the session-start hook briefs every agent session with the
-ranked blind spots, before it writes code.
+ranked blind spots before the agent writes code.
 
 ## 7. Pay the debt down
 
-Each baselined survivor is a test someone has to write. The loop is the same
-for a person and an agent:
+Each baselined survivor is a test that someone has to write. The loop is the
+same for a person and an agent:
 
 ```bash
 npx testguard status --json                          # next.target names the survivor
@@ -232,15 +240,15 @@ npx testguard status --json                          # next.target names the sur
 npx testguard admit test/auth.test.ts --claim AUTH-ADMIN   # ADMITTED or NOT ADMITTED
 ```
 
-`admit` runs the claim's faults against your uncommitted test and answers
+`admit` runs the faults of the claim against your uncommitted test. It answers
 `ADMITTED` only when the test is green on HEAD and fails on every fault, three
-runs out of three. Commit the test, re-probe, and run `baseline` again when
+runs out of three. Commit the test and probe again. Run `baseline` again when
 `status` says so.
 
-Never make a survivor go away by editing its fault. The evidence records every
-fault's content hash and `status` lists any fault changed after it survived.
-See [verdicts](../reference/verdicts.md) for the one acceptable fix per
-verdict.
+Never make a survivor go away by editing its fault. The evidence records the
+content hash of every fault, and `status` lists any fault that someone changed
+after it survived. See [verdicts](../reference/verdicts.md) for the one
+acceptable fix per verdict.
 
 > **Tell your agent:** "Take the top `next.target` from `testguard status
 > --json`. Write a test that fails with that fault applied and passes on HEAD.
@@ -248,35 +256,36 @@ verdict.
 
 ## 8. Scale out
 
-Once the first claims are steady:
+When the first claims are steady:
 
-- **Name kinds of promise, not single ones.** A *concern* such as "every admin
-  route refuses a caller without the admin role" plus a glob aims `sweep` at a
-  whole area; see [writing claims](writing-claims.md#concerns).
-- **Run `sweep --changed` in CI** on pull requests, so an unclaimed change gets
-  candidate faults instead of only an `UNCLAIMED` line.
+- **Name kinds of promise, not single promises.** A *concern* such as "every
+  admin route refuses a caller without the admin role", plus a glob, aims
+  `sweep` at a whole area. See [writing claims](writing-claims.md#concerns).
+- **Run `sweep --changed` in CI** on pull requests. An unclaimed change then
+  gets candidate faults, not only an `UNCLAIMED` line.
 - **Monorepos:** a nested `testguard.claims.json` is a separate project with its
-  own gate; see [monorepo](monorepo.md).
-- **Slow gates:** a shared, slow defender multiplies cost. `probe --cost` shows
-  where the time went; see [performance](performance.md).
+  own gate. See [monorepo](monorepo.md).
+- **Slow gates:** a shared, slow defender multiplies the cost. `probe --cost`
+  shows where the time went. See [performance](performance.md).
 
 ## Decision points
 
 | Situation | Do this |
 |---|---|
-| The suite is not green on main | Fix that first. TestGuard will report `FLAKY-DEFENDER` until it is. |
-| The suite takes many minutes | Start with `--claim` and `--no-escalate`; see [performance](performance.md). |
-| You run something other than vitest, jest, Playwright, pytest or unittest | `--runner-cmd "<cmd> {files} … {out}"`; see [languages and runners](../reference/languages-and-runners.md). |
-| `probe` refuses because tests are uncommitted | Expected: worktree mode probes a commit. Use `--include-dirty` to probe the working tree. |
-| A survivor is not worth a test | Narrow or drop the claim and say why in the commit. The change is recorded, never hidden. |
-| A whole directory will never carry claims | A `path` entry in `testguard.ignore.json` with a reason and, where possible, `expires`. |
-| CI already probes and your laptop does not | Brief from CI's evidence: `testguard brief --text --evidence <file>`; see [GitHub Actions](ci/github-actions.md). |
+| The suite is not green on main | Fix that first. TestGuard reports `FLAKY-DEFENDER` until the suite is green. |
+| The suite takes many minutes | Start with `--claim` and `--no-escalate`. See [performance](performance.md). |
+| You run something other than vitest, jest, Playwright, pytest or unittest | `--runner-cmd "<cmd> {files} … {out}"`. See [languages and runners](../reference/languages-and-runners.md). |
+| `probe` refuses because tests are uncommitted | This is expected: worktree mode probes a commit. Use `--include-dirty` to probe the working tree. |
+| A survivor is not worth a test | Narrow or drop the claim, and say why in the commit. TestGuard records the change and never hides it. |
+| A whole directory will never carry claims | Add a `path` entry in `testguard.ignore.json` with a reason and, where possible, `expires`. |
+| CI already probes and your laptop does not | Brief from the evidence of CI: `testguard brief --text --evidence <file>`. See [GitHub Actions](ci/github-actions.md). |
 
 ## What adoption does not do
 
-- It does not generate tests. It judges the ones you or your agent write.
-- It does not retro-specify the existing system. Claims are added where they
-  earn their keep, and the gate makes sure new code arrives with them.
+- It does not generate tests. It judges the tests that you or your agent write.
+- It does not write specifications for the existing system after the fact. You
+  add claims where they are worth the effort, and the gate makes sure that new
+  code arrives with claims.
 - It does not send anything anywhere. The CLI makes no network calls and
   collects no telemetry.
 

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **User documentation rewritten in plain language.** The README, the root documents, the pages under `docs/`, the print brief and the pt-BR and es translations use short sentences, active voice and one term per concept. No command, flag, heading or fact changes. The brief's masthead now names the author, and `sync-release-version.mjs` accepts that form when it updates the brief's version.
+
 ## [0.26.3] - 2026-11-23
 
 Automated weekly release — everything merged since `v0.26.2`.

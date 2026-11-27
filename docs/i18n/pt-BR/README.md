@@ -1,4 +1,4 @@
-> 🌐 Esta é uma tradução. A página em inglês é a referência oficial: [README.md](https://github.com/raccioly/testguard/blob/main/README.md). Traduzido da v0.18.3.
+> 🌐 Esta é uma tradução. A página em inglês é a referência oficial: [README.md](https://github.com/raccioly/testguard/blob/main/README.md). Traduzido da v0.26.1.
 
 # TestGuard
 
@@ -14,15 +14,15 @@
 
 [English](https://github.com/raccioly/testguard/blob/main/README.md) · **Português (Brasil)** · [Español](https://github.com/raccioly/testguard/blob/main/docs/i18n/es/README.md) · [简体中文](https://github.com/raccioly/testguard/blob/main/docs/i18n/zh-CN/README.md)
 
-> Quebra o seu código de propósito e relata cada promessa cuja quebra os seus
-> testes não perceberam.
+> Quebra o seu código de propósito e relata cada promessa que os seus testes
+> não perceberam que foi quebrada.
 
-**Não é um gerador de testes. É um verificador de alegações (claims).** Gerar
-testes é o que acontece depois que uma alegação se revela infalseável.
+**Não é um gerador de testes. É um verificador de alegações (claims).** A
+geração de testes vem depois que uma alegação se mostra infalseável.
 
-Terceira ferramenta do padrão Guard, ao lado de
-[`docguard-cli`](https://www.npmjs.com/package/docguard-cli) (docs ↔ código) e
-[`websec-validator`](https://pypi.org/project/websec-validator/) (superfície
+O TestGuard é a terceira ferramenta que segue o padrão Guard. As outras duas
+são [`docguard-cli`](https://www.npmjs.com/package/docguard-cli) (docs ↔ código)
+e [`websec-validator`](https://pypi.org/project/websec-validator/) (superfície
 de ataque ↔ código). As três rodam o mesmo ciclo:
 
 > declarar o que precisa ser verdade → tentar falseá-lo mecanicamente →
@@ -32,10 +32,10 @@ de ataque ↔ código). As três rodam o mesmo ciclo:
 ## Em um minuto
 
 **A cobertura diz que uma linha executou. Ela nunca diz que alguém conferiu o
-resultado.** Assim, uma base de código pode estar totalmente coberta e
-completamente indefesa, e nada no CI vai dar um pio.
+resultado.** Uma base de código pode ter 100% de cobertura e nenhuma defesa.
+Nada no CI avisa você.
 
-Aqui está um teste real, da própria fixture deste repositório:
+Aqui está um teste real, da fixture deste repositório:
 
 ```js
 expect(store.writeAudit).toHaveBeenCalledWith(
@@ -44,53 +44,53 @@ expect(store.writeAudit).toHaveBeenCalledWith(
 ```
 
 `objectContaining` ignora as chaves que não lista. Troque o texto mascarado
-pelo **segredo em claro** e este teste continua passando. Cobertura daquela
-linha: 100%. O log de auditoria agora vaza justamente aquilo que ele existe
-para proteger.
+pelo **segredo em claro** e este teste continua passando. A cobertura dessa
+linha é 100%. Agora o log de auditoria vaza os dados que ele existe para
+proteger.
 
-**O método: quebrar o código deliberadamente e observar o que os testes
-fazem.**
+**O método: quebre o código de propósito e observe o que os testes fazem.**
 
-- **killed** — você quebrou, um teste falhou. Ótimo. Esse comportamento está
-  de fato defendido.
-- **SURVIVED** — você quebrou, e tudo continuou verde. Um ponto cego.
+- **killed** — você quebrou o código e um teste falhou. Bom. A suíte defende
+  de fato esse comportamento.
+- **SURVIVED** — você quebrou o código e todos os testes continuaram verdes.
+  Isso é um ponto cego.
 
-A palavra confunde todo mundo uma vez: quem sobreviveu foi a *falha injetada
-(fault)*, não o teste. **SURVIVED é a má notícia.** Um relatório saudável é
-cheio de `killed`.
+A palavra confunde todo mundo uma vez: quem sobreviveu foi a *falha injetada*,
+não o teste. **SURVIVED é a má notícia.** Um relatório saudável é cheio de
+`killed`.
 
-Mas *"os testes falharam?"* é uma pergunta malfeita — uma suíte vermelha não é
-prova de detecção. Por isso existem sete vereditos, e cada um significa algo
-diferente:
+Mas *"os testes falharam?"* não é uma pergunta precisa. Uma suíte vermelha não
+prova que houve detecção. Por isso existem sete vereditos, e cada um tem um
+significado diferente:
 
 | Veredito | O que significa |
 |---|---|
-| `killed` | O corpo de um teste executou e rejeitou o comportamento. O único desfecho bom. |
+| `killed` | O corpo de um teste executou e rejeitou o comportamento. O único resultado bom. |
 | `SURVIVED` | Tudo passou. Um ponto cego real nos testes. |
-| `NOCOVER` | Nenhum teste sequer olha para este código. Não são "testes fracos" — são *nenhum* teste. |
-| `UNVERIFIABLE` | A falha não pôde ser aplicada: a âncora dela mudou de lugar, ou casa duas vezes. Nada foi aprendido. |
-| `FAULT-INVALID` | A própria quebra estava quebrada — não compilou. Culpa nossa, não sua. |
+| `NOCOVER` | Nenhum teste sequer olha para este código. Não são testes fracos: não há *nenhum* teste. |
+| `UNVERIFIABLE` | Não foi possível aplicar a falha: a âncora dela mudou de lugar ou aparece duas vezes. Nada foi aprendido. |
+| `FAULT-INVALID` | A própria quebra estava quebrada: ela não compilou. A culpa é nossa, não sua. |
 | `TIMEOUT` | A suíte travou. Um travamento não é uma detecção. |
-| `FLAKY-DEFENDER` | Os testes não são confiáveis o bastante em código intocado para que a pergunta lhes seja feita. |
+| `FLAKY-DEFENDER` | Em código intocado, os testes não são confiáveis o bastante para receber a pergunta. |
 
-Toda ambiguidade é arredondada para *não comprovado*: três execuções em vez de
-uma, uma execução de referência verde exigida antes de qualquer falha ser
-injetada, e um timeout, uma falha de carregamento ou um resultado misto nunca
-contam como kill. O motivo é a restrição da qual todo o design decorre —
-**uma ferramenta que relata tudo como detectado é pior do que ferramenta
-nenhuma, porque ninguém questiona boas notícias.**
+Quando um resultado não é claro, o TestGuard o trata como *não comprovado*.
+Ele roda três vezes, não uma. Ele exige uma baseline verde antes de injetar
+qualquer falha. Um timeout, uma falha de carregamento ou um resultado misto
+nunca conta como kill. O design inteiro segue uma regra: **uma ferramenta que
+relata tudo como detectado é pior do que ferramenta nenhuma, porque ninguém
+questiona boas notícias.**
 
 **O que não é novo:** quebrar código para testar os seus testes é *mutation
-testing* (teste de mutação), e isso remonta aos anos 1970. Stryker, PIT,
+testing* (teste de mutação). Isso existe desde os anos 1970. Stryker, PIT,
 mutmut e Cosmic Ray fazem isso.
 
 **O que muda é a pergunta.** O mutation testing clássico muta tudo
-mecanicamente e entrega *"mutation score: 73%"* — um número que não é
-acionável, não é auditável e não consegue dizer qual promessa está em risco.
-O TestGuard vincula cada falha injetada a uma **alegação declarada**, então a
-saída não é um score, e sim um achado: *"Seu projeto diz que um escopo
-ausente falha fechado (fail closed). Nada verifica isso."* Essa é a diferença
-entre uma métrica e uma auditoria.
+mecanicamente e entrega *"mutation score: 73%"*. Esse número não é acionável
+e não é auditável. Ele não diz qual promessa está em risco. O TestGuard
+vincula cada falha a uma **alegação declarada**. Por isso a saída é um achado,
+não um score: *"Seu projeto diz que um escopo ausente falha fechado (fail
+closed). Nada verifica isso."* Essa é a diferença entre uma métrica e uma
+auditoria.
 
 📄 **[Leia o resumo técnico de seis páginas (PDF)](https://github.com/raccioly/testguard/blob/main/docs/testguard-explained.pdf)**
 — a ideia na primeira página, depois as evidências de campo, a anatomia de
@@ -100,42 +100,43 @@ anteriores (prior art).
 ## Por quê
 
 A cobertura não distingue um teste que fixa o comportamento *correto* de um
-que fixa um *defeito*. Um agente que escreve tanto o código quanto os testes
-codifica aquilo em que acreditava — incluindo os próprios bugs — e a suíte
-fica verde.
+teste que fixa um *defeito*. Um agente que escreve o código e os testes
+codifica o que ele acreditava, bugs incluídos. A suíte fica verde.
 
-Medido em uma base de código real de produção, inteiramente escrita por IA,
-com ~4.900 testes disciplinados (sem snapshots, 0,4% sem nenhuma asserção):
-**8 de 9 bugs históricos reais eram invisíveis para a suíte**, no pior caso
-2.451 testes verdes sobre código sabidamente quebrado. A maior lacuna era um
-caminho crítico para compliance com 100% de cobertura, em que a única
-asserção que importava usava `expect.objectContaining({...})` e omitia o
-campo que carregava os dados.
+Em uma base de código de produção real, escrita inteiramente por IA, com
+~4.900 testes disciplinados (sem snapshots, 0,4% sem nenhuma asserção), **a
+suíte deixou passar 8 de 9 bugs históricos reais.** No pior caso, 2.451 testes
+continuaram verdes sobre código sabidamente quebrado. A maior lacuna era um
+caminho crítico para compliance com 100% de cobertura. A única asserção que
+importava usava `expect.objectContaining({...})` e omitia o campo que
+carregava os dados.
 
-Uma segunda execução, independente, em outra base de código escrita por IA
+Uma segunda execução, independente, usou outra base de código escrita por IA
 (63 arquivos de teste, 458 testes, 24 alegações de segurança escritas à mão,
-39 falhas): **21 de 39 falhas sobreviveram a uma suíte totalmente verde — 9
-delas críticas.** O bloqueio de super-admin, as verificações de membership,
-as flags de cookie e todo o callback de autorização podiam ser desativados
-sem que um único teste percebesse. Um arquivo de teste tinha reimplementado
-a lógica de autorização *dentro do teste* e fazia as asserções contra a
-cópia: quinze testes verdes, zero detecção. Depois que testes no nível do
-wrapper foram escritos contra as sobreviventes, 39/39 foram killed.
+39 falhas). **21 das 39 falhas sobreviveram a uma suíte totalmente verde, e 9
+delas eram críticas.** Nenhum teste percebeu quando o bloqueio de super-admin,
+as verificações de membership, as flags de cookie e todo o callback de
+autorização foram desativados. Um arquivo de teste tinha reimplementado a
+lógica de autorização *dentro do teste* e fazia as asserções contra a cópia.
+Isso deu quinze testes verdes e zero detecção. Depois que testes no nível do
+wrapper foram escritos contra as sobreviventes, as 39 de 39 falhas foram
+killed.
 
-O panorama revisado por pares em 2026 diz a mesma coisa pelo outro lado.
-Cobertura e mutation score de suítes geradas por LLM acompanham a
-efetividade apenas quando se presume que o código sob teste está correto;
-quando ele pode ter bugs, elas "no longer serve as reliable indicators"
-(deixam de servir como indicadores confiáveis) ([Zhao, Zhou e Cohen, ISSTA 2026](https://arxiv.org/abs/2607.22880)).
-Código com bugs empurra o modelo para testes que afirmam o bug, e incluir a
-especificação no prompt é a mitigação que funciona ([arXiv 2607.22883](https://arxiv.org/abs/2607.22883)) —
-e é por isso que aqui uma alegação nasce da intenção, uma falha injetada é
-vinculada à alegação, e o briefing entrega a alegação ao agente antes que
-ele escreva. E os agentes saturam quaisquer testes que conseguem ver, com a
-distância para os testes ocultos (held-out) crescendo cerca de 28 pontos a
-cada aumento de dez vezes no tamanho do código ([SpecBench](https://arxiv.org/abs/2605.21384)).
-Todo gerador do mercado admite um teste porque ele compila, passa e aumenta
-a cobertura. O TestGuard o admite porque ele falha quando a alegação é falsa.
+A pesquisa revisada por pares em 2026 diz a mesma coisa pelo outro lado.
+Cobertura e mutation score de suítes geradas por LLM acompanham a efetividade
+apenas quando se presume que o código sob teste está correto. Quando o código
+pode ter bugs, eles "no longer serve as reliable indicators" (deixam de servir
+como indicadores confiáveis) ([Zhao, Zhou e Cohen, ISSTA 2026](https://arxiv.org/abs/2607.22880)).
+Código com bugs leva o modelo a escrever testes que afirmam o bug. Incluir a
+especificação no prompt é a mitigação que funciona ([arXiv 2607.22883](https://arxiv.org/abs/2607.22883)).
+Por isso, no TestGuard, uma alegação nasce da intenção, uma falha é vinculada
+à alegação, e o briefing entrega a alegação ao agente antes que ele escreva.
+Além disso, os agentes saturam os testes que conseguem ver. A distância para
+os testes ocultos (held-out) cresce cerca de 28 pontos a cada aumento de dez
+vezes no tamanho do código ([SpecBench](https://arxiv.org/abs/2605.21384)).
+Todo gerador do mercado admite um teste porque ele compila, passa e aumenta a
+cobertura. O TestGuard admite um teste porque ele falha quando a alegação é
+falsa.
 
 ## Instalação
 
@@ -149,8 +150,8 @@ a cobertura. O TestGuard o admite porque ele falha quando a alegação é falsa.
 | pre-commit | `repo: https://github.com/raccioly/testguard`, hooks `testguard-claims`, `testguard-gate`, `testguard-probe` |
 | GitLab CI | `include: - remote: https://raw.githubusercontent.com/raccioly/testguard/v0.26.3/packaging/gitlab/testguard.gitlab-ci.yml` |
 
-Requisitos, instalações offline, `ENOVERSIONS` e todas as opções de CI estão
-no [guia de instalação](https://github.com/raccioly/testguard/blob/main/docs/installation.md).
+O [guia de instalação](https://github.com/raccioly/testguard/blob/main/docs/installation.md)
+cobre requisitos, instalações offline, `ENOVERSIONS` e todas as opções de CI.
 
 ## Deixe rápido
 
@@ -160,13 +161,13 @@ testguard probe --claim <ID> --confirm 1       # while writing one test: fast, p
 testguard probe                                # nightly, or when asked: every claim
 ```
 
-- As falhas já rodam em paralelo: metade das CPUs, no máximo 4 (`--serial` para uma de cada vez).
-- Todo kill é confirmado por uma execução sozinha, então uma suíte que compartilha uma porta ou um banco de dados não consegue fingir um.
-- Veredictos sem mudança são reaproveitados; uma execução com `--changed` ou `--claim` reaproveita o último probe completo.
-- `testguard init` escreve um hook pre-push que roda o primeiro comando, e `init --ci github|gitlab` um job de CI que o roda em cada pull request e o probe completo toda noite.
+- As falhas já rodam em paralelo: metade das CPUs, no máximo 4 (`--serial` roda uma de cada vez).
+- Uma execução isolada confirma cada kill. Assim, uma suíte que compartilha uma porta ou um banco de dados não consegue fingir um kill.
+- O TestGuard reaproveita os vereditos que não mudaram. Uma execução com `--changed` ou `--claim` reaproveita o último probe completo.
+- `testguard init` escreve um hook pre-push que roda o primeiro comando. `init --ci github|gitlab` escreve um job de CI que o roda nos pull requests e roda o probe completo toda noite.
 
-Ainda lento? `testguard status` mostra `advice` com o comando a rodar, e
-[por que está lento?](https://github.com/raccioly/testguard/blob/main/docs/guides/performance.md#why-is-this-slow) é o checklist.
+Ainda está lento? `testguard status` mostra `advice` com o comando a rodar.
+O checklist é [por que está lento?](https://github.com/raccioly/testguard/blob/main/docs/guides/performance.md#why-is-this-slow).
 
 ## Início rápido
 
@@ -190,8 +191,8 @@ pré-condição falhou e nada foi sondado, `3` erro de uso. Todo comando, exceto
 `mcp`, aceita `--json`.
 
 O [início rápido](https://github.com/raccioly/testguard/blob/main/docs/quickstart.md)
-percorre uma primeira alegação de ponta a ponta. Adicionar o TestGuard a uma
-base de código que já tem uma suíte grande tem um guia próprio:
+percorre uma primeira alegação do começo ao fim. Uma base de código que já tem
+uma suíte grande tem um guia próprio:
 [adotando o TestGuard em um projeto existente](https://github.com/raccioly/testguard/blob/main/docs/guides/existing-projects.md).
 
 ## Linguagens e test runners
@@ -204,16 +205,31 @@ base de código que já tem uma suíte grande tem um guia próprio:
 | Python ≥ 3.8 | pytest, ou `unittest` da stdlib quando o pytest não está presente | as mesmas sete, em sintaxe Python |
 | Qualquer outra | `--runner-cmd` com um relatório JSON compatível com o jest | falhas escritas à mão |
 
-Uma alegação pode ser defendida por um teste vitest e um teste pytest ao mesmo
-tempo. Resolução de runner, descoberta, mocks e limites estão na
-[referência de linguagens e runners](https://github.com/raccioly/testguard/blob/main/docs/reference/languages-and-runners.md).
+Um teste vitest e um teste pytest podem defender a mesma alegação ao mesmo
+tempo. A
+[referência de linguagens e runners](https://github.com/raccioly/testguard/blob/main/docs/reference/languages-and-runners.md)
+cobre resolução de runner, descoberta, mocks e limites.
+
+Os seus testes podem precisar de flags do runner (`--runner unittest --python .venv/bin/python`,
+um `--runner-cmd`, um `--node-modules`). Faça commit delas uma vez em
+`testguard.config.json`. Assim, todo hook, toda linha de CI e todo agente
+podem rodar apenas `testguard probe`:
+
+```json
+{ "schemaVersion": 1, "runner": "unittest", "python": ".venv/bin/python" }
+```
+
+Uma flag que você digita vale mais que o arquivo. Variáveis no estilo
+`TESTGUARD_PYTHON` também valem mais que ele. `--no-config` ignora o arquivo.
+As chaves e as regras estão na
+[referência de configuração](https://github.com/raccioly/testguard/blob/main/docs/reference/configuration.md#testguardconfigjson-how-this-projects-tests-run).
 
 ## Use com o seu agente de IA
 
-O TestGuard foi feito para ser conduzido por um agente. `testguard init`
-instala uma skill que ensina o ciclo de operação, uma seção no `AGENTS.md` e
-um hook de início de sessão que passa a cada sessão os pontos cegos
-ranqueados antes que ela escreva código. Para o Claude Code, o hook em
+Um agente foi feito para conduzir o TestGuard. `testguard init` instala três
+coisas: uma skill que ensina o ciclo de operação, uma seção no `AGENTS.md` e
+um hook de início de sessão. O hook entrega a cada sessão os pontos cegos
+ranqueados antes que o agente escreva código. Para o Claude Code, o hook em
 `.claude/settings.json` é:
 
 ```json
@@ -222,10 +238,10 @@ ranqueados antes que ela escreva código. Para o Claude Code, o hook em
 ] } ] } }
 ```
 
-Ele resolve primeiro a instalação do próprio projeto, depois um `testguard`
-no `PATH`, e termina em `true`, então nunca consegue quebrar uma sessão nem
-acessar a rede. Qualquer outro harness pode usar `testguard mcp` (cinco
-ferramentas somente leitura via stdio) ou `testguard status --json`. A
+O hook usa primeiro a instalação do próprio projeto. Se não houver uma, ele
+usa um `testguard` no `PATH`. Ele termina em `true`, então nunca quebra uma
+sessão nem acessa a rede. Qualquer outro harness pode usar `testguard mcp`
+(cinco ferramentas somente leitura via stdio) ou `testguard status --json`. A
 configuração para Claude Code, Codex, Cursor e outros está no
 [guia de agentes de IA](https://github.com/raccioly/testguard/blob/main/docs/guides/ai-agents.md).
 
@@ -243,16 +259,16 @@ configuração para Claude Code, Codex, Cursor e outros está no
 ## O que o TestGuard não é
 
 - **Não é um gerador de testes.** Ele julga um teste que o agente escreveu
-  (`admit`); a metade que gera os testes fica com o agente.
-- **Não é um dashboard de mutation score.** Sem mutantes em massa, sem score
-  único, sem limiar. As falhas injetadas são poucas e vinculadas a alegações
-  declaradas; os achados são ranqueados, nunca somados.
+  (`admit`). O agente continua gerando os testes.
+- **Não é um dashboard de mutation score.** Ele não tem mutantes em massa,
+  nem score único, nem limiar. As falhas são poucas e vinculadas a alegações
+  declaradas. O TestGuard ranqueia os achados e nunca os soma.
 - **Não é uma ferramenta de cobertura.** Uma linha executada não diz nada
-  sobre se uma asserção perceberia a quebra. `NOCOVER` aqui significa que
+  sobre se uma asserção perceberia a quebra. Aqui, `NOCOVER` significa que
   nenhum teste sequer importa o arquivo.
 - **Não é um cliente de rede.** A CLI nunca abre um socket e não coleta
-  telemetria. Uma única dependência de runtime, com versão fixada exata
-  (`ajv`), Node ≥ 20, MIT.
+  telemetria. Ela tem uma única dependência de runtime, com versão fixada
+  exata (`ajv`), exige Node ≥ 20 e usa a licença MIT.
 
 ## Experimente
 
@@ -264,41 +280,41 @@ git clone https://github.com/raccioly/testguard && cd testguard && npm install
 npm test                                  # includes probing the fixture end to end
 ```
 
-`fixtures/known-answer/` é um projeto minúsculo cujo teste da linha de
-auditoria faz a asserção com `expect.objectContaining({...})` e omite a chave
+`fixtures/known-answer/` é um projeto minúsculo. O teste da linha de auditoria
+dele faz a asserção com `expect.objectContaining({...})` e omite a chave
 `content`. Troque o texto mascarado pela entrada em claro e o teste continua
-verde. O `probe` relata isso como `SURVIVED`; o [README](https://github.com/raccioly/testguard/blob/main/fixtures/known-answer/README.md)
+verde. O `probe` relata a falha como `SURVIVED`. O [README](https://github.com/raccioly/testguard/blob/main/fixtures/known-answer/README.md)
 da fixture percorre cada veredito. O mesmo ponto cego em Python está em
-[`fixtures/known-answer-python/`](https://github.com/raccioly/testguard/blob/main/fixtures/known-answer-python/README.md),
-executado tanto com o `unittest` da stdlib quanto com o `pytest`, que precisam
-concordar em todos os vereditos.
+[`fixtures/known-answer-python/`](https://github.com/raccioly/testguard/blob/main/fixtures/known-answer-python/README.md).
+Ele roda tanto com o `unittest` da stdlib quanto com o `pytest`. Os dois
+precisam concordar em todos os vereditos.
 
 ## Status
 
-Treze comandos (`status`, `init`, `claims`, `probe`, `admit`, `baseline`,
-`brief`, `gate`, `scaffold`, `sweep`, `concerns`, `replay`, `mcp`). Runners
-para vitest, jest, Playwright, o test runner nativo do Node, pytest e o
-`unittest` da stdlib, além de `--runner-cmd` para qualquer coisa que gere um
+Catorze comandos (`status`, `init`, `claims`, `probe`, `admit`, `baseline`,
+`brief`, `gate`, `scaffold`, `sweep`, `concerns`, `replay`, `clean`, `mcp`).
+Runners para vitest, jest, Playwright, o test runner nativo do Node, pytest e
+o `unittest` da stdlib, além de `--runner-cmd` para qualquer coisa que gere um
 relatório compatível com o jest. Falhas escritas à mão e um scaffold mecânico
 para JavaScript, TypeScript e Python. O contrato são catorze JSON Schemas em
 [`spec/`](https://github.com/raccioly/testguard/blob/main/spec/README.md),
 compartilhados com as outras ferramentas Guard. Toda release está no
 [changelog](https://github.com/raccioly/testguard/blob/main/CHANGELOG.md).
 
-Ainda não: geração de testes (a metade de aceitação, `admit`, existe; a
-metade geradora fica com o agente), produtores com consciência de AST e a
+Ainda não: geração de testes (`admit`, a metade de aceitação, existe; o agente
+continua fazendo a metade geradora), produtores com consciência de AST e a
 transferência de uma calibração entre repositórios. O `replay` já mede essa
-transferência; se ela vale para um repositório sem histórico ainda não está
-comprovado. Cada um desses itens está previsto no design; nenhum é
-prometido.
+transferência. Se ela vale para um repositório sem histórico, isso ainda não
+está comprovado. Projetamos cada um desses itens e não afirmamos que nenhum
+deles existe.
 
 ## Contribuindo
 
-Relatos de bugs, relatos de campo e correções de documentação são bem-vindos.
-Leia antes o [CONTRIBUTING.md](https://github.com/raccioly/testguard/blob/main/CONTRIBUTING.md)
-e o [AGENTS.md](https://github.com/raccioly/testguard/blob/main/AGENTS.md);
-para ajuda, veja o [SUPPORT.md](https://github.com/raccioly/testguard/blob/main/SUPPORT.md),
-e reporte vulnerabilidades de forma privada conforme o
+Aceitamos relatos de bugs, relatos de campo e correções de documentação.
+Primeiro, leia o [CONTRIBUTING.md](https://github.com/raccioly/testguard/blob/main/CONTRIBUTING.md)
+e o [AGENTS.md](https://github.com/raccioly/testguard/blob/main/AGENTS.md).
+Para pedir ajuda, veja o [SUPPORT.md](https://github.com/raccioly/testguard/blob/main/SUPPORT.md).
+Reporte vulnerabilidades de forma privada, como descrito no
 [SECURITY.md](https://github.com/raccioly/testguard/blob/main/SECURITY.md).
 
 ## Licença

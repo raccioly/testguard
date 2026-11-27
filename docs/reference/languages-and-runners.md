@@ -1,9 +1,10 @@
 # Languages and runners
 
-Does TestGuard support your stack? This page is the answer: which languages it
-reads, which test runners it drives, how it finds and picks them, and where the
-support stops. It is for anyone evaluating TestGuard and for anyone whose probe
-just refused with "test runner is not resolvable".
+Does TestGuard support your stack? This page answers that question. It says
+which languages TestGuard reads and which test runners it drives. It says how
+TestGuard finds and picks a runner, and where the support stops. Read it if
+you are evaluating TestGuard. Read it also if your probe just refused with
+"test runner is not resolvable".
 
 ## The matrix
 
@@ -11,7 +12,7 @@ just refused with "test runner is not resolvable".
 |---|---|---|---|---|
 | Runners | `vitest`, `jest`, `playwright`, `node-test`, custom `--runner-cmd` | `vitest`, `jest`, `playwright`, custom `--runner-cmd` | `vitest`, `jest`, `playwright` | `python` (`pytest` or `unittest`) |
 | Picked by `auto` | `vitest`, then `jest` | `vitest`, then `jest` | `vitest`, then `jest` | `python`, when no JavaScript runner sees a test; a `.py` defender always runs under Python |
-| How the code is loaded | the runner's own loader | the runner's own transform: Vitest compiles TypeScript itself; Jest uses the transform the project already configures. TestGuard adds none | the runner's transform, as for TypeScript | the project's interpreter |
+| How the code is loaded | the runner's own loader | the runner's own transform. Vitest compiles TypeScript itself. Jest uses the transform the project already configures. TestGuard adds none | the runner's transform, as for TypeScript | the project's interpreter |
 | Defender discovery | test files that import the fault's file: relative paths, `tsconfig`/`jsconfig` `paths` (through `extends` and `references`), vite/vitest `resolve.alias`, `package.json#imports`, re-exports through barrel files | as JavaScript; a `./x.js` specifier also resolves to `x.ts`/`x.tsx` (`.mjs` → `.mts`, `.cjs` → `.cts`) | as TypeScript | test files that import the fault's module by dotted module name, however it reached `sys.path` |
 | Mock awareness | `vi.mock` / `jest.mock` (and `doMock`, `unstable_mockModule`) of the target removes the file as a defender | as JavaScript | as JavaScript | only a `patch()` of the whole module removes a defender; an attribute patch keeps it and raises `target-attribute-patched` |
 | Scaffold producers | the seven shared shapes; the two JSX shapes only where a line is JSX | as JavaScript | all nine: the seven shared shapes plus `element-removed` and `handler-dropped` | the seven shared shapes, in Python syntax |
@@ -21,9 +22,10 @@ just refused with "test runner is not resolvable".
 
 The seven shared scaffold shapes are `condition-forced`, `statement-deleted`,
 `return-altered`, `literal-changed`, `call-removed`, `field-dropped` and
-`argument-swapped`. The two JSX shapes are proposed for any one-line JSX
-element or `on<Event>={…}` prop the scaffold finds, whatever the file
-extension; they have no Python meaning and are absent there. [Writing claims](../guides/writing-claims.md) describes every shape;
+`argument-swapped`. The scaffold proposes the two JSX shapes for any one-line
+JSX element or `on<Event>={…}` prop it finds, whatever the file extension. They
+have no Python meaning, so Python files do not get them.
+[Writing claims](../guides/writing-claims.md) describes every shape.
 [Python](../guides/python.md) covers the Python differences.
 
 ### Runner summary
@@ -40,56 +42,61 @@ extension; they have no Python meaning and are absent there. [Writing claims](..
 | `auto` | the default | the first of `vitest`, `jest`, `python` that resolves **and** discovers at least one test file | — | — | — | — |
 
 `--workers` defaults to `1`, which already means one file at a time per run.
-For `probe`, `--serial` also means one fault at a time (`--fault-workers 1`);
-elsewhere it only changes a run that raised `--workers`.
+For `probe`, `--serial` also means one fault at a time (`--fault-workers 1`).
+For other commands, it changes only a run that raised `--workers`.
 [Performance](../guides/performance.md) explains when to raise it.
 
 ## How a runner is chosen
 
-`auto` tries `vitest`, then `jest`, then `python`, and takes the first one that
-both resolves and lists a non-empty test universe. A runner that resolves but
-sees no test file is skipped: a pure TypeScript project using only Playwright
-resolves neither Vitest nor Jest, and without that rule `auto` would fall
-through to Python — which resolves wherever a `python3` exists — find no `.py`
-test, and report every claim `NOCOVER`. An explicit `--runner` with an empty
-universe is refused for the same reason: zero observations are not evidence.
+`auto` tries `vitest`, then `jest`, then `python`. It takes the first one that
+both resolves and lists a non-empty test universe. `auto` skips a runner that
+resolves but sees no test file. Here is why. Take a pure TypeScript project
+that uses only Playwright. It resolves neither Vitest nor Jest. Without this
+rule, `auto` would fall through to Python, which resolves wherever a `python3`
+exists. It would find no `.py` test and report every claim `NOCOVER`. An
+explicit `--runner` with an empty universe is refused for the same reason: zero
+observations are not evidence.
 
 `auto` never picks `playwright` or `node-test` as the project runner.
-Playwright needs a config to mean anything and owns its files anyway; the Node
-built-in runner is opt-in.
+Playwright needs a config to mean anything, and it owns its files anyway. The
+Node built-in runner is opt-in.
 
 Two runners own **files** rather than projects, whatever the project runner is:
 
 - a test under the Playwright config's `testDir` runs under `playwright`;
 - a `.py` test runs under `python`.
 
-That is what lets one claim list a Vitest unit test, a Playwright spec and a
-pytest test together. The record's `defenders.byRunner` says which file ran
-where, and the evidence lists every runner that ran under `run.runners`. When
-two owning runners both list the same file, the probe refuses rather than
-guess.
+So one claim can list a Vitest unit test, a Playwright spec and a pytest test
+together. The record's `defenders.byRunner` says which file ran where. The
+evidence lists every runner that ran under `run.runners`. When two owning
+runners both list the same file, the probe refuses. It does not guess.
 
 ## How a runner is resolved
 
-A JavaScript runner is resolved from the **project's own package** first: the
-version it pinned, and the package's own `bin` script, run with the Node that
-runs TestGuard. Resolution walks up from the project directory the way Node's
-`require` does, so a runner hoisted to a monorepo root is found. Only when no
-package resolves is an executable on PATH asked for `--version`.
+TestGuard resolves a JavaScript runner from the **project's own package** first.
+It uses the version the project pinned, and the package's own `bin` script, run
+with the Node that runs TestGuard. Resolution walks up from the project
+directory the way Node's `require` does, so it finds a runner hoisted to a
+monorepo root. Only when no package resolves does TestGuard ask an executable
+on PATH for `--version`.
 
-`npx` is never asked. Its cache answers `npx --no-install vitest --version`
-from a project that has no Vitest at all, and a same-named executable (a
-Python `playwright` shim, say) answers too — the run would then happen against
-nothing.
+TestGuard never asks `npx`. The `npx` cache answers
+`npx --no-install vitest --version` from a project that has no Vitest at all.
+A same-named executable (a Python `playwright` shim, say) answers too. The run
+would then happen against nothing.
 
-`playwright` is stricter: it needs both a `playwright.config.{ts,mts,js,mjs,cjs}`
+`playwright` is stricter. It needs both a `playwright.config.{ts,mts,js,mjs,cjs}`
 in the project directory and `@playwright/test` resolvable from it.
 
-The evidence records where every resolved runner came from in
-`runner.source`: `project` (the project's own package, its virtualenv, or an
-interpreter named by path), `path` (an executable found on PATH, including a
-bare command name given to `--python`) or `builtin` (`node-test`, the Node
-running TestGuard). A `--runner-cmd` resolves nothing and records no source.
+The evidence records where every resolved runner came from in `runner.source`:
+
+- `project`: the project's own package, its virtualenv, or an interpreter named
+  by path.
+- `path`: an executable found on PATH, including a bare command name given to
+  `--python`.
+- `builtin`: `node-test`, the Node running TestGuard.
+
+A `--runner-cmd` resolves nothing and records no source.
 
 ```json
 "runner": { "name": "vitest", "version": "3.2.4", "source": "project" }
@@ -102,11 +109,11 @@ A Python run records the engine that actually ran, never the adapter name:
 "runner": { "name": "unittest", "version": "CPython 3.12.13", "source": "path" }
 ```
 
-The runner is part of what a verdict measured: a later probe reuses a verdict
+The runner is part of what a verdict measured. A later probe reuses a verdict
 only when it records the same name, version and source.
 
-An unresolvable runner is a precondition failure (exit `2`), never a verdict
-about the tests.
+An unresolvable runner is a precondition failure (exit `2`). It is never a
+verdict about the tests.
 
 ## `vitest`
 
@@ -115,13 +122,13 @@ about the tests.
 **How files are discovered.** TestGuard asks Vitest itself:
 `vitest list --filesOnly --passWithNoTests --maxWorkers=1`. Vitest loads its
 own config and workspace, so the universe is exactly what `vitest run` would
-collect. The config files it reads (`vitest.config.*`, `vite.config.*`,
-`vitest.workspace.*`) are hashed into the evidence; editing one invalidates
-reused verdicts.
+collect. TestGuard hashes the config files Vitest reads (`vitest.config.*`,
+`vite.config.*`, `vitest.workspace.*`) into the evidence. Editing one
+invalidates reused verdicts.
 
 **How it runs.** `vitest run <files> --reporter=json --outputFile=<tmp>
 --maxWorkers=<N>`, plus `--no-file-parallelism` when only one worker is
-allowed. The report is read from the file, never from stdout.
+allowed. TestGuard reads the report from the file, never from stdout.
 
 **Proof.** [`fixtures/known-answer`](../../fixtures/known-answer/README.md)
 reproduces every verdict in its `expected.json` under Vitest.
@@ -137,8 +144,8 @@ own `testMatch`, `projects` and ignore patterns decide.
 
 **How it runs.** `jest --ci --json --outputFile=<tmp> --runInBand
 --runTestsByPath <files>`, or `--maxWorkers=<N>` instead of `--runInBand` when
-`--workers` is above 1. `--runTestsByPath` makes each argument an exact path:
-without it Jest reads positionals as regular expressions, and a path with `+`
+`--workers` is above 1. `--runTestsByPath` makes each argument an exact path.
+Without it, Jest reads positionals as regular expressions. Then a path with `+`
 or `(` silently matches nothing.
 
 **Proof.** [`fixtures/known-answer-jest`](../../fixtures/known-answer-jest/README.md)
@@ -151,35 +158,36 @@ config's `testDir` runs under Playwright whatever the project runner is.
 `--runner playwright` makes it the project runner as well.
 
 **How files are discovered.** `playwright test --list --reporter=json`.
-Ownership reads `testDir` from the config as text — the config may be
-TypeScript, so it is never imported — and only a string literal
-(`testDir: './e2e'`) is understood. Without one, the config's own directory is
-the test directory, as in Playwright.
+Ownership reads `testDir` from the config as text. The config may be
+TypeScript, so TestGuard never imports it. TestGuard understands only a string
+literal (`testDir: './e2e'`). Without one, the config's own directory is the
+test directory, as in Playwright.
 
-**How it runs.** The project's `@playwright/test` CLI directly (no npm
-subprocess per run): `playwright test --reporter=json --workers=<N> <files>`,
-with the report written to a file named through
-`PLAYWRIGHT_JSON_OUTPUT_FILE`.
+**How it runs.** TestGuard calls the project's `@playwright/test` CLI directly
+(no npm subprocess per run): `playwright test --reporter=json --workers=<N> <files>`.
+The report goes to a file named through `PLAYWRIGHT_JSON_OUTPUT_FILE`.
 
-**What counts.** A test Playwright marks `flaky` — failed, then passed on a
-retry — makes the run **not** green; across N runs it becomes
+**What counts.** Playwright marks a test `flaky` when it fails, then passes on
+a retry. A flaky test makes the run **not** green. Across N runs it becomes
 `FLAKY-DEFENDER`. A `timedOut` test is a timeout and never a kill.
 
 **Servers the specs talk to (`webServer`).** TestGuard sets `CI=1` for every
-runner process, and the Playwright CLI evaluates the config in that same
-process, so `reuseExistingServer: !process.env.CI` is `false` under a probe.
-With a server from another checkout already on the port, Playwright then
-refuses to start, the run is an `error`, and the record is `unverifiable`
-(`defenders-failed-to-load`) with Playwright's own line in `detail.message`
-("... is already used ..."). A config that reuses a server regardless of `CI`
-(`reuseExistingServer: true`) runs the scratch tree's specs against the other
-checkout's server; the fault never reaches it, the negative control stays
-green, and the record is `unverifiable` (`subject-not-executed`) with a
-`detail.message` that names the reused server. It is never `survived` or
+runner process. The Playwright CLI evaluates the config in that same process.
+So `reuseExistingServer: !process.env.CI` is `false` under a probe. Suppose a
+server from another checkout is already on the port. Then Playwright refuses
+to start, the run is an `error`, and the record is `unverifiable`
+(`defenders-failed-to-load`). Playwright's own line is in `detail.message`
+("... is already used ...").
+
+Now suppose a config reuses a server regardless of `CI`
+(`reuseExistingServer: true`). Then the scratch tree's specs run against the
+other checkout's server. The fault never reaches that server, so the negative
+control stays green. The record is `unverifiable` (`subject-not-executed`),
+and its `detail.message` names the reused server. It is never `survived` or
 `killed`. The supported setup:
 
 - derive the port from `TESTGUARD_WORKER` (`4173 + Number(process.env.TESTGUARD_WORKER ?? 0)`), so
-  the trees of a fault fan-out never share a server;
+  the trees of parallel faults never share a server;
 - never reuse an existing server under probe: `reuseExistingServer: false`
   when `TESTGUARD_WORKER` is set, or `!process.env.CI` (which holds under a probe);
 - start the server from the config's own directory, so it serves the probed tree.
@@ -194,28 +202,29 @@ puts a foreign server on the port the config uses.
 **When it is chosen.** Only with `--runner node-test`. `auto` keeps its order
 and never selects it.
 
-**Where it comes from.** The Node executable running TestGuard. Nothing is
-installed; the evidence records `runner.source: "builtin"` and the actual Node
-version.
+**Where it comes from.** The Node executable running TestGuard. TestGuard
+installs nothing. The evidence records `runner.source: "builtin"` and the
+actual Node version.
 
-**How files are discovered.** Node's own default collection — the files
+**How files are discovered.** Node's own default collection: the files
 `node --test` would run with no arguments. Discovery loads each test module
-with every test body filtered out, so a module's top-level code does run
+with every test body filtered out. So a module's top-level code does run
 during discovery.
 
 **How it runs.** Every confirmation uses fresh processes. `--workers` sets the
-test concurrency. When exactly one test file is selected and Node is 22.8 or
-later in the 22 line, 24 or 26, the file runs in one fresh process rather than
-a controller plus a child.
+test concurrency. Sometimes exactly one test file is selected and Node is 22.8
+or later in the 22 line, 24 or 26. Then the file runs in one fresh process
+rather than a controller plus a child.
 
 **Limits.** Plain JavaScript with default Node loading. The runner refuses
-when `NODE_OPTIONS` or `NODE_PATH` is set, and custom loaders and
-module-mocking configurations are outside this adapter. It needs Node 20 or
-newer; CI checks the floor against the fixture on Node 20.0.0.
+when `NODE_OPTIONS` or `NODE_PATH` is set. Custom loaders and module-mocking
+configurations are outside this adapter. It needs Node 20 or newer. CI checks
+the floor against the fixture on Node 20.0.0.
 
 **Proof.** [`fixtures/known-answer-node`](../../fixtures/known-answer-node/README.md).
-To reproduce the narrow native-runner comparison, run this from a checkout of
-this repository after installing its pinned development dependencies:
+To reproduce the narrow native-runner comparison, install this repository's
+pinned development dependencies. Then run this from a checkout of the
+repository:
 
 ```bash
 node .github/scripts/benchmark-node-runner.mjs --out /absolute/receipt-dir
@@ -229,31 +238,32 @@ execution order. The results describe that workload and runtime only.
 
 **When it is chosen.** Third in `auto`; for every `.py` defender whatever the
 project runner is; or explicitly. `--runner python` takes pytest when the
-interpreter can import it and stdlib `unittest` when it cannot.
-`--runner pytest` and `--runner unittest` pin the engine and fail rather than
-fall back, because which engine ran changes what the evidence means.
+interpreter can import it. It takes stdlib `unittest` when the interpreter
+cannot. `--runner pytest` and `--runner unittest` pin the engine and fail
+rather than fall back, because which engine ran changes what the evidence
+means.
 
 **Where it comes from.** The project's interpreter, resolved in this order:
 
-1. `--python <interpreter>` or `TESTGUARD_PYTHON` — when either is set it is
-   the only candidate. Both read a value the same way: a bare name such as
-   `python3` is looked up on PATH, anything containing `/` is a path resolved
-   against the current directory. `probe`, `admit`, `sweep` and `replay` all
-   accept `--python`;
+1. `--python <interpreter>` or `TESTGUARD_PYTHON` — when either is set, it is
+   the only candidate. Both read a value the same way. TestGuard looks up a bare
+   name such as `python3` on PATH. It resolves anything containing `/` as a
+   path against the current directory. `probe`, `admit`, `sweep` and `replay`
+   all accept `--python`;
 2. the active virtualenv (`$VIRTUAL_ENV`);
 3. the project's `.venv`, `venv`, then `.env`;
 4. `python3`, then `python`, on PATH.
 
-It is resolved against your working tree, never the scratch worktree: a
+TestGuard resolves it against your working tree, never the scratch worktree. A
 virtualenv is gitignored, so the worktree does not contain one.
 
 **How files are discovered.** The globs `test_*.py`, `test*.py` and
-`*_test.py` across the project. pytest's `python_files` and `testpaths`
-settings are not consulted. The universe is bound to the hashes of
+`*_test.py` across the project. TestGuard does not consult pytest's
+`python_files` and `testpaths` settings. The universe is bound to the hashes of
 `pyproject.toml`, `pytest.ini`, `setup.cfg`, `tox.ini` and `conftest.py`, so
 editing one invalidates reused verdicts.
 
-**How it runs.** Nothing is installed into the project; TestGuard's reporters
+**How it runs.** TestGuard installs nothing into the project. Its reporters
 reach the interpreter through `PYTHONPATH`.
 
 - pytest: `python -m pytest -p _testguard_pytest_plugin -p no:cacheprovider
@@ -262,8 +272,8 @@ reach the interpreter through `PYTHONPATH`.
 - unittest: `python -m _testguard_unittest_main <files>`.
 
 Python always runs serially. A configuration that requires `pytest-xdist`
-must still work without it; if it does not, the claim stays unproven rather
-than bypassing the worker policy. Python has no per-test timeout without a
+must still work without it. If it does not, the claim stays unproven. TestGuard
+does not bypass the worker policy. Python has no per-test timeout without a
 plugin, so a hang ends at `--budget`.
 
 **Proof.** [`fixtures/known-answer-python`](../../fixtures/known-answer-python/README.md)
@@ -274,8 +284,8 @@ provenance and the Python scaffold.
 ## Custom runners
 
 Use `--runner-cmd` when the built-in command line is not how your project runs
-its tests: a specific config, a workspace filter, a wrapper script. It is
-accepted by `probe`, `admit`, `sweep` and `replay`.
+its tests. Examples are a specific config, a workspace filter or a wrapper
+script. `probe`, `admit`, `sweep` and `replay` accept it.
 
 ```bash
 npx testguard-cli probe . --runner-cmd "pnpm vitest run {files} --reporter=json --outputFile={out}"
@@ -286,35 +296,35 @@ npx testguard-cli probe . --runner-cmd "pnpm vitest run {files} --reporter=json 
 | Requirement | Why |
 |---|---|
 | `{files}` as a word of its own | it expands to one argument per selected test file, relative to the probed directory |
-| `{out}` somewhere | it is replaced by the path of a temporary report file; it may be embedded, as in `--outputFile={out}` |
+| `{out}` somewhere | TestGuard replaces it with the path of a temporary report file. You may embed it, as in `--outputFile={out}` |
 | a report written to `{out}` in the jest-compatible JSON shape | the parser reads `testResults[]` (each with `status`, `message` and `assertionResults[]` carrying `status`, `fullName` or `title`, `failureMessages`) and the top-level `numTotalTests`, `numPassedTests`, `numFailedTests` and `success`. `vitest --reporter=json` and `jest --json` write it |
 
-Single and double quotes group words. The command is **not** run through a
-shell: no pipes, no `&&`, no `VAR=value` prefix, no glob expansion. Use
-`env VAR=value <cmd>` or a script when you need any of those. The command runs
-with the probed directory as its working directory — the scratch worktree,
-unless `--in-place`.
+Single and double quotes group words. TestGuard does **not** run the command
+through a shell: no pipes, no `&&`, no `VAR=value` prefix, no glob expansion.
+Use `env VAR=value <cmd>` or a script when you need any of those. The command
+runs with the probed directory as its working directory. That is the scratch
+worktree, unless you pass `--in-place`.
 
-A report without a `testResults` array makes the defenders unverifiable, and
-the load message says the command must emit the jest-compatible shape. A
-template missing `{files}` or `{out}`, or with an unclosed quote, is a usage
-error: the command exits `3` with the reason before anything runs.
+A report without a `testResults` array makes the defenders unverifiable. The
+load message says the command must emit the jest-compatible shape. A template
+that is missing `{files}` or `{out}`, or that has an unclosed quote, is a usage
+error. The command exits `3` with the reason before anything runs.
 
 ### What changes with a custom command
 
 - **One execution boundary.** Every selected defender, including Playwright
   and `.py` files, goes to your one command.
 - **A static test universe.** The universe is the `--runner` adapter's file
-  globs (Vitest's under `auto`) plus the Playwright- and Python-owned files,
-  not a native listing. `--require-origin` cannot certify against it.
-- **No worker flags.** `--workers` and `--serial` do not edit your command;
-  put the runner's own parallelism flags in the template.
+  globs (Vitest's under `auto`) plus the Playwright- and Python-owned files.
+  It is not a native listing. `--require-origin` cannot certify against it.
+- **No worker flags.** `--workers` and `--serial` do not edit your command.
+  Put the runner's own parallelism flags in the template.
 - **The template is part of reuse.** The test universe's hash binds the
-  parsed command, so changing the `--runner-cmd` re-measures every fault;
-  reformatting whitespace that parses to the same words does not. The command
-  text itself is never written to the evidence, only the hash. A verdict whose
-  defenders failed to load is never reused at all, so fixing a broken command
-  is always measured again.
+  parsed command. So changing the `--runner-cmd` re-measures every fault.
+  Reformatting whitespace that parses to the same words does not. TestGuard
+  never writes the command text to the evidence, only the hash. TestGuard never
+  reuses a verdict whose defenders failed to load. So after you fix a broken
+  command, TestGuard always measures again.
 
 ### Worked examples
 
@@ -331,35 +341,35 @@ npx testguard-cli probe . --runner-cmd "pnpm exec jest --config jest.unit.config
 ```
 
 A pnpm workspace, probing one package that is its own TestGuard project.
-`pnpm --filter <package> exec` runs the command in that package's directory,
-which is also the probed directory, so the relative `{files}` paths line up:
+`pnpm --filter <package> exec` runs the command in that package's directory.
+That is also the probed directory, so the relative `{files}` paths line up:
 
 ```bash
 npx testguard-cli probe packages/billing --runner-cmd "pnpm --filter @acme/billing exec vitest run {files} --reporter=json --outputFile={out}"
 ```
 
 Do not use a filter that moves the command into a different directory from
-the one you probe: `{files}` are relative to the probed directory, and the
-runner would look for them in the wrong place.
+the one you probe. The `{files}` paths are relative to the probed directory,
+and the runner would look for them in the wrong place.
 [Monorepos](../guides/monorepo.md) covers the layouts in full.
 
 ## Not supported yet
 
 - **Languages other than JavaScript, TypeScript and Python.** Defender
   discovery, the scaffold, anchor syntax checks and `gate` cover only the
-  extensions in the matrix above; `gate` excludes every other file as
+  extensions in the matrix above. `gate` excludes every other file as
   `non-source`.
 - **Built-in runners beyond Vitest, Jest, Playwright, Node's test runner and
   Python.** Others go through `--runner-cmd` and need a reporter that writes
   the jest-compatible shape.
 - **TypeScript, custom loaders, `NODE_OPTIONS` and module mocking under
   `node-test`.**
-- **Parallel Python runs.** Python is serial; `pytest-xdist` is disabled.
-- **Test generation.** The acceptance half exists (`admit`); writing the test
+- **Parallel Python runs.** Python is serial. `pytest-xdist` is disabled.
+- **Test generation.** The acceptance half exists (`admit`). Writing the test
   stays the agent's job.
 - **AST-aware producers.** The scaffold is deterministic line heuristics.
 - **Transferring a calibration between repositories.** `replay` measures a
-  calibration now; whether it carries to a repository with no history is
+  calibration now. Whether it carries to a repository with no history is
   unproven. See [Replay](../guides/replay.md).
 
 ## Next

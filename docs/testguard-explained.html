@@ -144,7 +144,7 @@
 <div class="page">
   <div class="masthead">
     <div class="wordmark">Test<span class="mark">Guard</span></div>
-    <div class="meta">Technical Brief · v0.26.3 · MIT</div>
+    <div class="meta">Technical Brief · v0.26.3 · Ricardo Accioly · MIT</div>
   </div>
 
   <h1>Your tests pass. That is not the same as your tests working.</h1>
@@ -153,8 +153,8 @@
 
   <section class="rule-top">
     <h2>The problem</h2>
-    <p class="lede"><strong>Coverage tells you a line ran. It never tells you anyone checked the result.</strong>
-    So a codebase can be fully covered and completely undefended — and nothing in CI will say a word.</p>
+    <p class="lede"><strong>Coverage tells you a line ran. It does not tell you that a test checked the result.</strong>
+    A codebase can have full coverage and no defense, and CI gives no warning.</p>
 
     <div class="exhibit">
       <div class="cap">A real test, from this project's own fixture</div>
@@ -163,9 +163,9 @@
 );  <span class="cm">// `content` is never named — so nothing checks it</span></pre>
     </div>
 
-    <p><code>objectContaining</code> ignores keys it does not list. Swap the redacted text for the
-    <strong>raw secret</strong> and this test still passes. Coverage of that line: 100%. The audit log
-    now leaks the very thing it exists to protect.</p>
+    <p><code>objectContaining</code> ignores keys it does not list. Replace the redacted text with the
+    <strong>raw secret</strong> and this test still passes. Coverage of that line is 100%. The audit log
+    now leaks the data it must protect.</p>
 
     <figure style="margin-top:11px">
       <svg viewBox="0 0 760 112" role="img" aria-label="One hundred percent coverage, zero tests that would notice the line breaking">
@@ -183,7 +183,7 @@
         <text class="s-sub" x="412" y="95" style="font-size:8px">of the tests covering it would fail</text>
         <rect x="412" y="102" width="328" height="5" rx="2.5" fill="#f0ded5"/>
       </svg>
-      <p class="figcap">Fig. 1 — The same line of code, under two different questions. Only one of them is worth knowing.</p>
+      <p class="figcap">Fig. 1 — One line of code, two questions. Only one question matters.</p>
     </figure>
   </section>
 
@@ -192,19 +192,19 @@
     <div class="cols-2">
       <div class="verdict good">
         <span class="tag">killed</span>
-        <p>You broke it — a test failed. <strong>Good.</strong> That behaviour is genuinely defended.</p>
+        <p>You broke it and a test failed. <strong>Good.</strong> The tests defend that behavior.</p>
       </div>
       <div class="verdict bad">
         <span class="tag">SURVIVED</span>
-        <p>You broke it — everything stayed green. <strong>A blind spot.</strong></p>
+        <p>You broke it and every test still passed. <strong>A blind spot.</strong></p>
       </div>
     </div>
-    <p style="margin-top:10px"><strong>The word trips everyone once:</strong> it is the <em>fault</em> that
-    survived, not the test. SURVIVED is the bad news. A healthy report is full of <em>killed</em>.</p>
+    <p style="margin-top:10px"><strong>The word confuses everyone once:</strong> the <em>fault</em>
+    survived, not the test. SURVIVED is bad news. A healthy report shows mostly <em>killed</em>.</p>
   </section>
 
   <div class="pull">
-    <p>A tool that reports everything as caught is worse than no tool at all —
+    <p>A tool that reports every fault as caught is worse than no tool,
     because nobody questions good news.</p>
     <div class="attrib">The design constraint everything else follows from</div>
   </div>
@@ -222,7 +222,7 @@
   <section style="margin-top:17px">
     <h2>Two independent runs, two AI-authored codebases</h2>
     <p class="lede">Neither suite was sloppy. One had ~4,900 disciplined tests, no snapshots, and 0.4%
-    zero-assertion. Both were green. Both were substantially blind.</p>
+    zero-assertion. Both were green. Both had big blind spots.</p>
     <figure style="margin-top:13px">
       <svg viewBox="0 0 760 338" role="img" aria-label="Field measurements: 21 of 39 faults survived a fully green suite; all 39 killed after tests were written">
         <text class="s-tiny" x="0" y="12">Field report A — AI-authored production codebase, ~4,900 tests</text>
@@ -349,15 +349,15 @@
     <div class="cols-2">
       <div>
         <h3>It is not missing tests</h3>
-        <p class="note">One file had re-implemented the authorization logic <em>inside the test</em> and
-        asserted against its own copy. Fifteen tests, all green, all passing for the wrong reason — the
-        production path could be deleted outright without one of them noticing.</p>
+        <p class="note">One file copied the authorization logic <em>into the test</em> and
+        checked its own copy. Fifteen tests were green, and all passed for the wrong reason. You could
+        delete the production path and no test would notice.</p>
       </div>
       <div>
         <h3>It is assertions that name too little</h3>
-        <p class="note">The largest gap ran through a compliance-critical path at 100% coverage, where the
-        one assertion that mattered used <code>objectContaining</code> and omitted the field carrying the
-        data. Exactly the exhibit on page one.</p>
+        <p class="note">The largest gap was in a compliance-critical path with 100% coverage. The
+        one assertion that mattered used <code>objectContaining</code> and left out the field that holds the
+        data. This is the example on page one.</p>
       </div>
     </div>
   </section>
@@ -451,8 +451,8 @@
 
   <section class="rule-top">
     <h2>How a verdict is decided</h2>
-    <p class="note" style="margin-bottom:10px">The order is the specification. Each check short-circuits the ones below it,
-    so the tool never reaches an optimistic answer through a question it should not have asked.</p>
+    <p class="note" style="margin-bottom:10px">The order is the specification. Each check stops the checks below it.
+    So the tool never gives a good answer from a question it should not have asked.</p>
     <figure>
       <svg viewBox="0 0 760 336" role="img" aria-label="Decision order producing each of the seven verdicts">
         <defs>
@@ -482,14 +482,14 @@
           <text class="s-tiny" x="360" y="109" style="fill:#918d83">no</text>
           <rect x="420" y="103" width="130" height="22" rx="3" fill="#ffffff" stroke="#e6e2d8"/>
           <text class="s-v" x="432" y="118" style="fill:#565550">FLAKY-DEFENDER</text>
-          <text class="s-sub" x="560" y="118" style="font-size:7.4px">not steady enough to ask</text>
+          <text class="s-sub" x="560" y="118" style="font-size:7.4px">too unstable to probe</text>
           <circle cx="14" cy="158" r="3.6" fill="#918d83"/>
           <text class="s-q" x="28" y="161">With the fault in, did the suite still load?</text>
           <line x1="352" y1="158" x2="412" y2="158" stroke="#918d83" stroke-width="1.1" marker-end="url(#ar3)"/>
           <text class="s-tiny" x="360" y="153" style="fill:#918d83">no</text>
           <rect x="420" y="147" width="130" height="22" rx="3" fill="#ffffff" stroke="#e6e2d8"/>
           <text class="s-v" x="432" y="162" style="fill:#565550">FAULT-INVALID</text>
-          <text class="s-sub" x="560" y="162" style="font-size:7.4px">our break was broken</text>
+          <text class="s-sub" x="560" y="162" style="font-size:7.4px">the error is ours</text>
           <circle cx="14" cy="202" r="3.6" fill="#918d83"/>
           <text class="s-q" x="28" y="205">Did anything time out?</text>
           <line x1="352" y1="202" x2="412" y2="202" stroke="#918d83" stroke-width="1.1" marker-end="url(#ar3)"/>
@@ -522,21 +522,21 @@
     <h2>What a run costs, and why it is predictable</h2>
     <div class="cols-2">
       <div>
-        <p class="note" style="margin-bottom:8px">Wall clock is not a mystery. For each claim:</p>
+        <p class="note" style="margin-bottom:8px">Run time is predictable. For each claim:</p>
         <div class="exhibit" style="margin:0">
 <pre>(baseline runs + faults × N) × cost of the
                        claim's defender set</pre>
         </div>
         <p class="note" style="margin-top:8px;margin-bottom:0">Measured, not estimated:
-        <code>testguard.cost-budget.json</code> records what each set actually cost in CI, and
-        <code>--cost</code> reports the bill per claim and per file.</p>
+        <code>testguard.cost-budget.json</code> records the real CI cost of each set.
+        <code>--cost</code> reports the cost per claim and per file.</p>
       </div>
       <div>
-        <p class="note">The defender <em>set</em> is the unit, not the file — a run executes all of a claim's
-        tests at once. So one slow acceptance test named by five claims is paid for thirty times over, and
-        the report names that file rather than leaving you to guess.</p>
-        <p class="note" style="margin-bottom:0">Baselines are cached per defender set, and a verdict is
-        reused when the source, the defenders <em>and</em> the fault are all unchanged.</p>
+        <p class="note">The defender <em>set</em> is the unit, not the file. A run executes all tests of a claim
+        at once. So one slow acceptance test named by five claims runs thirty times, and
+        the report names that file.</p>
+        <p class="note" style="margin-bottom:0">Baselines are cached per defender set. A verdict is
+        reused when the source, the defenders <em>and</em> the fault are unchanged.</p>
       </div>
     </div>
   </section>
@@ -555,13 +555,13 @@
     <h2>Seven verdicts, because “did the tests fail?” is a sloppy question</h2>
     <table>
       <tr><th>Verdict</th><th>What it means</th></tr>
-      <tr><td class="v-good">killed</td><td>A test body ran and rejected the behaviour. The only good outcome.</td></tr>
+      <tr><td class="v-good">killed</td><td>A test body ran and rejected the behavior. The only good outcome.</td></tr>
       <tr><td class="v-bad">SURVIVED</td><td>Everything passed. A real blind spot in the tests.</td></tr>
       <tr><td>NOCOVER</td><td>No test even looks at this code. Not “weak tests” — <em>no</em> tests.</td></tr>
-      <tr><td>UNVERIFIABLE</td><td>The fault could not be applied: its anchor moved, or matches twice. Nothing was learned.</td></tr>
-      <tr><td>FAULT-INVALID</td><td>The break itself was broken — it did not compile. Our fault, not yours.</td></tr>
+      <tr><td>UNVERIFIABLE</td><td>The fault did not apply: its anchor moved or matches twice. Nothing was learned.</td></tr>
+      <tr><td>FAULT-INVALID</td><td>The injected fault did not compile. The error is ours, not yours.</td></tr>
       <tr><td>TIMEOUT</td><td>The suite hung. A hang is not a detection.</td></tr>
-      <tr><td>FLAKY-DEFENDER</td><td>The tests are not reliable enough on untouched code to be asked the question.</td></tr>
+      <tr><td>FLAKY-DEFENDER</td><td>The tests are too unstable on untouched code to probe.</td></tr>
     </table>
   </section>
 
@@ -634,7 +634,7 @@
         <rect x="0" y="196" width="760" height="58" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
         <text class="s-tiny" x="16" y="214">Why the baseline matters</text>
         <text class="s-sub" x="16" y="230" style="font-size:7.8px">A legacy codebase does not start with four hundred failures. Freeze what is already blind, then gate only on</text>
-        <text class="s-sub" x="16" y="243" style="font-size:7.8px">what gets worse — so the tool is adoptable on a Monday instead of being switched off on a Tuesday.</text>
+        <text class="s-sub" x="16" y="243" style="font-size:7.8px">what gets worse. Then a team can adopt the tool and keep it on.</text>
       </svg>
       <p class="figcap">Fig. 5 — Claims in, evidence out, and a gate that measures the delta rather than the debt.</p>
     </figure>
@@ -670,29 +670,29 @@
 
   <section style="margin-top:17px">
     <h2>The engine is one verb. The loop is the product.</h2>
-    <p class="note" style="margin-bottom:5px">Probing proves a claim. It does not tell you which claim to
-    write next, whether a new test earns its place, or whether the agent editing your code knows any of it.</p>
+    <p class="note" style="margin-bottom:5px">Probing checks a claim. It does not say which claim to
+    write next, whether a new test is worth keeping, or whether the agent that edits your code knows.</p>
     <table>
       <tr><th>Verb</th><th>Why it exists</th></tr>
-      <tr><td><code>status</code></td><td>Where the project is and the <em>one</em> next action. <code>--json</code> is the machine entry point.</td></tr>
-      <tr><td><code>init</code></td><td>Installs the agent layer — skill, session-start hook, AGENTS.md section — at the git root.</td></tr>
+      <tr><td><code>status</code></td><td>Shows the project state and the <em>one</em> next action. <code>--json</code> is the machine entry point.</td></tr>
+      <tr><td><code>init</code></td><td>Installs the agent layer at the git root: skill, session-start hook, AGENTS.md section.</td></tr>
       <tr><td><code>claims</code></td><td>Lists the claims and reports drift against the <code>@claim</code> annotations in the code.</td></tr>
-      <tr><td><code>scaffold</code></td><td>Proposes faults mechanically for one file, as a draft claims document. A starting point, not an answer.</td></tr>
-      <tr><td><code>sweep</code></td><td>The cold start: probe files with <em>no</em> claim — a diff, the write surface, or a one-line <code>concern</code>.</td></tr>
-      <tr><td class="v-good"><code>probe</code></td><td>The engine. Inject each fault, run its defenders, report what survived.</td></tr>
-      <tr><td><code>admit</code></td><td>The two-gate rule as one verb: green on HEAD <em>and</em> failing on every fault of the claim. Otherwise the test is not a defender.</td></tr>
+      <tr><td><code>scaffold</code></td><td>Proposes faults by rule for one file, as a draft claims document. A start, not an answer.</td></tr>
+      <tr><td><code>sweep</code></td><td>The cold start: probes files with <em>no</em> claim (a diff, the write surface, or a one-line <code>concern</code>).</td></tr>
+      <tr><td class="v-good"><code>probe</code></td><td>The engine. Injects each fault, runs its defenders, reports what survived.</td></tr>
+      <tr><td><code>admit</code></td><td>The two-gate rule as one verb: green on HEAD <em>and</em> failing on every fault of the claim. If not, the test is not a defender.</td></tr>
       <tr><td><code>baseline</code></td><td>Freezes today's unproven findings so only new ones gate.</td></tr>
-      <tr><td><code>gate</code></td><td>Fails when a changed source file carries no claim and no excusing entry. Unclaimed code is the blind spot before the blind test is.</td></tr>
-      <tr><td><code>brief</code></td><td>Emits the blind-spot block for an agent's session-start context.</td></tr>
-      <tr><td><code>mcp</code></td><td>Serves status, brief, claims and evidence read-only over MCP, so the loop works in any agent harness.</td></tr>
+      <tr><td><code>gate</code></td><td>Fails when a changed source file carries no claim and no excusing entry. Unclaimed code is a blind spot before any test is.</td></tr>
+      <tr><td><code>brief</code></td><td>Outputs the blind-spot block for an agent's session-start context.</td></tr>
+      <tr><td><code>mcp</code></td><td>Serves status, brief, claims and evidence read-only over MCP. The loop then works in any agent harness.</td></tr>
       <tr><td><code>replay</code></td><td>Would this suite have caught the bugs that already escaped? <em>Reports, never gates.</em></td></tr>
     </table>
   </section>
 
   <section class="rule-top">
     <h2>The honest question: does an injected fault resemble a real bug?</h2>
-    <p class="note" style="margin-bottom:9px">Every mutation tool has to answer this and most decline to.
-    <code>replay</code> answers it empirically: it walks real fix commits out of your history, reverts each
+    <p class="note" style="margin-bottom:9px">Every mutation tool must answer this. Most do not.
+    <code>replay</code> answers it with data: it takes real fix commits from your history, reverts each
     fix, runs the tests that exist <em>now</em>, and records whether they notice.</p>
 
     <div class="cols-2">
@@ -703,18 +703,18 @@
 field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
         </div>
         <p class="note" style="margin-top:8px;margin-bottom:0">Read as: <em>when a real bug of this class
-        escapes, how often does the suite miss it?</em> Each bug is labelled with the fault class its diff
-        most resembles — the join key that turns an uninterpretable score into a statement with a sample
-        size. Every <code>p</code> and interval is recomputable from <code>n</code>, and the validator
-        recomputes them.</p>
+        escapes, how often does the suite miss it?</em> Each bug gets the label of the fault class its diff
+        most resembles. This label is the join key. It turns a score nobody can read into a statement with a sample
+        size. You can recompute every <code>p</code> and interval from <code>n</code>, and the validator
+        does.</p>
       </div>
       <div>
         <ul class="ticks">
           <li><strong>Measurements enter the ratio:</strong> <code>caught</code>, <code>blind</code>, and
-          <code>nocover</code> — the last as a miss, because no tests at all must not score better than weak ones.</li>
+          <code>nocover</code>. The last counts as a miss, because no tests must not score better than weak tests.</li>
           <li><strong>Failed measurements enter neither side:</strong> <code>flaky</code> and
-          <code>unverifiable</code> conclude nothing, and are not allowed to flatter the number.</li>
-          <li><strong>Flake is biased pessimistically:</strong> a flaky failure would read as detection,
+          <code>unverifiable</code> prove nothing, so they must not improve the number.</li>
+          <li><strong>Flake counts against the suite:</strong> a flaky failure looks like detection,
           so mixed runs are never <code>caught</code>.</li>
         </ul>
       </div>
@@ -722,10 +722,10 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
 
     <div class="exhibit" style="margin-top:9px;border-left-color:var(--slate)">
       <div class="cap">The open question this instrument exists to answer</div>
-      <p class="note" style="margin:0">Does a calibration learned on a repository <em>with</em> history
-      transfer to a greenfield one that has none? AI-authored code has no history, so calibration is the only
-      bridge. <strong>That transfer is unproven.</strong> It is the core product bet, and this is the
-      instrument for testing it — not the answer.</p>
+      <p class="note" style="margin:0">Does a calibration from a repository <em>with</em> history
+      work on a new repository that has none? AI-authored code has no history, so calibration is the only
+      link. <strong>That transfer is unproven.</strong> It is the core product bet. This tool
+      tests the bet. It is not the answer.</p>
     </div>
   </section>
 
@@ -742,18 +742,18 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
 
   <section style="margin-top:17px">
     <h2>The bottleneck was never verification</h2>
-    <p class="lede">A verifier with no claim about a feature is silent about it by construction. Every
-    escaped defect in the field reports was a <strong>claim gap</strong> — not a probe that missed.</p>
-    <p>So the scarce thing is not the engine. It is the <em>oracle</em>: a sentence about what must be
-    true, written by someone who is not the code. <code>gate</code> names the changed files that carry no
-    claim and stops there, correctly — stating a claim is a human act. But a team adopting this reads
-    that list, has nothing to compare it against, and closes the tab.</p>
+    <p class="lede">A verifier with no claim about a feature says nothing about it. Every
+    defect that escaped in the field reports was a <strong>claim gap</strong>, not a probe miss.</p>
+    <p>So the engine is not the scarce part. The <em>oracle</em> is: a sentence about what must be
+    true, written by someone other than the code. <code>gate</code> lists the changed files that have no
+    claim and stops. That is correct, because a human must state a claim. But a team that adopts it reads
+    that list, has nothing to compare it with, and gives up.</p>
   </section>
 
   <section class="rule-top">
     <h2>Field report C — where a save button actually fails</h2>
     <p>Twenty-six faults on the persistence path of seven server actions in a real AI-authored
-    application: the write itself, and the fields it carries.</p>
+    application. They hit the write and its fields.</p>
     <figure style="margin-top:11px">
       <svg viewBox="0 0 760 150" role="img" aria-label="Save-path measurement: 12 of 26 faults survived, all of them a dropped payload field; across the whole write surface, 32 of 37 files are defended only by tests that mock the database">
         <rect x="0" y="0" width="243" height="74" rx="4" fill="#ffffff" stroke="#e6e2d8"/>
@@ -778,11 +778,11 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
       </svg>
       <p class="figcap">Fig. 7 — The save button reports success. The suite agrees. The column is empty.</p>
     </figure>
-    <p class="note">The third number is the read-back answer. A test that replaced the database proves the
-    call shape and nothing beyond it — a <code>where</code> matching no rows, a rolled-back transaction, a
+    <p class="note">The third number is the read-back answer. A test that replaces the database proves only the
+    call shape. A <code>where</code> that matches no rows, a rolled-back transaction and a
     rejected constraint all pass against a mock. On this surface a clean probe is not evidence of
-    persistence; it is evidence that nothing could have measured it, and the tool says so before any verdict.
-    The evidence now names the mocked layer and the assertion shape — exact, partial or argument-free —
+    persistence. It is evidence that no test could measure it, and the tool says so before any verdict.
+    The evidence now names the mocked layer and the assertion shape (exact, partial or argument-free)
     beside the survivor’s verdict.</p>
   </section>
 
@@ -791,16 +791,16 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
     <div class="cols-3">
       <div>
         <h3>Nothing written</h3>
-        <p class="note"><code>sweep</code> takes the files the gate just called uncovered, proposes
-        faults mechanically, probes a bounded selection, and reports what nothing noticed — ordering
-        candidates by what this project’s own runs have shown survives, the feedback that took
+        <p class="note"><code>sweep</code> takes the files that gate reported as uncovered, proposes
+        faults by rule, probes a limited selection, and reports what no test noticed. It orders
+        candidates by what this project’s own runs show survives. This feedback took
         Google’s productive rate from 15% to 89%.</p>
       </div>
       <div>
         <h3>A sentence or ten</h3>
-        <p class="note">A <em>concern</em> names a kind of promise and where to look. Five lines of JSON — “every admin route refuses a caller without the admin role” — found a
+        <p class="note">A <em>concern</em> names a kind of promise and where to look. Five lines of JSON, “every admin route refuses a caller without the admin role”, found a
         route whose owner/manager check can be forced to <code>false</code> with no test failing. One
-        sentence, twenty-four routes, no model.</p>
+        sentence covered twenty-four routes, with no model.</p>
       </div>
       <div>
         <h3>A claim</h3>
@@ -809,10 +809,10 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
       </div>
     </div>
     <p class="note" style="margin-top:9px">Four rules keep the lower rungs safe. A sweep <strong>never
-    writes the claims file</strong> — a sentence nobody wrote is not a claim. Its evidence <strong>never
-    replaces</strong> the canonical record. And it <strong>does not fail on its own bad guess</strong>:
-    only a survivor or an untested file exits non-zero. And whatever it does not probe, it counts —
-    past the cap, outside the concern, or presentational: an icon or a static wrapper nobody would test.</p>
+    writes the claims file</strong>, because a sentence nobody wrote is not a claim. Its evidence <strong>never
+    replaces</strong> the canonical record. It <strong>does not fail on its own bad guess</strong>:
+    only a survivor or an untested file exits non-zero. It counts whatever it does not probe:
+    past the cap, outside the concern, or presentational (an icon or a static wrapper nobody would test).</p>
   </section>
 
   <div class="pull">
@@ -834,35 +834,35 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
   <section style="margin-top:17px">
     <h2>What is not new, and who solved which part</h2>
     <p>Breaking code to test your tests is <strong>mutation testing</strong>, and it dates to the 1970s.
-    Stryker, PIT, mutmut and Cosmic Ray all do it. Anyone claiming that part is novel is selling something.
-    Two industrial programmes solved the parts that make it usable, and this tool takes both.</p>
+    Stryker, PIT, mutmut and Cosmic Ray all do it. Anyone who says that part is new is wrong.
+    Two industrial programs solved the parts that make it usable. This tool takes both.</p>
     <div class="cols-2" style="margin-top:11px">
       <div>
         <h3>Google — making it affordable</h3>
-        <p class="note">Mutating two billion lines is infeasible, so Petrović et al. mutate only
-        <em>changed</em> lines, suppress “arid” nodes nobody would test, cap what is surfaced at seven
-        per file, and order candidates by the measured productivity of the operator in similar context.
+        <p class="note">Mutating two billion lines is infeasible. So Petrović et al. mutate only
+        <em>changed</em> lines, suppress “arid” nodes nobody would test, show at most seven
+        mutants per file, and order candidates by the measured productivity of the operator in similar context.
         Developer feedback over six years took their productive rate from <strong>15% to 89%</strong>.
-        A later study found reported mutants are coupled to real faults: the bugs they analysed would
-        have been caught had a mutant been surfaced.</p>
+        A later study found that reported mutants link to real faults: the bugs it analyzed would
+        have been caught if a mutant had been shown.</p>
         <p class="note"><em>Taken here:</em> the diff scope, the cap, and a productivity-ordered
-        selection — measured on real probed faults rather than assumed. Their arid-node suppression
-        was measured, not copied: Google's categories are under 1% of what the producers propose;
-        the arid class here is presentational JSX, now set aside and counted.</p>
+        selection, measured on real probed faults, not assumed. We measured their arid-node suppression
+        instead of copying it: Google's categories are under 1% of what the producers propose.
+        The arid class here is presentational JSX, now set aside and counted.</p>
       </div>
       <div>
         <h3>Meta — making it specific</h3>
         <p class="note">ACH inverts the generator: an engineer writes a <em>concern</em> in plain text,
-        an LLM drafts faults for that concern, and each one must build, survive the existing suite, and
+        an LLM drafts faults for that concern. Each fault must build, survive the existing suite, and
         not be equivalent before a test is generated to kill it. Engineers accepted <strong>73%</strong>
-        of the resulting tests. Nothing is trusted because a model said it — every step is gated by
-        execution, and the mutant is shown to the reviewer as proof the test catches something real.</p>
+        of the resulting tests. Nothing is trusted because a model said it. Execution gates every step,
+        and the reviewer sees the mutant as proof that the test catches something real.</p>
         <p class="note"><em>Taken here:</em> the concern as the unit a human writes, and an execution
         gate between every model step and the record.</p>
       </div>
     </div>
-    <p class="note" style="margin-top:9px">What neither does is bind a fault to a <em>stated promise</em>.
-    That is the remaining gap, and it is the next section.</p>
+    <p class="note" style="margin-top:9px">Neither tool binds a fault to a <em>stated promise</em>.
+    That gap remains, and the next section covers it.</p>
   </section>
 
   <section class="rule-top">
@@ -873,16 +873,16 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
         <h3>Mutates everything, mechanically</h3>
         <span class="q">“How good are my tests?”</span>
         <p class="out">→ <em>Mutation score: 73%</em></p>
-        <p class="note" style="margin-top:8px">A number. Not actionable, not auditable, and it cannot tell
-        you which promise is at risk.</p>
+        <p class="note" style="margin-top:8px">A number. You cannot act on it or audit it, and it does not say
+        which promise is at risk.</p>
       </div>
       <div>
         <div class="kicker">TestGuard</div>
         <h3>Binds every fault to a stated claim</h3>
         <span class="q">“Is <em>this specific promise</em> defended?”</span>
         <p class="out">→ <em>“Your project says a missing scope fails closed. Nothing checks that.”</em></p>
-        <p class="note" style="margin-top:8px">A finding. An assessor reads your claims — reviewable like
-        code — not a score.</p>
+        <p class="note" style="margin-top:8px">A finding. An assessor reads your claims, which you review like
+        code, not a score.</p>
       </div>
     </div>
 
@@ -947,11 +947,11 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
     <h2>And one thing that was measured, not assumed</h2>
     <p class="note">“No model decides a verdict” is a design rule elsewhere in this brief. It is also a
     result. A calibrated commercial decision model was shadow-evaluated against real probed verdicts on
-    an AI-authored codebase: asked whether a given test would catch a given fault, it scored
-    <strong>AUC 0.813</strong> — and its errors ran in the forbidden direction, confidently reporting
+    an AI-authored codebase. It had to say whether a given test would catch a given fault. It scored
+    <strong>AUC 0.813</strong>. Its errors went in the forbidden direction: it confidently said
     that a test would catch a fault that in fact survived. On hand-built fixtures the same model looked
-    far better, which is the second finding: a synthetic fixture flatters any judge, because its blind
-    spots were authored to be legible. Execution remains the only thing permitted to say
+    far better. This is the second finding: a synthetic fixture flatters any judge, because its blind
+    spots were written to be easy to see. Only execution may say
     <code>killed</code>.</p>
   </section>
 
@@ -959,22 +959,22 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
     <h2>What it deliberately is not</h2>
     <div class="cols-2">
       <div><ul class="ticks">
-        <li><strong>Not a test generator.</strong> It judges a test the agent wrote; the generating half
-        stays with the agent, where the market is putting it.</li>
-        <li><strong>Not a coverage tool.</strong> A line executed says nothing about whether an assertion
+        <li><strong>Not a test generator.</strong> It judges a test the agent wrote. The agent keeps the job
+        of writing tests, as the market is doing.</li>
+        <li><strong>Not a coverage tool.</strong> A line that ran does not show that an assertion
         would notice.</li>
       </ul></div>
       <div><ul class="ticks">
         <li><strong>Not a mutation-score dashboard.</strong> No blanket mutants, no single number, no
         threshold to game.</li>
-        <li><strong>Not a self-healing runner.</strong> A defender that adapts itself to a change is a
-        defender that did not observe it.</li>
+        <li><strong>Not a self-healing runner.</strong> A defender that adapts itself to a change did not
+        observe the change.</li>
       </ul></div>
     </div>
-    <p class="note" style="margin-top:9px">And one gap it names rather than hides: a claim that
-    <em>disappeared</em> is invisible to all of the above — <code>probe</code> verifies the claims that
-    exist, and deleting one is cheaper than weakening it. So removal is reported too, against any
-    reference, with the verdict the claim last had. Removal is allowed; claims can be wrong, superseded
+    <p class="note" style="margin-top:9px">One gap it names: a claim that
+    <em>disappeared</em> is invisible to all of the above. <code>probe</code> verifies the claims that
+    exist, and deleting a claim is cheaper than weakening it. So it reports removal too, against any
+    reference, with the last verdict of the claim. Removal is allowed, because claims can be wrong, superseded
     or split. It is never silent.</p>
   </section>
 
@@ -983,9 +983,9 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
     <div class="cols-3">
       <div>
         <h3>Paranoid about itself</h3>
-        <p class="note">Most tools mark a mutant killed when the test command exits non-zero — conflating
-        “a test caught it” with “everything exploded.” Here the verdict set is closed and each member
-        means something different.</p>
+        <p class="note">Most tools mark a mutant killed when the test command exits non-zero. That confuses
+        “a test caught it” with “everything failed.” Here the verdict set is closed, and each verdict
+        has its own meaning.</p>
       </div>
       <div>
         <h3>Evidence, not output</h3>
@@ -995,7 +995,7 @@ field-dropped  missed 4/4  p=1.00  ci [0.51, 1.00]</pre>
       <div>
         <h3>Built for AI-written code</h3>
         <p class="note">When an agent writes the tests, the failure mode is not “no tests.” It is confident,
-        plausible tests that assert nothing. That is precisely what this detects.</p>
+        plausible tests that assert nothing. This is exactly what it detects.</p>
       </div>
     </div>
   </section>

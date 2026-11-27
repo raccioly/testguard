@@ -1,19 +1,20 @@
 # GitLab CI
 
-This guide wires TestGuard into GitLab CI with the include template this
-repository publishes: a gate on every merge request, a probe on merge requests
-and on the default branch, the brief as an artifact and, if you opt in, as a
-merge-request note. It is for whoever owns the project's `.gitlab-ci.yml`.
-Every template input is listed here with its default.
+This guide connects TestGuard to GitLab CI with the include template this
+repository publishes. You get a gate on every merge request and a probe on
+merge requests and on the default branch. You get the brief as an artifact.
+If you opt in, you also get the brief as a merge-request note. The guide is for
+whoever owns the project's `.gitlab-ci.yml`. It lists every template input with
+its default.
 
 The template is
 [`packaging/gitlab/testguard.gitlab-ci.yml`](../../../packaging/gitlab/testguard.gitlab-ci.yml).
-It declares `spec: inputs:`, so it is shaped like a CI/CD component.
+It declares `spec: inputs:`, so it has the shape of a CI/CD component.
 
 ## Include it
 
-Pin the include to a release tag, so the template and the CLI version it runs
-move together:
+Pin the include to a release tag. Then the template and the CLI version it
+runs change together:
 
 ```yaml
 include:
@@ -33,10 +34,10 @@ That adds two jobs to your pipeline:
 `<dir>` is the `dir` input; with the default `.` the artifacts are under
 `.testguard/` at the repository root.
 
-Both jobs extend a hidden `.testguard` job that uses the `image` and `stage`
-inputs, sets `TESTGUARD_VERSION`, `TESTGUARD_DIR` and `GIT_DEPTH` as its own
-variables, and before the script runs `cd "$TESTGUARD_DIR"` and installs the
-project's npm dependencies (its test runner lives there):
+Both jobs extend a hidden `.testguard` job. That job uses the `image` and
+`stage` inputs and sets `TESTGUARD_VERSION`, `TESTGUARD_DIR` and `GIT_DEPTH` as
+its own variables. Before the script runs, it does `cd "$TESTGUARD_DIR"` and
+installs the project's npm dependencies (the test runner lives there):
 
 | In `dir` | Install step |
 |---|---|
@@ -44,7 +45,7 @@ project's npm dependencies (its test runner lives there):
 | `package.json` without a lockfile | `npm install --ignore-scripts --no-save --no-package-lock --no-audit --no-fund`: installs into `node_modules` without writing a lockfile or changing `package.json` |
 | no `package.json` (a Python-only project) | nothing; the job says so and goes on |
 
-The CLI itself is never installed into the project. Each TestGuard command
+The template never installs the CLI into the project. Each TestGuard command
 runs as `npx -y "testguard-cli@${TESTGUARD_VERSION}"`.
 
 ## Inputs
@@ -73,32 +74,32 @@ boolean input. Every other input is a string.
 
 ## How the gate finds the base
 
-`testguard gate` with no `--changed` detects the base from the environment, in
-this order:
+`testguard gate` with no `--changed` detects the base from the environment. It
+checks these in order:
 
 1. `TESTGUARD_CHANGED_REF`, if you set it.
-2. `CI_MERGE_REQUEST_DIFF_BASE_SHA`: the exact diff base GitLab gives a merge
-   request pipeline. It needs no extra fetch.
+2. `CI_MERGE_REQUEST_DIFF_BASE_SHA`: the exact diff base that GitLab gives a
+   merge request pipeline. It needs no extra fetch.
 3. `CI_MERGE_REQUEST_TARGET_BRANCH_NAME`, as `origin/<target>`. This one needs
-   the branch locally: `GIT_DEPTH: 0`, or `git fetch origin <target>` before
-   the job.
+   the branch locally. Set `GIT_DEPTH: 0`, or run `git fetch origin <target>`
+   before the job.
 
 The template's gate job runs only on merge request pipelines, where step 2
-answers. If you add a gate on another kind of pipeline, set
-`TESTGUARD_CHANGED_REF` and fetch that ref. A base that is detected but does
-not resolve fails the gate with exit `2`.
+gives the answer. If you add a gate on another kind of pipeline, set
+`TESTGUARD_CHANGED_REF` and fetch that ref. If the gate detects a base but
+cannot resolve it, the gate fails with exit `2`.
 
 ## `GIT_DEPTH`
 
 The template sets `GIT_DEPTH: "0"` on its own two jobs, through the hidden
 `.testguard` job's `variables:`. The probe builds a scratch git worktree from
-`HEAD` and records, for each kill, whether the test and the code came from the
-same change; that record is `unknown` in a shallow clone. Full history is the
+`HEAD`. For each kill, it records whether the test and the code came from the
+same change. In a shallow clone, that record is `unknown`. Full history is the
 safe default.
 
 The template has no top-level `variables:`, because those would apply to
-every job in the including pipeline. Your other jobs keep the clone depth
-they had. To clone the TestGuard jobs shallower, override the variable on
+every job in the including pipeline. Your other jobs keep their clone depth.
+To make the TestGuard jobs clone less history, override the variable on
 them:
 
 ```yaml
@@ -115,34 +116,34 @@ then the ranked blind spots) as **one** note on the merge request, and updates
 that same note on later runs. It finds its earlier note by the marker on the
 note's first line, `<!-- testguard:brief -->`, among the latest 100 notes.
 
-It needs a token, because `CI_JOB_TOKEN` cannot write notes:
+It needs a token, because `CI_JOB_TOKEN` cannot write notes.
 
 1. Create a project or group access token with the `api` scope.
 2. Add it as a CI/CD variable named `TESTGUARD_GITLAB_TOKEN`, masked. A
    *protected* variable is only exposed to pipelines on protected branches, so
    a merge request from an unprotected branch would not see it.
 
-When the token is missing the job says so and leaves the brief in the
-artifacts. A failure to list, post or update the note is printed and never
-fails the job: the note is a convenience for the reviewer, the probe's exit
-code is the gate.
+When the token is missing, the job says so and leaves the brief in the
+artifacts. If the job fails to list, post or update the note, it prints the
+failure and does not fail the job. The note helps the reviewer. The probe's
+exit code is the gate.
 
-The CLI itself never talks to the network. The note is posted by a few lines
-of Node in the template's script, through the GitLab API, and only when you
-set `post_note: true`.
+The CLI itself never talks to the network. A few lines of Node in the
+template's script post the note through the GitLab API. They do this only when
+you set `post_note: true`.
 
 ## Things the template assumes
 
 - **npm for JavaScript dependencies.** The install step knows npm's
   lockfiles only. A Yarn or pnpm project gets `npm install` without a
-  lockfile, which resolves versions afresh; override `before_script` on the
+  lockfile, which resolves versions again. Override `before_script` on the
   jobs to install the way your project does.
 - **Node and, for Python, Python in one image.** The default `node:22` image
-  has no Python. Set `image` to one that carries both before probing a Python
-  project, and point `python` at the interpreter if your dependencies live in
-  a virtual environment the job creates. The template installs no Python
-  packages; add that step after the template's own, which has already changed
-  into `dir`:
+  has no Python. Before you probe a Python project, set `image` to one that
+  has both. If your dependencies live in a virtual environment that the job
+  creates, point `python` at the interpreter. The template installs no Python
+  packages. Add that step after the template's own step, which has already
+  changed into `dir`:
 
   ```yaml
   testguard:probe:
@@ -153,8 +154,9 @@ set `post_note: true`.
 
 ## Read CI's evidence locally
 
-The probe job's artifacts include `.testguard/evidence.json`. To brief from
-the default branch's evidence on your laptop, write the GitLab helper once:
+The probe job's artifacts include `.testguard/evidence.json`. To get a brief
+from the default branch's evidence on your laptop, write the GitLab helper
+once:
 
 ```bash
 npx testguard-cli init --ci-evidence gitlab   # writes .testguard/fetch-ci-evidence.sh
@@ -164,25 +166,27 @@ npx testguard-cli init --ci-evidence gitlab   # writes .testguard/fetch-ci-evide
 The helper runs `glab ci artifact <branch> testguard:probe` into
 `.testguard/ci/` and then
 `testguard brief . --text --evidence .testguard/ci/.testguard/evidence.json`.
-For a project in a subdirectory the artifact keeps the project's path, and the
+For a project in a subdirectory, the artifact keeps the project's path. The
 helper reads `.testguard/ci/<dir>/.testguard/evidence.json`, never another
 project's evidence from the same artifact.
-It runs the same CLI the session-start hook would (the project's
-`node_modules/.bin/testguard`, then the repository root's, then `PATH`), and
-exits `0` with a message when `glab` is missing, when no TestGuard CLI is
-found, or when there is no artifact for the branch. The session-start hook
-never runs it; you do, when you want CI's view. How a foreign evidence file is
-read (its commit named, staleness still computed from the recorded hashes) is
-described in [GitHub Actions](github-actions.md#read-cis-evidence-locally).
+
+It runs the same CLI the session-start hook would run: the project's
+`node_modules/.bin/testguard`, then the repository root's, then `PATH`. It
+exits `0` with a message when `glab` is missing, when it finds no TestGuard
+CLI, or when the branch has no artifact. The session-start hook never runs the
+helper. You run it when you want CI's view. TestGuard names the commit of a
+foreign evidence file and still computes staleness from the recorded hashes.
+See [GitHub Actions](github-actions.md#read-cis-evidence-locally) for how it
+reads that file.
 
 ## As a catalog component
 
-The template carries `spec: inputs:` with the same inputs as above. Mirrored
-into a GitLab project of your own, it can be published to the CI/CD catalog
-and included with `include: component:` instead of `include: remote:`, with
+The template carries `spec: inputs:` with the same inputs as above. Mirror it
+into a GitLab project of your own to publish it to the CI/CD catalog. Then
+include it with `include: component:` instead of `include: remote:`, with
 the same `inputs:`. A compliance framework can then require it on every
 project in a group. Follow GitLab's component documentation for the project
-layout a catalog component needs.
+layout that a catalog component needs.
 
 ## Next
 

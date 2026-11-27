@@ -1,13 +1,13 @@
 # Installation
 
-This page lists every way to install TestGuard, what each channel needs, how
-to tell which install answered a command, and how to remove everything
-`testguard init` wrote. Read it once when you pick a channel; the
+This page lists every way to install TestGuard and what each channel needs.
+It also shows how to tell which install answered a command, and how to remove
+everything `testguard init` wrote. Read it once when you pick a channel. The
 [quickstart](quickstart.md) assumes the npm devDependency.
 
 TestGuard is a Node.js CLI published to npm as `testguard-cli`. Every other
-channel (pip, Homebrew, the GitHub Action, pre-commit, GitLab CI) ends up
-running that same npm package.
+channel (pip, Homebrew, the GitHub Action, pre-commit, GitLab CI) runs that
+same npm package.
 
 ## Requirements
 
@@ -19,8 +19,8 @@ running that same npm package.
 | The project's own test runner | when you probe | vitest, jest and Playwright are resolved from the project's own `node_modules`; Python runs under pytest when the interpreter can import it, otherwise stdlib `unittest`. See [languages and runners](reference/languages-and-runners.md). |
 
 TestGuard has one exact-pinned runtime dependency, `ajv` (`8.20.0`). `ajv`
-brings four small packages of its own (`fast-deep-equal`, `fast-uri`,
-`json-schema-traverse`, `require-from-string`), so a production install is six
+needs four small packages of its own (`fast-deep-equal`, `fast-uri`,
+`json-schema-traverse`, `require-from-string`). A production install is six
 packages in total.
 
 ## Pick a channel
@@ -42,10 +42,9 @@ npx testguard-cli status        # runs the package without adding it to package.
 npx testguard-cli@<version> probe  # pin an exact version
 ```
 
-npx asks the npm registry for the package when the project does not already
-have it installed, so it needs network access the first time. Inside a project
-that has `testguard-cli` as a dependency, `npx testguard-cli` runs that local
-copy.
+npx asks the npm registry for the package when the project does not have it
+installed. So the first run needs network access. Inside a project that has
+`testguard-cli` as a dependency, `npx testguard-cli` runs that local copy.
 
 ### npm devDependency (recommended for JavaScript projects)
 
@@ -54,17 +53,19 @@ npm i -D testguard-cli          # adds it to devDependencies and the lockfile
 npx testguard --version         # the bin is called `testguard`
 ```
 
-The package's executable is `testguard`, so after a local install both
-`npx testguard` and `npx testguard-cli` work. This is the channel the
-session-start hook written by `init` looks for first
-(`node_modules/.bin/testguard`), which is why it is the recommended one for a
-project an AI agent works in. See [AI agents](guides/ai-agents.md).
+The package's executable is `testguard`. After a local install, both
+`npx testguard` and `npx testguard-cli` work.
+
+The session-start hook that `init` writes looks for this install first
+(`node_modules/.bin/testguard`).
+So this channel is the one we recommend for a project where an AI agent works.
+See [AI agents](guides/ai-agents.md).
 
 #### `min-release-age` and `ENOVERSIONS`
 
 A project that sets `min-release-age` in `.npmrc` cannot see a version
-published fewer than that many days ago, and npm fails with `ENOVERSIONS`.
-Install that one version with the setting overridden on the command line:
+published fewer than that many days ago. npm then fails with `ENOVERSIONS`.
+Override the setting on the command line to install that one version:
 
 ```bash
 npm i -D testguard-cli --min-release-age=0
@@ -78,26 +79,26 @@ testguard --version
 ```
 
 The PyPI package does not contain the CLI. It installs a small wrapper
-(`testguard_cli/wrapper.py`) that finds Node and runs the npm package:
+(`testguard_cli/wrapper.py`). The wrapper finds Node and runs the npm package:
 
-1. It looks for `node`, then `node22`, then `node20` on `PATH` and uses the
-   first whose major version is 20 or higher. With none, it exits 1 with
-   `Error: Node.js 20+ is required but not found.`
+1. It looks for `node`, then `node22`, then `node20` on `PATH`. It uses the
+   first one whose major version is 20 or higher. If it finds none, it exits 1
+   with `Error: Node.js 20+ is required but not found.`
 2. It searches upward from the current directory for
-   `node_modules/testguard-cli/cli/testguard.mjs`. If it finds one, it runs
-   that file, so a project that pins `testguard-cli` in npm runs the pinned
+   `node_modules/testguard-cli/cli/testguard.mjs`. If it finds that file, it
+   runs it. So a project that pins `testguard-cli` in npm runs the pinned
    version offline.
-3. Otherwise it runs `npx -y testguard-cli@<version>`, where `<version>` is
+3. Otherwise it runs `npx -y testguard-cli@<version>`. Here `<version>` is
    the pip package's own version, read from its installed metadata. The PyPI
-   and npm packages are released together at the same version, so
-   `pip install testguard-cli==X.Y.Z` runs CLI X.Y.Z. npx needs network
-   access the first time it fetches that version. If the wrapper cannot read
-   its own version (it was not installed through pip), it exits 1 rather than
-   run an unpinned CLI.
+   and npm packages are released together at the same version. So
+   `pip install testguard-cli==X.Y.Z` runs CLI X.Y.Z. The first time, npx
+   needs network access to fetch that version. If the wrapper cannot read its
+   own version (it was not installed through pip), it exits 1. It never runs
+   an unpinned CLI.
 
 To run the CLI offline, or at a version other than the wheel's, also install
-`testguard-cli` with npm in the project (or a parent directory) so step 2
-answers.
+`testguard-cli` with npm in the project (or a parent directory). Then step 2
+finds it.
 
 ### Homebrew
 
@@ -106,8 +107,8 @@ brew tap raccioly/tap
 brew install testguard          # or in one step: brew install raccioly/tap/testguard
 ```
 
-The formula depends on Homebrew's `node` and installs the published npm
-tarball, checked against a `sha256` recorded at release time.
+The formula depends on Homebrew's `node`. It installs the published npm
+tarball and checks it against a `sha256` recorded at release time.
 
 ### GitHub Action
 
@@ -118,10 +119,9 @@ tarball, checked against a `sha256` recorded at release time.
   with: { command: gate }
 ```
 
-The action is a composite: it sets up Node and runs
-`npx -y testguard-cli@<version>` with the inputs you give it. Every input,
-and complete pull-request and main-branch workflows, are in
-[GitHub Actions](guides/ci/github-actions.md).
+The action is a composite. It sets up Node and runs
+`npx -y testguard-cli@<version>` with the inputs you give it. [GitHub Actions](guides/ci/github-actions.md)
+lists every input and shows complete pull-request and main-branch workflows.
 
 ### pre-commit
 
@@ -135,10 +135,10 @@ repos:
       - id: testguard-probe
 ```
 
-pre-commit installs the repository at `rev` into its own Node environment, so
-the hooks run that version whatever the project has in `node_modules`. The
-three hooks, their stages and their arguments are in
-[pre-commit](guides/ci/pre-commit.md).
+pre-commit installs the repository at `rev` into its own Node environment.
+So the hooks run that version, whatever the project has in `node_modules`.
+[pre-commit](guides/ci/pre-commit.md) describes the three hooks, their stages
+and their arguments.
 
 ### GitLab CI
 
@@ -148,8 +148,8 @@ include:
     inputs: { dir: . }
 ```
 
-The template adds a `testguard:gate` job and a `testguard:probe` job. Every
-input is in [GitLab CI](guides/ci/gitlab.md).
+The template adds a `testguard:gate` job and a `testguard:probe` job.
+[GitLab CI](guides/ci/gitlab.md) lists every input.
 
 ## Verify the install
 
@@ -159,11 +159,11 @@ command -v testguard            # which executable your shell resolves
 node_modules/.bin/testguard --version   # the project's local install, if it has one
 ```
 
-Two installs on one machine (a global Homebrew one and a project's
-devDependency, say) can be different versions. The brief names the one that
-answered: its first line reads `testguard <version> (local install)` when the
-running CLI was started from a path inside a `node_modules` directory, and
-`(global)` otherwise.
+Two installs on one machine can be different versions. One example is a
+global Homebrew install and a project's devDependency. The brief names the
+install that answered. Its first line reads `testguard <version> (local install)`
+when the running CLI started from a path inside a `node_modules` directory.
+Otherwise it reads `(global)`.
 
 ```text
 testguard <version> (local install) @ bee6ee9530c6 — 1 claims, 1 faults probed, 1 unproven (no baseline; everything is new).
@@ -171,9 +171,9 @@ testguard <version> (local install) @ bee6ee9530c6 — 1 claims, 1 faults probed
 
 ## Offline and air-gapped machines
 
-The CLI itself never needs the network once installed. Getting it onto a
-machine without registry access needs the six packages of the production
-install. npm's own cache carries them:
+Once installed, the CLI never needs the network. To get it onto a machine
+without registry access, you need the six packages of the production install.
+npm's own cache carries them:
 
 ```bash
 # on a machine with registry access, in an empty directory
@@ -185,18 +185,19 @@ npm install --offline --cache /path/to/npm-cache -D testguard-cli@<version>
 npx --offline testguard --version
 ```
 
-`--offline` makes npm refuse any network request, so the install either comes
+`--offline` makes npm refuse any network request. The install either comes
 entirely from the copied cache or fails.
 
-pip alone is not an offline channel: when the wrapper finds no local
+pip alone is not an offline channel. When the wrapper finds no local
 `node_modules/testguard-cli`, it falls back to `npx -y testguard-cli@<its own version>`.
-Install the npm package offline as above and the wrapper runs it.
+Install the npm package offline as above, and the wrapper runs it.
 
 ## Network and telemetry
 
 The CLI collects nothing and sends nothing: no telemetry, no crash reports, no
 update check, no socket. [`PRIVACY.md`](../PRIVACY.md) is the full statement.
-What can reach the network is the channel around it, and only these:
+Only the channel around the CLI can reach the network, and only in these
+cases:
 
 | Who | When |
 |---|---|
@@ -210,12 +211,13 @@ What can reach the network is the channel around it, and only these:
 | An AI agent following the `init` instructions | optionally, once per session: `npm view testguard-cli dist-tags.latest` (see [Upgrading](upgrade.md#advisory-updates-for-ai-sessions)) |
 
 The session-start hook that `init` writes never fetches. It runs the
-project's `node_modules/.bin/testguard`, then a `testguard` already on `PATH`,
-then nothing; there is no `npx` in it.
+project's `node_modules/.bin/testguard`. If that does not exist, it runs a
+`testguard` already on `PATH`. If that does not exist, it runs nothing. The
+hook has no `npx` in it.
 
 Evidence files contain repository-relative paths, test file names, claim
 statements, content hashes, counts, durations and the commit sha. If you
-upload them as CI artifacts, you publish that.
+upload them as CI artifacts, you publish that information.
 
 ## Uninstall
 
@@ -230,7 +232,7 @@ brew uninstall testguard && brew untap raccioly/tap   # Homebrew
 For CI and hooks, delete the `uses: raccioly/testguard@…` steps, the GitLab
 `include:` entry, or the `testguard-*` entries in `.pre-commit-config.yaml`.
 
-`testguard init` wrote these files. Remove what you no longer want:
+`testguard init` wrote the files below. Remove what you no longer want:
 
 | What | Where | How to remove |
 |---|---|---|
@@ -240,7 +242,7 @@ For CI and hooks, delete the `uses: raccioly/testguard@…` steps, the GitLab
 | The `.gitignore` lines | the project's `.gitignore`, under `# TestGuard: regenerated per run (baseline.json IS committed)` | delete the comment and the `.testguard/…` lines below it |
 | The CI evidence helper (only with `--ci-evidence`) | `.testguard/fetch-ci-evidence.sh` | delete it |
 
-Your own project files are not written by `init` and stay until you remove
+`init` does not write your own project files. They stay until you remove
 them: `testguard.claims.json`, `testguard.ignore.json`,
 `testguard.concerns.json` and the `.testguard/` directory (whose committed
 file is `baseline.json`). See [artifacts](reference/artifacts.md) for what
