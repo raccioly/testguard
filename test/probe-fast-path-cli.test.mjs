@@ -135,4 +135,23 @@ describe('an --out file this TestGuard cannot read (#301)', () => {
       expect(evidenceAt(project, 'evidence.json').run.reuse.reused).toBe(0);
     } finally { rmSync(project.dir, { recursive: true, force: true }); }
   }, 60_000);
+
+  // Regression guard (#301, section 3): readReuseSources already treats an unreadable file as nothing to reuse, so this
+  // passes today. It pins the same behavior for an --out file the user names, not only the default evidence path.
+  it('an --out file named by the user is re-measured and replaced the same way', async () => {
+    const project = partialBudgetProject();
+    const out = join(project.dir, 'custom-evidence.json');
+    try {
+      const full = await run(project, { out });
+      expect(full.code, full.err.join('\n')).toBe(0);
+      const doc = JSON.parse(readFileSync(out, 'utf8'));
+      doc.run.faultWorkers = 2;
+      for (const record of doc.records) for (const r of record.detail.probeRuns ?? []) delete r.alone;
+      writeFileSync(out, JSON.stringify(doc));
+      const again = await run(project, { out });
+      expect(again.code, again.err.join('\n')).toBe(0);
+      expect(again.err.join('\n')).toMatch(/cannot be read as evidence by this TestGuard .*fault fan-out needs at least one probe run measured alone.*measured again/);
+      expect(JSON.parse(readFileSync(out, 'utf8')).run.reuse.reused).toBe(0);
+    } finally { rmSync(project.dir, { recursive: true, force: true }); }
+  }, 60_000);
 });

@@ -174,7 +174,7 @@ describe('init finds the slow and stale ways, and --upgrade fixes only its own',
       writeFileSync(skill, legacy);
       expect(initProject({ projectDir: dir, toolVersion: '0.23.0' }).outdated).toEqual([expect.stringMatching(/SKILL\.md: an older skill template, unmodified/)]);
       initProject({ projectDir: dir, upgrade: true, toolVersion: '0.23.0' });
-      expect(readFileSync(skill, 'utf8')).toBe(markSkill(TEMPLATE));
+      expect(readFileSync(skill, 'utf8')).toBe(markSkill(TEMPLATE, '0.23.0'));
       writeFileSync(skill, legacy + '\nOur own rule.\n');
       const r = initProject({ projectDir: dir, upgrade: true, toolVersion: '0.23.0' });
       expect(r.skipped).toEqual(expect.arrayContaining([expect.stringMatching(/SKILL\.md exists and was edited/)]));
@@ -231,12 +231,12 @@ describe('the pure pieces', () => {
   });
 
   it('a skill is current, an unmodified older template, or modified', () => {
-    expect(skillState(markSkill(TEMPLATE), TEMPLATE)).toBe('current');
-    expect(skillState(markSkill(TEMPLATE).replace(`template ${TEMPLATE_VERSION}`, 'template 1'), TEMPLATE)).toBe('old');
+    expect(skillState(markSkill(TEMPLATE, '0.23.0'), TEMPLATE)).toBe('current');
+    expect(skillState(markSkill(TEMPLATE, '0.23.0').replace(`template ${TEMPLATE_VERSION}`, 'template 1'), TEMPLATE)).toBe('old');
     expect(skillState('anything', TEMPLATE, [])).toBe('modified');
     // Edited after init wrote it: the marker's hash no longer matches.
-    expect(skillState(markSkill(TEMPLATE) + '\nOur own rule.\n', TEMPLATE)).toBe('modified');
-    expect(skillState(markSkill(TEMPLATE).replace(`template ${TEMPLATE_VERSION}`, 'template 1') + '\nOur own rule.\n', TEMPLATE)).toBe('modified');
+    expect(skillState(markSkill(TEMPLATE, '0.23.0') + '\nOur own rule.\n', TEMPLATE)).toBe('modified');
+    expect(skillState(markSkill(TEMPLATE, '0.23.0').replace(`template ${TEMPLATE_VERSION}`, 'template 1') + '\nOur own rule.\n', TEMPLATE)).toBe('modified');
   });
 
   it('versions compare numerically, and only plain x.y.z versions compare', () => {

@@ -21386,6 +21386,144 @@
           }
         }
       ]
+    },
+    {
+      "id": "TG-INIT-SKILL-CARRIES-GENERATED-HEADER",
+      "statement": "The skill init installs carries a generated-by header directly after its front matter, ahead of the marker, naming the command that regenerates it; init --upgrade adds the header to an unmodified copy that has none, leaves a copy that has it alone whatever release wrote it, and never rewrites an edited copy.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #300"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/init-generated-header.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The installed skill carries no generated-by header.",
+          "faultClass": "guard-removed",
+          "file": "src/init/managed.mjs",
+          "find": "${body.slice(0, end)}${generatedByHeader(version)}\\n<!-- testguard:template",
+          "replace": "${body.slice(0, end)}<!-- testguard:template",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A copy without the header counts as current, so --upgrade never adds it.",
+          "faultClass": "condition-forced",
+          "file": "src/init/managed.mjs",
+          "find": "return hasHeader && Number(m[1])",
+          "replace": "return Number(m[1])",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The header counts in the body hash, so a copy that has it reads as edited.",
+          "faultClass": "condition-forced",
+          "file": "src/init/managed.mjs",
+          "find": "const body = installed.replace(SKILL_MARK_RE, '').replace(SKILL_HEADER_RE, '');",
+          "replace": "const body = installed.replace(SKILL_MARK_RE, '');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CLOSURE-OUTSIDE-IMPORT-IS-INDETERMINATE",
+      "statement": "A relative import that resolves to a file outside the project directory makes the import closure indeterminate (unreadable-module, naming the importing file and the specifier) instead of leaving it complete and smaller; verdict reuse refuses it and probe --changed selects the claim whenever anything in the repository changed. An import that stays inside the project leaves the closure complete.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #273"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/outside-import-closure.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An import that leaves the project is dropped from the closure without a trace.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/imports.mjs",
+          "find": "if (found.status !== 'external') addIssue(ctx, 'unreadable-module', file, specifier); continue; }",
+          "replace": "continue; }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Only an ambiguous resolution outside the project is reported, so a plain relative import out of it still shrinks the closure.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/imports.mjs",
+          "find": "if (!inside(root, target)) { if (found.status !== 'external')",
+          "replace": "if (!inside(root, target)) { if (found.status === 'ambiguous')",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-DISCOVERY-FOLLOWS-WORKSPACE-PACKAGE",
+      "statement": "Symbol-level defender discovery resolves a bare specifier that names a workspace package to the package entry the way the import closure does and follows the binding into it, so a test that imports the package by name defends the package's source; an entry it cannot resolve is defender-discovery-indeterminate, never nocover, and an ordinary package stays outside discovery.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #274"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/workspace-discovery.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A workspace package is treated as an external package again, so discovery never follows the binding into it.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/imports.mjs",
+          "find": "if (!pkg) return { status: 'external' };",
+          "replace": "if (pkg || !pkg) return { status: 'external' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A package entry that cannot be read is no longer reported, so discovery does not name the indeterminate cause.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/imports.mjs",
+          "find": "if (pkg.unreadable || entries.length !== pkg.files.length) {",
+          "replace": "if (entries.length !== pkg.files.length) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
     }
   ]
 }

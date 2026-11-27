@@ -264,14 +264,14 @@ export function initProject({ projectDir, force = false, here = false, ciEvidenc
   const outdated = [];
   if (!existsSync(skillPath) || force) {
     const replaced = force && existsSync(skillPath);
-    write(skillPath, markSkill(skillTemplate));
+    write(skillPath, markSkill(skillTemplate, toolVersion));
     done.push(`${rel(skillPath)}${replaced ? ' (replaced)' : ''}`);
   } else {
     // An unmodified older skill is TestGuard's to refresh; an edited one is the
     // project's, and only --force replaces it (#270).
     const state = skillState(readFileSync(skillPath, 'utf8'), skillTemplate, SKILL_HISTORY);
     if (state === 'current') skipped.push(`${rel(skillPath)} is the current template`);
-    else if (state === 'old' && upgrade) { write(skillPath, markSkill(skillTemplate)); done.push(`${rel(skillPath)} (upgraded to template ${TEMPLATE_VERSION})`); }
+    else if (state === 'old' && upgrade) { write(skillPath, markSkill(skillTemplate, toolVersion)); done.push(`${rel(skillPath)} (upgraded to template ${TEMPLATE_VERSION})`); }
     else if (state === 'old') outdated.push(`${rel(skillPath)}: an older skill template, unmodified — testguard init --upgrade rewrites it`);
     else skipped.push(`${rel(skillPath)} exists and was edited (use --force to replace it with the current template)`);
   }

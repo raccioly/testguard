@@ -351,7 +351,8 @@ check order is this rule.
    repository but outside the project directory cannot be hashed
    project-relative, and an entry that resolves to no file cannot be followed:
    either makes the closure indeterminate (`unreadable-module`, naming the
-   specifier). A link whose target leaves the repository, and a package
+   specifier). So does a relative import (or alias target) that resolves to a
+   file outside the project directory (#273). A link whose target leaves the repository, and a package
    installed as a real directory, stay outside the closure.
    **An alias is read, or the closure says it could not be.** Aliased
    specifiers resolve through tsconfig/jsconfig `paths`, package.json
@@ -654,7 +655,12 @@ check order is this rule.
    star exports are resolved deterministically; type-only paths do not count.
    Ambiguous origins, unsupported runtime-generated exports, graph-limit
    exhaustion, and originless cycles are `unverifiable` with reason
-   `defender-discovery-indeterminate`, never `nocover`. A declared
+   `defender-discovery-indeterminate`, never `nocover`. A bare specifier that
+   names a workspace package (rule 8) is resolved to the package's entry the
+   way the import closure resolves it, and the binding is followed into the
+   package; its `package.json` is a discovery dependency. An entry that cannot
+   be resolved is `defender-discovery-indeterminate`, and a package outside the
+   project directory is not followed. A declared
    `defendedBy` remains authoritative. `inputs.discoveryHashes` binds every
    candidate test, intermediate barrel, and resolver-configuration file
    consulted by automatic discovery. Negative candidates are dependencies too:
