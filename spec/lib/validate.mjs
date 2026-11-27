@@ -417,6 +417,15 @@ const semantic = {
       if (r.detail.undeclaredKillers && r.detail.reason !== 'killed-by-undeclared-tests') {
         errors.push({ path: `${p}/detail/undeclaredKillers`, message: 'undeclaredKillers is only meaningful with reason killed-by-undeclared-tests' });
       }
+      // GATE-SEMANTICS rule 5: an attribution rests on N escalation runs, each a
+      // fail or an error (a load error elsewhere) with a failing test body.
+      if (r.detail.undeclaredKillers) {
+        const runs = r.detail.escalationRuns ?? [];
+        const attributable = (x) => (x.outcome === 'fail' || x.outcome === 'error') && (x.assertionFailures ?? 0) + (x.exceptionFailures ?? 0) > 0;
+        if (runs.length !== doc.run.confirmRuns || !runs.every(attributable)) {
+          errors.push({ path: `${p}/detail/undeclaredKillers`, message: `undeclaredKillers needs ${doc.run.confirmRuns} escalation runs that each failed with at least one failing test body; a timeout or a run with nothing failing never attributes` });
+        }
+      }
       if (r.defenders.selectionSource) {
         const empty = r.defenders.requested.length === 0;
         if ((r.defenders.selectionSource === 'discovery' && !empty)

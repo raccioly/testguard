@@ -4263,8 +4263,8 @@
           "description": "Attribution no longer requires all N runs to have happened, so a stopped-early escalation can name a killer.",
           "faultClass": "condition-forced",
           "file": "src/probe/attribution.mjs",
-          "find": "  const attributable = state.killers !== null && state.killers.size > 0 && complete && state.runs.every(isKill);",
-          "replace": "  const attributable = state.killers !== null && state.killers.size > 0 && state.runs.every(isKill);",
+          "find": "  const attributable = state.killers !== null && state.killers.size > 0 && complete && state.runs.every(isAttributableRun);",
+          "replace": "  const attributable = state.killers !== null && state.killers.size > 0 && state.runs.every(isAttributableRun);",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -21597,6 +21597,48 @@
           "file": "src/util/glob.mjs",
           "find": "|| now.some((f, i) => f !== inventory.files[i])",
           "replace": "|| false",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-ESCALATION-ATTRIBUTES-THROUGH-A-LOAD-ERROR",
+      "statement": "Escalation names a test that failed by assertion in every run as an undeclared killer even when an unrelated file fails to load, and never on a timeout or a run with no failing test body.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #282"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/attribution.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A load error anywhere in the suite cancels attribution again.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/attribution.mjs",
+          "find": "(run.outcome === 'fail' || run.outcome === 'error') && killingFailures(run) > 0",
+          "replace": "run.outcome === 'fail' && killingFailures(run) > 0",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A timeout that reported failed tests counts as detection.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/attribution.mjs",
+          "find": "(run.outcome === 'fail' || run.outcome === 'error') && killingFailures(run) > 0",
+          "replace": "run.outcome !== 'pass' && killingFailures(run) > 0",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

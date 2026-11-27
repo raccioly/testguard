@@ -270,6 +270,18 @@ check order is this rule.
    evidence records the early stop (`detail.escalationStoppedEarly`). Stopping
    can only fail to *name* a killer, never upgrade a verdict, which is the
    pessimistic side.
+   A killer is a test that **failed in every one of the N runs**, and a run
+   may count toward that only when it is a genuine kill of the whole suite:
+   its outcome is `fail`, or `error` with at least one assertion or exception
+   failure, because a load error in one file does not stop the other files
+   from running. A test that failed in a run proves its own file ran in it, so
+   a load error in an unrelated file, the same with or without the fault,
+   does not cancel the attribution. A load error that stops the killer's own
+   file from running leaves no failed test to name, so it still prevents
+   attribution. A run with outcome `timeout`, a run with no assertion or
+   exception failure, and fewer than N runs never attribute; a mixed result
+   (a test that failed in some runs and not in others) is not detection
+   either. When unsure the answer is no attribution.
    Escalation that was wanted but cannot run, because the test universe has no
    test outside the defenders, is recorded as
    `detail.escalationSkipped: "no-test-outside-defenders"` and shown on the

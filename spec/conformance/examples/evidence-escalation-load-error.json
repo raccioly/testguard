@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "testguard",
+    "version": "0.1.0"
+  },
+  "run": {
+    "id": "run-20260917-020000",
+    "startedAt": "2026-09-17T02:00:00Z",
+    "finishedAt": "2026-09-17T02:00:41Z",
+    "repo": {
+      "head": "deadbeefcafe",
+      "dirty": false,
+      "snapshot": "c0ffeeaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "runner": {
+      "name": "vitest",
+      "version": "5.0.1",
+      "source": "project"
+    },
+    "confirmRuns": 3,
+    "mode": "worktree",
+    "runners": [
+      {
+        "name": "vitest",
+        "version": "5.0.1"
+      },
+      {
+        "name": "playwright",
+        "version": "1.63.0"
+      }
+    ],
+    "serial": true,
+    "contention": {
+      "detected": true,
+      "runners": [
+        {
+          "pid": 4321,
+          "command": "node /repo/node_modules/vitest/vitest.mjs run"
+        }
+      ]
+    }
+  },
+  "records": [
+    {
+      "fingerprint": "25899190e7bfe187efb207b064a1287505a4927d72c0183d32ef401c3538b1c3",
+      "claim": {
+        "id": "REDACT-001",
+        "statement": "The audit record written for a redacted message never contains the original secret.",
+        "severity": "critical",
+        "source": {
+          "kind": "spec",
+          "ref": "docs/spec.md#audit-records"
+        },
+        "producedBy": {
+          "producer": "human",
+          "by": "maintainer",
+          "at": "2026-09-17T02:00:00Z"
+        }
+      },
+      "subject": {
+        "kind": "fault",
+        "id": "F2",
+        "description": "Redaction skipped.",
+        "file": "src/redact.mjs",
+        "faultClass": "statement-deleted",
+        "contentHash": "f232f31d9e6eecc8e952f0da1fb0878c5060e1a4dc19724874b041a4ab265aaf"
+      },
+      "verdict": "survived",
+      "detail": {
+        "baselineRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 310
+          }
+        ],
+        "probeRuns": [
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "pass",
+            "tests": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0
+            },
+            "assertionFailures": 0,
+            "exceptionFailures": 0,
+            "durationMs": 310
+          }
+        ],
+        "escalated": true,
+        "escalationRuns": [
+          {
+            "outcome": "error",
+            "tests": {
+              "total": 218,
+              "passed": 215,
+              "failed": 3
+            },
+            "assertionFailures": 3,
+            "exceptionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "error",
+            "tests": {
+              "total": 218,
+              "passed": 215,
+              "failed": 3
+            },
+            "assertionFailures": 3,
+            "exceptionFailures": 0,
+            "durationMs": 310
+          },
+          {
+            "outcome": "error",
+            "tests": {
+              "total": 218,
+              "passed": 215,
+              "failed": 3
+            },
+            "assertionFailures": 3,
+            "exceptionFailures": 0,
+            "durationMs": 310
+          }
+        ],
+        "reason": "killed-by-undeclared-tests",
+        "undeclaredKillers": [
+          "test/summary.test.js::a drop-in booking is priced at the peak rate",
+          "test/summary.test.js::an unknown customer type is rejected"
+        ]
+      },
+      "defenders": {
+        "requested": [
+          "test/redact.test.mjs"
+        ],
+        "resolved": [
+          "e2e/redact.spec.mjs",
+          "test/redact.test.mjs"
+        ],
+        "nocover": false,
+        "byRunner": {
+          "vitest": [
+            "test/redact.test.mjs"
+          ],
+          "playwright": [
+            "e2e/redact.spec.mjs"
+          ]
+        }
+      },
+      "inputs": {
+        "targetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "defenderHashes": {
+          "test/redact.test.mjs": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "e2e/redact.spec.mjs": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      }
+    }
+  ]
+}
