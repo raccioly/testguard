@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { RUNNERS, OWNED_RUNNERS } from '../../src/probe/runners/index.mjs';
-import { SOURCE_EXT, KNOWN_SOURCE } from '../../src/gate/changed.mjs';
+import { SOURCE_EXT, KNOWN_SOURCE, BUILD_SOURCE } from '../../src/gate/changed.mjs';
 import { checkRunnerAdapter, ADAPTER_EXPORTS } from '../lib/runner-adapter.mjs';
 
 const doc = readFileSync(fileURLToPath(new URL('../RUNNER-ADAPTER.md', import.meta.url)), 'utf8');
@@ -89,13 +89,61 @@ describe('the check can fail', () => {
 });
 
 describe('extensions and the gate', () => {
-  it('every extension an adapter declares is one the gate already treats as source', () => {
-    for (const adapter of Object.values(RUNNERS)) for (const ext of adapter.extensions ?? []) expect(SOURCE_EXT.has(ext), `${adapter.name} ${ext}`).toBe(true);
+  const buildEntry = (ext) => BUILD_SOURCE.find((l) => l.match(`src/file${ext}`));
+
+  it('every extension an adapter declares is source the gate can probe: always (SOURCE_EXT), or under that adapter\'s build file (BUILD_SOURCE)', () => {
+    for (const adapter of Object.values(RUNNERS)) {
+      for (const ext of adapter.extensions ?? []) {
+        const ok = SOURCE_EXT.has(ext) || buildEntry(ext)?.runners.includes(adapter.name);
+        expect(ok, `${adapter.name} ${ext}`).toBe(true);
+      }
+    }
   });
 
   it('a language the gate still lists as unprobeable is declared by no adapter', () => {
     const declared = new Set(Object.values(RUNNERS).flatMap((r) => r.extensions ?? []));
     for (const language of KNOWN_SOURCE) for (const ext of declared) expect(language.match(`src/file${ext}`), `${language.id} ${ext}`).toBe(false);
+  });
+
+  it('every build-system language names adapters that exist and declare its extension', () => {
+    for (const language of BUILD_SOURCE) {
+      expect(language.runners.length, language.id).toBeGreaterThan(0);
+      for (const runner of language.runners) {
+        const adapter = RUNNERS[runner];
+        expect(adapter, `${language.id} names ${runner}`).toBeDefined();
+        expect((adapter.extensions ?? []).some((ext) => language.match(`src/file${ext}`)), `${runner} declares ${language.id}`).toBe(true);
+      }
+    }
+  });
+
+  it('a build-system language is not also always-probeable', () => {
+    for (const language of BUILD_SOURCE) for (const ext of SOURCE_EXT) expect(language.match(`src/file${ext}`), `${language.id} ${ext}`).toBe(false);
+  });
+});
+
+describe('producers', () => {
+  const set = () => ({ extensions: ['.java'], proposalsForLine: () => [], functionHead: () => null, functionParams: () => [], isComment: () => false });
+
+  it('are accepted when complete and when they name an extension the adapter declares', () => {
+    expect(checkRunnerAdapter({ ...minimal(), extensions: ['.java', '.kt'], producers: set() })).toEqual([]);
+  });
+
+  it('refuse a producer set that is not complete', () => {
+    for (const key of ['proposalsForLine', 'functionHead', 'functionParams', 'isComment']) {
+      const broken = set(); delete broken[key];
+      expect(paths({ ...minimal(), extensions: ['.java'], producers: broken }), key).toEqual(['producers']);
+    }
+    for (const value of ['java', 3, [], null]) expect(paths({ ...minimal(), extensions: ['.java'], producers: value }), JSON.stringify(value)).toEqual(['producers']);
+  });
+
+  it('refuse extensions the adapter does not declare, so one language never gets another\'s shapes', () => {
+    expect(paths({ ...minimal(), extensions: ['.kt'], producers: set() })).toEqual(['producers']);
+    expect(paths({ ...minimal(), producers: set() })).toEqual(['producers']);
+    expect(paths({ ...minimal(), extensions: ['.java'], producers: { ...set(), extensions: [] } })).toEqual(['producers']);
+  });
+
+  it('only the build-system adapters supply them, and each for a language it declares', () => {
+    expect(Object.values(RUNNERS).filter((r) => r.producers).map((r) => r.name).sort()).toEqual(['gradle', 'maven']);
   });
 });
 

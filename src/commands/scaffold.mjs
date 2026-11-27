@@ -81,7 +81,8 @@ export async function scaffoldCommand({ projectDir, file, files = file ? [file] 
     // as for any scaffold that proposes nothing. The note goes to stderr so
     // `--json` stdout stays one parseable claims document.
     const { extension, language } = stats.unsupported;
-    io.err(`scaffold has no producers for ${extension}${language ? ` (${language})` : ''}: nothing was proposed. Write faults by hand (see Writing claims) and declare defendedBy, because TestGuard cannot discover defenders for ${extension} files.`);
+    const buildHint = extension === '.java' ? ' A .java file gets producers in a project with a pom.xml or Gradle build file above it.' : '';
+    io.err(`scaffold has no producers for ${extension}${language ? ` (${language})` : ''}: nothing was proposed. Write faults by hand (see Writing claims) and declare defendedBy, because TestGuard cannot discover defenders for ${extension} files.${buildHint}`);
     if (values.json) io.out(JSON.stringify(doc, null, 2));
     return 0;
   }
@@ -93,7 +94,10 @@ export async function scaffoldCommand({ projectDir, file, files = file ? [file] 
   writeSpecDoc('claims', outPath, doc);
   const shapes = Object.entries(stats.byClass).map(([k, v]) => `${v} ${k}`).join(', ');
   io.out(`${stats.proposals} proposed fault${stats.proposals === 1 ? '' : 's'} in ${stats.claims} draft claim${stats.claims === 1 ? '' : 's'} for ${rel}${shapes ? ` — ${shapes}` : ''}`);
-  io.out(stats.defendedBy.length ? `defendedBy prefilled from imports: ${stats.defendedBy.join(', ')}` : 'no test file imports this module; probing the draft as-is will report NOCOVER');
+  // A language with no import discovery (Java) must not blame the tests: the cause is that TestGuard could not look (#333).
+  io.out(stats.defendedBy.length ? `defendedBy prefilled from imports: ${stats.defendedBy.join(', ')}`
+    : stats.discovery?.supported === false ? `TestGuard cannot discover defenders for ${stats.discovery.extension} files: set defendedBy to the test classes that exercise this file; probing the draft as-is will report NOCOVER`
+      : 'no test file imports this module; probing the draft as-is will report NOCOVER');
   io.out(`draft: ${outPath}`);
   io.out(`Next: ${intentHandoff} Replace each TODO statement, drop proposals that do not express the intended claim, then review before moving the claims into testguard.claims.json.`);
   return 0;

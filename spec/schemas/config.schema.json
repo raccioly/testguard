@@ -10,7 +10,7 @@
     "schemaVersion": { "const": 1 },
     "runner": {
       "description": "--runner.",
-      "enum": ["vitest", "jest", "playwright", "python", "pytest", "unittest", "node-test", "auto"]
+      "enum": ["vitest", "jest", "playwright", "python", "pytest", "unittest", "node-test", "maven", "gradle", "karma", "auto"]
     },
     "runnerCmd": {
       "description": "--runner-cmd: a custom command; must contain {files} and {out}. Run as an argv, never through a shell.",

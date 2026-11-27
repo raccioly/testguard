@@ -60,7 +60,7 @@ inputs:
     required: false
     default: '22'
   runner:
-    description: 'probe only: vitest | jest | playwright | python | pytest | unittest | node-test | auto. `python` picks pytest when the interpreter can import it and stdlib unittest otherwise; `pytest`/`unittest` pin that choice and fail rather than fall back.'
+    description: 'probe only: vitest | jest | playwright | python | pytest | unittest | node-test | maven | gradle | karma | auto. `python` picks pytest when the interpreter can import it and stdlib unittest otherwise; `pytest`/`unittest` pin that choice and fail rather than fall back.'
     required: false
     default: 'auto'
   python:

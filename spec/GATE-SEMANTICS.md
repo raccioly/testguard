@@ -1165,9 +1165,15 @@ merge-base in the working tree — file by file:
   fixtures, mocks, snapshots, the tool's own directory). Exclusions are
   listed, never silent.
 - A changed file in a language the tool recognizes as source but cannot probe
-  (Apex, Java, Kotlin, Scala, C#, Go, Ruby, PHP, DataWeave, Salesforce Flow,
-  Mule XML) is **excluded** with `by: "unsupported-language"` and its
-  `language` id, never as `non-source`. It is a gap, not a file that never
+  (Apex, Scala, C#, Go, Ruby, PHP, DataWeave, Salesforce Flow, Mule XML, and
+  Java or Kotlin in a project with no `pom.xml` or Gradle build file above the
+  file) is **excluded** with `by: "unsupported-language"` and its
+  `language` id, never as `non-source`. Java and Kotlin are source the tool
+  can probe when a `pom.xml` or a Gradle build file is in the directory of the
+  file or above it, up to the project: the `maven` and `gradle` adapters run
+  them, so such a file is evaluated like any other source file, and a JUnit
+  test file (`src/test/java`, `src/test/kotlin`, `*Test`, `*Tests`) is a test.
+  [RUNNER-ADAPTER.md](RUNNER-ADAPTER.md#extensions) states the table. It is a gap, not a file that never
   needed a claim. It is not evaluated, and it is not covered unless an
   **unexpired** `path` ignore entry excuses it. The same default and user
   exclusions apply first.

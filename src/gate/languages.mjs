@@ -1,4 +1,5 @@
-import { extname } from 'node:path';
+import { existsSync } from 'node:fs';
+import { dirname, extname, join } from 'node:path';
 
 // `.py` belongs here for the same reason every other extension does: a file
 // the gate does not recognise as source is excluded as `non-source`, which
@@ -17,8 +18,6 @@ export const SOURCE_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts',
 const byExt = (...exts) => (file) => exts.some((e) => file.endsWith(e));
 export const KNOWN_SOURCE = Object.freeze([
   { id: 'apex', name: 'Apex', match: byExt('.cls', '.trigger') },
-  { id: 'java', name: 'Java', match: byExt('.java') },
-  { id: 'kotlin', name: 'Kotlin', match: byExt('.kt') },
   { id: 'scala', name: 'Scala', match: byExt('.scala') },
   { id: 'csharp', name: 'C#', match: byExt('.cs') },
   { id: 'go', name: 'Go', match: byExt('.go') },
@@ -29,14 +28,64 @@ export const KNOWN_SOURCE = Object.freeze([
   { id: 'mule-xml', name: 'Mule XML', match: (file) => file.endsWith('.xml') && /(^|\/)src\/main\/mule\//.test(file) },
 ]);
 
-/** The known-but-unprobeable language of a path, or null. Pure. */
+/**
+ * Source a built-in runner adapter makes probeable, but only where the project
+ * has that adapter's build file (#329). The gate runs with no runner selected,
+ * so the project decides: a `pom.xml` or a Gradle build file in the directory
+ * of the file, or in any directory above it up to the project, says `maven` or
+ * `gradle` can run it. With no such file the language is a reported gap, as
+ * before. Each entry names the adapters and the build files that select them;
+ * the conformance test holds the adapters' `extensions` to this table.
+ */
+export const BUILD_MARKERS = Object.freeze({
+  maven: Object.freeze(['pom.xml']),
+  gradle: Object.freeze(['build.gradle', 'build.gradle.kts', 'settings.gradle', 'settings.gradle.kts']),
+});
+export const BUILD_SOURCE = Object.freeze([
+  { id: 'java', name: 'Java', match: byExt('.java'), runners: Object.freeze(['maven', 'gradle']) },
+  { id: 'kotlin', name: 'Kotlin', match: byExt('.kt'), runners: Object.freeze(['maven', 'gradle']) },
+]);
+
+const gap = (hit) => ({ id: hit.id, name: hit.name });
+
+/** The known language of a path that TestGuard cannot probe without a build file, or null. Pure. */
 export const unsupportedLanguage = (file) => {
   if (SOURCE_EXT.has(extname(file))) return null;
-  const hit = KNOWN_SOURCE.find((l) => l.match(file));
-  return hit ? { id: hit.id, name: hit.name } : null;
+  const hit = KNOWN_SOURCE.find((l) => l.match(file)) ?? BUILD_SOURCE.find((l) => l.match(file));
+  return hit ? gap(hit) : null;
 };
 
-export const languageName = (id) => KNOWN_SOURCE.find((l) => l.id === id)?.name ?? id;
+/**
+ * What a project makes probeable. `probeable(file)`: source TestGuard can run
+ * here. `unsupported(file)`: the language gap, or null. `runnersFor(file)`: the
+ * build-system adapters whose build file is in the project, in table order.
+ * Directory lookups are cached for the life of the classifier only, so build
+ * one per measurement and never keep it.
+ */
+export function sourceClassifier(projectDir) {
+  const markers = new Map();
+  const runnersIn = (dir) => {
+    if (!markers.has(dir)) {
+      markers.set(dir, Object.entries(BUILD_MARKERS).filter(([, names]) => names.some((n) => existsSync(join(projectDir, dir, n)))).map(([runner]) => runner));
+    }
+    return markers.get(dir);
+  };
+  const runnersFor = (file) => {
+    const language = BUILD_SOURCE.find((l) => l.match(file));
+    if (!language) return [];
+    const found = new Set();
+    for (let dir = dirname(file); ; dir = dirname(dir)) {
+      for (const runner of runnersIn(dir === '.' ? '' : dir)) found.add(runner);
+      if (dir === '.' || dir === '/' || dir === '') break;
+    }
+    return language.runners.filter((runner) => found.has(runner));
+  };
+  const probeable = (file) => SOURCE_EXT.has(extname(file)) || runnersFor(file).length > 0;
+  const unsupported = (file) => (probeable(file) ? null : unsupportedLanguage(file));
+  return { probeable, unsupported, runnersFor };
+}
+
+export const languageName = (id) => KNOWN_SOURCE.find((l) => l.id === id)?.name ?? BUILD_SOURCE.find((l) => l.id === id)?.name ?? id;
 
 /** `{ total, byLanguage }` over language ids, or undefined for none. Ids sort for a stable document. */
 export const tallyLanguages = (ids) => {

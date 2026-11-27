@@ -174,7 +174,8 @@ and some projects forbid those files in their own rules.
 | `--json` | off | Print `{done, skipped, warnings, agentRoot, dir, mcpConfig?}`. |
 
 When the project has no JavaScript, TypeScript or Python source, and it has
-files in a language TestGuard knows but cannot probe (for example Apex or Java),
+files in a language TestGuard knows but cannot probe (for example Apex, or Java
+with no `pom.xml` or Gradle build file),
 `init` prints a note that names the language and the file count. It changes
 neither the exit code nor the files written.
 
@@ -311,6 +312,9 @@ confirmed, complete run may feed a baseline.
 | `pytest` | pytest, and fail rather than fall back. |
 | `unittest` | stdlib `unittest`, and fail rather than fall back. |
 | `node-test` | Node's built-in test runner, using the Node executable running TestGuard. Explicit only. `auto` never picks it. |
+| `maven` | Maven, through the project's `./mvnw` or `mvn`. Reads the JUnit XML that Surefire writes. Explicit only. |
+| `gradle` | Gradle, through the project's `./gradlew` or `gradle`. Reads the JUnit XML in `build/test-results/test`. Explicit only. |
+| `karma` | Karma for an Angular project, through `ng test` and `karma-junit-reporter`. Explicit only. |
 
 [Languages and runners](languages-and-runners.md) covers detection, limits and
 per-runner behavior.
@@ -436,9 +440,10 @@ from the current one. TestGuard never picks a same-name tracking branch,
 because it would produce a misleading empty diff. The gate says which
 reference it chose.
 
-Source files are `.js .mjs .cjs .ts .mts .cts .jsx .tsx .py`. The gate
-treats a changed file in a language it cannot probe (for example `.cls`,
-`.java`, `.dwl`) as a gap: it is listed as `unsupported-language`, and
+Source files are `.js .mjs .cjs .ts .mts .cts .jsx .tsx .py`, and `.java` and
+`.kt` in a project with a `pom.xml` or a Gradle build file in the file's directory
+or above it. The gate treats a changed file in a language it cannot probe (for
+example `.cls`, `.dwl`, or `.java` with no build file) as a gap: it is listed as `unsupported-language`, and
 `--strict` fails on it unless an ignore entry excuses it. Every other file is
 non-source. The default exclusions (`--explain`) are
 `**/*.d.ts`, `**/*.config.*`, `**/*.stories.*`, `**/*.generated.*`,

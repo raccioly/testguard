@@ -11042,8 +11042,8 @@
           "description": "A runner value is added to --runner with no row in the languages and runners reference.",
           "faultClass": "literal-changed",
           "file": "src/cli.mjs",
-          "find": "  --runner <name>      vitest | jest | playwright | python | pytest | unittest | node-test | auto",
-          "replace": "  --runner <name>      vitest | jest | playwright | python | pytest | unittest | node-test | deno | auto",
+          "find": "  --runner <name>      vitest | jest | playwright | python | pytest | unittest | node-test | maven | gradle | karma | auto",
+          "replace": "  --runner <name>      vitest | jest | playwright | python | pytest | unittest | node-test | maven | gradle | karma | deno | auto",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -11148,7 +11148,7 @@
           "description": "gate --explain prints a hand-written extension list without .py, while the gate treats .py as source.",
           "faultClass": "literal-changed",
           "file": "src/gate/changed.mjs",
-          "find": "  `Non-source files (anything but ${[...SOURCE_EXT].join(' ')}) are excluded before these patterns apply.`,",
+          "find": "  `Non-source files (anything but ${[...SOURCE_EXT].join(' ')}, and ${BUILD_SOURCE.map((l) => l.name).join(' and ')} under a pom.xml or Gradle build file) are excluded before these patterns apply.`,",
           "replace": "  'Non-source files (anything but .js .mjs .cjs .ts .mts .cts .jsx .tsx) are excluded before these patterns apply.',",
           "producedBy": {
             "producer": "agent",
@@ -21380,6 +21380,627 @@
           "file": "spec/lib/runner-adapter.mjs",
           "find": "if (!EXTENSION.test(ext)) bad(",
           "replace": "if (false) bad(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-BUILD-SOURCE-IS-DECIDED-BY-THE-BUILD-FILE",
+      "statement": "Java and Kotlin are claimable source only where a pom.xml or Gradle build file in the directory of the file, or above it, selects an adapter that can run them; with none they stay a reported unsupported-language gap, and no other language becomes probeable.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/RUNNER-ADAPTER.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/build-source-languages.test.mjs",
+        "spec/conformance/runner-adapter.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Java is probeable whether or not a build file exists.",
+          "faultClass": "return-altered",
+          "file": "src/gate/languages.mjs",
+          "find": "    return language.runners.filter((runner) => found.has(runner));",
+          "replace": "    return language.runners;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Only the directory of the file is searched for a build file, never the directories above it.",
+          "faultClass": "condition-forced",
+          "file": "src/gate/languages.mjs",
+          "find": "      if (dir === '.' || dir === '/' || dir === '') break;",
+          "replace": "      break;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A file a build file makes probeable is still reported as an unsupported language.",
+          "faultClass": "return-altered",
+          "file": "src/gate/languages.mjs",
+          "find": "  const unsupported = (file) => (probeable(file) ? null : unsupportedLanguage(file));",
+          "replace": "  const unsupported = (file) => unsupportedLanguage(file);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Java and Kotlin are no longer a known language without a build file, so the gate calls them non-source.",
+          "faultClass": "return-altered",
+          "file": "src/gate/languages.mjs",
+          "find": "  const hit = KNOWN_SOURCE.find((l) => l.match(file)) ?? BUILD_SOURCE.find((l) => l.match(file));",
+          "replace": "  const hit = KNOWN_SOURCE.find((l) => l.match(file));",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-JVM-TEST-FILES-ARE-TESTS",
+      "statement": "A JUnit test file (under src/test/java or src/test/kotlin, or named FooTest, FooTests, FooTestCase or TestFoo) is a test to the gate and to status, never source to scaffold; a class that only starts with the letters Test is source.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/RUNNER-ADAPTER.md"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/build-source-languages.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A class whose name merely starts with Test (Testament) is read as a test.",
+          "faultClass": "literal-changed",
+          "file": "src/gate/changed.mjs",
+          "find": "|(^|\\/)Test[A-Z]\\w*\\.(?:java|kt)$/;",
+          "replace": "|(^|\\/)Test\\w*\\.(?:java|kt)$/;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A class named FooTests outside the test source set is read as source.",
+          "faultClass": "literal-changed",
+          "file": "src/gate/changed.mjs",
+          "find": "(?:Tests?|TestCase)\\.(?:java|kt)$",
+          "replace": "(?:Test|TestCase)\\.(?:java|kt)$",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Kotlin sources under src/test/kotlin are read as source.",
+          "faultClass": "literal-changed",
+          "file": "src/gate/changed.mjs",
+          "find": "(^|\\/)src\\/test\\/(?:java|kotlin)\\/",
+          "replace": "(^|\\/)src\\/test\\/java\\/",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-JVM-A-DEFENDER-IS-SELECTED-BY-CLASS-AND-MODULE",
+      "statement": "A JUnit defender is selected by the class its path under src/test/java or src/test/kotlin implies, runs in the module that holds the nearest build file, and its reports are read from that module's report directories.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/RUNNER-ADAPTER.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/runner-jvm.test.mjs",
+        "test/runner-jvm-argv.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The class keeps its slashes, so the build selects nothing.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/jvm.mjs",
+          "find": "?.[1].replaceAll('/', '.') ?? null;",
+          "replace": "?.[1] ?? null;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A module is the nearest directory with a build file only when the project root has one.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/jvm.mjs",
+          "find": "    if (markers.some((marker) => existsSync(join(projectDir, rel, marker)))) return rel;",
+          "replace": "    if (markers.some((marker) => existsSync(join(projectDir, marker)))) return rel;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Failsafe reports are never read.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/jvm.mjs",
+          "find": "  ? [underModule(module, 'target/surefire-reports'), underModule(module, 'target/failsafe-reports')]",
+          "replace": "  ? [underModule(module, 'target/surefire-reports')]",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Modules run in the order their first file sorts, not in a stable order.",
+          "faultClass": "return-altered",
+          "file": "src/probe/runners/jvm.mjs",
+          "find": "  return new Map([...groups].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));",
+          "replace": "  return groups;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-JVM-RUN-IS-JUDGED-BY-ITS-REPORTS-AND-EXIT",
+      "statement": "A Maven or Gradle run is judged by the reports it wrote and its exit status together, never optimistically: no report is an error, a requested class with no suite is an error, a failed build beside green reports is an error, and a report older than the run is never read.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/RUNNER-ADAPTER.md"
+      },
+      "severity": "critical",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/runner-jvm.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A defender the build did not report no longer makes the run an error.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/jvm.mjs",
+          "find": "  if (missing.length) return error(",
+          "replace": "  if (false) return error(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A failed build beside reports with no failure is read as a pass.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/jvm.mjs",
+          "find": "if (parsed.run.outcome === 'pass' && describeExit(exit) !== 'code 0') {",
+          "replace": "if (false) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A run that wrote no report is read instead of being an error.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/jvm.mjs",
+          "find": "  if (!report) return error(",
+          "replace": "  if (false) return error(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A report file older than the run is read as this run's.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/jvm.mjs",
+          "find": "if (lstatSync(path).mtimeMs >= startedAt - 2000) found.push(path);",
+          "replace": "found.push(path);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A class whose name merely starts with the requested class counts as having run.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/jvm.mjs",
+          "find": "s.name === cls || s.name.startsWith(`${cls}$`)",
+          "replace": "s.name === cls || s.name.startsWith(cls)",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "The report directories are not removed before the build.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/jvm.mjs",
+          "find": "  for (const dir of dirs) rmSync(join(projectDir, dir), { recursive: true, force: true });",
+          "replace": "  for (const dir of dirs) void dir;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-JVM-COMMAND-LINES-KEEP-THE-FLAGS-THAT-MAKE-A-RUN",
+      "statement": "The maven and gradle command lines keep what makes a run a run: Surefire is told an unmatched class is not a failure, a defender in a module selects it with -pl and -am, Gradle runs without a daemon or a build cache and cleans the test task, and a module path is its directory path.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/RUNNER-ADAPTER.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/runner-jvm-argv.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "Maven fails when a class is not in a module.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/maven.mjs",
+          "find": "'-Dsurefire.failIfNoSpecifiedTests=false', ",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The root module is named by an empty string in -pl.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/maven.mjs",
+          "find": "['-pl', modules.map((module) => module || '.').join(','), '-am']",
+          "replace": "['-pl', below.join(','), '-am']",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "Gradle starts a daemon that outlives the run.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/gradle.mjs",
+          "find": "'--no-daemon', ",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "Gradle may restore a report from its build cache.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/gradle.mjs",
+          "find": "'--no-build-cache', ",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "Gradle does not clean the test task, so an up-to-date task writes no report.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/gradle.mjs",
+          "find": "argv.push(`${prefix}cleanTest`, `${prefix}test`);",
+          "replace": "argv.push(`${prefix}test`);",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F6",
+          "description": "A nested module is named with slashes in its Gradle path.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/gradle.mjs",
+          "find": "(module ? `:${module.split('/').join(':')}:` : ':')",
+          "replace": "(module ? `:${module}:` : ':')",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-AUTO-NAMES-THE-BUILD-SYSTEM-IT-FOUND",
+      "statement": "When auto resolves nothing and the project says it uses Karma, Maven or Gradle, the refusal names what was found and the --runner flag that runs it instead of advice to install vitest; a project with no build system keeps its install advice.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/RUNNER-ADAPTER.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/runner-karma-pure.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The refusal for a detected build system still ends with advice to install dependencies first.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/index.mjs",
+          "find": "  if (sel.detected) return",
+          "replace": "  if (false) return",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A karma test builder in angular.json is not detected as Karma.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/runners/karma.mjs",
+          "find": "if (angular && Object.values(angular.projects ?? {}).some(isKarmaTarget)) return",
+          "replace": "if (false) return",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A spec is run under the Angular project with the shortest root, not the longest.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/runners/karma.mjs",
+          "find": "if (best === null || root.length > best.root.length) best = { name: projectName, root };",
+          "replace": "if (best === null || root.length < best.root.length) best = { name: projectName, root };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-KARMA-CONFIG-FORCES-THE-JUNIT-REPORTER",
+      "statement": "The karma adapter runs ng test headless, once, with a generated Karma config that loads the project's own config first and then forces the junit reporter into a scratch directory.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/RUNNER-ADAPTER.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/runner-karma-pure.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The generated config leaves the project's reporters in place, so no JUnit XML is written.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/karma.mjs",
+          "find": "    reporters: ['junit'],",
+          "replace": "    reporters: ['progress'],",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The generated config keeps Karma watching, so the run never ends.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/karma.mjs",
+          "find": "    singleRun: true,",
+          "replace": "    singleRun: false,",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The project's own Karma config is never loaded.",
+          "faultClass": "statement-deleted",
+          "file": "src/probe/runners/karma.mjs",
+          "find": "  base(config);\n  config.set({",
+          "replace": "  config.set({",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "ng test is left watching.",
+          "faultClass": "literal-changed",
+          "file": "src/probe/runners/karma.mjs",
+          "find": ", '--watch=false'",
+          "replace": "",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-JAVA-SCAFFOLD-PROPOSES-ONLY-SHAPES-THAT-COMPILE",
+      "statement": "The Java scaffold proposes faults that still compile: a swapped argument is null and only for a reference-typed parameter, an instanceof binding is never forced away, a ternary return is never made true, and a loop header or annotation is never changed.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/RUNNER-ADAPTER.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/scaffold.java.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A primitive parameter is offered for a null argument.",
+          "faultClass": "guard-removed",
+          "file": "src/scaffold/producers.java.mjs",
+          "find": "    if (PRIMITIVE.test(type.trim())) continue;",
+          "replace": "    if (false) continue;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "The swapped argument is undefined, which Java does not have.",
+          "faultClass": "literal-changed",
+          "file": "src/scaffold/producers.java.mjs",
+          "find": "replace: line.replace(original, () => `${callee}(null`),",
+          "replace": "replace: line.replace(original, () => `${callee}(undefined`),",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A condition that binds a pattern variable is forced to a constant.",
+          "faultClass": "guard-removed",
+          "file": "src/scaffold/producers.java.mjs",
+          "find": "  if (INSTANCEOF_BINDING.test(withoutStrings(cond))) return [];",
+          "replace": "  if (false) return [];",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A ternary return is rewritten to return true.",
+          "faultClass": "guard-removed",
+          "file": "src/scaffold/producers.java.mjs",
+          "find": "if (!plain.includes('?') && BOOLEAN_CHECK.test(plain)) {",
+          "replace": "if (BOOLEAN_CHECK.test(plain)) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A boolean literal in a loop header or an assert is swapped.",
+          "faultClass": "guard-removed",
+          "file": "src/scaffold/producers.java.mjs",
+          "find": "ANNOTATION_LINE.test(line) || LOOP_OR_ASSERT.test(line) ||",
+          "replace": "ANNOTATION_LINE.test(line) ||",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-SCAFFOLD-USES-AN-ADAPTERS-PRODUCERS-ONLY-FOR-ITS-LANGUAGE",
+      "statement": "scaffold takes an adapter's producers only for a source extension the producers name and only in a project that selects the adapter, says defenders cannot be discovered for that language, and the contract check refuses producers for an extension the adapter does not declare.",
+      "source": {
+        "kind": "spec",
+        "ref": "spec/RUNNER-ADAPTER.md"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/scaffold.java.test.mjs",
+        "spec/conformance/runner-adapter.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The Java shapes are run on a Kotlin file.",
+          "faultClass": "condition-forced",
+          "file": "src/scaffold/scaffold.mjs",
+          "find": "    if (set?.extensions?.includes(extension)) return set;",
+          "replace": "    if (set) return set;",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A Java draft no longer says that defenders cannot be discovered.",
+          "faultClass": "literal-changed",
+          "file": "src/scaffold/scaffold.mjs",
+          "find": "...(producers ? { discovery: { supported: false, extension: extensionOf(file) } } : {})",
+          "replace": "...({})",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "A producer set for an extension the adapter does not declare is accepted.",
+          "faultClass": "guard-removed",
+          "file": "spec/lib/runner-adapter.mjs",
+          "find": "else if (!p.extensions.every((ext) => adapter.extensions?.includes(ext))) bad(",
+          "replace": "else if (false) bad(",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

@@ -112,6 +112,26 @@ would prove nothing. Either the path is wrong, or your runner config excludes
 the file. Fix the path or the config. TestGuard does not run a test that your
 own runner ignores.
 
+### `Karma was found …`, `Maven was found …` or `Gradle was found …`
+
+`auto` found no runner it may pick, and your project says it is built with Karma,
+Maven or Gradle. TestGuard never chooses these three on its own. Run it again
+with `--runner karma`, `--runner maven` or `--runner gradle`. The message names
+what is missing if that runner cannot start: `karma-junit-reporter`, a Karma
+config, `@angular/cli`, a `pom.xml`, or a wrapper or tool on PATH. None of these
+adapters has been run against a real project by its authors; read the first
+result before you trust a large run
+([languages and runners](reference/languages-and-runners.md#maven)).
+
+### `the build wrote no test report`
+
+A Maven or Gradle run left no JUnit XML. A compile error does this, and the
+message then carries the compiler's first line (the engine records a fault as
+`fault-invalid` and a defender as a load failure). A selector that matched no
+test does it too: the defender is not under `src/test/java` or `src/test/kotlin`,
+or its class has no test method. TestGuard removes the report directories before
+each run, so an old report is never read in its place.
+
 ### Using a runner TestGuard does not know
 
 Use `--runner-cmd` with `{files}` and `{out}` placeholders and a

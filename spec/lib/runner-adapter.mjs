@@ -22,6 +22,7 @@ export const ADAPTER_EXPORTS = Object.freeze({
   parseReport: { required: false, kind: 'function' },
   sharedExternalState: { required: false, kind: 'boolean' },
   extensions: { required: false, kind: 'string[]' },
+  producers: { required: false, kind: 'object' },
 });
 
 /**
@@ -49,6 +50,13 @@ export function checkRunnerAdapter(adapter) {
       for (const ext of adapter.extensions) if (!EXTENSION.test(ext)) bad('extensions', `extension ${JSON.stringify(ext)} must start with a dot and be lowercase (".java", ".cls")`);
       if (new Set(adapter.extensions).size !== adapter.extensions.length) bad('extensions', 'extensions must not repeat');
     }
+  }
+  if (adapter.producers !== undefined) {
+    const p = adapter.producers;
+    const complete = p !== null && typeof p === 'object' && ['proposalsForLine', 'functionHead', 'functionParams', 'isComment'].every((key) => isFn(p[key]));
+    if (!complete) bad('producers', 'producers must be an object with the functions proposalsForLine(lines, i, ctx), functionHead(line), functionParams(line) and isComment(line)');
+    else if (!isStringArray(p.extensions) || p.extensions.length === 0 || !p.extensions.every((ext) => EXTENSION.test(ext))) bad('producers', 'producers.extensions must be a non-empty array of the extensions the shapes apply to (".java")');
+    else if (!p.extensions.every((ext) => adapter.extensions?.includes(ext))) bad('producers', 'producers.extensions must be extensions the adapter itself declares in extensions, so a language never gets another language\'s shapes');
   }
   if (isFn(adapter.fatalEdit)) {
     let content;

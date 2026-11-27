@@ -11,6 +11,8 @@ import { parseReport as sharedParse, runProcess, mergeRuns } from '../src/probe/
 import * as playwright from '../src/probe/runners/playwright.mjs';
 import * as python from '../src/probe/runners/python.mjs';
 import * as nodeTest from '../src/probe/runners/node-test.mjs';
+import { evaluateJvmRun, runJvm } from '../src/probe/runners/jvm.mjs';
+import * as karma from '../src/probe/runners/karma.mjs';
 
 const RUNNERS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'probe', 'runners');
 const ERROR_SITE = /outcome(?::\s*|\s*=\s*)'error'|\?\s*'error'\s*:/g;
@@ -56,6 +58,12 @@ const LEDGER = [
   { file: 'python.mjs', path: 'parseReport: collection errors or zero tests', source: 'collectionErrors[], else a fixed sentence',
     run: () => python.parseReport({ tests: [], collectionErrors: [{ message: '' }] }, 5), expect: /\S/ },
   { file: 'python.mjs', path: 'makeRun: interpreter or engine not resolvable', source: 'the resolver\'s message', run: null },
+  { file: 'jvm.mjs', path: 'evaluateJvmRun: no report, a defender with no suite, or a failed build beside green reports', source: 'the build\'s first error line, else a fixed sentence naming what is missing',
+    run: () => evaluateJvmRun({ report: null, exit: 1, requested: [], durationMs: 1, stdout: '' }), expect: /no test report/ },
+  { file: 'jvm.mjs', path: 'runJvm: a defender outside the Maven/Gradle source set', source: 'a fixed sentence naming the file',
+    run: () => runJvm('maven', () => [], { projectDir: tmpdir(), files: ['Foo.java'] }), expect: /Foo\.java is not under src\/test/ },
+  { file: 'karma.mjs', path: 'run: no angular.json or @angular/cli, a spec in no karma project, or a project with no Karma config', source: 'a fixed sentence naming what is missing',
+    run: () => karma.run({ projectDir: tmpdir(), files: ['a.spec.ts'] }), expect: /angular\.json/ },
   { file: 'node-test.mjs', path: 'parseReport: load error or no test bodies', source: 'the diagnostic, else the error message, else a fixed sentence',
     run: () => nodeTest.parseReport(nodeReport([{ file: 'a.test.mjs', name: 'x', container: false, suite: false, skipped: false, passed: false, error: { failureType: 'cancelledByParent', code: 'X', message: '', fileExit: false } }]), 5), expect: /\S/ },
 ];

@@ -1,6 +1,8 @@
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { proposalsForLine, functionHead, functionParams } from './producers.mjs';
+import { sourceClassifier } from '../gate/languages.mjs';
+import { RUNNERS } from '../probe/runners/index.mjs';
 import * as py from './producers.python.mjs';
 import { locate } from '../probe/inject.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
@@ -16,6 +18,30 @@ const NO_FIELD_DROPS = /\.(test|spec)\.[cm]?[jt]sx?$|(^|\/)(__tests__|__fixtures
 const NO_FIELD_DROPS_PY = /(^|\/)(test[^/]*\.py|[^/]*_test\.py|conftest\.py)$|(^|\/)(tests?|__fixtures__|fixtures|migrations)\//;
 
 const isPython = (file) => file.endsWith('.py');
+// The JavaScript producers, in the shape an adapter's `producers` export has.
+// Each member calls through the import, so the producers stay one module that can be spied on.
+const JS_PRODUCERS = Object.freeze({
+  proposalsForLine: (...args) => proposalsForLine(...args),
+  functionHead: (line) => functionHead(line),
+  functionParams: (line) => functionParams(line),
+  isComment: (line) => /^\s*(\/\/|\*|\/\*)/.test(line),
+});
+
+/**
+ * The producer set a runner adapter supplies for `file` (#329, #333), or null.
+ * The adapter must be selected by the project (a build file the gate already
+ * reads, so the two never disagree) and its producers must name the file's
+ * extension: the Java shapes are never run on a Kotlin file. Look-up is by
+ * source extension, never by `owns`, which lists an adapter's test files.
+ */
+export function adapterProducers(projectDir, file) {
+  const extension = extensionOf(file);
+  for (const name of sourceClassifier(projectDir).runnersFor(file)) {
+    const set = RUNNERS[name]?.producers;
+    if (set?.extensions?.includes(extension)) return set;
+  }
+  return null;
+}
 const isDirectory = (projectDir, file) => { try { return statSync(join(projectDir, file)).isDirectory(); } catch { return false; } };
 // Producers exist for JavaScript-family files and Python only. Any other
 // extension has no producer set: the JavaScript line shapes are not valid
@@ -39,10 +65,11 @@ export function unsupportedLanguage(file) {
 }
 
 /**
- * JavaScript line scan: enclosing function tracked by brace depth, `@claim`
- * annotations read from `//` and `/* *\u002f` comments.
+ * Brace-language line scan: enclosing function tracked by brace depth, `@claim`
+ * annotations read from `//` and `/* *\u002f` comments. JavaScript is the default
+ * producer set; a runner adapter supplies its own (Java).
  */
-function scanJs({ source, lines, fieldDrops, keep, anchor }) {
+function scanBraces({ lines, fieldDrops, keep, anchor, producers = JS_PRODUCERS }) {
   const proposals = [];
   let offset = 0;
   let fn = null;
@@ -52,16 +79,16 @@ function scanJs({ source, lines, fieldDrops, keep, anchor }) {
   let pendingAnnotation = null;
   lines.forEach((line, i) => {
     const ann = ANNOTATION.exec(line);
-    if (ann && /^\s*(\/\/|\*|\/\*)/.test(line)) pendingAnnotation = ann[1];
+    if (ann && producers.isComment(line)) pendingAnnotation = ann[1];
 
-    const head = functionHead(line);
+    const head = producers.functionHead(line);
     if (head) {
       fn = head;
       fnDepth = depth;
-      params = new Set(functionParams(line));
+      params = new Set(producers.functionParams(line));
     }
 
-    for (const p of proposalsForLine(lines, i, { params, fieldDrops })) {
+    for (const p of producers.proposalsForLine(lines, i, { params, fieldDrops })) {
       const { hits, occurrence } = anchor(line, offset);
       const fault = { ...p, find: line, replace: p.replace, expectHits: hits, occurrence, line: i + 1, fn, annotation: pendingAnnotation };
       if (keep(fault)) proposals.push(fault); // never propose an unverifiable anchor or a no-op
@@ -69,7 +96,7 @@ function scanJs({ source, lines, fieldDrops, keep, anchor }) {
 
     depth += (line.match(/\{/g) ?? []).length - (line.match(/\}/g) ?? []).length;
     if (fn && depth <= fnDepth && !head) { fn = null; params = new Set(); }
-    if (pendingAnnotation && !ann && !head && line.trim() && !/^\s*(\/\/|\*|\/\*)/.test(line)) pendingAnnotation = null;
+    if (pendingAnnotation && !ann && !head && line.trim() && !producers.isComment(line)) pendingAnnotation = null;
     offset += line.length + 1;
   });
   return proposals;
@@ -105,7 +132,7 @@ function scanPython({ source, lines, fieldDrops, keep, anchor }) {
     for (const p of py.proposalsForLine(lines, i, { params, fieldDrops })) {
       const { hits, occurrence } = anchor(line, offset);
       const fault = { ...p, find: line, replace: p.replace, expectHits: hits, occurrence, line: i + 1, fn, annotation: pendingAnnotation };
-      if (keep(fault)) proposals.push(fault); // as scanJs: unverifiable anchors and no-ops never reach the draft
+      if (keep(fault)) proposals.push(fault); // as scanBraces: unverifiable anchors and no-ops never reach the draft
     }
 
     if (pendingAnnotation && !ann && !head && line.trim() && !py.isComment(line)) pendingAnnotation = null;
@@ -161,7 +188,8 @@ export function scaffoldFile({ projectDir, file, claimId, existingClaims, toolVe
   // Internal authoring can scan bytes already admitted through a descriptor.
   // Legacy callers still read the file; supplied empty text never falls back.
   // A directory is not a language: it keeps failing at the read, as before.
-  const unsupported = isDirectory(projectDir, file) ? null : unsupportedLanguage(file);
+  const producers = isDirectory(projectDir, file) ? null : adapterProducers(projectDir, file);
+  const unsupported = isDirectory(projectDir, file) || producers ? null : unsupportedLanguage(file);
   if (unsupported) {
     // Never scan it: no producer set exists, so nothing here would be valid.
     const doc = { $schema: './node_modules/testguard-cli/spec/schemas/claims.schema.json', schemaVersion: 1, claims: [] };
@@ -178,7 +206,7 @@ export function scaffoldFile({ projectDir, file, claimId, existingClaims, toolVe
   };
 
   const fieldDrops = !(isPython(file) ? NO_FIELD_DROPS_PY : NO_FIELD_DROPS).test(file);
-  const scan = isPython(file) ? scanPython : scanJs;
+  const scan = isPython(file) ? scanPython : (args) => scanBraces({ ...args, producers: producers ?? JS_PRODUCERS });
   let accepted = 0;
   const keep = (fault) => {
     if (!usableProposal(source, fault)) return false;
@@ -196,7 +224,9 @@ export function scaffoldFile({ projectDir, file, claimId, existingClaims, toolVe
     groupFor(key, id).proposals.push(p);
   }
 
-  const defendedBy = discoverDefenders(projectDir, file);
+  // An adapter language has no import discovery: say so rather than let "no
+  // test file imports this module" name the wrong cause (#333).
+  const defendedBy = producers ? [] : discoverDefenders(projectDir, file);
   const claims = [];
   const reservedIds = new Set([...existing.keys(), ...[...groups.values()].map(g => g.id).filter(id => id !== null)]);
   let placeholder = 1;
@@ -237,5 +267,5 @@ export function scaffoldFile({ projectDir, file, claimId, existingClaims, toolVe
 
   const byClass = {};
   for (const p of proposals) byClass[p.faultClass] = (byClass[p.faultClass] ?? 0) + 1;
-  return { doc, stats: { proposals: proposals.length, claims: claims.length, byClass, defendedBy } };
+  return { doc, stats: { proposals: proposals.length, claims: claims.length, byClass, defendedBy, ...(producers ? { discovery: { supported: false, extension: extensionOf(file) } } : {}) } };
 }

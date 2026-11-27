@@ -1,7 +1,7 @@
 import { readFileSync, realpathSync } from 'node:fs';
-import { extname, join, relative, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { git, GitError } from '../git.mjs';
-import { SOURCE_EXT, isDefaultExcluded } from '../gate/changed.mjs';
+import { sourceClassifier, isDefaultExcluded } from '../gate/changed.mjs';
 import { resolveDefenders } from './runners/shared.mjs';
 import { discoverDefendersDetailed } from './discover.mjs';
 import { defenderSelection } from './attribution.mjs';
@@ -211,7 +211,8 @@ export function resolveProbeScope({ projectDir, claims, ref, includeDirty = fals
     if (reasons.has(claim.id)) matched.add(claim.id);
   }
   const selected = (only ?? claims.claims.map((claim) => claim.id)).filter((id) => matched.has(id));
-  const unmatchedFiles = changed.files.filter((file) => SOURCE_EXT.has(extname(file)) && !isDefaultExcluded(file) && !touched.has(file));
+  const sources = sourceClassifier(projectDir);
+  const unmatchedFiles = changed.files.filter((file) => sources.probeable(file) && !isDefaultExcluded(file) && !touched.has(file));
   return {
     outcome: 'determined',
     ref,

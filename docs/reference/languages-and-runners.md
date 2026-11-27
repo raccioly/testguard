@@ -28,6 +28,38 @@ have no Python meaning, so Python files do not get them.
 [Writing claims](../guides/writing-claims.md) describes every shape.
 [Python](../guides/python.md) covers the Python differences.
 
+### Java, Kotlin and Angular
+
+Three runners reach stacks that the matrix above does not list. Each is named
+with `--runner`, and `auto` never picks it.
+
+| | Java | Kotlin | Angular (TypeScript) |
+|---|---|---|---|
+| Runners | `maven`, `gradle` | `maven`, `gradle` | `karma` |
+| Counted as source by `gate` and `status` | `.java`, when a `pom.xml` or a Gradle build file is in the file's directory or above it | `.kt`, on the same rule | `.ts`, as for TypeScript |
+| Test files | `src/test/java/**`: `*Test.java`, `*Tests.java`, `*TestCase.java`, `Test*.java` | `src/test/kotlin/**`: the same names with `.kt` | `**/*.spec.ts` |
+| Scaffold producers | five Java shapes (below) | none: a `.kt` file is refused, out loud | the TypeScript shapes |
+| Defender discovery | none: declare `defendedBy` | none: declare `defendedBy` | test files that import the fault's file, as for TypeScript |
+| Reports read | JUnit XML | JUnit XML | JUnit XML |
+
+Without a build file, a changed `.java` or `.kt` file is the same gap it was:
+`gate` reports it as `unsupported-language`, never as non-source.
+
+**These runners were not run against a real Maven, Gradle, Karma or Chrome.**
+Their tests use fake `mvnw`, `gradlew` and `ng` scripts that write the report
+files the real tools are documented to write. Run a probe on a small project
+of your own and read the first result before you trust a large one. The parts
+to confirm first are listed under each runner.
+
+The Java scaffold shapes are `condition-forced` (an `if` forced to `false` and
+to `true`), `statement-deleted` (a one-line guard removed, the null guard
+being the common case) with `call-removed` (`requireNonNull`), `return-altered`
+(a literal changed, or a boolean check made `true`), `literal-changed` (a
+boolean literal flipped) and `argument-swapped`. A swapped argument is `null`,
+never `undefined`, and only for a parameter of a reference type, because
+`null` does not compile where an `int` is expected. Each proposal must still
+compile. A line that cannot be changed safely gets no proposal.
+
 ### Runner summary
 
 | `--runner` | Chosen when | Resolved from | Test universe comes from | `--workers N` | `--serial` | Proven by |
@@ -36,6 +68,9 @@ have no Python meaning, so Python files do not get them.
 | `jest` | second in `auto`, or explicit; needs a `package.json` or `jest.config.*` | the project's `jest` package, then `jest` on PATH | `jest --listTests --json` | `--maxWorkers=N` | `--runInBand` | [`fixtures/known-answer-jest`](../../fixtures/known-answer-jest/README.md) |
 | `playwright` | per file, for tests under the config's `testDir`; whole project only when explicit | the project's `@playwright/test` package | `playwright test --list` | `--workers=N` | `--workers=1` | [`fixtures/known-answer-playwright`](../../fixtures/known-answer-playwright/README.md) |
 | `node-test` | explicit only | the Node executable running TestGuard | Node's own default collection | test concurrency `N` | concurrency 1 | [`fixtures/known-answer-node`](../../fixtures/known-answer-node/README.md) |
+| `maven` | explicit only; `auto` never picks it | the project's `./mvnw`, then `mvn` on PATH | the Surefire default test names under `src/test/java` and `src/test/kotlin` | not used | not used | none yet: tested with a fake `mvn` |
+| `gradle` | explicit only; `auto` never picks it | the project's `./gradlew`, then `gradle` on PATH | the same test names | not used | not used | none yet: tested with a fake `gradle` |
+| `karma` | explicit only; `auto` never picks it | the project's `@angular/cli`, never PATH | `**/*.spec.ts` | not used | not used | none yet: tested with a fake `ng` |
 | `python` | third in `auto`, per file for every `.py` defender, or explicit | `--python`, `TESTGUARD_PYTHON`, the active virtualenv, the project's `.venv`/`venv`/`.env`, then PATH | the globs `test_*.py`, `test*.py`, `*_test.py` | always serial | always serial | [`fixtures/known-answer-python`](../../fixtures/known-answer-python/README.md) |
 | `pytest` | explicit; `python` with the engine pinned | as `python` | as `python` | always serial | always serial | the same fixture, pytest leg |
 | `unittest` | explicit; `python` with the engine pinned | as `python` | as `python` | always serial | always serial | the same fixture, stdlib leg |
@@ -57,9 +92,16 @@ exists. It would find no `.py` test and report every claim `NOCOVER`. An
 explicit `--runner` with an empty universe is refused for the same reason: zero
 observations are not evidence.
 
-`auto` never picks `playwright` or `node-test` as the project runner.
-Playwright needs a config to mean anything, and it owns its files anyway. The
-Node built-in runner is opt-in.
+`auto` never picks `playwright`, `node-test`, `maven`, `gradle` or `karma` as the
+project runner. Playwright needs a config to mean anything, and it owns its
+files anyway. The Node built-in runner is opt-in. A `pom.xml` says a project is
+built with Maven, not that TestGuard may run its tests, so the build-system
+runners are opt-in too. When `auto` finds nothing to run and the project says
+it uses one of them, the refusal says so first and gives the flag. Take an
+Angular project with Karma and no Vitest or Jest. The refusal reads "Karma was
+found (angular.json has a karma test builder), but TestGuard does not choose it
+on its own: run it with --runner karma …", and then lists what `auto` tried.
+It does not tell you to install Vitest.
 
 Two runners own **files** rather than projects, whatever the project runner is:
 
@@ -254,6 +296,118 @@ It sends 17 identical classifier inputs and four existing faults through
 complete probes with three confirmations, fresh worker receipts and reversed
 execution order. The results describe that workload and runtime only.
 
+## `maven`
+
+**When it is chosen.** Only with `--runner maven`. The project directory must
+hold a `pom.xml`; run from the module that has one.
+
+**Where it comes from.** The project's own `./mvnw` when it has one. It is never
+second-guessed: a wrapper that fails is named in the refusal, and TestGuard does
+not fall back to `mvn` behind it. Without a wrapper, `mvn` on PATH. A probe runs in a
+scratch checkout, which holds only what git tracks, so commit the wrapper and its
+`.mvn` directory. `check`
+runs `--version` and records the Maven version; `source` is `project` for a
+wrapper and `path` for PATH. Windows is not verified: use `--runner-cmd` there.
+
+**How files are discovered.** The globs `**/src/test/java/**/*Test.java`,
+`*Tests.java`, `*TestCase.java` and `Test*.java`, and the same names as `.kt`
+under `src/test/kotlin`. A helper class that matches (`TestSupport`) is in the
+universe, and a run that selects it reports no suite for it and is an `error`.
+The universe is bound to the hash of every `pom.xml` and `.mvn/` setting.
+
+**How it runs.** `mvn -B test -Dtest=<classes> -Dsurefire.failIfNoSpecifiedTests=false
+-DfailIfNoTests=false`. A defender's class is the path after `src/test/java/`
+with dots for slashes. A defender in a module below the project adds `-pl
+<modules> -am`; a module is the nearest directory with a `pom.xml`. Before the
+build, the `target/surefire-reports` and `target/failsafe-reports` directories of
+those modules are removed. Afterwards, only XML written during the run is read.
+
+**What counts.** A JUnit 5 `AssertionFailedError` or a `java.lang.AssertionError`
+is an assertion. Any other exception type is an exception. No report is an
+`error`; for a fault the engine records `fault-invalid` with the compiler's first
+`[ERROR]` line. A class the build did not report is an `error`. A failed build
+beside reports with no failure is an `error`, because another module may not
+have built.
+
+**Limits.**
+
+- Not run against a real Maven. The `-Dtest=<package.Class>` form is the first
+  thing to confirm. If Surefire reads nothing from it, you get an `error`, never
+  a pass.
+- Only the `test` phase runs. Failsafe reports are read when the project binds
+  Failsafe into it; `mvn verify` is not run.
+- `target/classes` is kept between runs for speed. Maven recompiles a changed
+  source file, and the negative control catches a stale class: a broken file that
+  leaves the defenders green is not allowed to produce `survived`.
+- A `@Nested` class counts as its outer class having run.
+- With `--in-place`, the report directories it removes are the ones in your own
+  `target/` (Maven) or `build/` (Gradle). The scratch worktree is where a normal
+  probe runs.
+
+## `gradle`
+
+**When it is chosen.** Only with `--runner gradle`. The project directory must
+hold `build.gradle`, `build.gradle.kts`, `settings.gradle` or
+`settings.gradle.kts`.
+
+**Where it comes from.** The project's `./gradlew`, else `gradle` on PATH, as for
+Maven.
+
+**How files are discovered.** The same test names as `maven`. The universe is
+bound to every Gradle build file, `gradle.properties`, the version catalog and
+the wrapper settings.
+
+**How it runs.** `gradle --no-daemon --console=plain --no-build-cache --continue
+:cleanTest :test --tests <class>`, once for each module with a defender
+(`:billing:cleanTest :billing:test --tests <class>`). These flags are not
+optional. A daemon outlives the process tree, so the budget could not end the
+run. An up-to-date or cached `test` task writes no new report. `--continue`
+attempts every module. Reports are read from `build/test-results/test`, after
+that directory is removed.
+
+**Limits.**
+
+- Not run against a real Gradle.
+- Only the task named `test` is read. An Android `testDebugUnitTest` or an
+  `integrationTest` task is not.
+- With `--in-place`, the report directory it removes is `build/test-results/test`
+  in your own tree.
+- A module's Gradle path is its directory path with `:`. A module renamed in
+  `settings.gradle` needs `--runner-cmd` with `--report-format junit`.
+
+## `karma`
+
+**When it is chosen.** Only with `--runner karma`, for an Angular workspace. It
+needs `angular.json` with a project whose test builder is
+`@angular-devkit/build-angular:karma` or `@angular/build:karma`, the project's
+`@angular/cli`, `karma-junit-reporter` and a Karma config
+(`ng generate config karma`). `check` names the first one that is missing.
+
+**Where it comes from.** The project's own `@angular/cli`, never PATH.
+
+**How files are discovered.** `**/*.spec.ts`. The universe is bound to
+`angular.json` and the Karma and TypeScript configs.
+
+**How it runs.** `ng test <project> --watch=false --browsers=ChromeHeadless
+--karma-config=<generated> --include=<spec>`. Karma's reporter writes where the
+project's own config says, so TestGuard generates a config in the scratch
+directory. It loads the project's config, then sets the `junit` reporter, the
+output directory and a single run. The generated config and the report are
+removed after the run. A spec file in no Angular project with a karma target is
+an `error`.
+
+**Limits.**
+
+- Not run against a real Karma or Chrome.
+- `karma-junit-reporter` records no exception type for Jasmine, so every kill
+  reads as an exception and none as an assertion. `--require-assertion-kill`
+  cannot be met under `karma`.
+- The reporter writes one suite for each browser, not one for each spec file, so
+  the run cannot say that a requested spec did not run. `--include` selects it,
+  and a run that collects no test is an `error`.
+- Chrome must start in your environment. A container that runs as root needs a
+  custom launcher with `--no-sandbox` in your `karma.conf.js`.
+
 ## `python`, `pytest` and `unittest`
 
 **When it is chosen.** Third in `auto`; for every `.py` defender whatever the
@@ -327,8 +481,10 @@ worktree, unless you pass `--in-place`.
 
 ### JUnit XML reports
 
-Most stacks that TestGuard has no adapter for write JUnit XML: Maven (Surefire
-and Failsafe), Gradle, `pytest --junitxml`, `karma-junit-reporter` and
+Most stacks that TestGuard has no adapter for write JUnit XML. Maven, Gradle
+and Karma have adapters of their own (`--runner maven`, `gradle`, `karma`) that
+read the same format. For the rest, write it with a command: Maven (Surefire
+and Failsafe) in a layout the adapter does not know, Gradle, `pytest --junitxml`, `karma-junit-reporter` and
 `sf apex run test --result-format junit`. Add `--report-format junit` (or
 `"reportFormat": "junit"` in `testguard.config.json`) and TestGuard reads that
 format at `{out}`. You do not write a converter.
@@ -442,11 +598,13 @@ and the runner would look for them in the wrong place.
 
 ## Not supported yet
 
-- **Languages other than JavaScript, TypeScript and Python.** Defender
-  discovery, the scaffold, anchor syntax checks and `gate` cover only the
-  extensions in the matrix above. `gate` reports a changed file in a
-  known language it cannot probe (Apex, Java, Kotlin, Scala, C#, Go, Ruby,
-  PHP, DataWeave, Salesforce Flow and Mule XML) as `unsupported-language`, and
+- **Languages other than JavaScript, TypeScript, Python and, with a build
+  file, Java and Kotlin.** Defender discovery, the scaffold, anchor syntax
+  checks and `gate` cover only the extensions in the matrix above and the
+  Java and Kotlin support described under [Java, Kotlin and Angular](#java-kotlin-and-angular).
+  `gate` reports a changed file in a known language it cannot probe (Apex,
+  Scala, C#, Go, Ruby, PHP, DataWeave, Salesforce Flow, Mule XML, and Java or
+  Kotlin with no build file) as `unsupported-language`, and
   `gate --strict` fails on it. `status` counts these files beside the
   supported modules. A claim on such a file is `nocover` with the reason
   `defender-discovery-unsupported (java): declare defendedBy`: discovery could

@@ -348,6 +348,70 @@
       "reason": "Moved unchanged to TG-UNCONFIRMED-TEARDOWN-IS-REPORTED-NEVER-AS-SUCCESS/F3. The claim carried two statements (the run ends within the grace; an unconfirmed teardown is reported, never as success) and eleven faults, and measured 99 to 105 s in CI against the 100 s per-claim ceiling, so the cost gate passed or failed with the runner. Its second sentence is now its own claim with the three faults that falsify it: same file, same anchor, same replacement, same defender.",
       "by": "claude",
       "at": "2026-11-13T17:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/build-source-gate.test.mjs",
+      "reason": "Acceptance for the gate over a Java file: it starts a git repository per case. The rules it exercises are claimed by TG-BUILD-SOURCE-IS-DECIDED-BY-THE-BUILD-FILE and TG-JVM-TEST-FILES-ARE-TESTS, defended by the pure tests in test/build-source-languages.test.mjs; naming this file a defender would repeat the git setup for every fault. Added with the adapters (#329); the excuse expires so the next real edit states the claim it defends.",
+      "expires": "2027-02-27T00:00:00Z",
+      "by": "claude",
+      "at": "2026-11-27T22:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/build-source-surface.test.mjs",
+      "reason": "Acceptance for status and init over a Java project: it builds a git repository per case. The rules it exercises are claimed by TG-BUILD-SOURCE-IS-DECIDED-BY-THE-BUILD-FILE, defended by the pure tests in test/build-source-languages.test.mjs. Added with the adapters (#329); the excuse expires so the next real edit states the claim it defends.",
+      "expires": "2027-02-27T00:00:00Z",
+      "by": "claude",
+      "at": "2026-11-27T22:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/probe-karma-advice.test.mjs",
+      "reason": "Acceptance for the refusal advice on an Angular project: it runs probe on a generated project. The pure rule is claimed by TG-AUTO-NAMES-THE-BUILD-SYSTEM-IT-FOUND, defended by test/runner-karma-pure.test.mjs. Added with the adapters (#329); the excuse expires so the next real edit states the claim it defends.",
+      "expires": "2027-02-27T00:00:00Z",
+      "by": "claude",
+      "at": "2026-11-27T22:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/probe-maven-fake.test.mjs",
+      "reason": "End-to-end probe of a generated Maven project through a fake wrapper: two probes and a git repository. It pins that the adapters work together; the pure rules are claimed by the TG-JVM-* claims, defended by test/runner-jvm.test.mjs and test/runner-jvm-argv.test.mjs. Added with the adapters (#329); the excuse expires so the next real edit states the claim it defends.",
+      "expires": "2027-02-27T00:00:00Z",
+      "by": "claude",
+      "at": "2026-11-27T22:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/runner-maven.test.mjs",
+      "reason": "Adapter tests for maven with a fake wrapper (registration, check, universe, run). The report and selector rules are claimed by the TG-JVM-* claims, defended by test/runner-jvm.test.mjs; this file runs a fake process per case. Added with the adapters (#329); the excuse expires so the next real edit states the claim it defends.",
+      "expires": "2027-02-27T00:00:00Z",
+      "by": "claude",
+      "at": "2026-11-27T22:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/runner-gradle.test.mjs",
+      "reason": "Adapter tests for gradle with a fake wrapper (registration, check, universe, run). The report and selector rules are claimed by the TG-JVM-* claims, defended by test/runner-jvm.test.mjs; this file runs a fake process per case. Added with the adapters (#329); the excuse expires so the next real edit states the claim it defends.",
+      "expires": "2027-02-27T00:00:00Z",
+      "by": "claude",
+      "at": "2026-11-27T22:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/runner-karma.test.mjs",
+      "reason": "Adapter tests for karma with a fake ng executable. The configuration and detection rules are claimed by TG-KARMA-CONFIG-FORCES-THE-JUNIT-REPORTER and TG-AUTO-NAMES-THE-BUILD-SYSTEM-IT-FOUND, defended by test/runner-karma-pure.test.mjs. Added with the adapters (#329); the excuse expires so the next real edit states the claim it defends.",
+      "expires": "2027-02-27T00:00:00Z",
+      "by": "claude",
+      "at": "2026-11-27T22:00:00Z"
+    },
+    {
+      "kind": "path",
+      "pattern": "test/helpers/fake-jvm.mjs",
+      "reason": "Helper that writes fake mvn, gradle and ng executables for the adapter tests; it has no behavior of its own beyond them, and the tests that use it are listed beside it. Added with the adapters (#329); the excuse expires so the next real edit states the claim it defends.",
+      "expires": "2027-02-27T00:00:00Z",
+      "by": "claude",
+      "at": "2026-11-27T22:00:00Z"
     }
   ]
 }

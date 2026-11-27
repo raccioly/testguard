@@ -1,5 +1,5 @@
 import { existsSync, realpathSync, lstatSync } from 'node:fs';
-import { extname, join, relative, resolve, dirname } from 'node:path';
+import { join, relative, resolve, dirname } from 'node:path';
 import { git, repoRoot, headSha, GitError } from '../git.mjs';
 import { loadClaims, defaultClaimsPath, ClaimsError } from '../claims/load.mjs';
 import { readSpecDoc } from '../evidence/writer.mjs';
@@ -8,7 +8,7 @@ import { discoverDefenders } from '../probe/discover.mjs';
 import { defenderSelection } from '../probe/attribution.mjs';
 import { IS_PY_TEST } from '../probe/pyimports.mjs';
 import { globToRegExp } from '../util/glob.mjs';
-import { SOURCE_EXT, KNOWN_SOURCE, unsupportedLanguage, languageName, tallyLanguages, describeLanguages } from './languages.mjs';
+import { SOURCE_EXT, KNOWN_SOURCE, BUILD_SOURCE, unsupportedLanguage, sourceClassifier, languageName, tallyLanguages, describeLanguages } from './languages.mjs';
 
 /**
  * Claim coverage of a change.
@@ -23,11 +23,14 @@ import { SOURCE_EXT, KNOWN_SOURCE, unsupportedLanguage, languageName, tallyLangu
  * the smallest unit the rest of the contract already understands.
  */
 
-export { SOURCE_EXT, KNOWN_SOURCE, unsupportedLanguage, languageName, tallyLanguages, describeLanguages };
+export { SOURCE_EXT, KNOWN_SOURCE, BUILD_SOURCE, unsupportedLanguage, sourceClassifier, languageName, tallyLanguages, describeLanguages };
 
 const TEST_RE = /\.(test|spec)\.[cm]?[jt]sx?$/;
+// JUnit layout: anything under `src/test/java|kotlin`, or the class names the
+// build tools collect by default (`FooTest`, `FooTests`, `FooTestCase`, `TestFoo`).
+const JVM_TEST = /(^|\/)src\/test\/(?:java|kotlin)\/|(?:Tests?|TestCase)\.(?:java|kt)$|(^|\/)Test[A-Z]\w*\.(?:java|kt)$/;
 // Python names tests by file, not by a dotted suffix: `test_foo.py`, `foo_test.py`.
-export const isTestFile = (f) => TEST_RE.test(f) || IS_PY_TEST.test(f);
+export const isTestFile = (f) => TEST_RE.test(f) || IS_PY_TEST.test(f) || JVM_TEST.test(f);
 
 /** Files that are source by extension but never carry claims. Printed by --explain. */
 export const DEFAULT_EXCLUDES = Object.freeze([
@@ -51,8 +54,8 @@ const DEFAULT_EXCLUDE_RES = DEFAULT_EXCLUDES.map(globToRegExp);
 export const explainExclusions = () => [
   'Files that are source by extension but never carry claims (excluded by default; add more with --exclude <glob>):',
   ...DEFAULT_EXCLUDES.map((g) => `  ${g}`),
-  `Non-source files (anything but ${[...SOURCE_EXT].join(' ')}) are excluded before these patterns apply.`,
-  `Source in a language TestGuard cannot probe yet (${KNOWN_SOURCE.map((l) => l.name).join(', ')}) is reported as \`unsupported-language\`, never as non-source; --strict fails on it unless an ignore entry excuses it.`,
+  `Non-source files (anything but ${[...SOURCE_EXT].join(' ')}, and ${BUILD_SOURCE.map((l) => l.name).join(' and ')} under a pom.xml or Gradle build file) are excluded before these patterns apply.`,
+  `Source in a language TestGuard cannot probe yet (${[...KNOWN_SOURCE, ...BUILD_SOURCE].map((l) => l.name).join(', ')}; ${BUILD_SOURCE.map((l) => l.name).join(' and ')} only without a build file) is reported as \`unsupported-language\`, never as non-source; --strict fails on it unless an ignore entry excuses it.`,
 ];
 
 /** Whether a source-shaped path is outside TestGuard's claimable module surface. */
@@ -275,6 +278,7 @@ export function computeChangedGate({ projectDir, ref, includeDirty = false, excl
   const uncovered = [];
   const nested = new Map();
   const ownerOf = nestedProjectResolver(projectDir);
+  const sources = sourceClassifier(projectDir);
   for (const file of changed) {
     const owner = ownerOf(file);
     if (owner) {
@@ -282,8 +286,8 @@ export function computeChangedGate({ projectDir, ref, includeDirty = false, excl
       nested.get(owner).push(file);
       continue;
     }
-    const gap = unsupportedLanguage(file);
-    if (!gap && !SOURCE_EXT.has(extname(file))) { excluded.push({ file, by: 'non-source' }); continue; }
+    const gap = sources.unsupported(file);
+    if (!gap && !sources.probeable(file)) { excluded.push({ file, by: 'non-source' }); continue; }
     const ux = userExcludes.find((x) => x.re.test(file));
     if (ux) { excluded.push({ file, by: `exclude:${ux.glob}` }); continue; }
     const dx = defaultExcludes.find((x) => x.re.test(file));

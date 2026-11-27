@@ -3,6 +3,13 @@ import * as jest from './jest.mjs';
 import * as playwright from './playwright.mjs';
 import * as pythonRunner from './python.mjs';
 import * as nodeTest from './node-test.mjs';
+import * as maven from './maven.mjs';
+import * as gradle from './gradle.mjs';
+import * as karma from './karma.mjs';
+import { detectKarma } from './karma.mjs';
+import { BUILD_MARKERS } from '../../gate/languages.mjs';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { createDiscoveryManifest, DiscoveryError, hashDiscoveryConfigs } from './discovery.mjs';
 
 export const RUNNERS = {
@@ -16,9 +23,13 @@ export const RUNNERS = {
   pytest: pythonRunner.pinned('pytest'),
   unittest: pythonRunner.pinned('unittest'),
   'node-test': nodeTest,
+  // The build-system adapters (#329): explicit only, never chosen by `auto`.
+  maven,
+  gradle,
+  karma,
 };
 
-export const RUNNER_NAMES = ['vitest', 'jest', 'playwright', 'python', 'pytest', 'unittest', 'node-test'];
+export const RUNNER_NAMES = ['vitest', 'jest', 'playwright', 'python', 'pytest', 'unittest', 'node-test', 'maven', 'gradle', 'karma'];
 
 /**
  * Runners that own files rather than projects: a defender under Playwright's
@@ -57,13 +68,43 @@ export async function discoverRunnerManifest(runner, check, projectDir, budgetMs
   return immutableManifest(manifest);
 }
 
+const BUILD_LABELS = { maven: 'Maven', gradle: 'Gradle', karma: 'Karma' };
+
+/**
+ * The build systems a project says it uses, from its files alone: `[{ runner,
+ * why }]` for `maven` (a pom.xml), `gradle` (a Gradle build file) and `karma`
+ * (a karma builder or dependency). `auto` never picks these; the list is only
+ * used to say what was found when nothing else resolved.
+ */
+export function detectBuildRunners(projectDir) {
+  const found = [];
+  for (const runner of ['maven', 'gradle']) {
+    const marker = BUILD_MARKERS[runner].find((name) => existsSync(join(projectDir, name)));
+    if (marker) found.push({ runner, why: `${marker} is in the project` });
+  }
+  const k = detectKarma(projectDir);
+  if (k) found.push({ runner: 'karma', why: k.why });
+  return found;
+}
+
+const BUILD_HOW = {
+  maven: 'run it with --runner maven (a project ./mvnw or mvn on PATH)',
+  gradle: 'run it with --runner gradle (a project ./gradlew or gradle on PATH)',
+  karma: 'run it with --runner karma (it needs @angular/cli, karma-junit-reporter and a karma.conf.js, and starts ChromeHeadless)',
+};
+
+/** One sentence per build system found: what it is, why we think so, how to run it. */
+const buildAdvice = (found) => found.map(({ runner, why }) => `${BUILD_LABELS[runner]} was found (${why}), but TestGuard does not choose it on its own: ${BUILD_HOW[runner]}, or pass --runner-cmd with --report-format junit.`).join(' ');
+
 /**
  * The precondition message for a runner that did not resolve. The dependency
  * advice is for a missing install; a config file that cannot be parsed gets
- * only its own error (#330).
+ * only its own error (#330), and a project whose build system was found is told
+ * how to run it instead of being told to install vitest.
  */
 export function runnerUnresolvableMessage({ sel, mode }) {
   const where = mode === 'worktree' ? 'scratch worktree' : 'project';
+  if (sel.detected) return `test runner is not resolvable in the ${where} (${sel.error})`;
   if (sel.configError) return `test runner is not resolvable in the ${where} (${sel.error}). Fix that config file; no dependency change will help.`;
   const advice = mode === 'worktree'
     ? 'If dependencies are missing, pass --node-modules <path>, or run with --in-place. Otherwise fix the discovery error above.'
@@ -112,7 +153,12 @@ export async function selectRunner({ projectDir, sourceDir, python, name = 'auto
     if (testFiles > 0 || name !== 'auto') return { ...selected, testFiles };
     messages.push(empty);
   }
-  return { error: messages.length ? messages.join('; ') : 'no runner discovered test files' };
+  const others = messages.length ? messages.join('; ') : 'no runner discovered test files';
+  // `auto` found nothing to run. A project that says it is built with Maven,
+  // Gradle or Karma gets that said first, rather than advice to install vitest.
+  const detected = name === 'auto' ? detectBuildRunners(projectDir) : [];
+  if (detected.length) return { error: `${buildAdvice(detected)} Runners \`auto\` tried: ${others}`, detected };
+  return { error: others };
 }
 
 /** What the evidence calls a runner: the engine that actually ran, else the module's name. */

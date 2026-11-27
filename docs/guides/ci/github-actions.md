@@ -30,7 +30,7 @@ dependencies. Your workflow must do both before the action runs.
 | `strict` | `false` | `gate` | `true` fails a change whose files were all excluded (non-source, or never-claimed patterns), and a change that holds a file in a language TestGuard cannot probe. Without it, the change passes with a note. |
 | `version` | the CLI release published with this action tag | all | The `testguard-cli` version to run. Change it only if you want to run a different CLI from the same action. |
 | `node-version` | `22` | all | Node.js version that the action sets up (20 or later). It replaces any Node that your job set up earlier, for this step and the steps after it. |
-| `runner` | `auto` | `probe` | `vitest`, `jest`, `playwright`, `python`, `pytest`, `unittest`, `node-test` or `auto`. Any value other than `auto` is passed as `--runner`. `python` picks pytest when the interpreter can import it and stdlib `unittest` otherwise; `pytest` and `unittest` pin that choice and fail rather than fall back. |
+| `runner` | `auto` | `probe` | `vitest`, `jest`, `playwright`, `python`, `pytest`, `unittest`, `node-test`, `maven`, `gradle`, `karma` or `auto`. Any value other than `auto` is passed as `--runner`. `python` picks pytest when the interpreter can import it and stdlib `unittest` otherwise; `pytest` and `unittest` pin that choice and fail rather than fall back. |
 | `python` | `''` | `probe` | Python interpreter for `.py` defenders. Empty means `$VIRTUAL_ENV`, then the project's `.venv`/`venv`, then `python3` on `PATH`. |
 
 The action ignores inputs that do not apply to the chosen command. Some flags
