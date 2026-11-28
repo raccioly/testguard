@@ -97,3 +97,25 @@ describe('kill kinds — status', () => {
     expect(validate('status', doc).ok).toBe(false);
   });
 });
+
+describe('escalation attribution through a load error elsewhere (#282, rule 5)', () => {
+  const load = () => JSON.parse(readFileSync(new URL('./examples/evidence-escalation-load-error.json', import.meta.url), 'utf8'));
+  it('a killer that failed in every run counts although each run also had a load error in another file', () => {
+    const doc = load();
+    expect(doc.records[0].detail.escalationRuns.map((r) => r.outcome)).toEqual(['error', 'error', 'error']);
+    expect(validate('evidence', doc).errors).toEqual([]);
+  });
+  it('a timeout among the runs, or a run with no failing test body, is refused', () => {
+    const timedOut = load();
+    timedOut.records[0].detail.escalationRuns[1].outcome = 'timeout';
+    expect(validate('evidence', timedOut).errors.map((e) => e.message).join('\n')).toMatch(/never attributes/);
+    const hollow = load();
+    hollow.records[0].detail.escalationRuns[2].assertionFailures = 0;
+    expect(validate('evidence', hollow).ok).toBe(false);
+  });
+  it('fewer escalation runs than the run confirmed is refused', () => {
+    const doc = load();
+    doc.records[0].detail.escalationRuns.pop();
+    expect(validate('evidence', doc).ok).toBe(false);
+  });
+});

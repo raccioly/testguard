@@ -7,7 +7,7 @@ import { resolveDefenders } from '../probe/runners/shared.mjs';
 import { discoverDefenders } from '../probe/discover.mjs';
 import { defenderSelection } from '../probe/attribution.mjs';
 import { IS_PY_TEST } from '../probe/pyimports.mjs';
-import { globToRegExp } from '../util/glob.mjs';
+import { globToRegExp, createInventory, inventoryChanged, InventoryError } from '../util/glob.mjs';
 import { SOURCE_EXT, KNOWN_SOURCE, unsupportedLanguage, languageName, tallyLanguages, describeLanguages } from './languages.mjs';
 
 /**
@@ -257,14 +257,32 @@ export function computeChangedGate({ projectDir, ref, includeDirty = false, excl
   // Coverage index: which files carry a fault, which test files defend a claim.
   const faultFiles = new Map(); // file → claimIds
   const defenderFiles = new Map(); // test file → claimIds
+  // One walk serves every resolution of this command (#231). Resolving once per fault walked the repository
+  // thousands of times. Same declared lists and same discovery targets give the same answer over one snapshot,
+  // so each is computed once.
+  const inventory = createInventory(projectDir);
+  const declaredMemo = new Map(); // JSON of the declared list → files
+  const discoveredMemo = new Map(); // fault file → files
+  const resolveOnce = (requested) => {
+    const key = JSON.stringify(requested);
+    if (!declaredMemo.has(key)) declaredMemo.set(key, resolveDefenders(projectDir, requested, inventory));
+    return declaredMemo.get(key);
+  };
+  const discoverOnce = (file) => {
+    if (!discoveredMemo.has(file)) discoveredMemo.set(file, discoverDefenders(projectDir, file, undefined, inventory));
+    return discoveredMemo.get(file);
+  };
   for (const c of claims.claims) {
     for (const f of c.faults) faultFiles.set(f.file, [...new Set([...(faultFiles.get(f.file) ?? []), c.id])]);
     const defenders = [...new Set(c.faults.flatMap((f) => {
       const { requested } = defenderSelection(c, f);
-      return requested.length ? resolveDefenders(projectDir, requested) : discoverDefenders(projectDir, f.file);
+      return requested.length ? resolveOnce(requested) : discoverOnce(f.file);
     }))];
     for (const d of defenders) defenderFiles.set(d, [...new Set([...(defenderFiles.get(d) ?? []), c.id])]);
   }
+  // A file that appeared or vanished while the index was built means some resolutions saw one tree and some another.
+  // Refuse rather than report a coverage the repository never had.
+  if (inventoryChanged(inventory)) throw new InventoryError('the repository changed while the gate was resolving defenders; run the gate again on a settled tree');
 
   const pathEntries = ignore.entries.filter((e) => e.kind === 'path').map((e) => ({ entry: e, re: globToRegExp(e.pattern), expired: isExpired(e, now), files: [] }));
   const userExcludes = exclude.map((g) => ({ glob: g, re: globToRegExp(g) }));

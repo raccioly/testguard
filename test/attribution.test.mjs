@@ -87,6 +87,46 @@ describe('escalation attribution — a killer must fail in every run', () => {
     expect(escalationResult(noAssertion, 3).undeclaredKillers).toBeUndefined();
   });
 
+  it('attributes through a load error in an unrelated file: the killer ran in every run (#282)', () => {
+    // The same assertion failure in every run; one other file fails to load each time, so the runner calls the run an error.
+    const loadError = () => ({ ...run('error', 3), tests: { total: 218, passed: 215, failed: 3 } });
+    const s = fold(
+      { run: loadError(), failedTests: ['summary.test.js::a', 'summary.test.js::b'] },
+      { run: loadError(), failedTests: ['summary.test.js::a', 'summary.test.js::b'] },
+      { run: loadError(), failedTests: ['summary.test.js::a', 'summary.test.js::b'] },
+    );
+    const r = escalationResult(s, 3);
+    expect(r.reason).toBe('killed-by-undeclared-tests');
+    expect(r.undeclaredKillers).toEqual(['summary.test.js::a', 'summary.test.js::b']);
+  });
+
+  it('a run mixing a load error with an ordinary failure still attributes only what failed in all runs (#282)', () => {
+    const s = fold(
+      { run: run('error', 1), failedTests: ['a.test.mjs::x', 'b.test.mjs::y'] },
+      { run: kill(), failedTests: ['a.test.mjs::x'] },
+      { run: run('error', 1), failedTests: ['a.test.mjs::x'] },
+    );
+    expect(escalationResult(s, 3).undeclaredKillers).toEqual(['a.test.mjs::x']);
+  });
+
+  it('a load error that stops the killer file from running prevents attribution: nothing failed by assertion (#282)', () => {
+    const s = fold(
+      { run: run('error', 0), failedTests: [] },
+      { run: run('error', 0), failedTests: [] },
+      { run: run('error', 0), failedTests: [] },
+    );
+    expect(escalationResult(s, 3).undeclaredKillers).toBeUndefined();
+  });
+
+  it('a timeout still prevents attribution, even when it reports failed tests (#282)', () => {
+    const s = fold(
+      { run: run('error', 1), failedTests: ['a.test.mjs::x'] },
+      { run: { ...run('timeout', 1) }, failedTests: ['a.test.mjs::x'] },
+      { run: run('error', 1), failedTests: ['a.test.mjs::x'] },
+    );
+    expect(escalationResult(s, 3).undeclaredKillers).toBeUndefined();
+  });
+
   it('always reports the runs it made, attributed or not', () => {
     expect(escalationResult(fold({ run: kill(), failedTests: [] }), 3)).toMatchObject({ escalated: true, escalationRuns: [expect.objectContaining({ outcome: 'fail' })] });
   });

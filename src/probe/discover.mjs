@@ -43,9 +43,9 @@ export function unsupportedDiscovery(targetRel) {
   return { reason: 'defender-discovery-unsupported', message: `defender-discovery-unsupported (${language.id}): declare defendedBy` };
 }
 
-export function discoverDefendersDetailed(projectDir, targetRel, testUniverse) {
+export function discoverDefendersDetailed(projectDir, targetRel, testUniverse, inventory) {
   const explicit = explicitFiles(projectDir, testUniverse);
-  const candidates = explicit ?? (isPython(targetRel) ? listTestFiles(projectDir, PY_TEST_GLOBS) : listTestFiles(projectDir));
+  const candidates = explicit ?? (isPython(targetRel) ? listTestFiles(projectDir, PY_TEST_GLOBS, inventory) : listTestFiles(projectDir, undefined, inventory));
   if (isPython(targetRel)) {
     const pythonCandidates = candidates.filter((t) => t.endsWith('.py'));
     const importing = pythonCandidates.filter((t) => pyFileImports(projectDir, join(projectDir, t), targetRel, t));
@@ -76,6 +76,6 @@ export function discoverDefendersDetailed(projectDir, targetRel, testUniverse) {
   };
 }
 
-export function discoverDefenders(projectDir, targetRel, testUniverse) {
-  return discoverDefendersDetailed(projectDir, targetRel, testUniverse).canDetect;
+export function discoverDefenders(projectDir, targetRel, testUniverse, inventory) {
+  return discoverDefendersDetailed(projectDir, targetRel, testUniverse, inventory).canDetect;
 }

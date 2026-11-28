@@ -975,7 +975,26 @@ export function createImportResolver(projectDir, { aliases = [], configFiles = [
       addIssue(ctx, 'unreadable-module', from, specifier);
       return { status: 'indeterminate' };
     }
-    return resolved.status === 'resolved' && inside(root, resolved.file) ? resolved : { status: 'external' };
+    if (resolved.status === 'resolved' && inside(root, resolved.file)) return resolved;
+    if (resolved.status !== 'external') return { status: 'external' };
+    // A bare specifier naming a workspace package (#274): follow its entry the
+    // way the closure does (#268), so discovery sees the binding go into the
+    // package. An entry that cannot be resolved or read is indeterminate.
+    const pkg = resolveWorkspace(from, specifier);
+    if (!pkg) return { status: 'external' };
+    for (const manifest of pkg.manifests) ctx.dependencies.add(manifest);
+    const entries = pkg.files.filter((file) => inside(root, file));
+    // A package outside the project cannot reach a target inside it by name.
+    if (!pkg.unreadable && !entries.length) return { status: 'external' };
+    if (pkg.unreadable || entries.length !== pkg.files.length) {
+      addIssue(ctx, 'unreadable-module', from, specifier);
+      return { status: 'indeterminate' };
+    }
+    if (entries.length > 1) {
+      addIssue(ctx, 'ambiguous-resolution', from, specifier);
+      return { status: 'indeterminate', candidates: entries };
+    }
+    return { status: 'resolved', file: entries[0], usedAlias: false };
   }
 
   function origin(file, symbol, target, ctx, depth, path) {
@@ -1205,7 +1224,12 @@ export function createImportResolver(projectDir, { aliases = [], configFiles = [
             }
           }
           for (const target of targets) {
-            if (!inside(root, target) || files.has(target)) continue;
+            // A resolved file outside the project (a relative import out of
+            // it) is source the defenders run that cannot be hashed
+            // project-relative: indeterminate, never silently smaller (#273).
+            // A workspace package already recorded its issue above.
+            if (!inside(root, target)) { if (found.status !== 'external') addIssue(ctx, 'unreadable-module', file, specifier); continue; }
+            if (files.has(target)) continue;
             files.add(target);
             next.push(target);
             // Jest/Vitest substitute an adjacent `__mocks__` file for a mocked

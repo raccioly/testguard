@@ -270,6 +270,18 @@ check order is this rule.
    evidence records the early stop (`detail.escalationStoppedEarly`). Stopping
    can only fail to *name* a killer, never upgrade a verdict, which is the
    pessimistic side.
+   A killer is a test that **failed in every one of the N runs**, and a run
+   may count toward that only when it is a genuine kill of the whole suite:
+   its outcome is `fail`, or `error` with at least one assertion or exception
+   failure, because a load error in one file does not stop the other files
+   from running. A test that failed in a run proves its own file ran in it, so
+   a load error in an unrelated file, the same with or without the fault,
+   does not cancel the attribution. A load error that stops the killer's own
+   file from running leaves no failed test to name, so it still prevents
+   attribution. A run with outcome `timeout`, a run with no assertion or
+   exception failure, and fewer than N runs never attribute; a mixed result
+   (a test that failed in some runs and not in others) is not detection
+   either. When unsure the answer is no attribution.
    Escalation that was wanted but cannot run, because the test universe has no
    test outside the defenders, is recorded as
    `detail.escalationSkipped: "no-test-outside-defenders"` and shown on the
@@ -351,7 +363,8 @@ check order is this rule.
    repository but outside the project directory cannot be hashed
    project-relative, and an entry that resolves to no file cannot be followed:
    either makes the closure indeterminate (`unreadable-module`, naming the
-   specifier). A link whose target leaves the repository, and a package
+   specifier). So does a relative import (or alias target) that resolves to a
+   file outside the project directory (#273). A link whose target leaves the repository, and a package
    installed as a real directory, stay outside the closure.
    **An alias is read, or the closure says it could not be.** Aliased
    specifiers resolve through tsconfig/jsconfig `paths`, package.json
@@ -654,7 +667,12 @@ check order is this rule.
    star exports are resolved deterministically; type-only paths do not count.
    Ambiguous origins, unsupported runtime-generated exports, graph-limit
    exhaustion, and originless cycles are `unverifiable` with reason
-   `defender-discovery-indeterminate`, never `nocover`. A declared
+   `defender-discovery-indeterminate`, never `nocover`. A bare specifier that
+   names a workspace package (rule 8) is resolved to the package's entry the
+   way the import closure resolves it, and the binding is followed into the
+   package; its `package.json` is a discovery dependency. An entry that cannot
+   be resolved is `defender-discovery-indeterminate`, and a package outside the
+   project directory is not followed. A declared
    `defendedBy` remains authoritative. `inputs.discoveryHashes` binds every
    candidate test, intermediate barrel, and resolver-configuration file
    consulted by automatic discovery. Negative candidates are dependencies too:

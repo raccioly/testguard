@@ -212,9 +212,9 @@ export function checkRunner({ projectDir, pkg, bin, budgetMs = 60_000, env = pro
 export const checkBinary = ({ bin, ...rest }) => checkRunner({ ...rest, pkg: bin, bin });
 
 /** Defender globs → existing files. Empty result is the `nocover` signal. */
-export const resolveDefenders = (projectDir, globs) => matchGlobs(projectDir, globs ?? []);
+export const resolveDefenders = (projectDir, globs, inventory) => matchGlobs(projectDir, globs ?? [], inventory);
 
-export const listTestFiles = (projectDir, globs = TEST_GLOBS) => matchGlobs(projectDir, globs);
+export const listTestFiles = (projectDir, globs = TEST_GLOBS, inventory) => matchGlobs(projectDir, globs, inventory);
 
 /**
  * Turn vitest's JSON report into a spec `testRun`.

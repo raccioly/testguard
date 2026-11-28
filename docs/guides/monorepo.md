@@ -68,14 +68,19 @@ project only when you write its `testguard.claims.json`.
 
 | Layout | Choose it when | Trade-off |
 |---|---|---|
-| One project per package | each package owns its tests and its runner config | defender discovery stays inside the package. Discovery does not find a test in another package that imports this one by package name |
+| One project per package | each package owns its tests and its runner config | defender discovery stays inside the package. Discovery does not follow a package that lives outside the project directory |
 | One project at the root | a root runner config (a Vitest workspace, a Jest `projects` list) runs every package's tests | one claims file and one gate for everything. Probes and baselines are not split by package |
 
 Defender discovery resolves relative imports and configured aliases
 (`tsconfig` `paths`, vite/vitest `resolve.alias`, Jest `moduleNameMapper`,
-`package.json#imports`). It
-does not resolve a bare package name such as `@acme/billing`. So you must list
-a cross-package defender in the claim's `defendedBy`. See
+`package.json#imports`). It also resolves a bare package name that the
+repository declares as a workspace (such as `@acme/billing`) to the package
+entry, and follows the binding into the package. If it cannot resolve the
+entry, the claim is `unverifiable` (`defender-discovery-indeterminate`), not
+`nocover`. A package outside the project directory is not followed. So list a
+defender that lives in another project in the claim's `defendedBy`. A relative
+import that leaves the project directory makes the import closure
+indeterminate, so verdict reuse never trusts it. See
 [Languages and runners](../reference/languages-and-runners.md).
 
 ## `init` in a subdirectory

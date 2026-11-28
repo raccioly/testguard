@@ -1,5 +1,5 @@
 import { readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 // Dependency and tool directories. The Python entries are not cosmetic: a
 // virtualenv inside the project holds thousands of `test_*.py` files belonging
@@ -49,8 +49,16 @@ export function globToRegExp(glob) {
   return new RegExp(re + '$');
 }
 
+/** The tree changed under a command that had already taken its snapshot: a finding about the run, not about the project. */
+export class InventoryError extends Error { kind = 'inventory'; }
+
+let walks = 0;
+/** How many times a directory tree was walked in this process. A test reads it to prove one command walks once. */
+export const walkCount = () => walks;
+
 /** Every file under `root` as a posix path relative to it, skipping tool and dependency directories. */
 export function walk(root) {
+  walks++;
   const out = [];
   const visit = (dir, rel) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -66,9 +74,30 @@ export function walk(root) {
   return out.sort();
 }
 
+/**
+ * One walk, kept for a whole command (#231). A command that resolves hundreds of defender lists used to walk
+ * the repository for each one. The snapshot is the same list `walk` returns (same skips, same order, same
+ * symlink policy), frozen, and bound to the root it was taken from: it answers for that root and no other.
+ */
+export function createInventory(root) {
+  return Object.freeze({ root: resolve(root), files: Object.freeze(walk(root)) });
+}
+
+/** Has the tree changed since the snapshot was taken? One fresh walk, compared entry by entry. */
+export function inventoryChanged(inventory) {
+  const now = walk(inventory.root);
+  return now.length !== inventory.files.length || now.some((f, i) => f !== inventory.files[i]);
+}
+
+const filesOf = (root, inventory) => {
+  if (!inventory) return walk(root);
+  if (resolve(root) !== inventory.root) throw new Error(`inventory snapshot of ${inventory.root} cannot answer for ${resolve(root)}`);
+  return inventory.files;
+};
+
 /** Files under `root` matching any of `globs`. A glob with no wildcard is an exact relative path. */
-export function matchGlobs(root, globs) {
+export function matchGlobs(root, globs, inventory) {
   if (!globs || globs.length === 0) return [];
   const regexps = globs.map(globToRegExp);
-  return walk(root).filter((f) => regexps.some((r) => r.test(f)));
+  return filesOf(root, inventory).filter((f) => regexps.some((r) => r.test(f)));
 }

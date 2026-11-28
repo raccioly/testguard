@@ -4263,8 +4263,8 @@
           "description": "Attribution no longer requires all N runs to have happened, so a stopped-early escalation can name a killer.",
           "faultClass": "condition-forced",
           "file": "src/probe/attribution.mjs",
-          "find": "  const attributable = state.killers !== null && state.killers.size > 0 && complete && state.runs.every(isKill);",
-          "replace": "  const attributable = state.killers !== null && state.killers.size > 0 && state.runs.every(isKill);",
+          "find": "  const attributable = state.killers !== null && state.killers.size > 0 && complete && state.runs.every(isAttributableRun);",
+          "replace": "  const attributable = state.killers !== null && state.killers.size > 0 && state.runs.every(isAttributableRun);",
           "producedBy": {
             "producer": "human",
             "by": "maintainer",
@@ -21380,6 +21380,265 @@
           "file": "spec/lib/runner-adapter.mjs",
           "find": "if (!EXTENSION.test(ext)) bad(",
           "replace": "if (false) bad(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-INIT-SKILL-CARRIES-GENERATED-HEADER",
+      "statement": "The skill init installs carries a generated-by header directly after its front matter, ahead of the marker, naming the command that regenerates it; init --upgrade adds the header to an unmodified copy that has none, leaves a copy that has it alone whatever release wrote it, and never rewrites an edited copy.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #300"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/init-generated-header.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The installed skill carries no generated-by header.",
+          "faultClass": "guard-removed",
+          "file": "src/init/managed.mjs",
+          "find": "${body.slice(0, end)}${generatedByHeader(version)}\\n<!-- testguard:template",
+          "replace": "${body.slice(0, end)}<!-- testguard:template",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A copy without the header counts as current, so --upgrade never adds it.",
+          "faultClass": "condition-forced",
+          "file": "src/init/managed.mjs",
+          "find": "return hasHeader && Number(m[1])",
+          "replace": "return Number(m[1])",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The header counts in the body hash, so a copy that has it reads as edited.",
+          "faultClass": "condition-forced",
+          "file": "src/init/managed.mjs",
+          "find": "const body = installed.replace(SKILL_MARK_RE, '').replace(SKILL_HEADER_RE, '');",
+          "replace": "const body = installed.replace(SKILL_MARK_RE, '');",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-CLOSURE-OUTSIDE-IMPORT-IS-INDETERMINATE",
+      "statement": "A relative import that resolves to a file outside the project directory makes the import closure indeterminate (unreadable-module, naming the importing file and the specifier) instead of leaving it complete and smaller; verdict reuse refuses it and probe --changed selects the claim whenever anything in the repository changed. An import that stays inside the project leaves the closure complete.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #273"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/outside-import-closure.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "An import that leaves the project is dropped from the closure without a trace.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/imports.mjs",
+          "find": "if (found.status !== 'external') addIssue(ctx, 'unreadable-module', file, specifier); continue; }",
+          "replace": "continue; }",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Only an ambiguous resolution outside the project is reported, so a plain relative import out of it still shrinks the closure.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/imports.mjs",
+          "find": "if (!inside(root, target)) { if (found.status !== 'external')",
+          "replace": "if (!inside(root, target)) { if (found.status === 'ambiguous')",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-DISCOVERY-FOLLOWS-WORKSPACE-PACKAGE",
+      "statement": "Symbol-level defender discovery resolves a bare specifier that names a workspace package to the package entry the way the import closure does and follows the binding into it, so a test that imports the package by name defends the package's source; an entry it cannot resolve is defender-discovery-indeterminate, never nocover, and an ordinary package stays outside discovery.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #274"
+      },
+      "severity": "high",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/workspace-discovery.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A workspace package is treated as an external package again, so discovery never follows the binding into it.",
+          "faultClass": "guard-removed",
+          "file": "src/probe/imports.mjs",
+          "find": "if (!pkg) return { status: 'external' };",
+          "replace": "if (pkg || !pkg) return { status: 'external' };",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A package entry that cannot be read is no longer reported, so discovery does not name the indeterminate cause.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/imports.mjs",
+          "find": "if (pkg.unreadable || entries.length !== pkg.files.length) {",
+          "replace": "if (entries.length !== pkg.files.length) {",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-GATE-WALKS-ONCE",
+      "statement": "The changed-file gate walks the repository once for the whole command, so every declared and discovered defender resolves against one snapshot; the snapshot answers only for its own root, and the gate refuses a tree that changed while it was resolving.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #231"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/glob-inventory.test.mjs",
+        "test/gate-inventory-refusal.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "The gate resolves each declared defender list with a fresh walk again.",
+          "faultClass": "guard-removed",
+          "file": "src/gate/changed.mjs",
+          "find": "declaredMemo.set(key, resolveDefenders(projectDir, requested, inventory))",
+          "replace": "declaredMemo.set(key, resolveDefenders(projectDir, requested))",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "Discovery walks the repository again for every fault file.",
+          "faultClass": "guard-removed",
+          "file": "src/gate/changed.mjs",
+          "find": "discoveredMemo.set(file, discoverDefenders(projectDir, file, undefined, inventory))",
+          "replace": "discoveredMemo.set(file, discoverDefenders(projectDir, file))",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F3",
+          "description": "The gate no longer refuses a tree that changed while it resolved defenders.",
+          "faultClass": "guard-removed",
+          "file": "src/gate/changed.mjs",
+          "find": "if (inventoryChanged(inventory)) throw new InventoryError(",
+          "replace": "if (false) throw new InventoryError(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F4",
+          "description": "A snapshot answers for a root it was not taken from.",
+          "faultClass": "guard-removed",
+          "file": "src/util/glob.mjs",
+          "find": "if (resolve(root) !== inventory.root) throw new Error(",
+          "replace": "if (false) throw new Error(",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F5",
+          "description": "A rename that keeps the file count is not seen as a change.",
+          "faultClass": "condition-forced",
+          "file": "src/util/glob.mjs",
+          "find": "|| now.some((f, i) => f !== inventory.files[i])",
+          "replace": "|| false",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        }
+      ]
+    },
+    {
+      "id": "TG-ESCALATION-ATTRIBUTES-THROUGH-A-LOAD-ERROR",
+      "statement": "Escalation names a test that failed by assertion in every run as an undeclared killer even when an unrelated file fails to load, and never on a timeout or a run with no failing test body.",
+      "source": {
+        "kind": "spec",
+        "ref": "issue #282"
+      },
+      "severity": "medium",
+      "producedBy": {
+        "producer": "agent",
+        "by": "claude"
+      },
+      "defendedBy": [
+        "test/attribution.test.mjs"
+      ],
+      "faults": [
+        {
+          "id": "F1",
+          "description": "A load error anywhere in the suite cancels attribution again.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/attribution.mjs",
+          "find": "(run.outcome === 'fail' || run.outcome === 'error') && killingFailures(run) > 0",
+          "replace": "run.outcome === 'fail' && killingFailures(run) > 0",
+          "producedBy": {
+            "producer": "agent",
+            "by": "claude"
+          }
+        },
+        {
+          "id": "F2",
+          "description": "A timeout that reported failed tests counts as detection.",
+          "faultClass": "condition-forced",
+          "file": "src/probe/attribution.mjs",
+          "find": "(run.outcome === 'fail' || run.outcome === 'error') && killingFailures(run) > 0",
+          "replace": "run.outcome !== 'pass' && killingFailures(run) > 0",
           "producedBy": {
             "producer": "agent",
             "by": "claude"

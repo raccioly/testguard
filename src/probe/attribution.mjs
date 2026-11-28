@@ -12,9 +12,7 @@
  */
 
 import { isDeepStrictEqual } from 'node:util';
-import { isKillRun } from './kill-kind.mjs';
-
-const isKill = isKillRun;
+import { killingFailures } from './kill-kind.mjs';
 
 /** Compare only the claim metadata actually recorded in evidence. */
 export function sameClaimMetadata(recorded, current) {
@@ -58,14 +56,24 @@ export function escalationPlan({ verdict, subjectReached, escalate, broaderCount
 export const escalationStart = () => ({ runs: [], killers: null, stoppedEarly: undefined });
 
 /**
+ * A run that may count toward attribution (GATE-SEMANTICS rule 5): the suite
+ * failed with at least one assertion or exception failure. An `error` run
+ * counts too, because a test file that fails to load in an unrelated place
+ * makes the whole run an `error` while the other files still ran and failed
+ * (#282); a test that failed proves its own file ran. A timeout never counts,
+ * and neither does an `error` run with no failing test body.
+ */
+const isAttributableRun = (run) => (run.outcome === 'fail' || run.outcome === 'error') && killingFailures(run) > 0;
+
+/**
  * What escalation concluded. `undeclaredKillers` is named only when a test
- * failed in all N runs AND every run was a genuine kill (an assertion
- * failure). A suite that errored or timed out proves nothing about the fault,
- * so it never earns an attribution.
+ * failed in all N runs AND every run is attributable (see
+ * `isAttributableRun`). A suite that timed out, or that failed with nothing
+ * to point at, proves nothing about the fault and never earns an attribution.
  */
 export function escalationResult(state, confirmRuns) {
   const complete = state.runs.length === confirmRuns;
-  const attributable = state.killers !== null && state.killers.size > 0 && complete && state.runs.every(isKill);
+  const attributable = state.killers !== null && state.killers.size > 0 && complete && state.runs.every(isAttributableRun);
   return {
     escalated: true,
     escalationRuns: state.runs,
